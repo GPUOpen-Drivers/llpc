@@ -52,7 +52,11 @@ PreservedAnalyses LowerDesc::run(Module &module, ModuleAnalysisManager &analysis
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   m_pipelineState = pipelineState;
 
-  static const auto visitor = llvm_dialects::VisitorBuilder<LowerDesc>().add(&LowerDesc::visitLoadBufferDesc).build();
+  static const auto visitor = llvm_dialects::VisitorBuilder<LowerDesc>()
+                                  .add(&LowerDesc::visitLoadBufferAddr)
+                                  .add(&LowerDesc::visitLoadBufferDesc)
+                                  .add(&LowerDesc::visitLoadStridedBufferDesc)
+                                  .build();
 
   visitor.visit(*this, module);
 
@@ -62,6 +66,28 @@ PreservedAnalyses LowerDesc::run(Module &module, ModuleAnalysisManager &analysis
   if (m_toErase.empty())
     return PreservedAnalyses::all();
   return PreservedAnalyses::allInSet<CFGAnalyses>();
+}
+
+// =====================================================================================================================
+// Lower a load.buffer.addr operation. The result is an i64.
+//
+// @param op : the operation
+void LowerDesc::visitLoadBufferAddr(LoadBufferAddrOp &op) {
+  BuilderImpl builder(m_pipelineState);
+  builder.setShaderStage(getShaderStage(op.getFunction()));
+  builder.SetInsertPoint(&op);
+
+  // BufferFlagAddress only supports the case where the descriptor is a compact descriptor. This op supports
+  // normal descriptors, extracting the 48-bit address out of the descriptor.
+  unsigned flags = op.getFlags() & ~Builder::BufferFlagAddress;
+  Value *desc = builder.CreateBufferDesc(op.getDescSet(), op.getBinding(), op.getDescIndex(), flags);
+  m_toErase.push_back(&op);
+
+  // Extract 48-bit address out of <4 x i32> descriptor, resulting in an i64.
+  Value *addr = builder.CreateShuffleVector(desc, desc, {0, 1});
+  addr = builder.CreateBitCast(addr, builder.getInt64Ty());
+  addr = builder.CreateAnd(addr, builder.getInt64(0x0000ffffffffffffULL));
+  op.replaceAllUsesWith(addr);
 }
 
 // =====================================================================================================================
@@ -84,5 +110,28 @@ void LowerDesc::visitLoadBufferDesc(LoadBufferDescOp &op) {
 
   // Convert to fat pointer.
   op.replaceAllUsesWith(builder.create<BufferDescToPtrOp>(desc));
+}
+
+// =====================================================================================================================
+// Lower a load.strided.buffer.desc operation
+//
+// @param op : the operation
+void LowerDesc::visitLoadStridedBufferDesc(LoadStridedBufferDescOp &op) {
+  BuilderImpl builder(m_pipelineState);
+  builder.setShaderStage(getShaderStage(op.getFunction()));
+  builder.SetInsertPoint(&op);
+
+  unsigned flags = op.getFlags();
+  // Anyone who wants to get a 64-bit buffer descriptor address should call `CreateBufferDesc` directly. (This is only
+  // available in LGC as we don't expect front-end would required such usage.)
+  assert(!(flags & Builder::BufferFlagAddress) &&
+         "Returning a 64-bit address is unsupported by lgc.load.strided.buffer.desc");
+
+  Value *desc =
+      builder.CreateStridedBufferDesc(op.getDescSet(), op.getBinding(), op.getDescIndex(), flags, op.getStride());
+
+  m_toErase.push_back(&op);
+
+  op.replaceAllUsesWith(builder.create<StridedBufferDescToPtrOp>(desc));
 }
 } // namespace lgc

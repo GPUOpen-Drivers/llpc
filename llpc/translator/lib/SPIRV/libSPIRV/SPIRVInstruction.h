@@ -455,7 +455,7 @@ public:
     return std::vector<SPIRVEntry *>();
   }
 
-  virtual void validate() const {};
+  virtual void validate() const override{};
   SPIRVType *getMemObjType() const {
     SPIRVType *spvMemType = nullptr;
     if (getOpCode() == OpVariable) {

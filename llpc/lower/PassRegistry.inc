@@ -54,7 +54,7 @@ LLPC_MODULE_PASS("llpc-spirv-lower-math-precision", SpirvLowerMathPrecision)
 LLPC_MODULE_PASS("llpc-spirv-lower-math-float-op", SpirvLowerMathFloatOp)
 LLPC_MODULE_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp)
 LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-query-post-inline", SpirvLowerRayQueryPostInline)
+LLPC_MODULE_PASS("lower-post-inline", LowerPostInline)
 
 #undef LLPC_PASS
 #undef LLPC_MODULE_PASS

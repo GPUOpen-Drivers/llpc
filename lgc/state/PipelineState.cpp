@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
@@ -52,9 +53,6 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 
 // -enable-row-export: enable row export for mesh shader
 static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row export for mesh shader"),
-                                     cl::init(true));
-
-cl::opt<bool> UseRegisterFieldFormat("use-register-field-format", cl::desc("Use register field format in pipeline ELF"),
                                      cl::init(true));
 
 // Names for named metadata nodes when storing and reading back pipeline state
@@ -331,7 +329,6 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
-  m_registerFieldFormat = UseRegisterFieldFormat;
   m_tessLevel.inner[0] = -1.0f;
   m_tessLevel.inner[1] = -1.0f;
   m_tessLevel.outer[0] = -1.0f;
@@ -368,7 +365,7 @@ unsigned PipelineState::getPalAbiVersion() const {
 // Get PalMetadata object, creating an empty one if necessary
 PalMetadata *PipelineState::getPalMetadata() {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, m_registerFieldFormat);
+    m_palMetadata = new PalMetadata(this);
   return m_palMetadata;
 }
 
@@ -386,7 +383,7 @@ void PipelineState::clearPalMetadata() {
 // @param isGlueCode : True if the blob was generated for glue code.
 void PipelineState::mergePalMetadataFromBlob(StringRef blob, bool isGlueCode) {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, blob, m_registerFieldFormat);
+    m_palMetadata = new PalMetadata(this, blob);
   else
     m_palMetadata->mergeFromBlob(blob, isGlueCode);
 }
@@ -474,7 +471,7 @@ void PipelineState::readState(Module *module) {
   readColorExportState(module);
   readGraphicsState(module);
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, module, m_registerFieldFormat);
+    m_palMetadata = new PalMetadata(this, module);
   setXfbStateMetadata(module);
 }
 
@@ -1364,7 +1361,6 @@ unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
 //
 // @param stage : Shader stage
 unsigned PipelineState::getMergedShaderWaveSize(ShaderStageEnum stage) {
-  assert(getTargetInfo().getGfxIpVersion().major >= 10);
   unsigned waveSize = m_waveSize[stage];
 
   // NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one. That is
@@ -1409,6 +1405,114 @@ unsigned PipelineState::getMergedShaderWaveSize(ShaderStageEnum stage) {
 }
 
 // =====================================================================================================================
+// Builds mapping of ShaderStageEnum to Util::Abi::HardwareStageFlagBits for pipeline stages.
+// Assigns an Util::Abi::PipelineType to the pipeline.
+void PipelineState::buildAbiHwShaderMap() {
+  assert(isGraphics());
+
+  const bool hasVs = hasShaderStage(ShaderStage::Vertex);
+  const bool hasTcs = hasShaderStage(ShaderStage::TessControl);
+  const bool hasTes = hasShaderStage(ShaderStage::TessEval);
+  const bool hasTs = hasTcs || hasTes;
+  const bool hasGs = hasShaderStage(ShaderStage::Geometry);
+  const bool hasTask = hasShaderStage(ShaderStage::Task);
+  const bool hasMesh = hasShaderStage(ShaderStage::Mesh);
+
+  m_abiPipelineType = Util::Abi::PipelineType::VsPs;
+  m_abiHwShaderMap.clear();
+
+  if (hasTask || hasMesh) {
+    assert(getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}));
+    if (hasMesh) {
+      m_abiHwShaderMap[ShaderStage::Mesh] = Util::Abi::HwShaderGs;
+      m_abiPipelineType = Util::Abi::PipelineType::Mesh;
+    }
+    if (hasTask) {
+      m_abiHwShaderMap[ShaderStage::Task] = Util::Abi::HwShaderCs;
+      m_abiPipelineType = Util::Abi::PipelineType::TaskMesh;
+    }
+  } else {
+    if (hasGs) {
+      auto preGsStage = getPrevShaderStage(ShaderStage::Geometry);
+      if (preGsStage != ShaderStage::Invalid)
+        m_abiHwShaderMap[preGsStage] = Util::Abi::HwShaderGs;
+    }
+    if (hasTcs) {
+      m_abiHwShaderMap[ShaderStage::TessControl] = Util::Abi::HwShaderHs;
+      if (hasVs)
+        m_abiHwShaderMap[ShaderStage::Vertex] = Util::Abi::HwShaderHs;
+    }
+
+    auto lastVertexProcessingStage = getLastVertexProcessingStage();
+    if (lastVertexProcessingStage != ShaderStage::Invalid) {
+      if (lastVertexProcessingStage == ShaderStage::CopyShader)
+        lastVertexProcessingStage = ShaderStage::Geometry;
+      if (isNggEnabled()) {
+        m_abiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderGs;
+        m_abiPipelineType = hasTs ? Util::Abi::PipelineType::NggTess : Util::Abi::PipelineType::Ngg;
+      } else {
+        m_abiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderVs;
+        if (hasGs)
+          m_abiHwShaderMap[lastVertexProcessingStage] |= Util::Abi::HwShaderGs;
+
+        if (hasTs && hasGs)
+          m_abiPipelineType = Util::Abi::PipelineType::GsTess;
+        else if (hasTs)
+          m_abiPipelineType = Util::Abi::PipelineType::Tess;
+        else if (hasGs)
+          m_abiPipelineType = Util::Abi::PipelineType::Gs;
+        else
+          m_abiPipelineType = Util::Abi::PipelineType::VsPs;
+      }
+    }
+  }
+  if (hasShaderStage(ShaderStage::Fragment))
+    m_abiHwShaderMap[ShaderStage::Fragment] = Util::Abi::HwShaderPs;
+}
+
+// =====================================================================================================================
+// Gets ABI pipeline type for pipeline.
+//
+// @return Util::Abi::PipelineType as unsigned
+unsigned PipelineState::getAbiPipelineType() {
+  if (m_abiHwShaderMap.empty())
+    buildAbiHwShaderMap();
+  return m_abiPipelineType;
+}
+
+// =====================================================================================================================
+// Gets map of shader stages to hardware stage masks.
+// Computes the mapping if required.
+//
+// @return map from ShaderStageEnum to Util::Abi::HardwareStageFlagBits
+const DenseMap<unsigned, unsigned> *PipelineState::getAbiHwShaderMap() {
+  if (m_abiHwShaderMap.empty())
+    buildAbiHwShaderMap();
+  return &m_abiHwShaderMap;
+}
+
+// =====================================================================================================================
+// Gets hardware stage for a given shader stage after merging.
+//
+// @param stage : Shader stage
+// @return unsigned representing Util::Abi::HardwareStageFlagBits of shader stage
+unsigned PipelineState::getShaderHwStageMask(ShaderStageEnum stage) {
+  if (!isGraphics())
+    return static_cast<unsigned>(Util::Abi::HwShaderCs);
+
+  auto &abiHwShaderMap = *getAbiHwShaderMap();
+  if (stage == ShaderStage::CopyShader)
+    stage = ShaderStage::Geometry;
+
+  auto hwStageMask = abiHwShaderMap.find(stage);
+  if (hwStageMask != abiHwShaderMap.end())
+    return hwStageMask->second;
+
+  // Return no hardware stages enabled.
+  return 0;
+}
+
+// =====================================================================================================================
 // Get subgroup size for the specified shader stage.
 //
 // @param stage : Shader stage
@@ -1432,8 +1536,7 @@ unsigned PipelineState::getShaderSubgroupSize(ShaderStageEnum stage) {
 // @param stage : Shader stage
 void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
   ShaderStageEnum checkingStage = stage;
-  const bool isGfx10Plus = getTargetInfo().getGfxIpVersion().major >= 10;
-  if (isGfx10Plus && stage == ShaderStage::Geometry && !hasShaderStage(ShaderStage::Geometry)) {
+  if (stage == ShaderStage::Geometry && !hasShaderStage(ShaderStage::Geometry)) {
     // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
     // In such cases, we check the property of VS or TES.
     checkingStage = hasShaderStage(ShaderStage::TessEval) ? ShaderStage::TessEval : ShaderStage::Vertex;
@@ -1446,76 +1549,75 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
     unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
     unsigned subgroupSize = waveSize;
 
-    if (isGfx10Plus) {
-      // NOTE: GPU property wave size is used in shader, unless:
-      //  1) A stage-specific default is preferred.
-      //  2) If specified by tuning option, use the specified wave size.
-      //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
-      //  4) If gl_SubgroupSize is not used in the (mesh/task/compute) shader, and the workgroup size is
-      //     not larger than 32, use wave size 32.
+    // NOTE: GPU property wave size is used in shader, unless:
+    //  1) A stage-specific default is preferred.
+    //  2) If specified by tuning option, use the specified wave size.
+    //  3) If gl_SubgroupSize is used in shader, use the specified subgroup size when required.
+    //  4) If gl_SubgroupSize is not used in the (mesh/task/compute) shader, and the workgroup size is
+    //     not larger than 32, use wave size 32.
 
-      if (checkingStage == ShaderStage::Fragment) {
-        // Per programming guide, it's recommended to use wave64 for fragment shader.
-        waveSize = 64;
-      } else if (hasShaderStage(ShaderStage::Geometry)) {
-        // Legacy (non-NGG) hardware path for GS does not support wave32.
-        waveSize = 64;
-        if (getTargetInfo().getGfxIpVersion().major >= 11)
-          waveSize = 32;
-      }
-
-      // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
-      // on post-GFX10.3. Hence, set the wave size to wave64 by default.
-      if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStage::Compute)
-        waveSize = 64;
-
-      // Prefer wave64 on GFX11+
-      if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({11}))
-        waveSize = 64;
-
-      unsigned waveSizeOption = getShaderOptions(checkingStage).waveSize;
-      if (waveSizeOption != 0)
-        waveSize = waveSizeOption;
-
-      // Note: the conditions below override the tuning option.
-      // If workgroup size is not larger than 32, use wave size 32.
-      if (checkingStage == ShaderStage::Mesh || checkingStage == ShaderStage::Task ||
-          checkingStage == ShaderStage::Compute) {
-        unsigned workGroupSize;
-        if (checkingStage == ShaderStage::Mesh) {
-          auto &mode = m_shaderModes.getMeshShaderMode();
-          workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
-        } else {
-          assert(checkingStage == ShaderStage::Task || checkingStage == ShaderStage::Compute);
-          auto &mode = m_shaderModes.getComputeShaderMode();
-          workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
-        }
-
-        if (workGroupSize <= 32)
-          waveSize = 32;
-      }
-
-      // If subgroup size is used in any shader in the pipeline, use the specified subgroup size.
-      if (m_shaderModes.getAnyUseSubgroupSize()) {
-        // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
-        subgroupSize = getShaderOptions(checkingStage).subgroupSize;
-        // The driver only sets waveSize if a size is requested by an app. We may want to change that in the driver to
-        // set subgroupSize instead.
-        if (subgroupSize == 0)
-          subgroupSize = getShaderOptions(checkingStage).waveSize;
-        if (subgroupSize == 0)
-          subgroupSize = waveSize;
-
-        if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
-          waveSize = subgroupSize;
-      } else {
-        // The subgroup size cannot be observed, use the wave size.
-        subgroupSize = waveSize;
-      }
-
-      assert(waveSize == 32 || waveSize == 64);
-      assert(waveSize <= subgroupSize);
+    if (checkingStage == ShaderStage::Fragment) {
+      // Per programming guide, it's recommended to use wave64 for fragment shader.
+      waveSize = 64;
+    } else if (hasShaderStage(ShaderStage::Geometry)) {
+      // Legacy (non-NGG) hardware path for GS does not support wave32.
+      waveSize = 64;
+      if (getTargetInfo().getGfxIpVersion().major >= 11)
+        waveSize = 32;
     }
+
+    // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
+    // on post-GFX10.3. Hence, set the wave size to wave64 by default.
+    if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStage::Compute)
+      waveSize = 64;
+
+    // Prefer wave64 on GFX11+
+    if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({11}))
+      waveSize = 64;
+
+    unsigned waveSizeOption = getShaderOptions(checkingStage).waveSize;
+    if (waveSizeOption != 0)
+      waveSize = waveSizeOption;
+
+    // Note: the conditions below override the tuning option.
+    // If workgroup size is not larger than 32, use wave size 32.
+    if (checkingStage == ShaderStage::Mesh || checkingStage == ShaderStage::Task ||
+        checkingStage == ShaderStage::Compute) {
+      unsigned workGroupSize;
+      if (checkingStage == ShaderStage::Mesh) {
+        auto &mode = m_shaderModes.getMeshShaderMode();
+        workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
+      } else {
+        assert(checkingStage == ShaderStage::Task || checkingStage == ShaderStage::Compute);
+        auto &mode = m_shaderModes.getComputeShaderMode();
+        workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
+      }
+
+      if (workGroupSize <= 32)
+        waveSize = 32;
+    }
+
+    // If subgroup size is used in any shader in the pipeline, use the specified subgroup size.
+    if (m_shaderModes.getAnyUseSubgroupSize()) {
+      // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
+      subgroupSize = getShaderOptions(checkingStage).subgroupSize;
+      // The driver only sets waveSize if a size is requested by an app. We may want to change that in the driver to
+      // set subgroupSize instead.
+      if (subgroupSize == 0)
+        subgroupSize = getShaderOptions(checkingStage).waveSize;
+      if (subgroupSize == 0)
+        subgroupSize = waveSize;
+
+      if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
+        waveSize = subgroupSize;
+    } else {
+      // The subgroup size cannot be observed, use the wave size.
+      subgroupSize = waveSize;
+    }
+
+    assert(waveSize == 32 || waveSize == 64);
+    assert(waveSize <= subgroupSize);
+
     m_waveSize[checkingStage] = waveSize;
     m_subgroupSize[checkingStage] = subgroupSize;
   }
@@ -1539,6 +1641,15 @@ bool PipelineState::getShaderWgpMode(ShaderStageEnum stage) const {
   assert(stage < m_shaderOptions.size());
 
   return m_shaderOptions[stage].wgpMode;
+}
+
+// =====================================================================================================================
+// Checks if NGG is enabled for the pipeline
+bool PipelineState::isNggEnabled() const {
+  auto gfxIp = getTargetInfo().getGfxIpVersion();
+  if (gfxIp.major >= 11)
+    return true;
+  return m_nggControl.enableNgg;
 }
 
 // =====================================================================================================================
@@ -1610,6 +1721,29 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStageEnum shaderStage
     intfData = std::make_unique<InterfaceData>();
   }
   return &*intfData;
+}
+
+// =====================================================================================================================
+// Gets static LDS usage of the specified shader stage in dwords
+// Note: does not consider shader merging.
+//
+// @param shaderStage : Shader stage
+// @param rtStack : Get size of LDS RayQuery stack for this stage
+// @return LDS size in dwords
+unsigned PipelineState::getShaderStaticLdsUsage(ShaderStageEnum shaderStage, bool rtStack) {
+  const ResourceUsage *RU = getShaderResourceUsage(shaderStage);
+  switch (shaderStage) {
+  case ShaderStage::TessControl: {
+    const auto &calcFactor = RU->inOutUsage.tcs.calcFactor;
+    return rtStack ? calcFactor.rayQueryLdsStackSize : calcFactor.tessOnChipLdsSize;
+  }
+  case ShaderStage::Geometry: {
+    const auto &calcFactor = RU->inOutUsage.gs.calcFactor;
+    return rtStack ? calcFactor.rayQueryLdsStackSize : calcFactor.gsOnChipLdsSize;
+  }
+  default:
+    return 0;
+  }
 }
 
 // =====================================================================================================================

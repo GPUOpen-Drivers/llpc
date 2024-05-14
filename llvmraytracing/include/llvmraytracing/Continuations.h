@@ -81,9 +81,7 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/PassManager.h"
-#include "llvm/Pass.h"
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include <cstdint>
 #include <limits>
@@ -102,10 +100,10 @@ class PassManagerBuilder;
 class SmallBitVector;
 struct CoroSplitPass;
 
-// Returns the PAQShaderStage corresponding to the given DXILShaderKind, if
-// there is any.
+// Returns the PAQShaderStage corresponding to the given RayTracingShaderStage,
+// if there is any.
 std::optional<PAQShaderStage>
-dxilShaderKindToPAQShaderStage(DXILShaderKind ShaderKind);
+rtShaderStageToPAQShaderStage(lgc::rt::RayTracingShaderStage ShaderKind);
 
 /// Create a new function, as cloneFunctionHeader, but include types metadata.
 Function *cloneFunctionHeaderWithTypes(Function &F, ContFuncTy &NewType,
@@ -164,7 +162,8 @@ Value *getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDataTy,
 /// Replace call to intrinsic (lgc.rt.*) with a call to the driver
 /// implementation (_cont_*).
 CallInst *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
-                               Value *SystemData, DXILShaderKind Kind,
+                               Value *SystemData,
+                               lgc::rt::RayTracingShaderStage Kind,
                                CallInst *Call, Module *GpurtLibrary,
                                CompilerUtils::CrossModuleInliner &Inliner);
 
@@ -231,7 +230,8 @@ public:
 class CleanupContinuationsPass
     : public llvm::PassInfoMixin<CleanupContinuationsPass> {
 public:
-  CleanupContinuationsPass() {}
+  CleanupContinuationsPass(bool Use64BitContinuationReferences = false)
+      : Use64BitContinuationReferences{Use64BitContinuationReferences} {}
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
@@ -265,13 +265,27 @@ private:
   void lowerIntrinsicCall(Module &Mod);
   void lowerGetResumePoint(Module &Mod);
 
-  llvm_dialects::Builder *Builder;
-  Function *ContMalloc;
-  Function *ContFree;
+  llvm_dialects::Builder *Builder = nullptr;
+  Function *ContMalloc = nullptr;
+  Function *ContFree = nullptr;
   MapVector<Function *, ContinuationData> ToProcess;
   uint32_t MaxContStateBytes;
-  llvm::Module *GpurtLibrary;
+  llvm::Module *GpurtLibrary = nullptr;
+  bool Use64BitContinuationReferences;
+  llvm::Type *ContinuationReferenceType = nullptr;
 };
+
+// Define a wrapper pass that is used for CleanupContinuationsPass creating
+// 64-bit lgc.cps.as.continuation.reference ops.
+class DXILCleanupContinuationsPass : public CleanupContinuationsPass {
+public:
+  DXILCleanupContinuationsPass() : CleanupContinuationsPass(true) {}
+
+  static llvm::StringRef name() {
+    return "DXIL cleanup continuations pass wrapper";
+  }
+};
+
 class LowerRaytracingPipelinePass
     : public llvm::PassInfoMixin<LowerRaytracingPipelinePass> {
 public:
@@ -383,6 +397,10 @@ public:
     return "DXIL continuations coro split pass wrapper";
   }
 };
+
+// Helper function to query whether an instruction is rematerializable, which is
+// shared between both DX and Vulkan path.
+bool commonMaterializable(Instruction &I);
 
 // Rematerializable callback specific to LgcCps - mainly used to extend what's
 // considered rematerializable for continuations

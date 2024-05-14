@@ -37,7 +37,6 @@
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
-#include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsDialect.h"
@@ -46,7 +45,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/InitializePasses.h"
 #include <cassert>
 
 using namespace llvm;

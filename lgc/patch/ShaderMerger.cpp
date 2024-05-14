@@ -56,7 +56,6 @@ using namespace lgc;
 ShaderMerger::ShaderMerger(PipelineState *pipelineState, PipelineShadersResult *pipelineShaders)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
-  assert(m_gfxIp.major >= 10);
   assert(m_pipelineState->isGraphics());
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStage::Vertex);
@@ -92,8 +91,6 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, LsHs::Specia
       {LsHs::TfBufferBase, 4},     // s4
       {LsHs::waveIdInGroup, 5},    // s5
   };
-
-  assert(gfxIp.major >= 10); // Must be GFX10+
 
   if (gfxIp.major >= 11) {
     assert(LsHsSpecialSgprInputMapGfx11.count(sgprInput) > 0);
@@ -145,18 +142,14 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
       {EsGs::FlatScratchHigh, 7},  // s7
   };
 
-  assert(gfxIp.major >= 10); // Must be GFX10+
-
   if (gfxIp.major >= 11) {
     assert(EsGsSpecialSgprInputMapGfx11.count(sgprInput) > 0);
     return EsGsSpecialSgprInputMapGfx11.at(sgprInput);
   }
 
-  if (gfxIp.major >= 10) {
-    if (useNgg) {
-      assert(EsGsSpecialSgprInputMapGfx10.count(sgprInput) > 0);
-      return EsGsSpecialSgprInputMapGfx10.at(sgprInput);
-    }
+  if (useNgg) {
+    assert(EsGsSpecialSgprInputMapGfx10.count(sgprInput) > 0);
+    return EsGsSpecialSgprInputMapGfx10.at(sgprInput);
   }
 
   assert(EsGsSpecialSgprInputMapGfx9.count(sgprInput) > 0);
@@ -312,6 +305,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   Function *entryPoint = createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, hsEntryPoint->getParent(),
                                               lgcName::LsHsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  setShaderStage(entryPoint, ShaderStage::TessControl);
+
   auto module = hsEntryPoint->getParent();
   module->getFunctionList().push_front(entryPoint);
 
@@ -322,8 +317,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::TessControl);
-  if (m_gfxIp.major >= 10)
-    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -651,8 +645,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
-  if (m_gfxIp.major >= 10)
-    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -955,43 +948,29 @@ void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, ArrayRef<Argu
 // @param entryPoint1 : The first entry-point of the shader pair (could be LS or ES)
 // @param entryPoint2 : The second entry-point of the shader pair (could be HS or GS)
 void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entryPoint2) const {
-  assert(m_gfxIp.major >= 10);
+  Function *entryPoint = entryPoint2 ? entryPoint2 : entryPoint1;
+  assert(entryPoint);
 
-  Module *module = nullptr;
-  if (entryPoint1)
-    module = entryPoint1->getParent();
-  else if (entryPoint2)
-    module = entryPoint2->getParent();
-  assert(module);
-
+  Module *module = entryPoint->getParent();
   auto ldsStack = module->getNamedGlobal(RayQueryLdsStackName);
   if (ldsStack) {
-    unsigned ldsStackBase = 0;
+    std::optional<ShaderStageEnum> shaderStage = lgc::getShaderStage(entryPoint);
+    bool hasLdsStack = false;
 
-    std::optional<ShaderStageEnum> shaderStage2;
-    if (entryPoint2)
-      shaderStage2 = lgc::getShaderStage(entryPoint2);
-
-    if (shaderStage2 == ShaderStage::TessControl) {
+    if (shaderStage == ShaderStage::TessControl) {
       // Must be LS-HS merged shader
       const auto &calcFactor =
           m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-      if (calcFactor.rayQueryLdsStackSize > 0)
-        ldsStackBase = calcFactor.tessOnChipLdsSize;
+      hasLdsStack = calcFactor.rayQueryLdsStackSize > 0;
     } else {
       // Must be ES-GS merged shader or NGG primitive shader
       const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
-      if (calcFactor.rayQueryLdsStackSize > 0)
-        ldsStackBase = calcFactor.gsOnChipLdsSize;
+      hasLdsStack = calcFactor.rayQueryLdsStackSize > 0;
     }
 
-    if (ldsStackBase > 0) {
-      auto lds = Patch::getLdsVariable(m_pipelineState, module);
-      auto newLdsStack = ConstantExpr::getGetElementPtr(
-          lds->getValueType(), lds,
-          ArrayRef<Constant *>({ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                ConstantInt::get(Type::getInt32Ty(*m_context), ldsStackBase)}));
-      newLdsStack = ConstantExpr::getBitCast(newLdsStack, ldsStack->getType());
+    if (hasLdsStack) {
+      auto lds = Patch::getLdsVariable(m_pipelineState, entryPoint, /*rtStack=*/true);
+      auto newLdsStack = ConstantExpr::getBitCast(lds, ldsStack->getType());
 
       SmallVector<Instruction *, 4> ldsStackInsts;
       for (auto user : ldsStack->users()) {
@@ -1336,7 +1315,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
         builder.CreateIntToPtr(globalTablePtr, PointerType::get(tfBufferDescTy, ADDR_SPACE_CONST), "globalTablePtr");
 
     Value *tfBufferDescPtr =
-        builder.CreateGEP(tfBufferDescTy, globalTablePtr, builder.getInt32(SiDrvTableTfBufferOffs), "tfBufferDescPtr");
+        builder.CreateConstGEP1_32(builder.getInt8Ty(), globalTablePtr, SiDrvTableTfBufferOffs * 4, "tfBufferDescPtr");
     auto tfBufferDesc = builder.CreateLoad(tfBufferDescTy, tfBufferDescPtr, "tfBufferDesc");
     Value *tfBufferBase = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
 
@@ -1363,8 +1342,8 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
 Value *ShaderMerger::readValueFromLds(Type *readTy, Value *ldsOffset, IRBuilder<> &builder) {
   assert(readTy->getScalarSizeInBits() == 32); // Only accept 32-bit data
 
-  auto lds = Patch::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getModule());
-  Value *readPtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
+  auto lds = Patch::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
+  Value *readPtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
   readPtr = builder.CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
   return builder.CreateAlignedLoad(readTy, readPtr, Align(4));
 }
@@ -1379,8 +1358,8 @@ void ShaderMerger::writeValueToLds(Value *writeValue, Value *ldsOffset, IRBuilde
   auto writeTy = writeValue->getType();
   assert(writeTy->getScalarSizeInBits() == 32); // Only accept 32-bit data
 
-  auto lds = Patch::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getModule());
-  Value *writePtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
+  auto lds = Patch::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
+  Value *writePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
   writePtr = builder.CreateBitCast(writePtr, PointerType::get(writeTy, writePtr->getType()->getPointerAddressSpace()));
   builder.CreateAlignedStore(writeValue, writePtr, Align(4));
 }

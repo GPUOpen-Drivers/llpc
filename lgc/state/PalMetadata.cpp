@@ -61,18 +61,6 @@ struct KeyValuePair {
 using ArrayMap = KeyValuePair[];
 
 // =====================================================================================================================
-// Returns the value for the given key in the map.  It assumes that the key will be found.
-//
-// @param map : The map to search.
-// @param key : The key to be searched for.
-unsigned findValueInArrayMap(ArrayRef<KeyValuePair> map, unsigned key) {
-  auto entryHasGivenKey = [key](const KeyValuePair &keyValuePair) { return keyValuePair.key == key; };
-  auto keyValuePair = std::find_if(map.begin(), map.end(), entryHasGivenKey);
-  assert(keyValuePair != map.end() && "Could not find key in the array map.");
-  return keyValuePair->value;
-}
-
-// =====================================================================================================================
 // Returns an ArrayDocNode associated with the given document that contains the given data.
 //
 // @param document : The msgpack document the returned array will be associated with.
@@ -89,9 +77,7 @@ msgpack::ArrayDocNode buildArrayDocNode(msgpack::Document *document, Hash128 has
 // Construct empty object
 //
 // @param pipelineState : PipelineState
-// @param useRegisterFieldFormat: The control of new PAL metadata or not
-PalMetadata::PalMetadata(PipelineState *pipelineState, bool useRegisterFieldFormat)
-    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
+PalMetadata::PalMetadata(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
   m_document = new msgpack::Document;
   initialize();
 }
@@ -101,9 +87,7 @@ PalMetadata::PalMetadata(PipelineState *pipelineState, bool useRegisterFieldForm
 //
 // @param pipelineState : PipelineState
 // @param blob : MsgPack PAL metadata
-// @param useRegisterFieldFormat: The control of using new PAL metadata or not
-PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob, bool useRegisterFieldFormat)
-    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
+PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob) : m_pipelineState(pipelineState) {
   m_document = new msgpack::Document;
   bool success = m_document->readFromBlob(blob, /*multi=*/false);
   assert(success && "Bad PAL metadata format");
@@ -116,9 +100,7 @@ PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob, bool useR
 //
 // @param pipelineState : PipelineState
 // @param module : Pipeline IR module
-// @param useRegisterFieldFormat: The control of using new PAL metadata or not
-PalMetadata::PalMetadata(PipelineState *pipelineState, Module *module, bool useRegisterFieldFormat)
-    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
+PalMetadata::PalMetadata(PipelineState *pipelineState, Module *module) : m_pipelineState(pipelineState) {
   m_document = new msgpack::Document;
   NamedMDNode *namedMd = module->getNamedMetadata(PalMetadataName);
   if (namedMd && namedMd->getNumOperands()) {
@@ -147,14 +129,15 @@ void PalMetadata::initialize() {
   // Pre-find (or create) heavily used nodes.
   m_pipelineNode =
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
-  if (!m_useRegisterFieldFormat)
-    m_registers = m_pipelineNode[".registers"].getMap(true);
   m_userDataLimit = &m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit];
   if (m_userDataLimit->isEmpty())
     *m_userDataLimit = 0U;
   m_spillThreshold = &m_pipelineNode[Util::Abi::PipelineMetadataKey::SpillThreshold];
   if (m_spillThreshold->isEmpty())
     *m_spillThreshold = MAX_SPILL_THRESHOLD;
+  for (unsigned stage = ShaderStage::Task; stage < ShaderStage::CountInternal; ++stage) {
+    m_pipelineState->setSpillThreshold(static_cast<ShaderStageEnum>(stage), MAX_SPILL_THRESHOLD);
+  }
 }
 
 // =====================================================================================================================
@@ -165,13 +148,8 @@ void PalMetadata::initialize() {
 void PalMetadata::record(Module *module) {
   // Add the metadata version number.
   auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  if (m_useRegisterFieldFormat) {
-    versionNode[0] = Util::Abi::PipelineMetadataMajorVersionNew;
-    versionNode[1] = Util::Abi::PipelineMetadataMinorVersionNew;
-  } else {
-    versionNode[0] = Util::Abi::PipelineMetadataMajorVersion;
-    versionNode[1] = Util::Abi::PipelineMetadataMinorVersion;
-  }
+  versionNode[0] = Util::Abi::PipelineMetadataMajorVersionNew;
+  versionNode[1] = Util::Abi::PipelineMetadataMinorVersionNew;
 
   // Write the MsgPack document into an IR metadata node.
   // The IR named metadata node contains an MDTuple containing an MDString containing the msgpack data.
@@ -202,100 +180,6 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
   // 0: success; *dest has been set up with the merged node. For an array, 0 means overwrite the existing array
   //    rather than appending.
   auto merger = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
-    // Allow array and map merging.
-    if (srcNode.isMap() && destNode->isMap())
-      return 0;
-    if (srcNode.isArray() && destNode->isArray())
-      return 0;
-    // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
-    // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
-    // fetchless VS.
-    if (destNode->isString() && srcNode.isString()) {
-      if (destNode->getString() == srcNode.getString())
-        return 0;
-      if (srcNode.getString().ends_with("_fetchless"))
-        return 0;
-      if (destNode->getString().ends_with("_fetchless")) {
-        *destNode = srcNode;
-        return 0;
-      }
-      if (srcNode.getString() == "color_export_shader")
-        return 0;
-      if (destNode->getString() == "color_export_shader") {
-        *destNode = srcNode;
-        return 0;
-      }
-    }
-    // Allow bool merging (for things like .uses_viewport_array_index).
-    if (destNode->getKind() == msgpack::Type::Boolean && srcNode.getKind() == msgpack::Type::Boolean) {
-      if (srcNode.getBool())
-        *destNode = srcNode.getDocument()->getNode(true);
-      return 0;
-    }
-    // Disallow merging other than uint.
-    if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
-      return -1;
-    // Special cases of uint merging.
-    if (mapKey.getKind() == msgpack::Type::UInt) {
-      switch (mapKey.getUInt()) {
-      case mmVGT_SHADER_STAGES_EN:
-        // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
-        // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
-        // part-pipeline, rather than the other way round.)
-        if (isGlueCode)
-          return 0;
-        break; // Use "default behavior for uint nodes" code below.
-      case mmSPI_SHADER_PGM_RSRC1_LS:
-      case mmSPI_SHADER_PGM_RSRC1_HS:
-      case mmSPI_SHADER_PGM_RSRC1_ES:
-      case mmSPI_SHADER_PGM_RSRC1_GS:
-      case mmSPI_SHADER_PGM_RSRC1_VS:
-      case mmSPI_SHADER_PGM_RSRC1_PS: {
-        // For the RSRC1 registers, we need to consider the VGPRs and SGPRs fields separately, and max them.
-        // This happens when linking in a glue shader.
-        SPI_SHADER_PGM_RSRC1 destRsrc1;
-        SPI_SHADER_PGM_RSRC1 srcRsrc1;
-        SPI_SHADER_PGM_RSRC1 origRsrc1;
-        origRsrc1.u32All = destNode->getUInt();
-        srcRsrc1.u32All = srcNode.getUInt();
-        destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
-        destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
-        destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
-        if (isGlueCode) {
-          // The float mode should come from the body of the shader and not the glue code.
-          destRsrc1.bits.FLOAT_MODE = origRsrc1.bits.FLOAT_MODE;
-        }
-        *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
-        return 0;
-      }
-      case mmSPI_PS_INPUT_ENA:
-      case mmSPI_PS_INPUT_ADDR:
-      case mmSPI_PS_IN_CONTROL:
-        if (isGlueCode)
-          return 0;
-        break; // Use "default behavior for uint nodes" code below.
-      }
-    } else if (mapKey.isString()) {
-      // For .userdatalimit, register counts, and register limits, take the max value.
-      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
-          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
-          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
-          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
-          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
-        *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
-        return 0;
-      }
-      // For .spillthreshold, take the min value.
-      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
-        *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
-        return 0;
-      }
-    }
-    // Default behavior for uint nodes: "or" the values together.
-    *destNode = destNode->getUInt() | srcNode.getUInt();
-    return 0;
-  };
-  auto mergerNew = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
     // Allow array and map merging.
     if (srcNode.isMap() && destNode->isMap())
       return 0;
@@ -389,94 +273,10 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
 
     return 0;
   };
-  bool success = false;
-  if (m_useRegisterFieldFormat)
-    success = m_document->readFromBlob(blob, /*multi=*/false, mergerNew);
-  else
-    success = m_document->readFromBlob(blob, /*multi=*/false, merger);
+  bool success = m_document->readFromBlob(blob, /*multi=*/false, merger);
 
   assert(success && "Bad PAL metadata format");
   ((void)success);
-}
-
-// =====================================================================================================================
-// Get the first user data register number for the given shader stage, taking into account what shader
-// stages are present in the pipeline, and whether NGG is enabled. The first time this is called must be
-// after PatchResourceCollect has run.
-//
-// @param stage : ShaderStageEnum
-unsigned PalMetadata::getUserDataReg0(ShaderStageEnum stage) {
-  assert(!m_useRegisterFieldFormat);
-  if (m_userDataRegMapping[stage] != 0)
-    return m_userDataRegMapping[stage];
-
-  // Mapping not yet initialized.
-  // Set up ShaderStageEnum -> user data register mapping.
-  m_userDataRegMapping[ShaderStage::Compute] = mmCOMPUTE_USER_DATA_0;
-  m_userDataRegMapping[ShaderStage::Fragment] = mmSPI_SHADER_USER_DATA_PS_0;
-  m_userDataRegMapping[ShaderStage::Task] = mmCOMPUTE_USER_DATA_0;
-  m_userDataRegMapping[ShaderStage::Mesh] = mmSPI_SHADER_USER_DATA_GS_0;
-
-  if (!m_pipelineState->getNggControl()->enableNgg) {
-    // GFX10+ not NGG: Same as GFX9, except ES-GS user data goes into GS registers.
-    m_userDataRegMapping[ShaderStage::CopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_GS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
-      m_userDataRegMapping[ShaderStage::TessEval] = m_userDataRegMapping[ShaderStage::Geometry];
-    else
-      m_userDataRegMapping[ShaderStage::TessEval] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStage::TessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
-      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::TessControl];
-    else if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
-      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::Geometry];
-    else
-      m_userDataRegMapping[ShaderStage::Vertex] = mmSPI_SHADER_USER_DATA_VS_0;
-
-  } else {
-    // GFX10+ NGG
-    m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_GS_0;
-    m_userDataRegMapping[ShaderStage::TessEval] = m_userDataRegMapping[ShaderStage::Geometry];
-    m_userDataRegMapping[ShaderStage::TessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
-      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::TessControl];
-    else
-      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::Geometry];
-  }
-
-  return m_userDataRegMapping[stage];
-}
-
-// =====================================================================================================================
-// Set the PAL metadata SPI register for a number of consecutive user data entries
-//
-// @param stage : ShaderStageEnum
-// @param userDataIndex : User data index 0-15 or 0-31 depending on HW and shader stage
-// @param userDataValue : Value to store in that entry, one of:
-//                        - a 0-based integer for the root user data dword offset
-//                        - one of the UserDataMapping values, e.g. UserDataMapping::GlobalTable
-// @param dwordCount : Number of user data entries to set
-void PalMetadata::setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex, unsigned userDataValue,
-                                   unsigned dwordCount) {
-  assert(!m_useRegisterFieldFormat);
-  // Get the start register number of SPI user data registers for this shader stage.
-  unsigned userDataReg = getUserDataReg0(stage);
-
-  // Assert that the supplied user data index is not too big.
-  bool inRange = userDataIndex + dwordCount <= 16;
-  if (stage != ShaderStage::Compute && stage != ShaderStage::Task)
-    inRange = userDataIndex + dwordCount <= 32;
-  assert(inRange && "Out of range user data index");
-  (void(inRange)); // Unused
-
-  // Update userDataLimit if userData is a 0-based integer for root user data dword offset.
-  if (userDataValue < InterfaceData::MaxSpillTableSize && userDataValue + dwordCount > m_userDataLimit->getUInt())
-    *m_userDataLimit = userDataValue + dwordCount;
-
-  // Write the register(s)
-  userDataReg += userDataIndex;
-  while (dwordCount--)
-    m_registers[userDataReg++] = userDataValue++;
 }
 
 // =====================================================================================================================
@@ -484,7 +284,14 @@ void PalMetadata::setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex
 // set to the minimum of any call to this function in any shader.
 //
 // @param dwordOffset : Dword offset that the spill table is used at
-void PalMetadata::setUserDataSpillUsage(unsigned dwordOffset) {
+// @param shaderStage : The shaderStage for the spill table is used at
+void PalMetadata::setUserDataSpillUsage(unsigned dwordOffset, std::optional<ShaderStageEnum> shaderStage) {
+  // Update shaderstage spillThreshold in shader level which try to fix the cache issue
+  // More details can refer on llpcElfWriter.cpp
+  if (dwordOffset < m_pipelineState->getSpillThreshold(shaderStage.value())) {
+    m_pipelineState->setSpillThreshold(shaderStage.value(), dwordOffset);
+  }
+  // Update pipeline spillThreshold
   if (dwordOffset < m_spillThreshold->getUInt())
     *m_spillThreshold = dwordOffset;
 }
@@ -529,26 +336,13 @@ void PalMetadata::fixUpRegisters() {
       };
       // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
       // see PatchResourceCollect::canUseNgg.
-      if (m_pipelineState->useRegisterFieldFormat()) {
-        auto graphicsRegisters = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
-        if (graphicsRegisters.find(Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType) !=
-            graphicsRegisters.end()) {
-          auto primType = getPrimType();
-          auto vgtGsOutPrimType =
-              graphicsRegisters[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
-          vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] =
-              serializeEnum(Util::Abi::GsOutPrimType(primType));
-        }
-      } else {
-        unsigned vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE;
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-          // NOTE: Register VGT_GS_OUT_PRIM_TYPE is a special one that has different HW offset on GFX11+.
-          vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE_GFX11;
-        }
-        if (m_registers.find(m_document->getNode(vgtGsOutPrimType)) != m_registers.end()) {
-          auto primType = getPrimType();
-          m_registers[vgtGsOutPrimType] = primType;
-        }
+      auto graphicsRegisters = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+      if (graphicsRegisters.find(Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType) != graphicsRegisters.end()) {
+        auto primType = getPrimType();
+        auto vgtGsOutPrimType =
+            graphicsRegisters[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
+        vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] =
+            serializeEnum(Util::Abi::GsOutPrimType(primType));
       }
     }
   }
@@ -600,59 +394,36 @@ void PalMetadata::finalizeUserDataLimit() {
 //                          for part-pipeline or shader compilation.
 void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
   assert(m_pipelineState->isGraphics());
-  if (m_pipelineState->useRegisterFieldFormat()) {
-    auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+  auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
 
-    if (m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+  if (m_pipelineState->getShaderStageMask().contains(ShaderStage::Fragment)) {
+    // There is a divergence between Vulkan/OpenGL and D3D11/12 specs in terms of sample mask output and alpha to
+    // coverage. DX spec states that "Alpha to Coverage is disabled if this register (i.e. oMask) is written in a
+    // shader." In contrast, the VK spec allows (or rather, does not disallow) enabling both sample mask output and
+    // alpha to coverage at the same time.
+    auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+    bool alphaToCoverageEnable = m_pipelineState->getColorExportState().alphaToCoverageEnable;
+    if (m_pipelineState->getOptions().sampleMaskExportOverridesAlphaToCoverage) {
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          !alphaToCoverageEnable || dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
+    } else if (alphaToCoverageEnable) {
       dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = false;
     }
-
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStage::Fragment).waveBreakSize;
-      auto paScShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::PaScShaderControl].getMap(true);
-      paScShaderControl[Util::Abi::PaScShaderControlMetadataKey::WaveBreakRegionSize] =
-          static_cast<unsigned>(waveBreakSize);
-    }
-
-    if (m_pipelineState->getRasterizerState().innerCoverage)
-      graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
-          serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_INNER_COVERAGE));
-    else
-      graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
-          serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
-  } else {
-    // Set PA_CL_CLIP_CNTL from pipeline state settings.
-    // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
-    // version 629), and are no longer part of the PAL ELF ABI.
-    const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
-    PA_CL_CLIP_CNTL paClClipCntl = {};
-    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
-    paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
-    setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
-
-    if (m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      DB_SHADER_CONTROL dbShaderControl = {};
-      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = 0;
-      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
-    }
-
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStage::Fragment).waveBreakSize;
-      PA_SC_SHADER_CONTROL paScShaderControl = {};
-      paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned>(waveBreakSize);
-      setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
-    }
-
-    PA_SC_AA_CONFIG paScAaConfig = {};
-    if (m_pipelineState->getRasterizerState().innerCoverage) {
-      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
-    } else {
-      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
-    }
-    setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
   }
+
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
+    WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStage::Fragment).waveBreakSize;
+    auto paScShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::PaScShaderControl].getMap(true);
+    paScShaderControl[Util::Abi::PaScShaderControlMetadataKey::WaveBreakRegionSize] =
+        static_cast<unsigned>(waveBreakSize);
+  }
+
+  if (m_pipelineState->getRasterizerState().innerCoverage)
+    graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
+        serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_INNER_COVERAGE));
+  else
+    graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
+        serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
 }
 
 // =====================================================================================================================
@@ -679,29 +450,16 @@ void PalMetadata::finalizeInputControlRegisterSetting() {
   const bool usesViewportArrayIndex = usesViewportArrayIndexNode->getBool();
 
   if (!usesViewportArrayIndex) {
-    if (m_useRegisterFieldFormat) {
-      auto spiPsInputCntl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiPsInputCntl]
-                                .getArray(true);
-      // Check if pointCoordLoc is not used
-      auto spiPsInputCntlElem = spiPsInputCntl[viewportIndexLoc].getMap(true);
-      if (!spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
-        // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
-        constexpr unsigned defaultVal = (1 << 5);
-        spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = defaultVal;
-        spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::FlatShade] = false;
-      }
-    } else {
-      SPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
-      spiPsInputCntl.u32All = getRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc);
-      // Check if pointCoordLoc is not used
-      if (!spiPsInputCntl.bits.PT_SPRITE_TEX) {
-        // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
-        constexpr unsigned defaultVal = (1 << 5);
-        spiPsInputCntl.bits.OFFSET = defaultVal;
-        spiPsInputCntl.bits.FLAT_SHADE = false;
-        setRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc, spiPsInputCntl.u32All);
-      }
+    auto spiPsInputCntl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                              .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiPsInputCntl]
+                              .getArray(true);
+    // Check if pointCoordLoc is not used
+    auto spiPsInputCntlElem = spiPsInputCntl[viewportIndexLoc].getMap(true);
+    if (!spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
+      // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
+      constexpr unsigned defaultVal = (1 << 5);
+      spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = defaultVal;
+      spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::FlatShade] = false;
     }
   }
 }
@@ -735,32 +493,6 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
 
   // Erase the PAL metadata for FS input mappings.
   eraseFragmentInputInfo();
-}
-
-// =====================================================================================================================
-// Get a register value in PAL metadata.  Returns 0 if the node does not have an entry.
-//
-// @param regNum : Register number
-unsigned PalMetadata::getRegister(unsigned regNum) {
-  assert(!m_useRegisterFieldFormat);
-  auto mapIt = m_registers.find(m_document->getNode(regNum));
-  if (mapIt == m_registers.end()) {
-    return 0;
-  }
-  msgpack::DocNode &node = mapIt->second;
-  assert(node.getKind() == msgpack::Type::UInt);
-  return node.getUInt();
-}
-
-// =====================================================================================================================
-// Set a register value in PAL metadata.
-//
-// @param regNum : Register number
-// @param value : Value to set
-void PalMetadata::setRegister(unsigned regNum, unsigned newValue) {
-  assert(!m_useRegisterFieldFormat);
-  msgpack::DocNode &node = m_registers[regNum];
-  node = newValue;
 }
 
 // =====================================================================================================================
@@ -849,67 +581,6 @@ void PalMetadata::eraseColorExportInfo() {
 }
 
 // =====================================================================================================================
-// Get the VS entry register info. Used by the linker to generate the fetch shader.
-//
-// @param [out] regInfo : Where to store VS entry register info
-void PalMetadata::getVsEntryRegInfo(VsEntryRegInfo &regInfo) {
-  regInfo = {};
-  std::string hwStageName;
-  regInfo.callingConv = getCallingConventionForFirstHardwareShaderStage(hwStageName);
-  unsigned sgprsBeforeUserData = getNumberOfSgprsBeforeUserData(regInfo.callingConv);
-  unsigned sgprsAfterUserData = getNumberOfSgprsAfterUserData(regInfo.callingConv);
-
-  regInfo.vertexId = getVertexIdOffset(regInfo.callingConv);
-  regInfo.instanceId = getInstanceIdOffset(regInfo.callingConv);
-  regInfo.vgprCount = getVgprCount(regInfo.callingConv);
-  regInfo.wave32 = isWave32(regInfo.callingConv);
-
-  if (m_useRegisterFieldFormat) {
-    auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-    assert(hardwareStages.find(hwStageName) != hardwareStages.end());
-    auto hwStage = hardwareStages[hwStageName].getMap(true);
-    auto userDataRegMap = hwStage[Util::Abi::HardwareStageMetadataKey::UserDataRegMap].getArray(true);
-    regInfo.sgprCount =
-        sgprsBeforeUserData + hwStage[Util::Abi::HardwareStageMetadataKey::UserSgprs].getUInt() + sgprsAfterUserData;
-    regInfo.vertexBufferTable =
-        sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegMap, UserDataMapping::VertexBufferTable);
-    regInfo.baseVertex = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegMap, UserDataMapping::BaseVertex);
-    regInfo.baseInstance = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegMap, UserDataMapping::BaseInstance);
-  } else {
-    unsigned userDataReg0 = getFirstUserDataReg(regInfo.callingConv);
-    auto userDataRegIt = m_registers.find(m_document->getNode(userDataReg0));
-    assert(userDataRegIt != m_registers.end());
-    regInfo.sgprCount = sgprsBeforeUserData + getUserDataCount(regInfo.callingConv) + sgprsAfterUserData;
-    regInfo.vertexBufferTable =
-        sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::VertexBufferTable);
-    regInfo.baseVertex = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseVertex);
-    regInfo.baseInstance = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseInstance);
-  }
-}
-
-// =====================================================================================================================
-// Returns the number of user data registers are used for the shader with the given calling convention.
-//
-// @param callingConv : The calling convention of the shader we are interested in.
-unsigned PalMetadata::getUserDataCount(unsigned callingConv) {
-  assert(!m_useRegisterFieldFormat);
-  // Should we just define mmSPI_SHADER_PGM_RSRC2_* for all shader types? The comment before the definition of
-  // mmSPI_SHADER_PGM_RSRC2_VS in AbiMetadata.h says that do not want to.
-  static const ArrayMap callingConvToRsrc2Map = {{CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0 - 1},
-                                                 {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0 - 1},
-                                                 {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0 - 1},
-                                                 {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0 - 1},
-                                                 {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0 - 1}};
-
-  SPI_SHADER_PGM_RSRC2 rsrc2;
-  rsrc2.u32All = m_registers[m_document->getNode(findValueInArrayMap(callingConvToRsrc2Map, callingConv))].getUInt();
-
-  // For GFX9+, we ignore the USER_SGPR_MSB field.  We know that there is at least one user SGPR, so if we find that
-  // USER_SGPR is 0, it must mean 32.
-  return rsrc2.bits.USER_SGPR == 0 ? 32 : rsrc2.bits.USER_SGPR;
-}
-
-// =====================================================================================================================
 // Get the llvm type for that corresponds to tyName.  Returns nullptr if no such type exists.
 //
 // @param tyName : A type name that is an encoding of a type.
@@ -947,66 +618,53 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
   for (auto [i, expFormat] : enumerate(expFormats))
     spiShaderColFormat |= expFormat << (4 * i);
 
-  if (m_pipelineState->useRegisterFieldFormat()) {
-    auto spiShaderColFormatNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                      .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
-                                      .getMap(true);
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_0ExportFormat] = spiShaderColFormat & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_1ExportFormat] =
-        (spiShaderColFormat >> 4) & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_2ExportFormat] =
-        (spiShaderColFormat >> 8) & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_3ExportFormat] =
-        (spiShaderColFormat >> 12) & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_4ExportFormat] =
-        (spiShaderColFormat >> 16) & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_5ExportFormat] =
-        (spiShaderColFormat >> 20) & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_6ExportFormat] =
-        (spiShaderColFormat >> 24) & 0xF;
-    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_7ExportFormat] =
-        (spiShaderColFormat >> 28) & 0xF;
-  } else {
-    setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
-  }
+  auto spiShaderColFormatNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                    .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
+                                    .getMap(true);
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_0ExportFormat] = spiShaderColFormat & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_1ExportFormat] = (spiShaderColFormat >> 4) & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_2ExportFormat] = (spiShaderColFormat >> 8) & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_3ExportFormat] =
+      (spiShaderColFormat >> 12) & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_4ExportFormat] =
+      (spiShaderColFormat >> 16) & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_5ExportFormat] =
+      (spiShaderColFormat >> 20) & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_6ExportFormat] =
+      (spiShaderColFormat >> 24) & 0xF;
+  spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_7ExportFormat] =
+      (spiShaderColFormat >> 28) & 0xF;
 }
 
 // =====================================================================================================================
 // Updates the CB_SHADER_MASK entry.
 //
 void PalMetadata::updateCbShaderMask(unsigned cbShaderMask) {
-  if (m_pipelineState->useRegisterFieldFormat()) {
-    auto cbShaderMaskNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask]
-                                .getMap(true);
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output1Enable] = (cbShaderMask >> 4) & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output2Enable] = (cbShaderMask >> 8) & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output3Enable] = (cbShaderMask >> 12) & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output4Enable] = (cbShaderMask >> 16) & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
-    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
-  } else {
-    setRegister(mmCB_SHADER_MASK, cbShaderMask);
-  }
+  auto cbShaderMaskNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                              .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask]
+                              .getMap(true);
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output1Enable] = (cbShaderMask >> 4) & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output2Enable] = (cbShaderMask >> 8) & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output3Enable] = (cbShaderMask >> 12) & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output4Enable] = (cbShaderMask >> 16) & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
 }
 
 // =====================================================================================================================
 //  Updates the DB shader control that depends on the CB state.
 //
 void PalMetadata::updateDbShaderControl() {
-  if (m_pipelineState->useRegisterFieldFormat()) {
-    auto dbShaderControl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                               .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
-                               .getMap(true);
+  auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+  auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+  bool alphaToCoverageEnable = m_pipelineState->getColorExportState().alphaToCoverageEnable;
+  if (m_pipelineState->getOptions().sampleMaskExportOverridesAlphaToCoverage) {
     dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-        !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+        !alphaToCoverageEnable || dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
   } else {
-    DB_SHADER_CONTROL dbShaderControl = {};
-    dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-    dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = !m_pipelineState->getColorExportState().alphaToCoverageEnable;
-    setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
+    dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = !alphaToCoverageEnable;
   }
 }
 
@@ -1015,14 +673,8 @@ void PalMetadata::updateDbShaderControl() {
 //
 // @param zExportFormat : new z-export-format
 void PalMetadata::setSpiShaderZFormat(unsigned zExportFormat) {
-  if (m_pipelineState->useRegisterFieldFormat()) {
-    auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
-    graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = zExportFormat;
-  } else {
-    SPI_SHADER_Z_FORMAT spiShaderZFormat = {};
-    spiShaderZFormat.bitfields.Z_EXPORT_FORMAT = zExportFormat;
-    setRegister(mmSPI_SHADER_Z_FORMAT, spiShaderZFormat.u32All);
-  }
+  auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+  graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = zExportFormat;
 }
 
 // =====================================================================================================================
@@ -1181,218 +833,6 @@ unsigned PalMetadata::getFragmentShaderBuiltInLoc(unsigned builtin) {
 }
 
 // =====================================================================================================================
-// Returns the calling convention of the first hardware shader stage that will be executed in the pipeline.
-//
-// @param hwStageName : The hardware stage name that is filled in with the new register field format.
-unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName) {
-  if (m_useRegisterFieldFormat) {
-    auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Hs)];
-    if (hardwareStages.find(hwStageName) != hardwareStages.end())
-      return CallingConv::AMDGPU_HS;
-
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Gs)];
-    if (hardwareStages.find(hwStageName) != hardwareStages.end())
-      return CallingConv::AMDGPU_GS;
-
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
-    if (hardwareStages.find(hwStageName) != hardwareStages.end())
-      return CallingConv::AMDGPU_VS;
-
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Cs)];
-    return CallingConv::AMDGPU_CS;
-  }
-  constexpr unsigned hwShaderStageCount = 6;
-  static const std::pair<unsigned, unsigned> shaderTable[hwShaderStageCount] = {
-      {mmSPI_SHADER_PGM_RSRC1_LS, CallingConv::AMDGPU_LS}, {mmSPI_SHADER_PGM_RSRC1_HS, CallingConv::AMDGPU_HS},
-      {mmSPI_SHADER_PGM_RSRC1_ES, CallingConv::AMDGPU_ES}, {mmSPI_SHADER_PGM_RSRC1_GS, CallingConv::AMDGPU_GS},
-      {mmSPI_SHADER_PGM_RSRC1_VS, CallingConv::AMDGPU_VS}, {mmCOMPUTE_PGM_RSRC1, CallingConv::AMDGPU_CS}};
-
-  for (unsigned i = 0; i < hwShaderStageCount; ++i) {
-    auto entry = m_registers.find(m_document->getNode(shaderTable[i].first));
-    if (entry != m_registers.end())
-      return shaderTable[i].second;
-  }
-  return CallingConv::AMDGPU_CS;
-}
-
-// =====================================================================================================================
-// Returns the offset of the first user data register for the given calling convention.
-//
-// @param callingConv : The calling convention
-unsigned PalMetadata::getFirstUserDataReg(unsigned callingConv) {
-  assert(!m_useRegisterFieldFormat);
-  static const ArrayMap shaderTable = {
-      {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0},
-      {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0},
-      {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_PGM_RSRC1}};
-
-  ArrayRef<KeyValuePair> currentShaderTable(shaderTable);
-  return findValueInArrayMap(currentShaderTable, callingConv);
-}
-
-// =====================================================================================================================
-// Returns to number of SGPRs before the SGPRs used for other purposes before the first user data SGPRs.
-//
-// @param callingConv : The calling convention of the shader
-unsigned PalMetadata::getNumberOfSgprsBeforeUserData(unsigned callingConv) {
-  switch (callingConv) {
-  case CallingConv::AMDGPU_CS:
-  case CallingConv::AMDGPU_VS:
-  case CallingConv::AMDGPU_PS:
-    return 0;
-  default:
-    // Merged shader have an extra 8 SGPRs before user data.
-    return 8;
-  }
-}
-
-// =====================================================================================================================
-// Returns the offset of the userDataMapping from firstUserDataNode.  Returns UINT_MAX if it cannot be found.
-//
-// @param firstUserDataNode : An iterator identifying the starting point for the search.  It is assumed that it points
-//                            to the first user data node for some shader stage.
-// @param userDataMapping : The user data mapping that is being search for.
-//
-unsigned PalMetadata::getOffsetOfUserDataReg(std::map<msgpack::DocNode, msgpack::DocNode>::iterator firstUserDataNode,
-                                             UserDataMapping userDataMapping) {
-  assert(!m_useRegisterFieldFormat);
-  unsigned firstReg = firstUserDataNode->first.getUInt();
-  unsigned lastReg = firstReg + m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
-  for (auto &userDataNode : make_range(firstUserDataNode, m_registers.end())) {
-    unsigned reg = userDataNode.first.getUInt();
-    if (reg >= lastReg)
-      return UINT_MAX;
-    if (static_cast<UserDataMapping>(userDataNode.second.getUInt()) == userDataMapping)
-      return reg - firstReg;
-  }
-  return UINT_MAX;
-}
-
-// =====================================================================================================================
-// Returns the offset of the userDataMapping from firstUserDataNode.  Returns UINT_MAX if it cannot be found.
-//
-// @param userDataReg :
-// @param userDataMapping : The user data mapping that is being search for.
-unsigned PalMetadata::getOffsetOfUserDataReg(msgpack::ArrayDocNode &userDataReg, UserDataMapping userDataMapping) {
-  for (unsigned id = 0; id < userDataReg.size(); ++id) {
-    if (userDataReg[id].getUInt() == static_cast<unsigned>(userDataMapping))
-      return id;
-  }
-  return UINT_MAX;
-}
-
-// =====================================================================================================================
-// Returns the upper bound on the number of SGPRs that contain parameters for the shader after the user data.
-//
-// @param callingConv : The calling convention of the shader stage
-unsigned PalMetadata::getNumberOfSgprsAfterUserData(unsigned callingConv) {
-  // Conservatively set the total number of input SGPRs. A merged shader with 8 SGPRs before user data
-  // does not have any extra ones after; an unmerged shader has up to 10 SGPRs after.
-  if (getNumberOfSgprsBeforeUserData(callingConv) == 0)
-    return 10;
-  return 0;
-}
-
-// =====================================================================================================================
-// Returns the offset of the vertex id in the parameter vertex registers.
-//
-// @param callingConv : The calling convention of the shader stage
-unsigned PalMetadata::getVertexIdOffset(unsigned callingConv) {
-  switch (callingConv) {
-  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
-  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
-  case CallingConv::AMDGPU_VS:
-    return 0;
-  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
-    return 2;
-  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
-    return 5;
-  default:
-    llvm_unreachable("Unexpected calling convention.");
-    return UINT_MAX;
-  }
-}
-
-// =====================================================================================================================
-// Returns the offset of the register containing the instance id in the shader.
-//
-// @param callingConv : The calling convention of the shader stage
-unsigned PalMetadata::getInstanceIdOffset(unsigned callingConv) {
-  switch (callingConv) {
-  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
-  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
-  case CallingConv::AMDGPU_VS:
-    return 3;
-  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
-    return 5;
-  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
-    return 8;
-  default:
-    llvm_unreachable("Unexpected calling convention.");
-    return UINT_MAX;
-  }
-}
-
-// =====================================================================================================================
-// Returns the number of VGPRs used for inputs to the shader.
-//
-// @param callingConv : The calling convention of the shader stage
-unsigned PalMetadata::getVgprCount(unsigned callingConv) {
-  switch (callingConv) {
-  case CallingConv::AMDGPU_LS: // Before-GFX9 unmerged LS
-  case CallingConv::AMDGPU_ES: // Before-GFX9 unmerged ES
-  case CallingConv::AMDGPU_VS:
-    return 4;
-  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
-    return 6;
-  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
-    return 9;
-  default:
-    llvm_unreachable("Unexpected calling convention.");
-    return UINT_MAX;
-  }
-}
-
-// =====================================================================================================================
-// Returns true if the shader runs in wave32 mode.
-//
-// @param callingConv : The calling convention of the shader stage
-bool PalMetadata::isWave32(unsigned callingConv) {
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
-
-  if (m_useRegisterFieldFormat) {
-    auto vgtShaderStagesEn = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::VgtShaderStagesEn]
-                                 .getMap(true);
-    switch (callingConv) {
-    case CallingConv::AMDGPU_VS:
-      return vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsW32En].getBool();
-    case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
-      return vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En].getBool();
-    case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
-      return vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En].getBool();
-    default:
-      llvm_unreachable("Unexpected calling convention.");
-      return false;
-    }
-  }
-  VGT_SHADER_STAGES_EN vgtShaderStagesEn;
-  vgtShaderStagesEn.u32All = m_registers[m_document->getNode(mmVGT_SHADER_STAGES_EN)].getUInt();
-  switch (callingConv) {
-  case CallingConv::AMDGPU_VS:
-    return vgtShaderStagesEn.gfx10.VS_W32_EN;
-  case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
-    return vgtShaderStagesEn.gfx10.HS_W32_EN;
-  case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
-    return vgtShaderStagesEn.gfx10.GS_W32_EN;
-  default:
-    llvm_unreachable("Unexpected calling convention.");
-    return false;
-  }
-}
-
-// =====================================================================================================================
 // Serialize Util::Abi::CoverageToShaderSel to a string.
 //
 // @param value : The input enum of Util::Abi::CoverageToShaderSel
@@ -1463,4 +903,10 @@ llvm::StringRef PalMetadata::serializeEnum(Util::Abi::GsOutPrimType value) {
 void PalMetadata::setUserDataLimit(unsigned value) {
   if (value > m_userDataLimit->getUInt())
     *m_userDataLimit = value;
+}
+
+// =====================================================================================================================
+// Set Util::Abi::PipelineMetadataKey::PsDummyExport to true
+void PalMetadata::setPsDummyExport() {
+  m_pipelineNode[Util::Abi::PipelineMetadataKey::PsDummyExport] = true;
 }

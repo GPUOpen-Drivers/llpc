@@ -75,7 +75,9 @@ def AwaitOp : LgcCpsOp<"await", [NoUnwind, WillReturn]> {
 // =====================================================================================================================
 def AsContinuationReferenceOp : LgcCpsOp<"as.continuation.reference", [NoUnwind, WillReturn]> {
     let arguments = (ins PointerType:$fn);
-    let results = (outs ContinuationReference:$ref);
+    let results = (outs (or ContinuationReference, I64):$ref);
+
+    let defaultBuilderHasExplicitResultType = true;
 
     let summary = "Obtain a continuation reference from a function pointer.";
     let description = [{

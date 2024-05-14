@@ -31,9 +31,11 @@
 #include "PrepareContinuations.h"
 #include "compilerutils/CompilerUtils.h"
 #include "llpcContext.h"
+#include "llpcRayTracingContext.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
+#include "llvm/IR/Module.h"
 
 #define DEBUG_TYPE "prepare-continuations"
 using namespace lgc;
@@ -75,6 +77,13 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
     inliner.inlineCall(builder, contKernel, {});
     setLgcRtShaderStage(entryFunc, RayTracingShaderStage::KernelEntry);
     lgc::Pipeline::markShaderEntryPoint(entryFunc, lgc::ShaderStage::Compute);
+  } else {
+    m_entryPoint->setName(module.getName());
+    auto rtContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+
+    ContHelper::setMaxPayloadRegisterCount(module, cps::CpsPayloadMaxNumVgprs);
+
+    setShaderHitAttributeSize(m_entryPoint, rtContext->getAttributeDataSizeInBytes());
   }
 
   return PreservedAnalyses::none();

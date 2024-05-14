@@ -3,7 +3,9 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fmul.legacy(float %{{.*}}, float %{{.*}})
+; SHADERTEST: call ninf float @llvm.amdgcn.fmul.legacy(float %{{.*}}, float %{{.*}})
+; SHADERTEST: call ninf float @llvm.amdgcn.fmul.legacy(float %{{.*}}, float %{{.*}})
+; SHADERTEST: call ninf float @llvm.amdgcn.fmul.legacy(float %{{.*}}, float %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -13,6 +15,7 @@
 ; Bound: 28
 ; Schema: 0
                OpCapability Shader
+               OpCapability Kernel
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
                OpEntryPoint Fragment %main "main" %b %a %fragColor
@@ -26,6 +29,9 @@
                OpDecorate %b Location 1
                OpDecorate %a Location 0
                OpDecorate %fragColor Location 0
+               OpDecorate %22 FPFastMathMode NotInf
+               OpDecorate %32 FPFastMathMode NotInf
+               OpDecorate %38 FPFastMathMode NotInf
        %void = OpTypeVoid
           %3 = OpTypeFunction %void
       %float = OpTypeFloat 32
@@ -33,6 +39,8 @@
 %_ptr_Input_float = OpTypePointer Input %float
           %b = OpVariable %_ptr_Input_float Input
     %float_0 = OpConstant %float 0
+    %float_05 = OpConstant %float 0.5
+    %float_15 = OpConstant %float 1.5
        %bool = OpTypeBool
           %a = OpVariable %_ptr_Input_float Input
     %v4float = OpTypeVector %float 4
@@ -50,7 +58,17 @@
          %20 = OpLoad %float %b
          %21 = OpSelect %float %19 %float_0 %20
          %22 = OpFMul %float %17 %21
-               OpStore %c %22
+         %28 = OpLoad %float %b
+         %29 = OpFOrdEqual %bool %28 %float_0
+         %31 = OpSelect %float %29 %float_0 %float_05
+         %32 = OpFMul %float %28 %31
+         %33 = OpFAdd %float %22 %32
+         %34 = OpLoad %float %a
+         %35 = OpFOrdEqual %bool %34 %float_0
+         %37 = OpSelect %float %35 %float_0 %float_15
+         %38 = OpFMul %float %34 %37
+         %39 = OpFAdd %float %33 %38
+               OpStore %c %39
          %26 = OpLoad %float %c
          %27 = OpCompositeConstruct %v4float %26 %26 %26 %26
                OpStore %fragColor %27

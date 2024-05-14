@@ -29,7 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "llpcContext.h"
+#include "GfxRuntimeContext.h"
+#include "LowerAdvancedBlend.h"
+#include "ProcessGfxRuntimeLibrary.h"
 #include "SPIRVInternal.h"
+#include "gfxruntime/GfxRuntimeLibrary.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
@@ -114,6 +118,7 @@ LgcContext *Context::getLgcContext() {
     m_builderContext.reset(LgcContext::create(&*m_targetMachine, *this, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
     lgc::GpurtContext::get(*this).theModule = nullptr;
     lgc::GpurtContext::get(*this).ownedTheModule.reset();
+    lgc::GfxRuntimeContext::get(*this).theModule.reset();
 
     // Pass the state of LLPC_OUTS on to LGC.
     LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
@@ -207,6 +212,9 @@ void Context::setModuleTargetMachine(Module *module) {
   std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
   // continuation stack address space.
   dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
+  // SPIRV address spaces.
+  dataLayoutStr = dataLayoutStr + "-p" + std::to_string(SPIRAS_Input) + ":32:32";
+  dataLayoutStr = dataLayoutStr + "-p" + std::to_string(SPIRAS_Output) + ":32:32";
   module->setDataLayout(dataLayoutStr);
 }
 
@@ -275,6 +283,55 @@ void Context::ensureGpurtLibrary() {
 
   gpurtContext.ownedTheModule = std::move(gpurt);
   gpurtContext.theModule = gpurtContext.ownedTheModule.get();
+}
+
+// =====================================================================================================================
+// Ensure that a GfxRuntime library module is attached to this context via GfxRuntimeContext.
+void Context::ensureGfxRuntimeLibrary() {
+  // Check whether we already have a GPURT library module that can be used
+  auto &gfxRuntimeContext = lgc::GfxRuntimeContext::get(*this);
+
+  if (gfxRuntimeContext.theModule)
+    return;
+
+  // Create the GfxRuntime library module
+  ShaderModuleData moduleData = {};
+  std::tie(moduleData.binCode.codeSize, moduleData.binCode.pCode) = Vkgc::GetAdvancedBlendLibrary();
+  moduleData.binType = BinaryType::Spirv;
+  moduleData.usage.keepUnusedFunctions = true;
+
+  PipelineShaderInfo shaderInfo = {};
+  shaderInfo.entryStage = ShaderStageCompute;
+  shaderInfo.pEntryTarget = nullptr;
+  shaderInfo.pModuleData = &moduleData;
+
+  auto gfxRuntime = std::make_unique<Module>("gfxruntime", *this);
+  setModuleTargetMachine(gfxRuntime.get());
+
+  TimerProfiler timerProfiler(getPipelineHashCode(), "LLPC GfxRuntime", TimerProfiler::PipelineTimerEnableMask);
+  std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(getLgcContext()));
+  SpirvLower::registerTranslationPasses(*lowerPassMgr);
+
+  timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
+
+  lowerPassMgr->addPass(SpirvLowerTranslator(ShaderStageCompute, &shaderInfo));
+  if (EnableOuts()) {
+    lowerPassMgr->addPass(
+        PrintModulePass(outs(), "\n"
+                                "===============================================================================\n"
+                                "// LLPC SPIRV-to-LLVM translation results\n"));
+  }
+
+  lowerPassMgr->addPass(SpirvLowerCfgMerges());
+  lowerPassMgr->addPass(ProcessGfxRuntimeLibrary());
+  lowerPassMgr->addPass(AlwaysInlinerPass());
+  lowerPassMgr->addPass(SpirvLowerAccessChain());
+  lowerPassMgr->addPass(SpirvLowerGlobal());
+  timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
+
+  lowerPassMgr->run(*gfxRuntime);
+
+  gfxRuntimeContext.theModule = std::move(gfxRuntime);
 }
 
 } // namespace Llpc

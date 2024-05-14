@@ -90,6 +90,8 @@ struct ResultErrorCategory : std::error_category {
       return "Unsupported";
     case Result::Success:
       return "Success";
+    case Result::RequireFullPipeline:
+      return "RequireFullPipeline";
     default:
       llvm_unreachable("Invalid Result code");
       return "Invalid Result code";

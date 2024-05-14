@@ -226,7 +226,8 @@ enum InternalBinding : unsigned {
   PrintfBufferBindingId = 6,                ///< Binding ID of internal buffer for debug printf
   ReverseThreadGroupControlBinding = 7,     ///< Binding ID of internal buffer for reverseThreadGroup
   RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer
-  SpecConstInternalBufferBindingId = 9,     ///< Binding ID of internal buffer for specialized constant.
+  PixelOpInternalBinding = 9,               ///< Binding ID of pixel operand image buffer.
+  SpecConstInternalBufferBindingId = 10,    ///< Binding ID of internal buffer for specialized constant.
   SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
   ConstantBuffer0Binding = 24, ///< Binding ID of default uniform block
   ConstantBuffer0BindingEnd = ConstantBuffer0Binding + ShaderStageGfxCount,
@@ -281,6 +282,14 @@ enum GlCompatibilityUniformLocation : unsigned {
   AlphaTestRef,                               ///< Internal uniform location use to pass on the alpha test ref.
   ClipPlane,                                  ///< Internal uniform location of gl_ClipPlane.
   UniformLocationCount = ClipPlane + GlCompatibilityLimits::MaxClipPlanes - GlCompatibilityLimits::MaxUniformLocations
+};
+
+/// Represents how to enable/disable DrawPixels related patches.
+enum GlCompatibilityDrawPixelsType : unsigned {
+  DrawPixelsTypeNone,    ///< Disable all DrawPixels related patch
+  DrawPixelsTypeColor,   ///< Enable DrawPixels for color
+  DrawPixelsTypeDepth,   ///< Enable DrawPixels for depth
+  DrawPixelsTypeStencil, ///< Enable DrawPixels for stencil
 };
 
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
@@ -499,6 +508,7 @@ struct ResourceNodeData {
   unsigned location;                ///< ID of resource location
   bool mergedLocationBinding;       ///< TRUE if location and binding are merged in spirv binary
   unsigned isTexelBuffer;           ///< TRUE if it is ImageBuffer or TextureBuffer
+  unsigned isTexelFetchUsed;        ///< TRUE if texelFetch is used
   unsigned isDefaultUniformSampler; ///< TRUE if it's sampler image in default uniform struct
   unsigned columnCount;             ///< Column count if this is a matrix variable.
   BasicType basicType;              ///< Type of the variable or element
@@ -536,38 +546,39 @@ struct ResourcesNodes {
 
 /// Represents usage info of a shader module
 struct ShaderModuleUsage {
-  bool enableVarPtrStorageBuf; ///< Whether to enable "VariablePointerStorageBuffer" capability
-  bool enableVarPtr;           ///< Whether to enable "VariablePointer" capability
-  bool useSubgroupSize;        ///< Whether gl_SubgroupSize is used
-  bool useSpecConstant;        ///< Whether specialization constant is used
-  bool keepUnusedFunctions;    ///< Whether to keep unused function
-  bool enableRayQuery;         ///< Whether the "RayQueryKHR" capability is used
-  bool rayQueryLibrary;        ///< Whether the shaderModule is rayQueryLibrary
-  bool isInternalRtShader;     ///< Whether the shaderModule is a GPURT internal shader (e.g. BVH build)
-  bool hasTraceRay;            ///< Whether the shaderModule has OpTraceRayKHR
-  bool hasExecuteCallable;     ///< Whether the shaderModule has OpExecuteCallableKHR
-  bool useIsNan;               ///< Whether IsNan is used
-  bool useInvariant;           ///< Whether invariant variable is used
-  bool usePointSize;           ///< Whether gl_PointSize is used in output
-  bool useShadingRate;         ///< Whether shading rate is used
-  bool useSampleInfo;          ///< Whether gl_SamplePosition or InterpolateAtSample are used
-  bool useClipVertex;          ///< Whether gl_ClipVertex is used
-  bool useFrontColor;          ///< Whether gl_FrontColor is used
-  bool useBackColor;           ///< Whether gl_BackColor is used
-  bool useFrontSecondaryColor; ///< Whether gl_FrontSecondaryColor is used
-  bool useBackSecondaryColor;  ///< Whether gl_BackSecondaryColor is used
-  ResourcesNodes *pResources;  ///< Resource node for buffers and opaque types
-  bool useFragCoord;           ///< Whether gl_FragCoord is used
-  bool originUpperLeft;        ///< Whether pixel origin is upper-left
-  bool pixelCenterInteger;     ///< Whether pixel coord is Integer
-  bool useGenericBuiltIn;      ///< Whether to use builtIn inputs that include gl_PointCoord, gl_PrimitiveId,
-                               ///  gl_Layer, gl_ClipDistance or gl_CullDistance.
-  bool enableXfb;              ///< Whether transform feedback is enabled
-  unsigned localSizeX;         ///< Compute shader work-group size in the X dimension
-  unsigned localSizeY;         ///< Compute shader work-group size in the Y dimension
-  unsigned localSizeZ;         ///< Compute shader work-group size in the Z dimension
-  bool useBarycentric;         ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
-  bool disableDualSource;      ///< Whether disable dualSource blend
+  bool enableVarPtrStorageBuf;    ///< Whether to enable "VariablePointerStorageBuffer" capability
+  bool enableVarPtr;              ///< Whether to enable "VariablePointer" capability
+  bool useSubgroupSize;           ///< Whether gl_SubgroupSize is used
+  bool useSpecConstant;           ///< Whether specialization constant is used
+  bool keepUnusedFunctions;       ///< Whether to keep unused function
+  bool enableRayQuery;            ///< Whether the "RayQueryKHR" capability is used
+  bool rayQueryLibrary;           ///< Whether the shaderModule is rayQueryLibrary
+  bool isInternalRtShader;        ///< Whether the shaderModule is a GPURT internal shader (e.g. BVH build)
+  bool hasTraceRay;               ///< Whether the shaderModule has OpTraceRayKHR
+  bool hasExecuteCallable;        ///< Whether the shaderModule has OpExecuteCallableKHR
+  bool useIsNan;                  ///< Whether IsNan is used
+  bool useInvariant;              ///< Whether invariant variable is used
+  bool usePointSize;              ///< Whether gl_PointSize is used in output
+  bool useShadingRate;            ///< Whether shading rate is used
+  bool useSampleInfo;             ///< Whether gl_SamplePosition or InterpolateAtSample are used
+  bool useClipVertex;             ///< Whether gl_ClipVertex is used
+  bool useFrontColor;             ///< Whether gl_FrontColor is used
+  bool useBackColor;              ///< Whether gl_BackColor is used
+  bool useFrontSecondaryColor;    ///< Whether gl_FrontSecondaryColor is used
+  bool useBackSecondaryColor;     ///< Whether gl_BackSecondaryColor is used
+  ResourcesNodes *pResources;     ///< Resource node for buffers and opaque types
+  bool useFragCoord;              ///< Whether gl_FragCoord is used
+  bool originUpperLeft;           ///< Whether pixel origin is upper-left
+  bool pixelCenterInteger;        ///< Whether pixel coord is Integer
+  bool useGenericBuiltIn;         ///< Whether to use builtIn inputs that include gl_PointCoord, gl_PrimitiveId,
+                                  ///  gl_Layer, gl_ClipDistance or gl_CullDistance.
+  bool enableXfb;                 ///< Whether transform feedback is enabled
+  unsigned localSizeX;            ///< Compute shader work-group size in the X dimension
+  unsigned localSizeY;            ///< Compute shader work-group size in the Y dimension
+  unsigned localSizeZ;            ///< Compute shader work-group size in the Z dimension
+  bool useBarycentric;            ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
+  bool disableDualSource;         ///< Whether disable dualSource blend
+  uint32_t clipDistanceArraySize; ///< Count of output clip distance
 };
 
 /// Represents common part of shader module data
@@ -1168,6 +1179,11 @@ struct TessellationLevel {
   float outer[4]; ///< Outer tessellation level
 };
 
+struct AdvancedBlendInfo {
+  bool enableAdvancedBlend; ///< Whether enable advanced blending
+  unsigned binding;         ///< The binding point of the texture resource attached to the framebuffer
+};
+
 /// Represents info to build a graphics pipeline.
 struct GraphicsPipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
@@ -1262,17 +1278,24 @@ struct GraphicsPipelineBuildInfo {
   const auto &getGlState() const { return *this; }
 #else
   struct {
-    bool originUpperLeft;                        ///< Whether origin coordinate of framebuffer is upper-left.
-    unsigned numUniformConstantMaps;             ///< Number of uniform constant maps
-    UniformConstantMap **ppUniformMaps;          ///< Pointers to array of pointers for the uniform constant map.
-    ApiXfbOutData apiXfbOutData;                 ///< Transform feedback data specified by API interface.
-    bool vbAddressLowBitsKnown;                  ///< Whether vbAddressLowBits is valid
-    uint8_t vbAddressLowBits[MaxVertexBindings]; ///< Lowest two bits of vertex buffer addresses
+    bool originUpperLeft;                         ///< Whether origin coordinate of framebuffer is upper-left.
+    bool vbAddressLowBitsKnown;                   ///< Whether vbAddressLowBits is valid
+    bool enableBitmap;                            ///< Whether enable Bitmap patch
+    bool enableBitmapLsb;                         ///< Whether enable LSB as first bit in bitmap resource
+    bool enableTwoSideLighting;                   ///< Whether enable two-side lighting
+    unsigned numUniformConstantMaps;              ///< Number of uniform constant maps
+    UniformConstantMap **ppUniformMaps;           ///< Pointers to array of pointers for the uniform constant map.
+    ApiXfbOutData apiXfbOutData;                  ///< Transform feedback data specified by API interface.
+    GlCompatibilityDrawPixelsType drawPixelsType; ///< DrawPixel type.
+    uint8_t vbAddressLowBits[MaxVertexBindings];  ///< Lowest two bits of vertex buffer addresses
+    float pixelTransferScale[4];                  ///< Scale apply to render color target
+    float pixelTransferBias[4];                   ///< Bias apply to render color target
   } glState;
   const auto &getGlState() const { return glState; }
 #endif
-  const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
-  size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
+  const void *pClientMetadata;         ///< Pointer to (optional) client-defined data to be stored inside the ELF
+  size_t clientMetadataSize;           ///< Size (in bytes) of the client-defined data
+  AdvancedBlendInfo advancedBlendInfo; ///< The info of advanced blend
 };
 
 /// Represents info to build a compute pipeline.
@@ -1441,6 +1464,12 @@ public:
   /// @param [in]  gfxIp            Graphics IP version info
   /// @param [in]  pPipelineBin     Pipeline binary (ELF)
   static void VKAPI_CALL DumpPipelineBinary(void *pDumpFile, GfxIpVersion gfxIp, const BinaryData *pPipelineBin);
+
+  /// Dump graphics stage library file name.
+  ///
+  /// @param [in]  pDumpFile        The handle of pipeline dump file
+  /// @param [in]  libFileNames     File name array of size three
+  static void VKAPI_CALL DumpGraphicsLibraryFileName(void *pDumpFile, const char **libFileNames);
 
   /// Dump extra info to pipeline file.
   ///

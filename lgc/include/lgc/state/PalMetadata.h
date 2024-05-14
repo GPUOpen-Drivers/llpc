@@ -87,9 +87,9 @@ struct FsInputMappings {
 class PalMetadata {
 public:
   // Constructors
-  PalMetadata(PipelineState *pipelineState, bool useRegisterFieldFormat);
-  PalMetadata(PipelineState *pipelineState, llvm::StringRef blob, bool useRegisterFieldFormat);
-  PalMetadata(PipelineState *pipelineState, llvm::Module *module, bool useRegisterFieldFormat);
+  PalMetadata(PipelineState *pipelineState);
+  PalMetadata(PipelineState *pipelineState, llvm::StringRef blob);
+  PalMetadata(PipelineState *pipelineState, llvm::Module *module);
   PalMetadata(const PalMetadata &) = delete;
   PalMetadata &operator=(const PalMetadata &) = delete;
 
@@ -104,29 +104,13 @@ public:
   // Get the MsgPack document for explicit manipulation. Only ConfigBuilder* uses this.
   llvm::msgpack::Document *getDocument() { return m_document; }
 
-  // Set the PAL metadata SPI register for one user data entry
-  void setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex, unsigned userDataValue, unsigned dwordCount = 1);
-  void setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex, UserDataMapping userDataValue,
-                        unsigned dwordCount = 1) {
-    setUserDataEntry(stage, userDataIndex, static_cast<unsigned>(userDataValue), dwordCount);
-  }
-
   // Mark that the user data spill table is used at the given offset. The SpillThreshold PAL metadata entry is
   // set to the minimum of any call to this function in any shader.
-  void setUserDataSpillUsage(unsigned dwordOffset);
+  void setUserDataSpillUsage(unsigned dwordOffset, std::optional<ShaderStageEnum> shaderStage);
 
   // Fix up registers. Any user data register that has one of the unlinked UserDataMapping values defined in
   // AbiUnlinked.h is fixed up by looking at pipeline state; And some dynamic states also need to be fixed.
   void fixUpRegisters();
-
-  // Get a register value in PAL metadata.
-  unsigned getRegister(unsigned regNum);
-
-  // Set a register value in PAL metadata. If the register has a value set already, it gets overwritten.
-  void setRegister(unsigned regNum, unsigned value);
-
-  // Get the VS entry register info. Used by the linker to generate the fetch shader.
-  void getVsEntryRegInfo(VsEntryRegInfo &regInfo);
 
   // Store the color export info in the PAL metadata
   void addColorExportInfo(llvm::ArrayRef<ColorExportInfo> exports);
@@ -208,12 +192,12 @@ public:
   // Set userDataLimit to the given value
   void setUserDataLimit(unsigned value);
 
+  // Set Util::Abi::PipelineMetadataKey::PsDummyExport to true
+  void setPsDummyExport();
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
-
-  // Get the first user data register number for the given shader stage.
-  unsigned getUserDataReg0(ShaderStageEnum stage);
 
   // Get the llvm type that corresponds to tyName.  Returns nullptr if no such type exists.
   llvm::Type *getLlvmType(llvm::StringRef tyName) const;
@@ -236,30 +220,14 @@ private:
   // The maximum possible value for the spill threshold entry in the PAL metadata.
   static constexpr uint64_t MAX_SPILL_THRESHOLD = USHRT_MAX;
 
-  unsigned getUserDataCount(unsigned callingConv);
-  unsigned getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName);
-  unsigned getFirstUserDataReg(unsigned callingConv);
-  unsigned getNumberOfSgprsBeforeUserData(unsigned conv);
-  unsigned getOffsetOfUserDataReg(std::map<llvm::msgpack::DocNode, llvm::msgpack::DocNode>::iterator firstUserDataNode,
-                                  UserDataMapping userDataMapping);
-  unsigned getOffsetOfUserDataReg(llvm::msgpack::ArrayDocNode &userDataReg, UserDataMapping userDataRegMapping);
-  unsigned getNumberOfSgprsAfterUserData(unsigned callingConv);
-  unsigned getVertexIdOffset(unsigned callingConv);
-  unsigned getInstanceIdOffset(unsigned callingConv);
-  unsigned getVgprCount(unsigned callingConv);
-  bool isWave32(unsigned callingConv);
-
-  PipelineState *m_pipelineState;           // PipelineState
-  llvm::msgpack::Document *m_document;      // The MsgPack document
-  llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
-  llvm::msgpack::MapDocNode m_registers;    // MsgPack map node for amdpal.pipelines[0].registers
-  llvm::msgpack::DocNode m_colorExports;    // MsgPack map node for amdpal.pipelines[0].colorExports
-  // Mapping from ShaderStageEnum to SPI user data register start, allowing for merged shaders and NGG.
-  unsigned m_userDataRegMapping[ShaderStage::CountInternal] = {};
+  PipelineState *m_pipelineState;             // PipelineState
+  llvm::msgpack::Document *m_document;        // The MsgPack document
+  llvm::msgpack::MapDocNode m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
+  llvm::msgpack::MapDocNode m_registers;      // MsgPack map node for amdpal.pipelines[0].registers
+  llvm::msgpack::DocNode m_colorExports;      // MsgPack map node for amdpal.pipelines[0].colorExports
   llvm::msgpack::DocNode *m_userDataLimit;    // Maximum so far number of user data dwords used
   llvm::msgpack::DocNode *m_spillThreshold;   // Minimum so far dword offset used in user data spill table
   llvm::SmallString<0> m_fsInputMappingsBlob; // Buffer for returning FS input mappings blob to LGC client
-  bool m_useRegisterFieldFormat;              // Whether to use new PAL metadata in ELF
 };
 
 } // namespace lgc

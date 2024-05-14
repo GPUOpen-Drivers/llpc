@@ -218,8 +218,7 @@ private:
 
   bool m_hasGs; // Whether the pipeline has geometry shader
 
-  llvm::GlobalVariable *m_lds; // Global variable to model LDS
-  llvm::Value *m_threadId;     // Thread ID
+  llvm::Value *m_threadId; // Thread ID
 
   std::vector<llvm::CallInst *> m_importCalls; // List of "call" instructions to import inputs
   std::vector<llvm::CallInst *> m_exportCalls; // List of "call" instructions to export outputs

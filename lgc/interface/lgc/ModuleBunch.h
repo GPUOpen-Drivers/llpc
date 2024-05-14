@@ -80,6 +80,10 @@ public:
   // Dump the module to stderr (for debugging).
   void dump() const;
 
+  bool IsNewDbgInfoFormat = false;
+
+  void setIsNewDbgInfoFormat(bool UseNewFormat) { llvm_unreachable("Should never be called!"); }
+
 private:
   SmallVector<std::unique_ptr<Module>> Modules;
 };

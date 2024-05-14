@@ -67,6 +67,9 @@ llvm::Function *cloneFunctionHeader(llvm::Function &f, llvm::FunctionType *newTy
 llvm::Function *cloneFunctionHeader(llvm::Function &f, llvm::FunctionType *newType,
                                     llvm::ArrayRef<llvm::AttributeSet> argAttrs, llvm::Module *targetModule = nullptr);
 
+// Add an unreachable at the current position and remove the rest of the basic block.
+void createUnreachable(llvm::IRBuilder<> &b);
+
 struct CrossModuleInlinerResult {
   llvm::Value *returnValue;
   llvm::iterator_range<llvm::Function::iterator> newBBs;
@@ -104,9 +107,37 @@ public:
   llvm::GlobalValue *findCopiedGlobal(llvm::GlobalValue &sourceGv, llvm::Module &targetModule);
 
 private:
+  // Checks that we haven't processed a different target module earlier.
+  void checkTargetModule(llvm::Module &targetModule) {
+    if (lastUsedTargetModule == nullptr)
+      lastUsedTargetModule = &targetModule;
+    else
+      assert(lastUsedTargetModule == &targetModule);
+  }
+
   llvm::SmallDenseMap<llvm::GlobalValue *, llvm::GlobalValue *> mappedGlobals;
+  llvm::Module *lastUsedTargetModule = nullptr; // used to check that we don't use different target modules
 };
 
+// Essentially RAUW for pointers for the case that these use different address
+// spaces, rewriting all derived pointers to also use the new address space.
+// Writes instructions which are redundant after the replacement into
+// the given ToBeRemoved vector.
+// The caller has to handle the erasure afterwards.
+void replaceAllPointerUses(llvm::IRBuilder<> *builder, llvm::Value *oldPointerValue, llvm::Value *newPointerValue,
+                           llvm::SmallVectorImpl<llvm::Instruction *> &toBeRemoved);
+
 } // namespace CompilerUtils
+
+namespace llvm {
+
+// Replacement for PointerType::getWithSamePointeeType that works with new LLVM.
+// Returns a typed pointer type if the pointer type is typed.
+//
+// TODO: Remove this as soon as all internal users of opaque pointers have been
+//       fixed.
+PointerType *getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace);
+
+} // namespace llvm
 
 #endif

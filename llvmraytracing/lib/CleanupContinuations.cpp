@@ -61,17 +61,14 @@
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsDialect.h"
+#include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/Support/MathExtras.h"
-#include <cassert>
 
 using namespace llvm;
 using namespace lgc;
@@ -202,7 +199,7 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
 
   SmallVector<Instruction *> ToBeRemoved;
   Value *OldBase = getContinuationFramePtr(F, IsStart, CpsInfo, &ToBeRemoved);
-  replaceAllPointerUses(Builder, OldBase, CpsStack, ToBeRemoved);
+  CompilerUtils::replaceAllPointerUses(Builder, OldBase, CpsStack, ToBeRemoved);
 
   for (auto *I : reverse(ToBeRemoved))
     I->eraseFromParent();
@@ -480,19 +477,31 @@ void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data,
   Builder->SetInsertPoint(Call);
 
   SmallVector<Value *> TailArgs;
-  // %rcr (aka. return continuation reference) for the callee.
+  uint32_t SkipCount = 2;
+  // WaitMask and %rcr (aka. return continuation reference) for the callee.
   if (cps::isCpsFunction(*cast<Function>(ResumeFun))) {
-    auto *ResumeCR = Builder->create<cps::AsContinuationReferenceOp>(ResumeFun);
+    // Ensure the first argument stays the wait mask. This comes after the CR
+    // and the levels.
+    if (ContHelper::isWaitAwaitCall(*Call)) {
+      TailArgs.push_back(Call->getArgOperand(2));
+      ++SkipCount;
+    }
+
+    auto *ResumeCR = Builder->create<cps::AsContinuationReferenceOp>(
+        ContinuationReferenceType, ResumeFun);
+
     TailArgs.push_back(ResumeCR);
   } else {
     // For entry-point compute kernel, pass a poison %rcr.
     TailArgs.push_back(PoisonValue::get(Builder->getInt32Ty()));
   }
-  // Skip continuation.reference and levels.
-  TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), 2)));
+  // Skip continuation.reference, levels and potentially the wait mask.
+  TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), SkipCount)));
   auto *CR = Call->getArgOperand(0);
-  Value *Level = Call->getArgOperand(1);
+  Value *Level =
+      Call->getArgOperand(ContHelper::isWaitAwaitCall(*Call) ? 2 : 1);
   unsigned LevelImm = cast<ConstantInt>(Level)->getZExtValue();
+
   // TODO: Continuation state are passed through stack for now.
   auto *State = PoisonValue::get(StructType::get(Builder->getContext(), {}));
   auto *JumpCall = Builder->create<cps::JumpOp>(CR, LevelImm, State, TailArgs);
@@ -538,8 +547,6 @@ void CleanupContinuationsPass::lowerIntrinsicCall(Module &Mod) {
     auto Stage = lgc::rt::getLgcRtShaderStage(Caller);
     if (!Stage)
       continue;
-    DXILShaderKind ShaderKind =
-        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
 
     // Signature of cps function: { state, rcr, shader-index, system-data}
     auto *SystemDataArg = Caller->getArg(CpsArgIdxSystemData);
@@ -552,30 +559,36 @@ void CleanupContinuationsPass::lowerIntrinsicCall(Module &Mod) {
     Builder->CreateStore(SystemDataArg, SystemData);
     for (auto *Call : IntrinsicCalls)
       replaceIntrinsicCall(*Builder, SystemDataArg->getType(), SystemData,
-                           ShaderKind, Call, GpurtLibrary ? GpurtLibrary : &Mod,
+                           *Stage, Call, GpurtLibrary ? GpurtLibrary : &Mod,
                            CrossInliner);
   }
 }
 
 void CleanupContinuationsPass::lowerGetResumePoint(Module &Mod) {
-  auto *GetResumePoint = Mod.getFunction("_AmdGetResumePointAddr");
-  if (!GetResumePoint)
-    return;
+  for (auto &F : make_early_inc_range(Mod)) {
+    auto FuncName = F.getName();
+    if (!FuncName.starts_with("_AmdGetResumePointAddr"))
+      continue;
+    for (auto &Use : make_early_inc_range(F.uses())) {
+      auto *GetResumeCall = dyn_cast<CallInst>(Use.getUser());
+      // Get the lgc.cps.jump that is dominated by this _AmdGetResumePointAddr
+      // call.
+      auto JumpCall = findDominatedContinueCall(GetResumeCall);
+      assert(JumpCall && "Should find a dominated call to lgc.cps.jump");
+      // For wait calls, skip the wait mask.
+      uint32_t SkipCount =
+          ContHelper::isWaitAwaitCall(*(JumpCall.value())) ? 1 : 0;
 
-  for (auto &Use : make_early_inc_range(GetResumePoint->uses())) {
-    auto *GetResumeCall = dyn_cast<CallInst>(Use.getUser());
-    // Get the lgc.cps.jump that is dominated by this _AmdGetResumePointAddr
-    // call.
-    auto JumpCall = findDominatedContinueCall(GetResumeCall);
-    assert(JumpCall && "Should find a dominated call to lgc.cps.jump");
-    Value *ResumeFn = *cast<cps::JumpOp>(*JumpCall)->getTail().begin();
-    assert(ResumeFn && isa<cps::AsContinuationReferenceOp>(ResumeFn));
-    // We can always move this as.continuation.reference call.
-    cast<Instruction>(ResumeFn)->moveBefore(GetResumeCall);
-    Builder->SetInsertPoint(GetResumeCall);
-    auto *ResumePtr = Builder->CreateZExt(ResumeFn, Builder->getInt64Ty());
-    GetResumeCall->replaceAllUsesWith(ResumePtr);
-    GetResumeCall->eraseFromParent();
+      lgc::cps::JumpOp *Jump = cast<cps::JumpOp>(*JumpCall);
+      Value *ResumeFn = *(Jump->getTail().begin() + SkipCount);
+      assert(ResumeFn && isa<cps::AsContinuationReferenceOp>(ResumeFn));
+      // We can always move this as.continuation.reference call.
+      cast<Instruction>(ResumeFn)->moveBefore(GetResumeCall);
+      Builder->SetInsertPoint(GetResumeCall);
+      auto *ResumePtr = Builder->CreateZExt(ResumeFn, Builder->getInt64Ty());
+      GetResumeCall->replaceAllUsesWith(ResumePtr);
+      GetResumeCall->eraseFromParent();
+    }
   }
 }
 
@@ -595,6 +608,12 @@ CleanupContinuationsPass::run(llvm::Module &Mod,
 
   llvm_dialects::Builder B(Mod.getContext());
   Builder = &B;
+
+  if (Use64BitContinuationReferences)
+    ContinuationReferenceType = Builder->getInt64Ty();
+  else
+    ContinuationReferenceType = Builder->getInt32Ty();
+
   // Map the entry function of a continuation to the analysis result
   for (auto &F : Mod.functions()) {
     if (F.empty())

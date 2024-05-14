@@ -301,11 +301,13 @@ CallInst *Builder::CreateUnaryIntrinsic(Intrinsic::ID id, Value *value, Instruct
 // @param value2 : Input value 2
 // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
 // @param name : Name to give instruction
-CallInst *Builder::CreateBinaryIntrinsic(Intrinsic::ID id, Value *value1, Value *value2, Instruction *fmfSource,
-                                         const Twine &name) {
-  CallInst *result = IRBuilder<>::CreateBinaryIntrinsic(id, value1, value2, fmfSource, name);
-  if (!fmfSource && isa<FPMathOperator>(result))
-    result->setFastMathFlags(getFastMathFlags());
+Value *Builder::CreateBinaryIntrinsic(Intrinsic::ID id, Value *value1, Value *value2, Instruction *fmfSource,
+                                      const Twine &name) {
+  Value *result = IRBuilder<>::CreateBinaryIntrinsic(id, value1, value2, fmfSource, name);
+  if (auto *intr = dyn_cast<CallInst>(result)) {
+    if (!fmfSource && isa<FPMathOperator>(intr))
+      intr->setFastMathFlags(getFastMathFlags());
+  }
   return result;
 }
 

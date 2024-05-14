@@ -13,12 +13,11 @@ define <4 x i32> @simple_await(<4 x i32> %arg) !continuation.registercount !1 {
 ; CHECK-LABEL: define void @simple_await(
 ; CHECK-SAME: i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] !continuation.stacksize [[META3:![0-9]+]] !continuation.state [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
+; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CHECK-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CHECK-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META1]], !continuation.returnedRegistercount !1
 ; CHECK-NEXT:    unreachable
 ;
@@ -31,12 +30,11 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; CHECK-LABEL: define void @simple_await_entry(
 ; CHECK-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount [[META1]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] !continuation.stacksize [[META3]] !continuation.state [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
+; CHECK-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CHECK-NEXT:    store ptr addrspace(1) [[MEM]], ptr addrspace(32) [[MEM_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META1]], !continuation.returnedRegistercount !1
 ; CHECK-NEXT:    unreachable
 ;

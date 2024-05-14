@@ -73,14 +73,8 @@ protected:
   // Get the PipelineState object.
   PipelineState *getPipelineState() const { return m_pipelineState; }
 
-  // Get whether the context we are building in supports DPP ROW_XMASK operations.
-  bool supportDppRowXmask() const;
-
   // Get whether the context we are building in support the bpermute operation.
   bool supportWaveWideBPermute() const;
-
-  // Get whether the context we are building in supports permute lane DPP operations.
-  bool supportPermLaneDpp() const;
 
   // Get whether the context we are building in supports permute lane 64 DPP operations.
   bool supportPermLane64Dpp() const;
@@ -294,7 +288,15 @@ private:
 public:
   // Create a buffer descriptor.
   llvm::Value *CreateBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                const llvm::Twine &instName = "");
+                                const llvm::Twine &instName = "") {
+    return createBufferDesc(descSet, binding, descIndex, flags, 0);
+  }
+
+  // Create a strided buffer descriptor.
+  llvm::Value *CreateStridedBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                       unsigned stride, const llvm::Twine &instName = "") {
+    return createBufferDesc(descSet, binding, descIndex, flags, stride);
+  }
 
   // Create a get of the stride (in bytes) of a descriptor.
   llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
@@ -308,7 +310,7 @@ public:
   llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
 
   // Calculate a buffer descriptor for an inline buffer
-  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);
+  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr, unsigned stride);
 
   // Check whether vertex buffer descriptors are in a descriptor array binding instead of the VertexBufferTable.
   bool useVertexBufferDescArray();
@@ -328,8 +330,11 @@ private:
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
 
   // Build buffer compact descriptor
-  llvm::Value *buildBufferCompactDesc(llvm::Value *desc);
+  llvm::Value *buildBufferCompactDesc(llvm::Value *desc, unsigned stride);
 
+  // Create a buffer descriptor.
+  llvm::Value *createBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                unsigned stride, const llvm::Twine &instName = "");
   // -------------------------------------------------------------------------------------------------------------------
   // Image operations
 
@@ -395,6 +400,10 @@ public:
   // and implicit LOD.
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
+
+  // Create a query of the sample position of given sample id in an image.
+  llvm::Value *CreateImageGetSamplePosition(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *sampleId,
+                                            const llvm::Twine &instName = "");
 
   // Create a ray intersect result with specified node in BVH buffer
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
@@ -621,9 +630,6 @@ public:
   // Create a "kill". Only allowed in a fragment shader.
   llvm::Instruction *CreateKill(const llvm::Twine &instName = "");
 
-  // Create a "debug break".
-  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "");
-
   // Create a "readclock".
   llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName = "");
 
@@ -788,6 +794,7 @@ private:
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
 
 protected:
+  llvm::Value *createGroupBallot(llvm::Value *const value, bool excludeHelperLanes);
   llvm::Value *createGroupBallot(llvm::Value *const value);
   llvm::Value *createFindMsb(llvm::Value *const mask);
 };

@@ -872,9 +872,8 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
   const char *padding = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
   const char *endPadding = nullptr;
   if (shdr->sh_flags & ELF::SHF_EXECINSTR) {
-    padding = "\0\0\x80\xBF\0\0\x80\xBF\0\0\x80\xBF\0\0\x80\xBF"; // s_nop
-    if (m_linker->getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10)
-      endPadding = "\0\0\x9F\xBF\0\0\x9F\xBF\0\0\x9F\xBF\0\0\x9F\xBF"; // s_code_end
+    padding = "\0\0\x80\xBF\0\0\x80\xBF\0\0\x80\xBF\0\0\x80\xBF";    // s_nop
+    endPadding = "\0\0\x9F\xBF\0\0\x9F\xBF\0\0\x9F\xBF\0\0\x9F\xBF"; // s_code_end
   }
 
   // Output the contributions from the input sections.

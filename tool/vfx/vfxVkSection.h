@@ -798,6 +798,33 @@ private:
 };
 
 // =====================================================================================================================
+// Represents the sub section AdvancedBlendInfo
+class SectionAdvancedBlendInfo : public Section {
+public:
+  typedef Vkgc::AdvancedBlendInfo SubState;
+
+  SectionAdvancedBlendInfo() : Section(getAddrTable(), SectionTypeUnset, "advancedBlendInfo") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionAdvancedBlendInfo, enableAdvancedBlend, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionAdvancedBlendInfo, binding, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+};
+
+// =====================================================================================================================
 // Represents the section graphics state
 class SectionGraphicsState : public Section {
 public:
@@ -882,6 +909,7 @@ public:
                                          false);
 #endif
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionGraphicsState, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_advancedBlendInfo, MemberTypeAdvancedBlendInfo, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -896,6 +924,7 @@ public:
       m_state.cbState.target[i].channelWriteMask = colorBuffer.channelWriteMask;
       m_state.cbState.target[i].format = colorBuffer.format;
     }
+    m_advancedBlendInfo.getSubState(m_state.advancedBlendInfo);
     m_options.getSubState(m_state.options);
     m_nggState.getSubState(m_state.nggState);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
@@ -972,6 +1001,7 @@ private:
   std::vector<SectionXfbOutInfo> m_xfbOutInfo;
   std::vector<Vkgc::XfbOutInfo> m_xfbOutInfoData;
   unsigned m_usrClipPlaneMask;
+  SectionAdvancedBlendInfo m_advancedBlendInfo;
 };
 
 // =====================================================================================================================

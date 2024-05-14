@@ -44,6 +44,7 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Object/ArchiveWriter.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Support/AMDGPUMetadata.h"
 #include "llvm/Support/StringSaver.h"
@@ -144,6 +145,56 @@ private:
 } // anonymous namespace
 
 // =====================================================================================================================
+// Disassemble an archive of ELFs. We put the disassembled code into a new archive with same member
+// names with ".S" suffix.
+static void disassembleArchive(MemoryBufferRef data, raw_ostream &ostream) {
+  Error err = Error::success();
+  SmallVector<NewArchiveMember> disassembledMembers;
+  SmallVector<SmallString<0>> strBuffers;
+  object::Archive archive(data, err);
+  if (!err) {
+    for (object::Archive::Child child : archive.children(err)) {
+      if (err)
+        break;
+      Expected<StringRef> name = child.getName();
+      if (err = name.takeError())
+        break;
+      Expected<MemoryBufferRef> contents = child.getMemoryBufferRef();
+      if (err = contents.takeError())
+        break;
+      strBuffers.resize(strBuffers.size() + 2);
+      SmallString<0> &nameBuffer = strBuffers[strBuffers.size() - 2];
+      SmallString<0> &disBuffer = strBuffers.back();
+      nameBuffer = *name;
+      nameBuffer += ".S";
+      raw_svector_ostream disasmStream(disBuffer);
+      disasmStream << "// Member " << *name << ":\n";
+      ObjDisassembler::disassembleObject(*contents, disasmStream);
+      disassembledMembers.emplace_back(MemoryBufferRef(disBuffer, nameBuffer));
+    }
+  }
+
+  if (!err) {
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 472105
+    Expected<std::unique_ptr<MemoryBuffer>> newArchive =
+        writeArchiveToBuffer(disassembledMembers, SymtabWritingMode::NoSymtab, object::Archive::Kind::K_GNU,
+                             /*Deterministic=*/true, /*Thin=*/false);
+#else
+    Expected<std::unique_ptr<MemoryBuffer>> newArchive =
+        writeArchiveToBuffer(disassembledMembers, /*WriteSymtab=*/false, object::Archive::Kind::K_GNU,
+                             /*Deterministic=*/true, /*Thin=*/false);
+#endif
+    if (!newArchive)
+      err = newArchive.takeError();
+    else
+      ostream << (*newArchive)->getBuffer();
+  }
+
+  if (err)
+    report_fatal_error(std::move(err));
+}
+
+// =====================================================================================================================
 // Disassemble an ELF object into ostream. Does report_fatal_error on error.
 //
 // @param data : The object file contents
@@ -154,7 +205,13 @@ void lgc::disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
   InitializeAllTargetMCs();
   InitializeAllDisassemblers();
 
-  // Do the disassembly.
+  if (data.getBuffer().starts_with("!<arch>\n")) {
+    // Disassemble archive of ELFs.
+    disassembleArchive(data, ostream);
+    return;
+  }
+
+  // Attempt to disassemble ELF.
   ObjDisassembler::disassembleObject(data, ostream);
 }
 

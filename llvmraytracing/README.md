@@ -7,4 +7,4 @@ This is supposed to be used as a submodule in a driver repository.
 
 ### Tests
 
-Lit tests are behind the `check-continuations` CMake target, they can be run with `make check-continuations`.
+Lit tests are behind the `check-llvmraytracing` CMake target, they can be run with `make check-llvmraytracing`.

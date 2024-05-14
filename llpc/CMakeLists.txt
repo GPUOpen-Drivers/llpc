@@ -132,6 +132,7 @@ if(ICD_BUILD_LLPC)
         endforeach()
     endif()
     target_link_libraries(llpcinternal PUBLIC ${extra_llvm_libs})
+    target_link_libraries(llpcinternal PRIVATE gfxruntime)
 endif()
 
 ### Compiler Options ###################################################################################################
@@ -204,6 +205,7 @@ if(ICD_BUILD_LLPC)
         context/llpcGraphicsContext.cpp
         context/llpcPipelineContext.cpp
         context/llpcRayTracingContext.cpp
+        context/GfxRuntimeContext.cpp
     )
 
 # llpc/lower
@@ -217,7 +219,7 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
         lower/llpcSpirvLowerRayQuery.cpp
-        lower/llpcSpirvLowerRayQueryPostInline.cpp
+        lower/LowerPostInline.cpp
         lower/llpcSpirvLowerRayTracing.cpp
         lower/llpcSpirvLowerTerminator.cpp
         lower/llpcSpirvLowerTranslator.cpp
@@ -227,6 +229,8 @@ if(ICD_BUILD_LLPC)
         lower/LowerGLCompatibility.cpp
         lower/llpcSpirvLowerCooperativeMatrix.cpp
         lower/PrepareContinuations.cpp
+        lower/LowerAdvancedBlend.cpp
+        lower/ProcessGfxRuntimeLibrary.cpp
     )
 
 # llpc/translator

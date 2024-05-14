@@ -468,7 +468,7 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
   }
 
   FragColorExport fragColorExport(m_pipelineState->getLgcContext());
-  bool dummyExport = m_resUsage->builtInUsage.fs.discard;
+  bool dummyExport = m_resUsage->builtInUsage.fs.discard || m_pipelineState->getOptions().forceFragColorDummyExport;
   FragColorExport::Key key = FragColorExport::computeKey(m_info, m_pipelineState);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
                                              builder, dynamicIsDualSource, key);
@@ -1041,6 +1041,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     }
     if (!lastExport && dummyExport) {
       lastExport = FragColorExport::addDummyExport(builder);
+      palMetadata->setPsDummyExport();
       finalExportFormats.push_back(EXP_FORMAT_32_R);
     }
     if (lastExport)
@@ -1106,10 +1107,8 @@ Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, Pipeli
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(entryPoint, ShaderStage::Fragment);
   entryPoint->setCallingConv(CallingConv::AMDGPU_PS);
-  if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
-    const unsigned waveSize = pipelineState->getShaderWaveSize(ShaderStage::Fragment);
-    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
-  }
+  const unsigned waveSize = pipelineState->getShaderWaveSize(ShaderStage::Fragment);
+  entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   return entryPoint;
 }
 

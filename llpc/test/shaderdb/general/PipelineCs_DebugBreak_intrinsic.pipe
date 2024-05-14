@@ -47,7 +47,7 @@ userDataNode[0].set = 0
 userDataNode[0].binding = 0
 ; CHECK-LABEL: @main(
 ; CHECK-NEXT:  .entry:
-; CHECK-NEXT:    call void (...) @lgc.create.debug.break.V()
+; CHECK-NEXT:    call void @llvm.amdgcn.s.sethalt(i32 1)
 ; CHECK-NEXT:    ret void
 ;
 ;

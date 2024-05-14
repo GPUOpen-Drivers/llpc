@@ -33,7 +33,6 @@
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
-#include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm-dialects/Dialect/OpSet.h"
 #include "llvmraytracing/ContinuationsDialect.h"
@@ -46,6 +45,7 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -95,6 +95,7 @@ const llvm_dialects::OpMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {{
     GPURTMAP_ENTRY(PrimitiveIndexOp, "PrimitiveIndex", true),
     GPURTMAP_ENTRY(GeometryIndexOp, "GeometryIndex", true),
     GPURTMAP_ENTRY(InstanceInclusionMaskOp, "InstanceInclusionMask", false),
+    GPURTMAP_ENTRY(TriangleVertexPositionsOp, "TriangleVertexPositions", true),
 }};
 
 #undef GPURTMAP_ENTRY
@@ -139,8 +140,8 @@ bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
   return DidChange;
 }
 
-bool ContHelper::isRematerializableLgcRtOp(CallInst &CInst,
-                                           std::optional<DXILShaderKind> Kind) {
+bool ContHelper::isRematerializableLgcRtOp(
+    CallInst &CInst, std::optional<lgc::rt::RayTracingShaderStage> Kind) {
   using namespace lgc::rt;
   Function *Callee = CInst.getCalledFunction();
   if (!llvm::isLgcRtOp(Callee))
@@ -158,7 +159,7 @@ bool ContHelper::isRematerializableLgcRtOp(CallInst &CInst,
   // ClosestHit, because if ClosestHit calls TraceRay or CallShader, that
   // information is lost from the system data struct. Also exclude rayTCurrent
   // because ReportHit calls can change that.
-  if (!Kind || *Kind == DXILShaderKind::Intersection) {
+  if (!Kind || *Kind == RayTracingShaderStage::Intersection) {
     static const llvm_dialects::OpSet RematerializableIntersectionDialectOps =
         llvm_dialects::OpSet::get<
             InstanceIdOp, InstanceIndexOp, GeometryIndexOp,
@@ -172,104 +173,52 @@ bool ContHelper::isRematerializableLgcRtOp(CallInst &CInst,
   return false;
 }
 
-void llvm::replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
-                                 Value *NewPointerValue,
-                                 SmallVectorImpl<Instruction *> &ToBeRemoved) {
-  // Note: The implementation explicitly supports typed pointers, which
-  //       complicates some of the code below.
+Type *ContHelper::getPaddingType(const DataLayout &DL, LLVMContext &Context,
+                                 ArrayRef<Type *> Types,
+                                 unsigned TargetNumDwords) {
+  unsigned DwordsOccupied = lgc::cps::getArgumentDwordCount(DL, Types);
 
-  // Assert that both types are pointers that only differ in the address space.
-  PointerType *OldPtrTy = cast<PointerType>(OldPointerValue->getType());
-  PointerType *NewPtrTy = cast<PointerType>(NewPointerValue->getType());
-  unsigned NewAS = NewPtrTy->getAddressSpace();
-  assert(NewAS != OldPtrTy->getAddressSpace());
-  assert(getWithSamePointeeType(OldPtrTy, NewAS) == NewPtrTy);
-
-  OldPointerValue->mutateType(NewPtrTy);
-
-  // Traverse through the users and setup the addrspace
-  SmallVector<Value *> Worklist(OldPointerValue->users());
-  OldPointerValue->replaceAllUsesWith(NewPointerValue);
-
-  // Given a pointer type, get a pointer with the same pointee type (possibly
-  // opaque) as the given type that uses the NewAS address space.
-  auto GetMutatedPtrTy = [NewAS](Type *Ty) {
-    PointerType *PtrTy = cast<PointerType>(Ty);
-    // Support typed pointers:
-    return getWithSamePointeeType(PtrTy, NewAS);
-  };
-
-  while (!Worklist.empty()) {
-    Value *Ptr = Worklist.pop_back_val();
-    Instruction *Inst = cast<Instruction>(Ptr);
-    LLVM_DEBUG(dbgs() << "Visiting " << *Inst << '\n');
-    // In the switch below, "break" means to continue with replacing
-    // the users of the current value, while "continue" means to stop at
-    // the current value, and proceed with next one from the work list.
-    switch (Inst->getOpcode()) {
-    default:
-      LLVM_DEBUG(Inst->dump());
-      llvm_unreachable("Unhandled instruction\n");
-      break;
-    case Instruction::Call: {
-      if (Inst->isLifetimeStartOrEnd()) {
-        // The lifetime marker is not useful anymore.
-        Inst->eraseFromParent();
-      } else {
-        LLVM_DEBUG(Inst->dump());
-        llvm_unreachable("Unhandled call instruction\n");
-      }
-      // No further processing needed for the users.
-      continue;
-    }
-    case Instruction::Load:
-    case Instruction::Store:
-      // No further processing needed for the users.
-      continue;
-    case Instruction::And:
-    case Instruction::Add:
-    case Instruction::PtrToInt:
-      break;
-    case Instruction::BitCast: {
-      // This can happen with typed pointers
-      auto *BC = cast<BitCastOperator>(Inst);
-      assert(cast<BitCastOperator>(Inst)->getSrcTy()->isPointerTy() &&
-             BC->getDestTy()->isPointerTy());
-      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
-      break;
-    }
-    case Instruction::AddrSpaceCast:
-      // Check that the pointer operand has already been fixed
-      assert(Inst->getOperand(0)->getType()->getPointerAddressSpace() == NewAS);
-      // Push the correct users before RAUW.
-      Worklist.append(Ptr->users().begin(), Ptr->users().end());
-      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
-      // Since we are mutating the address spaces of users as well,
-      // we can just use the (already mutated) cast operand.
-      Inst->replaceAllUsesWith(Inst->getOperand(0));
-      ToBeRemoved.push_back(Inst);
-      continue;
-    case Instruction::IntToPtr:
-    case Instruction::GetElementPtr: {
-      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
-      break;
-    }
-    case Instruction::Select: {
-      auto *OldType = Inst->getType();
-      if (OldType->isPointerTy()) {
-        Type *NewType = GetMutatedPtrTy(OldType);
-        // No further processing if the type has the correct pointer type
-        if (NewType == OldType)
-          continue;
-
-        Inst->mutateType(NewType);
-      }
-      break;
-    }
-    }
-
-    Worklist.append(Ptr->users().begin(), Ptr->users().end());
+  assert(DwordsOccupied <= TargetNumDwords);
+  unsigned DwordsRemaining = TargetNumDwords - DwordsOccupied;
+  if (DwordsRemaining > 0) {
+    auto I32 = Type::getInt32Ty(Context);
+    return ArrayType::get(I32, DwordsRemaining);
+  } else {
+    return StructType::get(Context);
   }
+}
+
+void ContHelper::addPaddingType(const DataLayout &DL, LLVMContext &Context,
+                                SmallVectorImpl<Type *> &Types,
+                                unsigned TargetNumDwords) {
+  Types.push_back(getPaddingType(DL, Context, Types, TargetNumDwords));
+}
+
+void ContHelper::addPaddingValue(const DataLayout &DL, LLVMContext &Context,
+                                 SmallVectorImpl<Value *> &Values,
+                                 unsigned TargetNumDwords) {
+  SmallVector<Type *> Types;
+  for (auto Value : Values)
+    Types.push_back(Value->getType());
+
+  Values.push_back(
+      PoisonValue::get(getPaddingType(DL, Context, Types, TargetNumDwords)));
+}
+
+bool ContHelper::getGpurtVersionFlag(Module &GpurtModule,
+                                     GpuRtVersionFlag Flag) {
+  auto *F = GpurtModule.getFunction(ContDriverFunc::GpurtVersionFlagsName);
+  if (!F) {
+    // If the GpuRt version flags intrinsic is not found, treat flags as set,
+    // enabling new behavior. This is mainly intended for tests which lack the
+    // intrinsic and should always use the new behavior.
+    return true;
+  }
+  StructType *RetTy = cast<StructType>(F->getReturnType());
+  assert(RetTy->getNumElements() == 1);
+  ArrayType *InnerTy = cast<ArrayType>(RetTy->getElementType(0));
+  uint32_t Flags = InnerTy->getNumElements();
+  return (Flags & static_cast<uint32_t>(Flag)) != 0;
 }
 
 void llvm::forwardContinuationFrameStoreToLoad(DominatorTree &DT,
@@ -356,6 +305,14 @@ void llvm::forwardContinuationFrameStoreToLoad(DominatorTree &DT,
         Worklist.push_back(PointerUse(&UU, PtrUse.Offset));
       break;
     }
+
+    case Instruction::Call: {
+      auto *Call = cast<CallInst>(U);
+      // Ignore lifetime markers.
+      if (Call->isLifetimeStartOrEnd())
+        break;
+    }
+      LLVM_FALLTHROUGH;
     default:
       LLVM_DEBUG(dbgs() << "Unhandled user of continuation frame pointer: "
                         << *U << '\n');
@@ -430,17 +387,6 @@ void llvm::forwardContinuationFrameStoreToLoad(DominatorTree &DT,
         PtrInstr->eraseFromParent();
     }
   }
-}
-
-PointerType *llvm::getWithSamePointeeType(PointerType *PtrTy,
-                                          unsigned AddressSpace) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 482880
-  return PointerType::getWithSamePointeeType(PtrTy, AddressSpace);
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
-  return PointerType::get(PtrTy->getContext(), AddressSpace);
-#endif
 }
 
 static const char *toString(DXILShaderKind ShaderKind) {
@@ -891,11 +837,10 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData,
   return B.CreateInBoundsGEP(OrigSystemDataTy, SystemData, Indices);
 }
 
-CallInst *
-llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
-                           Value *SystemData, DXILShaderKind Kind,
-                           CallInst *Call, Module *GpurtLibrary,
-                           CompilerUtils::CrossModuleInliner &Inliner) {
+CallInst *llvm::replaceIntrinsicCall(
+    IRBuilder<> &B, Type *SystemDataTy, Value *SystemData,
+    lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
+    CompilerUtils::CrossModuleInliner &Inliner) {
   B.SetInsertPoint(Call);
 
   auto IntrImplEntry = findIntrImplEntryByIntrinsicCall(Call);
@@ -917,8 +862,8 @@ llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
   // For hit data accessors, get the hit data struct
   if (IntrImplEntry->AccessesHitData) {
     Function *GetHitData;
-    if (Kind == DXILShaderKind::AnyHit ||
-        Kind == DXILShaderKind::Intersection) {
+    if (Kind == lgc::rt::RayTracingShaderStage::AnyHit ||
+        Kind == lgc::rt::RayTracingShaderStage::Intersection) {
       auto *GetCandidateState =
           GpurtLibrary->getFunction(ContDriverFunc::GetCandidateStateName);
       assert(GetCandidateState && "Could not find GetCandidateState function");
@@ -984,10 +929,21 @@ llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
   }
 
   auto *NewCall = B.CreateCall(IntrImpl, Arguments);
+  Value *Replacement = NewCall;
+  if (isa<lgc::rt::TriangleVertexPositionsOp>(Call)) {
+    // Special handling for TriangleVertexPositionsOp
+    // GPURT returns { <3 x float>, <3 x float>, <3 x float> }, but shader
+    // requires [3 x <3 x float>].
+    Replacement = PoisonValue::get(Call->getType());
+    for (unsigned i = 0; i < 3; i++) {
+      Replacement =
+          B.CreateInsertValue(Replacement, B.CreateExtractValue(NewCall, i), i);
+    }
+  }
 
   LLVM_DEBUG(dbgs() << "Replacing " << *Call << " by " << *NewCall << "\n");
   if (!Call->getType()->isVoidTy())
-    Call->replaceAllUsesWith(NewCall);
+    Call->replaceAllUsesWith(Replacement);
   Inliner.inlineCall(*NewCall);
   B.SetInsertPoint(&*B.GetInsertPoint());
   Call->eraseFromParent();
@@ -1012,7 +968,7 @@ static void replaceEnqueueIntrinsic(Function &F, Function *NewFunc) {
         }
 
         B.CreateCall(NewFunc, Args);
-        CInst->eraseFromParent();
+        CompilerUtils::createUnreachable(B);
       }
     }
   }
@@ -1068,8 +1024,56 @@ static void handleGetUninitialized(Function &Func) {
   auto *ArgTy = Func.getReturnType();
   auto *Poison = PoisonValue::get(ArgTy);
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst.replaceAllUsesWith(Poison);
+    IRBuilder<> B(&CInst);
+    // Create a frozen poison value so poison doesn't propagate into
+    // dependent values, e.g. when bitpacking the uninitialized value into
+    // a bitfield that should not be invalidated.
+    Value *Freeze = B.CreateFreeze(Poison);
+    CInst.replaceAllUsesWith(Freeze);
     CInst.eraseFromParent();
+  });
+}
+
+static void handleGetSetting(Function &F, ArrayRef<ContSetting> Settings) {
+  auto *Ty = dyn_cast<IntegerType>(F.getReturnType());
+  if (!Ty)
+    report_fatal_error(Twine("Only integer settings are supported but '") +
+                       F.getName() + "' does not return an integer");
+  auto Name = F.getName();
+  bool Consumed = Name.consume_front("_AmdGetSetting_");
+  if (!Consumed)
+    report_fatal_error(Twine("Setting intrinsic needs to start with "
+                             "'_AmdGetSetting_' but is called '") +
+                       Name + "'");
+
+  uint64_t NameVal;
+  bool Failed = Name.getAsInteger(10, NameVal);
+  if (Failed) {
+    report_fatal_error(
+        Twine("Failed to parse _AmdGetSetting_ suffix as int: ") + Name);
+  }
+
+  uint64_t Value = 0;
+  bool Found = false;
+  for (auto &Setting : Settings) {
+    if (Setting.NameHash == NameVal) {
+      Value = Setting.Value;
+      Found = true;
+      break;
+    }
+  }
+  if (!Found) {
+#ifndef NDEBUG
+    errs() << Twine("Warning: Setting '") + Name +
+                  "' is not defined, setting to 0\n";
+#endif
+  }
+
+  auto *Val = ConstantInt::get(Ty, Value);
+
+  forEachCall(F, [&](CallInst &Call) {
+    Call.replaceAllUsesWith(Val);
+    Call.eraseFromParent();
   });
 }
 
@@ -1116,6 +1120,8 @@ bool llvm::earlyDriverTransform(Module &M) {
   // Import from metadata if set
   auto RtipLevel = ContHelper::tryGetRtip(M);
   auto Flags = ContHelper::tryGetFlags(M);
+  SmallVector<ContSetting> GpurtSettings;
+  ContHelper::getGpurtSettings(M, GpurtSettings);
 
   bool Changed = false;
   // Replace Enqueue and Complete intrinsics
@@ -1150,6 +1156,9 @@ bool llvm::earlyDriverTransform(Module &M) {
     } else if (Name.starts_with("_AmdGetUninitialized")) {
       Changed = true;
       handleGetUninitialized(F);
+    } else if (Name.starts_with("_AmdGetSetting")) {
+      Changed = true;
+      handleGetSetting(F, GpurtSettings);
     }
   }
 
@@ -1184,6 +1193,23 @@ bool defaultMaterializable(Instruction &V);
 } // End namespace coro
 } // End namespace llvm
 
+bool llvm::commonMaterializable(Instruction &Inst) {
+  if (coro::defaultMaterializable(Inst))
+    return true;
+
+  // Insert into constant.
+  if (isa<InsertElementInst, InsertValueInst>(Inst) &&
+      isa<Constant>(Inst.getOperand(0))) {
+    return true;
+  }
+
+  if (auto *Shuffle = dyn_cast<ShuffleVectorInst>(&Inst);
+      Shuffle && Shuffle->isSingleSource())
+    return true;
+
+  return false;
+}
+
 bool llvm::LgcMaterializable(Instruction &OrigI) {
   Instruction *V = &OrigI;
 
@@ -1203,14 +1229,8 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
       break;
   }
 
-  if (coro::defaultMaterializable(*V))
+  if (commonMaterializable(*V))
     return true;
-
-  // Insert into constant.
-  if (isa<InsertElementInst, InsertValueInst>(V) &&
-      isa<Constant>(V->getOperand(0))) {
-    return true;
-  }
 
   if (auto *LI = dyn_cast<LoadInst>(V)) {
     // load from constant address space

@@ -34,6 +34,7 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llpc/GpurtEnums.h"
+#include "llpc/GpurtVersion.h"
 #include "llvm-dialects/Dialect/OpMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -89,6 +90,8 @@ constexpr uint32_t CpsArgIdxReturnAddr = 1;
 constexpr uint32_t CpsArgIdxShaderIndex = 2;
 constexpr uint32_t CpsArgIdxSystemData = 3;
 constexpr uint32_t CpsArgIdxHitAttributes = 4;
+constexpr uint32_t CpsArgIdxPadding = 5;
+constexpr uint32_t CpsArgIdxPayload = 6;
 
 struct DxRayIntrinsic {
   unsigned int Id;
@@ -179,6 +182,13 @@ Type *getFuncArgPtrElementType(const Argument *Arg);
 /// via !types metadata where appropriate.
 /// Returns nullptr for non-pointers.
 Type *getFuncArgPtrElementType(const Function *F, int ArgNo);
+
+struct ContSetting {
+  /// A hash value that is used as name.
+  uint64_t NameHash;
+  /// Value of the setting
+  uint64_t Value;
+};
 
 // Helper class to access data specific to continuation passes, e.g.
 // metadata or globals.
@@ -314,6 +324,7 @@ public:
   static constexpr const char *MDTypesVoidName = "void";
   static constexpr const char *MDContPayloadTyName = "cont.payload.type";
   static constexpr const char *MDLgcCpsModuleName = "lgc.cps.module";
+  static constexpr const char *MDGpurtSettingsName = "gpurt.settings";
 
   // Global variable names
   static constexpr const char *GlobalPayloadName = "PAYLOAD";
@@ -337,13 +348,48 @@ public:
   // modules.
   static void addDxilGpurtLibraryPasses(llvm::ModulePassManager &MPM);
 
+  // Get gpurt settings from metadata.
+  static void getGpurtSettings(const Module &M,
+                               SmallVectorImpl<ContSetting> &Settings) {
+    auto *MD = M.getNamedMetadata(MDGpurtSettingsName);
+    if (!MD)
+      return;
+    auto *Tup = MD->getOperand(0);
+
+    // Stored as {name, value, name, value, ...}
+    for (auto *Op = Tup->op_begin(); Op != Tup->op_end(); ++Op) {
+      ContSetting Setting;
+      Setting.NameHash = mdconst::extract<ConstantInt>(*Op)->getZExtValue();
+      ++Op;
+      Setting.Value = mdconst::extract<ConstantInt>(*Op)->getZExtValue();
+      Settings.push_back(Setting);
+    }
+  };
+
+  // Store gpurt settings in metadata.
+  static void setGpurtSettings(Module &M, ArrayRef<ContSetting> Settings) {
+    auto *MD = M.getOrInsertNamedMetadata(MDGpurtSettingsName);
+    MD->clearOperands();
+    auto &Context = M.getContext();
+    SmallVector<Metadata *> Vals;
+    IntegerType *Int64Ty = Type::getInt64Ty(Context);
+    // Stored as {bitwidth, value, bitwidth, value, ...}
+    for (auto &Setting : Settings) {
+      Vals.push_back(
+          ConstantAsMetadata::get(ConstantInt::get(Int64Ty, Setting.NameHash)));
+      Vals.push_back(
+          ConstantAsMetadata::get(ConstantInt::get(Int64Ty, Setting.Value)));
+    }
+    MD->addOperand(MDTuple::get(Context, Vals));
+  }
+
   // Set metadata specifying the number of outgoing payload registers.
   static void setOutgoingRegisterCount(Instruction *I, uint32_t RegisterCount) {
     I->setMetadata(MDRegisterCountName,
                    getI32MDConstant(I->getContext(), RegisterCount));
   }
 
-  // Get the number of incoming payload registers if set.
+  // Get the number of outgoing payload registers if set.
   static std::optional<uint32_t>
   tryGetOutgoingRegisterCount(const Instruction *I) {
     return extractZExtI32Constant(I->getMetadata(MDRegisterCountName));
@@ -436,10 +482,6 @@ public:
     assert(MD && "Failed to create metadata node!");
     MD->clearOperands();
     MD->addOperand(getI32MDConstant(M.getContext(), MaxPayloadRegisterCount));
-  }
-
-  static std::optional<uint32_t> tryGetPayloadRegisterCount(const Module &M) {
-    return tryGetMaxUsedPayloadRegisterCount(M);
   }
 
   static void setMaxHitAttributeByteCount(Function &F,
@@ -586,19 +628,41 @@ public:
   /// in a shader of the specified kind.
   ///
   /// If no shader kind is specified, return false.
-  static bool
-  isRematerializableLgcRtOp(CallInst &CInst,
-                            std::optional<DXILShaderKind> Kind = std::nullopt);
+  static bool isRematerializableLgcRtOp(
+      CallInst &CInst,
+      std::optional<lgc::rt::RayTracingShaderStage> Kind = std::nullopt);
 
   static bool isLegacyEntryFunction(Function *Func) {
     return Func->hasMetadata(MDEntryName);
   }
+
+  // Given a list of types, get a type that makes the list of types
+  // occupy a specific number of dwords including it.
+  static Type *getPaddingType(const DataLayout &DL, LLVMContext &Context,
+                              ArrayRef<Type *> Types, unsigned TargetNumDwords);
+
+  // Given a list of types, add a type to the list that makes the list of types
+  // occupy a specific number of dwords.
+  static void addPaddingType(const DataLayout &DL, LLVMContext &Context,
+                             SmallVectorImpl<Type *> &Types,
+                             unsigned TargetNumDwords);
+
+  // Given a list of values, add a value to the list that makes the list of
+  // values occupy a specific number of dwords.
+  static void addPaddingValue(const DataLayout &DL, LLVMContext &Context,
+                              SmallVectorImpl<Value *> &Values,
+                              unsigned TargetNumDwords);
+
+  // Returns whether the given flag is enabled in the given GpuRt module,
+  // using the GpuRt version flags intrinsic. If the intrinsic is not found,
+  // returns true, enabling new behavior (e.g. for tests).
+  static bool getGpurtVersionFlag(Module &GpurtModule, GpuRtVersionFlag Flag);
 };
 
 class ShaderStageHelper final {
 public:
   static DXILShaderKind
-  shaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
+  rtShaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
     switch (Stage) {
     case lgc::rt::RayTracingShaderStage::RayGeneration:
       return DXILShaderKind::RayGeneration;
@@ -619,12 +683,13 @@ public:
       //       eliminate most uses of DXILShaderKind except for initial
       //       conversions to the shared enum.
       return DXILShaderKind::Compute;
+    default:
+      llvm_unreachable("invalid stage!");
     }
-    llvm_unreachable("invalid stage!");
   }
 
   static std::optional<lgc::rt::RayTracingShaderStage>
-  dxilShaderKindToShaderStage(DXILShaderKind Kind) {
+  dxilShaderKindToRtShaderStage(DXILShaderKind Kind) {
     switch (Kind) {
     case DXILShaderKind::RayGeneration:
       return lgc::rt::RayTracingShaderStage::RayGeneration;
@@ -665,6 +730,7 @@ DRIVER_FUNC_NAME(GetSbtStride)
 DRIVER_FUNC_NAME(HitKind)
 DRIVER_FUNC_NAME(Traversal)
 DRIVER_FUNC_NAME(KernelEntry)
+DRIVER_FUNC_NAME(GpurtVersionFlags)
 
 #undef DRIVER_FUNC_NAME
 } // namespace ContDriverFunc
@@ -718,25 +784,12 @@ void forEachTerminator(Function *Func, ArrayRef<unsigned> TerminatorOpcodes,
   }
 }
 
-// Essentially RAUW for pointers for the case that these use different address
-// spaces, rewriting all derived pointers to also use the new address space.
-// Writes instructions which are redundant after the replacement into
-// the given ToBeRemoved vector.
-// The caller has to handle the erasure afterwards.
-void replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
-                           Value *NewPointerValue,
-                           SmallVectorImpl<Instruction *> &ToBeRemoved);
-
 // Do store-to-load forwarding for memory access to continuation stack.  This is
 // helpful to mitigate the issue that coroutine passes in some cases still load
 // state from the in-memory continuation state when it is still available in SSA
 // variables. The implementation is assuming there is no other pointers in the
 // program that may alias the pointer argument.
 void forwardContinuationFrameStoreToLoad(DominatorTree &DT, Value *FramePtr);
-
-// Replacement for PointerType::getWithSamePointeeType that works with new LLVM.
-// Returns a typed pointer type if the pointer type is typed.
-PointerType *getWithSamePointeeType(PointerType *PtrTy, unsigned AddressSpace);
 
 /// Look for the continue call that is dominated by the call to
 /// GetResumePointAddr. Due to saving the payload before, many basic blocks may

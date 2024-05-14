@@ -1741,7 +1741,7 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
     assert((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit) ||
            (m_shaderStage == ShaderStageRayTracingClosestHit));
     func->getArg(1)->replaceAllUsesWith(m_traceParams[TraceParam::HitAttributes]);
-    setShaderHitAttributeSize(newFunc, getShaderHitAttributeSize(func));
+    setShaderHitAttributeSize(newFunc, getShaderHitAttributeSize(func).value_or(0));
   }
 
   // Transfer code from old entry function to the new entry function

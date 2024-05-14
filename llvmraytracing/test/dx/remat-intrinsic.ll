@@ -131,8 +131,9 @@ attributes #1 = { nounwind }
 ; POSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; POSTPROCESS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; POSTPROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 0
-; POSTPROCESS-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
+; POSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 8
+; POSTPROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
+; POSTPROCESS-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
 ; POSTPROCESS-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i32 0
 ; POSTPROCESS-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[TMP4]], align 4
 ; POSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
@@ -147,11 +148,8 @@ attributes #1 = { nounwind }
 ; POSTPROCESS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; POSTPROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(20) @REGISTERS, align 4
 ; POSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 8
-; POSTPROCESS-NEXT:    store i32 [[TMP8]], ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP10:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @called.resume.0 to i64))
-; POSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 2, i32 [[TMP9]], i64 [[TMP10]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]]), !continuation.registercount [[META14]], !continuation.returnedRegistercount !14
+; POSTPROCESS-NEXT:    [[TMP8:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @called.resume.0 to i64))
+; POSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 2, i32 [[TMP7]], i64 [[TMP8]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]]), !continuation.registercount [[META14]], !continuation.returnedRegistercount !14
 ; POSTPROCESS-NEXT:    unreachable
 ;
 ;
@@ -164,29 +162,26 @@ attributes #1 = { nounwind }
 ; POSTPROCESS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; POSTPROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
 ; POSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -8
-; POSTPROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; POSTPROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; POSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT3:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; POSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; POSTPROCESS-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP4]] to ptr addrspace(21)
-; POSTPROCESS-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP6]], i32 0
-; POSTPROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[TMP7]], align 4
+; POSTPROCESS-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
+; POSTPROCESS-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP4]], i32 0
+; POSTPROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[TMP5]], align 4
 ; POSTPROCESS-NEXT:    [[HANDLE011:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; POSTPROCESS-NEXT:    [[HANDLE110:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[HANDLE011]])
 ; POSTPROCESS-NEXT:    [[HANDLE29:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[HANDLE110]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; POSTPROCESS-NEXT:    [[TMP8:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
-; POSTPROCESS-NEXT:    [[I8:%.*]] = extractelement <3 x i32> [[TMP8]], i8 0
+; POSTPROCESS-NEXT:    [[TMP6:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; POSTPROCESS-NEXT:    [[I8:%.*]] = extractelement <3 x i32> [[TMP6]], i8 0
 ; POSTPROCESS-NEXT:    [[UNPACKED7:%.*]] = call [[DX_TYPES_FOURI32:%.*]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I8]])
-; POSTPROCESS-NEXT:    [[TMP9:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
-; POSTPROCESS-NEXT:    [[I6:%.*]] = extractelement <3 x i32> [[TMP9]], i8 0
+; POSTPROCESS-NEXT:    [[TMP7:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; POSTPROCESS-NEXT:    [[I6:%.*]] = extractelement <3 x i32> [[TMP7]], i8 0
 ; POSTPROCESS-NEXT:    [[UNPACKED5:%.*]] = call [[DX_TYPES_FOURI32]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I6]])
-; POSTPROCESS-NEXT:    [[TMP10:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
-; POSTPROCESS-NEXT:    [[I4:%.*]] = extractelement <3 x i32> [[TMP10]], i8 0
+; POSTPROCESS-NEXT:    [[TMP8:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; POSTPROCESS-NEXT:    [[I4:%.*]] = extractelement <3 x i32> [[TMP8]], i8 0
 ; POSTPROCESS-NEXT:    [[UNPACKED3:%.*]] = call [[DX_TYPES_FOURI32]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I4]])
-; POSTPROCESS-NEXT:    [[TMP11:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
-; POSTPROCESS-NEXT:    [[I2:%.*]] = extractelement <3 x i32> [[TMP11]], i8 0
+; POSTPROCESS-NEXT:    [[TMP9:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; POSTPROCESS-NEXT:    [[I2:%.*]] = extractelement <3 x i32> [[TMP9]], i8 0
 ; POSTPROCESS-NEXT:    [[UNPACKED1:%.*]] = call [[DX_TYPES_FOURI32]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I2]])
 ; POSTPROCESS-NEXT:    [[A:%.*]] = extractvalue [[DX_TYPES_FOURI32]] [[UNPACKED7]], 0
 ; POSTPROCESS-NEXT:    [[B:%.*]] = extractvalue [[DX_TYPES_FOURI32]] [[UNPACKED5]], 1
@@ -196,6 +191,9 @@ attributes #1 = { nounwind }
 ; POSTPROCESS-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[HANDLE29]], i32 0, i32 0, i32 undef, float 1.000000e+00, float 2.000000e+00, float 3.000000e+00, float 1.000000e+00, i8 15)
 ; POSTPROCESS-NEXT:    store i32 [[PACKED]], ptr addrspace(20) @REGISTERS, align 4
 ; POSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT3]], 0
+; POSTPROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CSP]], align 4
+; POSTPROCESS-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], -8
+; POSTPROCESS-NEXT:    store i32 [[TMP11]], ptr [[CSP]], align 4
 ; POSTPROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CSP]], align 4
 ; POSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP12]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META14]]
 ; POSTPROCESS-NEXT:    unreachable

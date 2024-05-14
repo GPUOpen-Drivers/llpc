@@ -395,6 +395,25 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
   compileInfo.rayTracePipelineInfo = pipelineState->rayPipelineInfo;
   compileInfo.pipelineType = pipelineState->pipelineType;
 
+  if (pipelineState->pipelineType == VfxPipelineTypeGraphicsLibrary) {
+    LLPC_OUTS("// Pipeline type is Graphics library, compile each stage library:\n");
+    for (auto &libFileName : pipelineState->graphicsLibFileName) {
+      if (!libFileName.empty()) {
+        LLPC_OUTS(libFileName + "\n");
+        auto inputSpecOrErr = parseInputFileSpec(libFileName);
+        assert(!inputSpecOrErr.takeError());
+        compileInfo.inputSpecs.push_back(std::move(*inputSpecOrErr));
+      }
+    }
+    return Error::success();
+  }
+
+  if (!pipelineState->fsOutputs.empty()) {
+    // Color export shader
+    compileInfo.fsOutputs = pipelineState->fsOutputs;
+    compileInfo.isGraphicsLibrary = true;
+  }
+
   if (ignoreColorAttachmentFormats) {
     // NOTE: When this option is enabled, we set color attachment format to
     // R8G8B8A8_SRGB for color target 0. Also, for other color targets, if the

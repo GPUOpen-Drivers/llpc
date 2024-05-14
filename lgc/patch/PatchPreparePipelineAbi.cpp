@@ -29,7 +29,6 @@
 ***********************************************************************************************************************
 */
 #include "lgc/patch/PatchPreparePipelineAbi.h"
-#include "Gfx9ConfigBuilder.h"
 #include "MeshTaskShader.h"
 #include "RegisterMetadataBuilder.h"
 #include "ShaderMerger.h"
@@ -110,14 +109,14 @@ PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisMan
 // @param builder : IR builder to insert instructions
 std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineState *pipelineState, Value *relPatchId,
                                                                      IRBuilder<> &builder) {
-  auto module = builder.GetInsertBlock()->getModule();
-  auto lds = Patch::getLdsVariable(pipelineState, module);
+  auto func = builder.GetInsertBlock()->getParent();
+  auto lds = Patch::getLdsVariable(pipelineState, func);
 
   // Helper to read value from LDS
   auto readValueFromLds = [&](Type *readTy, Value *ldsOffset) {
     assert(readTy->getScalarSizeInBits() == 32); // Only accept 32-bit data
 
-    Value *readPtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
+    Value *readPtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
     readPtr = builder.CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
     return builder.CreateAlignedLoad(readTy, readPtr, Align(4));
   };
@@ -229,14 +228,14 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   if (primitiveMode == PrimitiveMode::Isolines) {
     assert(numOuterTfs == 2 && numInnerTfs == 0);
 
-    auto callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
-                                            {outerTf,                             // vdata
-                                             tfBufferDesc,                        // rsrc
-                                             tfBufferOffset,                      // voffset
-                                             tfBufferBase,                        // soffset
-                                             builder.getInt32(bufferFormatX2),    // format
-                                             builder.getInt32(coherent.u32All)}); // glc
-    (void)callInst;
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
+                            {outerTf,                             // vdata
+                             tfBufferDesc,                        // rsrc
+                             tfBufferOffset,                      // voffset
+                             tfBufferBase,                        // soffset
+                             builder.getInt32(bufferFormatX2),    // format
+                             builder.getInt32(coherent.u32All)}); // glc
+
   } else if (primitiveMode == PrimitiveMode::Triangles) {
     assert(numOuterTfs == 3 && numInnerTfs == 1);
 
@@ -245,35 +244,33 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
     tessFactor =
         builder.CreateInsertElement(tessFactor, builder.CreateExtractElement(innerTf, static_cast<uint64_t>(0)), 3);
 
-    auto callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, tessFactor->getType(),
-                                            {tessFactor,                          // vdata
-                                             tfBufferDesc,                        // rsrc
-                                             tfBufferOffset,                      // voffset
-                                             tfBufferBase,                        // soffset
-                                             builder.getInt32(bufferFormatX4),    // format
-                                             builder.getInt32(coherent.u32All)}); // glc
-    (void)callInst;
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, tessFactor->getType(),
+                            {tessFactor,                          // vdata
+                             tfBufferDesc,                        // rsrc
+                             tfBufferOffset,                      // voffset
+                             tfBufferBase,                        // soffset
+                             builder.getInt32(bufferFormatX4),    // format
+                             builder.getInt32(coherent.u32All)}); // glc
   } else {
     assert(primitiveMode == PrimitiveMode::Quads);
     assert(numOuterTfs == 4 && numInnerTfs == 2);
 
-    auto callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
-                                            {outerTf,                             // vdata
-                                             tfBufferDesc,                        // rsrc
-                                             tfBufferOffset,                      // voffset
-                                             tfBufferBase,                        // soffset
-                                             builder.getInt32(bufferFormatX4),    // format
-                                             builder.getInt32(coherent.u32All)}); // glc
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
+                            {outerTf,                             // vdata
+                             tfBufferDesc,                        // rsrc
+                             tfBufferOffset,                      // voffset
+                             tfBufferBase,                        // soffset
+                             builder.getInt32(bufferFormatX4),    // format
+                             builder.getInt32(coherent.u32All)}); // glc
 
     tfBufferOffset = builder.CreateAdd(tfBufferOffset, builder.getInt32(4 * sizeof(float)));
-    callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, innerTf->getType(),
-                                       {innerTf,                             // vdata
-                                        tfBufferDesc,                        // rsrc
-                                        tfBufferOffset,                      // voffset
-                                        tfBufferBase,                        // soffset
-                                        builder.getInt32(bufferFormatX2),    // format
-                                        builder.getInt32(coherent.u32All)}); // glc
-    (void)callInst;
+    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, innerTf->getType(),
+                            {innerTf,                             // vdata
+                             tfBufferDesc,                        // rsrc
+                             tfBufferOffset,                      // voffset
+                             tfBufferBase,                        // soffset
+                             builder.getInt32(bufferFormatX2),    // format
+                             builder.getInt32(coherent.u32All)}); // glc
   }
 }
 
@@ -282,8 +279,6 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::mergeShader(Module &module) {
-  assert(m_gfxIp.major >= 10);
-
   const bool hasTs = (m_hasTcs || m_hasTes);
 
   if (m_pipelineState->isGraphics()) {
@@ -425,13 +420,8 @@ void PatchPreparePipelineAbi::setAbiEntryNames(Module &module) {
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
-  if (m_pipelineState->useRegisterFieldFormat()) {
-    Gfx9::RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState, m_pipelineShaders);
-    regMetadataBuilder.buildPalMetadata();
-  } else {
-    Gfx9::ConfigBuilder configBuilder(&module, m_pipelineState);
-    configBuilder.buildPalMetadata();
-  }
+  RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState, m_pipelineShaders);
+  regMetadataBuilder.buildPalMetadata();
 }
 
 // =====================================================================================================================

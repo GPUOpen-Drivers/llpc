@@ -173,15 +173,15 @@ void lgc::rt::setShaderArgSize(Function *func, size_t size) {
 
 // ==============================================================================================
 // Get attribute size (in bytes) metadata for a ray-tracing shader function.
-size_t lgc::rt::getShaderHitAttributeSize(const Function *func) {
+std::optional<size_t> lgc::rt::getShaderHitAttributeSize(const Function *func) {
   MDNode *node = func->getMetadata(AttributeSizeMetadata);
   if (!node)
-    return 0;
+    return std::nullopt;
 
   if (auto *value = mdconst::dyn_extract<ConstantInt>(node->getOperand(0)))
     return value->getZExtValue();
 
-  return 0;
+  return std::nullopt;
 }
 
 // ==============================================================================================

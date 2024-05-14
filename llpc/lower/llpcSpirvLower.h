@@ -57,7 +57,8 @@ union LowerFlag {
     unsigned isRayTracing : 1;       // Whether we are lowering a ray tracing pipeline shader
     unsigned isRayQuery : 1;         // Whether we are lowering a ray query library
     unsigned isInternalRtShader : 1; // Whether we are lowering an internal ray tracing shader
-    unsigned reserved : 29;
+    unsigned usesAdvancedBlend : 1;  // Whether we are lowering an advanced blend shader
+    unsigned reserved : 28;
   };
   unsigned u32All;
 };
@@ -76,8 +77,6 @@ public:
   // Register all the lowering passes into the given pass manager
   static void registerLoweringPasses(lgc::PassManager &passMgr);
 
-  static void removeConstantExpr(Context *context, llvm::GlobalVariable *global);
-  static void replaceConstWithInsts(Context *context, llvm::Constant *const constVal);
   static void replaceGlobal(Context *context, llvm::GlobalVariable *original, llvm::GlobalVariable *replacement);
 
 protected:

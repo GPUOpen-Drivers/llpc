@@ -317,6 +317,13 @@ public:
   // Gets subgroup size for the specified shader stage
   unsigned getShaderSubgroupSize(ShaderStageEnum stage);
 
+  // Gets Util::Abi::PipelineType for pipeline
+  unsigned getAbiPipelineType();
+  // Gets map of ShaderStageEnum to Util::Abi::HardwareStageFlagBits
+  const llvm::DenseMap<unsigned, unsigned> *getAbiHwShaderMap();
+  // Gets Util::Abi::HardwareStageFlagBits for the given shader stage
+  unsigned getShaderHwStageMask(ShaderStageEnum stage);
+
   // Set the default wave size for the specified shader stage
   void setShaderDefaultWaveSize(ShaderStageEnum stage);
 
@@ -332,20 +339,23 @@ public:
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
 
+  // Is NGG enabled
+  bool isNggEnabled() const;
+
   // Checks if SW-emulated mesh pipeline statistics is needed
   bool needSwMeshPipelineStats() const;
 
   // Checks if row export for mesh shader is enabled or not
   bool enableMeshRowExport() const;
 
-  // Checks if register field value format is used or not
-  bool useRegisterFieldFormat() const { return m_registerFieldFormat; }
-
   // Checks if SW-emulated stream-out should be enabled
   bool enableSwXfb();
 
   // Gets resource usage of the specified shader stage
   ResourceUsage *getShaderResourceUsage(ShaderStageEnum shaderStage);
+
+  // Gets static LDS usage of the specified shader stage
+  unsigned getShaderStaticLdsUsage(ShaderStageEnum shaderStage, bool rtStack);
 
   // Gets interface data of the specified shader stage
   InterfaceData *getShaderInterfaceData(ShaderStageEnum shaderStage);
@@ -435,6 +445,13 @@ public:
   // Get user data for a specific shader stage
   llvm::ArrayRef<unsigned> getUserDataMap(ShaderStageEnum shaderStage) const { return m_userDataMaps[shaderStage]; }
 
+  // Set spill_threshold for a specific shader stage
+  void setSpillThreshold(ShaderStageEnum shaderStage, unsigned spillThreshold) {
+    m_shaderSpillThreshold[shaderStage] = spillThreshold;
+  }
+
+  // Get spill_threshold for a specific shader stage
+  unsigned getSpillThreshold(ShaderStageEnum shaderStage) { return m_shaderSpillThreshold[shaderStage]; }
   // -----------------------------------------------------------------------------------------------------------------
   // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
 
@@ -577,6 +594,9 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
+  // ABI Shader Map
+  void buildAbiHwShaderMap();
+
   std::string m_lastError; // Error to be reported by getLastError()
   bool m_emitLgc = false;  // Whether -emit-lgc is on
   // Whether generating pipeline or unlinked part-pipeline
@@ -596,7 +616,6 @@ private:
 
   bool m_gsOnChip = false;                                                       // Whether to use GS on-chip mode
   bool m_meshRowExport = false;                                                  // Enable mesh shader row export or not
-  bool m_registerFieldFormat = false;                                            // Use register field format
   NggControl m_nggControl = {};                                                  // NGG control settings
   ShaderModes m_shaderModes;                                                     // Shader modes for this pipeline
   unsigned m_deviceIndex = 0;                                                    // Device index
@@ -615,11 +634,15 @@ private:
   bool m_outputPackState[ShaderStage::GfxCount] = {}; // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};           // Transform feedback state metadata
   llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStage::CountInternal]; // The user data per-shader
+  unsigned m_shaderSpillThreshold[ShaderStage::CountInternal] = {};           // The spillThreshold per-shader
 
   struct {
     float inner[2]; // default tessellation inner level
     float outer[4]; // default tessellation outer level
   } m_tessLevel;
+
+  llvm::DenseMap<unsigned, unsigned> m_abiHwShaderMap;
+  unsigned m_abiPipelineType = 0;
 };
 
 // =====================================================================================================================

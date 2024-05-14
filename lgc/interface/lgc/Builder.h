@@ -313,6 +313,7 @@ public:
     ImageFlagEnforceReadFirstLaneSampler = 0x100, // Whether enabling readfirstlane on the sampler descriptor
     ImageFlagNotAliased = 0x200,                  // Whether the image is known not to alias any other memory object
     ImageFlagInvariant = 0x400,                   // Invariant load
+    ImageFlagSamplePatternOffset = 0x800,         // Retrieving sample pattern offset in dwords for specified image
   };
 
   // Address array indices for image sample and gather methods. Where an optional entry is missing (either
@@ -431,8 +432,8 @@ public:
   // @param value2 : Input value 2
   // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
   // @param name : Name to give instruction
-  llvm::CallInst *CreateBinaryIntrinsic(llvm::Intrinsic::ID id, llvm::Value *value1, llvm::Value *value2,
-                                        llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
+  llvm::Value *CreateBinaryIntrinsic(llvm::Intrinsic::ID id, llvm::Value *value1, llvm::Value *value2,
+                                     llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
 
   //
   // @param id : Intrinsic ID
@@ -1117,6 +1118,16 @@ public:
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
 
+  // Create a query of the sample position of given sample id in an image. Returns an v2f32 value.
+  //
+  // @param dim : Image dimension
+  // @param flags : ImageFlag* flags
+  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param sampleId : Sample ID
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateImageGetSamplePosition(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *sampleId,
+                                            const llvm::Twine &instName = "");
+
   // Create a ray intersect result with specified node in BVH buffer.
   // nodePtr is the combination of BVH node offset type.
   //
@@ -1375,11 +1386,6 @@ public:
   //
   // @param instName : Name to give instruction(s)
   llvm::Instruction *CreateKill(const llvm::Twine &instName = "");
-
-  // Create a "debug break".
-  //
-  // @param instName : Name to give instruction(s)
-  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "");
 
   // Create a "readclock".
   //

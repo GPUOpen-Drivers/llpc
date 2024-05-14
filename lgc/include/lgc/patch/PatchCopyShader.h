@@ -64,7 +64,7 @@ private:
 
   PipelineState *m_pipelineState = nullptr; // Pipeline state
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects
-  llvm::GlobalVariable *m_lds = nullptr;    // Global variable representing LDS
+  llvm::Constant *m_lds = nullptr;          // Global variable representing LDS
 
   llvm::DenseMap<unsigned, llvm::DenseMap<unsigned, unsigned>>
       m_outputLocCompSizeMap[MaxGsStreams]; // The dword size of the output value at the new mapped <location,

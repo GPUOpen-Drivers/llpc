@@ -38,10 +38,8 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/InitializePasses.h"
 #include <cassert>
 #include <cctype>
 
@@ -156,9 +154,11 @@ static bool isUtilFunction(StringRef Name) {
       "GetLocalRootIndex",
       "GetResumePointAddr",
       "GetRtip",
+      "GetSetting",
       "GetShaderKind",
       "GetTriangleHitAttributes",
       "GetUninitialized",
+      "GpurtVersionFlags",
       "I32Count",
       "IsEndSearch",
       "KernelEntry",

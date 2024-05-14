@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -24,53 +24,30 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerRayQueryPostInline.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerRayQueryPostInline.
+ * @file  LowerAdvancedBlend.h
+ * @brief LLPC header file: contains declaration of Llpc::LowerAdvancedBlend
  ***********************************************************************************************************************
  */
-#include "llpcSpirvLowerRayQueryPostInline.h"
-#include "SPIRVInternal.h"
-#include "llpcContext.h"
-#include "llpcSpirvLowerUtil.h"
-#include "lgc/Builder.h"
-#include "lgc/Pipeline.h"
-#include "llvm/IR/DerivedTypes.h"
+#pragma once
 
-#define DEBUG_TYPE "llpc-spirv-lower-ray-query-post-inline"
-
-using namespace llvm;
-using namespace Llpc;
+#include "llpcSpirvLower.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/IR/PassManager.h"
 
 namespace Llpc {
-
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-PreservedAnalyses SpirvLowerRayQueryPostInline::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-ray-query-post-inline\n");
+// Represents the pass of SPIR-V lowering advanced blend shader
+class LowerAdvancedBlend : public SpirvLower, public llvm::PassInfoMixin<LowerAdvancedBlend> {
 
-  for (Function &func : module) {
-    MDNode *execModelNode = func.getMetadata(gSPIRVMD::ExecutionModel);
-    if (!func.empty() && execModelNode) {
-      m_entryPoint = &func;
-      break;
-    }
-  }
-  assert(m_entryPoint != nullptr);
+public:
+  LowerAdvancedBlend(unsigned binding = 0);
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  static llvm::StringRef name() { return "Lower SPIR-V advanced blend shader"; }
 
-  for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
-    Function *func = &*funcIt++;
-    if ((func->getLinkage() == GlobalValue::ExternalLinkage || func->getLinkage() == GlobalValue::WeakAnyLinkage) &&
-        !func->empty()) {
-      if (!func->getName().starts_with(m_entryPoint->getName())) {
-        func->dropAllReferences();
-        func->eraseFromParent();
-      }
-    }
-  }
-  return PreservedAnalyses::none();
-}
+private:
+  typedef void (LowerAdvancedBlend::*LibraryFuncPtr)(llvm::Function *, unsigned);
+  void processFsOutputs(llvm::Module &module);
 
+  unsigned m_binding; // The binding point for the multi-sample
+};
 } // namespace Llpc

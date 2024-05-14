@@ -1,0 +1,80 @@
+; Test on fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --disable-fma=false -v -gfxip=11 %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST: call ninf float @llvm.amdgcn.fma.legacy(float %{{.*}}, float %{{.*}}, float %{{.*}})
+; SHADERTEST: call ninf float @llvm.amdgcn.fma.legacy(float %{{.*}}, float %{{.*}}, float %{{.*}})
+; SHADERTEST: call ninf float @llvm.amdgcn.fma.legacy(float %{{.*}}, float %{{.*}}, float %{{.*}})
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos Glslang Reference Front End; 11
+; Bound: 28
+; Schema: 0
+               OpCapability Shader
+               OpCapability Kernel
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %c %b %a %fragColor
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %a "a"
+               OpName %b "b"
+               OpName %c "c"
+               OpName %d "d"
+               OpName %fragColor "fragColor"
+               OpDecorate %c Location 2 
+               OpDecorate %b Location 1
+               OpDecorate %a Location 0
+               OpDecorate %fragColor Location 0
+               OpDecorate %22 FPFastMathMode NotInf
+               OpDecorate %32 FPFastMathMode NotInf
+               OpDecorate %38 FPFastMathMode NotInf
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Input_float = OpTypePointer Input %float
+          %c = OpVariable %_ptr_Input_float Input
+          %b = OpVariable %_ptr_Input_float Input
+    %float_0 = OpConstant %float 0
+         %30 = OpConstant %float 0.5
+         %36 = OpConstant %float 1.5
+       %bool = OpTypeBool
+          %a = OpVariable %_ptr_Input_float Input
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+  %fragColor = OpVariable %_ptr_Output_v4float Output
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %d = OpVariable %_ptr_Function_float Function
+         %11 = OpLoad %float %b
+         %14 = OpFOrdEqual %bool %11 %float_0
+         %16 = OpLoad %float %a
+         %17 = OpSelect %float %14 %float_0 %16
+         %18 = OpLoad %float %a
+         %19 = OpFOrdEqual %bool %18 %float_0
+         %20 = OpLoad %float %b
+         %21 = OpSelect %float %19 %float_0 %20
+         %23 = OpLoad %float %c
+         %22 = OpExtInst %float %1 Fma %17 %21 %23
+         %28 = OpLoad %float %b
+         %29 = OpFOrdEqual %bool %28 %float_0
+         %31 = OpSelect %float %29 %float_0 %30
+         %32 = OpExtInst %float %1 Fma %28 %31 %23
+         %33 = OpFAdd %float %32 %22
+         %34 = OpLoad %float %a
+         %35 = OpFOrdEqual %bool %34 %float_0
+         %37 = OpSelect %float %35 %float_0 %36
+         %38 = OpExtInst %float %1 Fma %34 %37 %23
+         %39 = OpFAdd %float %38 %22
+               OpStore %d %39
+         %26 = OpLoad %float %d
+         %27 = OpCompositeConstruct %v4float %26 %26 %26 %26
+               OpStore %fragColor %27
+               OpReturn
+               OpFunctionEnd

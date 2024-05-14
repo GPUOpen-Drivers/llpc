@@ -151,82 +151,68 @@ define void @MyClosestHitShader(%struct.RayPayload* noalias nocapture %payload, 
 ; CHECK-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; CHECK-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 1, 0
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -8
-; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[TMP4]], 28
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP5]]
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(22) [[TMP6]], align 4
-; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32 [[TMP7]] to float
-; CHECK-NEXT:    [[DOTSROA_0_0_VEC_INSERT:%.*]] = insertelement <4 x float> undef, float [[TMP8]], i32 0
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = add i32 [[TMP9]], -8
-; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], 32
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP11]]
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(22) [[TMP12]], align 4
-; CHECK-NEXT:    [[TMP14:%.*]] = bitcast i32 [[TMP13]] to float
-; CHECK-NEXT:    [[DOTSROA_0_4_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_0_VEC_INSERT]], float [[TMP14]], i32 1
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = add i32 [[TMP15]], -8
-; CHECK-NEXT:    [[TMP17:%.*]] = add i32 [[TMP16]], 36
-; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP17]]
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(22) [[TMP18]], align 4
-; CHECK-NEXT:    [[TMP20:%.*]] = bitcast i32 [[TMP19]] to float
-; CHECK-NEXT:    [[DOTSROA_0_8_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_4_VEC_INSERT]], float [[TMP20]], i32 2
-; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP22:%.*]] = add i32 [[TMP21]], -8
-; CHECK-NEXT:    [[TMP23:%.*]] = add i32 [[TMP22]], 40
-; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP23]]
-; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(22) [[TMP24]], align 4
-; CHECK-NEXT:    [[TMP26:%.*]] = bitcast i32 [[TMP25]] to float
-; CHECK-NEXT:    [[DOTSROA_0_12_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_8_VEC_INSERT]], float [[TMP26]], i32 3
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 20
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(22) [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = bitcast i32 [[TMP6]] to float
+; CHECK-NEXT:    [[DOTSROA_0_0_VEC_INSERT:%.*]] = insertelement <4 x float> undef, float [[TMP7]], i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP4]], 4
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP8]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(22) [[TMP9]], align 4
+; CHECK-NEXT:    [[TMP11:%.*]] = bitcast i32 [[TMP10]] to float
+; CHECK-NEXT:    [[DOTSROA_0_4_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_0_VEC_INSERT]], float [[TMP11]], i32 1
+; CHECK-NEXT:    [[TMP12:%.*]] = add i32 [[TMP4]], 8
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP12]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(22) [[TMP13]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = bitcast i32 [[TMP14]] to float
+; CHECK-NEXT:    [[DOTSROA_0_8_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_4_VEC_INSERT]], float [[TMP15]], i32 2
+; CHECK-NEXT:    [[TMP16:%.*]] = add i32 [[TMP4]], 12
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP16]]
+; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(22) [[TMP17]], align 4
+; CHECK-NEXT:    [[TMP19:%.*]] = bitcast i32 [[TMP18]] to float
+; CHECK-NEXT:    [[DOTSROA_0_12_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_8_VEC_INSERT]], float [[TMP19]], i32 3
 ; CHECK-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] poison, <2 x float> [[DOTFCA_1_0_EXTRACT]], 0
 ; CHECK-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; CHECK-NEXT:    [[DOTSROA_06_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; CHECK-NEXT:    [[TMP27:%.*]] = bitcast float [[DOTSROA_06_0_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP28:%.*]] = bitcast i32 [[TMP27]] to float
-; CHECK-NEXT:    [[HITATTRS_SROA_0_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP28]], i32 0
+; CHECK-NEXT:    [[TMP20:%.*]] = bitcast float [[DOTSROA_06_0_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP21:%.*]] = bitcast i32 [[TMP20]] to float
+; CHECK-NEXT:    [[HITATTRS_SROA_0_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP21]], i32 0
 ; CHECK-NEXT:    [[DOTSROA_06_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; CHECK-NEXT:    [[TMP29:%.*]] = bitcast float [[DOTSROA_06_4_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP30:%.*]] = bitcast i32 [[TMP29]] to float
-; CHECK-NEXT:    [[HITATTRS_SROA_0_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[HITATTRS_SROA_0_0_VEC_INSERT]], float [[TMP30]], i32 1
+; CHECK-NEXT:    [[TMP22:%.*]] = bitcast float [[DOTSROA_06_4_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP23:%.*]] = bitcast i32 [[TMP22]] to float
+; CHECK-NEXT:    [[HITATTRS_SROA_0_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[HITATTRS_SROA_0_0_VEC_INSERT]], float [[TMP23]], i32 1
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 0
-; CHECK-NEXT:    [[TMP32:%.*]] = fsub fast float 1.000000e+00, [[TMP31]]
-; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 1
-; CHECK-NEXT:    [[TMP34:%.*]] = fsub fast float [[TMP32]], [[TMP33]]
-; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <4 x float> undef, float [[TMP34]], i64 0
-; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <4 x float> [[TMP35]], float [[TMP31]], i64 1
-; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <4 x float> [[TMP36]], float [[TMP33]], i64 2
-; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <4 x float> [[TMP37]], float 1.000000e+00, i64 3
-; CHECK-NEXT:    [[DOTSROA_0_0_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP38]], i32 0
-; CHECK-NEXT:    [[TMP39:%.*]] = bitcast float [[DOTSROA_0_0_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], -8
-; CHECK-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], 28
-; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP42]]
-; CHECK-NEXT:    store i32 [[TMP39]], ptr addrspace(22) [[TMP43]], align 4
-; CHECK-NEXT:    [[DOTSROA_0_4_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP38]], i32 1
-; CHECK-NEXT:    [[TMP44:%.*]] = bitcast float [[DOTSROA_0_4_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP46:%.*]] = add i32 [[TMP45]], -8
-; CHECK-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], 32
-; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP47]]
-; CHECK-NEXT:    store i32 [[TMP44]], ptr addrspace(22) [[TMP48]], align 4
-; CHECK-NEXT:    [[DOTSROA_0_8_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP38]], i32 2
-; CHECK-NEXT:    [[TMP49:%.*]] = bitcast float [[DOTSROA_0_8_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], -8
-; CHECK-NEXT:    [[TMP52:%.*]] = add i32 [[TMP51]], 36
-; CHECK-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP52]]
-; CHECK-NEXT:    store i32 [[TMP49]], ptr addrspace(22) [[TMP53]], align 4
-; CHECK-NEXT:    [[DOTSROA_0_12_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP38]], i32 3
-; CHECK-NEXT:    [[TMP54:%.*]] = bitcast float [[DOTSROA_0_12_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP56:%.*]] = add i32 [[TMP55]], -8
-; CHECK-NEXT:    [[TMP57:%.*]] = add i32 [[TMP56]], 40
-; CHECK-NEXT:    [[TMP58:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP57]]
-; CHECK-NEXT:    store i32 [[TMP54]], ptr addrspace(22) [[TMP58]], align 4
+; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 0
+; CHECK-NEXT:    [[TMP25:%.*]] = fsub fast float 1.000000e+00, [[TMP24]]
+; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 1
+; CHECK-NEXT:    [[TMP27:%.*]] = fsub fast float [[TMP25]], [[TMP26]]
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <4 x float> undef, float [[TMP27]], i64 0
+; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <4 x float> [[TMP28]], float [[TMP24]], i64 1
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <4 x float> [[TMP29]], float [[TMP26]], i64 2
+; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <4 x float> [[TMP30]], float 1.000000e+00, i64 3
+; CHECK-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP33:%.*]] = add i32 [[TMP32]], 20
+; CHECK-NEXT:    [[DOTSROA_0_0_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP31]], i32 0
+; CHECK-NEXT:    [[TMP34:%.*]] = bitcast float [[DOTSROA_0_0_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP33]]
+; CHECK-NEXT:    store i32 [[TMP34]], ptr addrspace(22) [[TMP35]], align 4
+; CHECK-NEXT:    [[TMP36:%.*]] = add i32 [[TMP33]], 4
+; CHECK-NEXT:    [[DOTSROA_0_4_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP31]], i32 1
+; CHECK-NEXT:    [[TMP37:%.*]] = bitcast float [[DOTSROA_0_4_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP36]]
+; CHECK-NEXT:    store i32 [[TMP37]], ptr addrspace(22) [[TMP38]], align 4
+; CHECK-NEXT:    [[TMP39:%.*]] = add i32 [[TMP33]], 8
+; CHECK-NEXT:    [[DOTSROA_0_8_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP31]], i32 2
+; CHECK-NEXT:    [[TMP40:%.*]] = bitcast float [[DOTSROA_0_8_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP41:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP39]]
+; CHECK-NEXT:    store i32 [[TMP40]], ptr addrspace(22) [[TMP41]], align 4
+; CHECK-NEXT:    [[TMP42:%.*]] = add i32 [[TMP33]], 12
+; CHECK-NEXT:    [[DOTSROA_0_12_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP31]], i32 3
+; CHECK-NEXT:    [[TMP43:%.*]] = bitcast float [[DOTSROA_0_12_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP42]]
+; CHECK-NEXT:    store i32 [[TMP43]], ptr addrspace(22) [[TMP44]], align 4
 ; CHECK-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
-; CHECK-NEXT:    [[TMP59:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP59]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META8]]
+; CHECK-NEXT:    [[TMP45:%.*]] = load i32, ptr [[CSP]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP45]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META8]]
 ; CHECK-NEXT:    unreachable
 ;

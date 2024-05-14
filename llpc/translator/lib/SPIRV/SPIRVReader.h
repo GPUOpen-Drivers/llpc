@@ -106,13 +106,14 @@ public:
   Value *transAtomicRMW(SPIRVValue *, const AtomicRMWInst::BinOp);
   Constant *transInitializer(SPIRVValue *, Type *);
   template <spv::Op> Value *transValueWithOpcode(SPIRVValue *);
+  template <spv::Op> Value *transValueWithOpcode(SPIRVValue *, Function *f, BasicBlock *bb);
   template <spv::Op> SmallVector<Value *> transValueMultiWithOpcode(SPIRVValue *);
+  template <spv::Op> SmallVector<Value *> transValueMultiWithOpcode(SPIRVValue *, Function *f, BasicBlock *bb);
   Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
   Value *loadImageSampler(Type *elementTy, Value *base);
   Value *transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *elementTy = nullptr);
   Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
                                  lgc::ResourceNodeType searchType);
-  Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
   Value *indexDescPtr(Type *elementTy, Value *base, Value *index);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
@@ -136,7 +137,7 @@ public:
   Instruction *transBarrierFence(SPIRVInstruction *bi, BasicBlock *bb);
   Value *transString(const SPIRVString *spvValue);
   Value *transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func, BasicBlock *bb);
-  Value *transVariable(SPIRVValue *const spvValue);
+  Value *transVariableNonImage(SPIRVValue *const spvValue);
   SmallVector<Value *> transAccessChain(SPIRVValue *const spvValue);
   Value *transArrayLength(SPIRVValue *const spvValue);
   // Struct used to pass information in and out of getImageDesc.
@@ -211,8 +212,8 @@ public:
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
-  SmallVector<Value *> getTranslatedValues(SPIRVValue *bv);
-  Value *getTranslatedValue(SPIRVValue *bv);
+  SmallVector<Value *> getTranslatedValues(SPIRVValue *bv, Function *f, BasicBlock *bb);
+  Value *getTranslatedValue(SPIRVValue *bv, Function *f, BasicBlock *bb);
 
   // Create !lgc.xfb.state metadata
   void createXfbMetadata(bool hasXfbOuts);
@@ -245,6 +246,7 @@ private:
   typedef DenseMap<SPIRVType *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
   typedef DenseMap<SPIRVValue *, Type *> SPIRVAccessChainValueToLLVMRetTypeMap;
   typedef DenseMap<const SPIRVEntry *, Value *> SPIRVToLLVMEntryMap;
+  typedef DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> BlockPredecessorToCountInFunction;
 
   // A SPIRV value may be translated to a load instruction of a placeholder
   // global variable. This map records load instruction of these placeholders
@@ -272,6 +274,8 @@ private:
   SPIRVBlockToLLVMStructMap m_blockMap;
   SPIRVToLLVMPlaceholderMap m_placeholderMap;
   SPIRVToLLVMDbgTran m_dbgTran;
+  DenseMap<std::pair<SPIRVValue *, Function *>, SmallVector<Value *>> m_variableMap;
+  DenseMap<SPIRVValue *, Value *> m_variableNonImageMap;
 
   // Hash map with correlation between (SPIR-V) OpAccessChain and its returned (dereferenced) type.
   // We have to store base type because opaque-pointers are removing information about dereferenced type.
@@ -281,7 +285,7 @@ private:
   DenseMap<Type *, bool> m_typesWithPadMap;
   DenseMap<Type *, uint64_t> m_typeToStoreSize;
   DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
-  DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
+  DenseMap<Function *, BlockPredecessorToCountInFunction> m_blockPredecessorToCount;
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
   GlobalVariable *m_debugOutputBuffer;
 
@@ -294,6 +298,7 @@ private:
   bool m_requireFullQuads;
 
   bool m_maximallyReconverges = false;
+  bool m_hasDemoteToHelper = false;
 
   enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
   struct ScratchBoundsCheckData {
@@ -386,13 +391,14 @@ private:
 
   // Used to keep track of the number of incoming edges to a block from each
   // of the predecessor.
-  void recordBlockPredecessor(BasicBlock *block, BasicBlock *predecessorBlock) {
+  void recordBlockPredecessor(Function *func, BasicBlock *block, BasicBlock *predecessorBlock) {
+    assert(func);
     assert(block);
     assert(predecessorBlock);
-    m_blockPredecessorToCount[{block, predecessorBlock}] += 1;
+    m_blockPredecessorToCount[func][{block, predecessorBlock}] += 1;
   }
 
-  unsigned getBlockPredecessorCounts(BasicBlock *block, BasicBlock *predecessor);
+  unsigned getBlockPredecessorCounts(Function *f, BasicBlock *block, BasicBlock *predecessor);
 
   bool isSPIRVBuiltinVariable(GlobalVariable *gv, SPIRVBuiltinVariableKind *kind = nullptr);
 

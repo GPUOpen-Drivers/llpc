@@ -66,14 +66,12 @@ PreservedAnalyses BuilderReplayer::run(Module &module, ModuleAnalysisManager &an
   for (auto &func : module) {
     // Skip non-declarations; they are definitely not lgc.create.* calls.
     if (!func.isDeclaration()) {
-      if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
-        // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
-        // pass know we are in which wavesize mode.
-        auto shaderStage = lgc::getShaderStage(&func);
-        if (shaderStage) {
-          unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage.value());
-          func.addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
-        }
+      // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
+      // pass know we are in which wavesize mode.
+      auto shaderStage = lgc::getShaderStage(&func);
+      if (shaderStage) {
+        unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage.value());
+        func.addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
       }
 
       continue;
@@ -547,6 +545,14 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateImageGetLod(dim, flags, imageDesc, samplerDesc, coord);
   }
 
+  case BuilderOpcode::ImageGetSamplePosition: {
+    unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();
+    unsigned flags = cast<ConstantInt>(args[1])->getZExtValue();
+    Value *imageDesc = args[2];
+    Value *sampleId = args[3];
+    return m_builder->CreateImageGetSamplePosition(dim, flags, imageDesc, sampleId);
+  }
+
   // Replayer implementations of InOutBuilder methods
   case BuilderOpcode::ReadGenericInput: {
     InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
@@ -674,9 +680,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::IsHelperInvocation: {
     return m_builder->CreateIsHelperInvocation();
-  }
-  case BuilderOpcode::DebugBreak: {
-    return m_builder->CreateDebugBreak();
   }
   case BuilderOpcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);

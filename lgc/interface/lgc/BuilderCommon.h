@@ -94,6 +94,11 @@ public:
   // @param ty : pointer type.
   llvm::Value *CreateAllocaAtFuncEntry(llvm::Type *ty);
 
+  // Create a "debug break".
+  //
+  // @param instName : Name to give instruction(s)
+  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "");
+
   // -----------------------------------------------------------------------------------------------------------------
   // Cooperative matrix operation.
 

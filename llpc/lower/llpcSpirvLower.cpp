@@ -30,6 +30,7 @@
  */
 #include "llpcSpirvLower.h"
 #include "LowerGLCompatibility.h"
+#include "LowerPostInline.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerAccessChain.h"
@@ -40,7 +41,6 @@
 #include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerMath.h"
 #include "llpcSpirvLowerMemoryOp.h"
-#include "llpcSpirvLowerRayQueryPostInline.h"
 #include "llpcSpirvLowerRayTracing.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerTranslator.h"
@@ -52,6 +52,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/IR/ReplaceConstant.h"
 #include "llvm/IR/Verifier.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
@@ -88,82 +89,6 @@ using namespace lgc;
 using namespace llvm;
 
 namespace Llpc {
-// =====================================================================================================================
-// Replace a constant with instructions using a builder.
-//
-// @param context : The context
-// @param [in/out] constVal : The constant to replace with instructions.
-void SpirvLower::replaceConstWithInsts(Context *context, Constant *const constVal)
-
-{
-  SmallSet<Constant *, 8> otherConsts;
-  Builder *builder = context->getBuilder();
-  for (User *const user : constVal->users()) {
-    if (Constant *const otherConst = dyn_cast<Constant>(user))
-      otherConsts.insert(otherConst);
-  }
-
-  for (Constant *const otherConst : otherConsts)
-    replaceConstWithInsts(context, otherConst);
-
-  otherConsts.clear();
-
-  SmallVector<Value *, 8> users;
-
-  for (User *const user : constVal->users())
-    users.push_back(user);
-
-  for (Value *const user : users) {
-    Instruction *const inst = cast<Instruction>(user);
-
-    // If the instruction is a phi node, we have to insert the new instructions in the correct predecessor.
-    if (PHINode *const phiNode = dyn_cast<PHINode>(inst)) {
-      const unsigned incomingValueCount = phiNode->getNumIncomingValues();
-      for (unsigned i = 0; i < incomingValueCount; i++) {
-        if (phiNode->getIncomingValue(i) == constVal) {
-          builder->SetInsertPoint(phiNode->getIncomingBlock(i)->getTerminator());
-          break;
-        }
-      }
-    } else
-      builder->SetInsertPoint(inst);
-
-    if (ConstantExpr *const constExpr = dyn_cast<ConstantExpr>(constVal)) {
-      Instruction *const insertPos = builder->Insert(constExpr->getAsInstruction());
-      inst->replaceUsesOfWith(constExpr, insertPos);
-    } else if (ConstantVector *const constVector = dyn_cast<ConstantVector>(constVal)) {
-      Value *resultValue = PoisonValue::get(constVector->getType());
-      for (unsigned i = 0; i < constVector->getNumOperands(); i++) {
-        // Have to not use the builder here because it will constant fold and we are trying to undo that now!
-        Instruction *const insertPos =
-            InsertElementInst::Create(resultValue, constVector->getOperand(i), builder->getInt32(i));
-        resultValue = builder->Insert(insertPos);
-      }
-      inst->replaceUsesOfWith(constVector, resultValue);
-    } else
-      llvm_unreachable("Should never be called!");
-  }
-
-  constVal->removeDeadConstantUsers();
-  constVal->destroyConstant();
-}
-
-// =====================================================================================================================
-// Removes those constant expressions that reference global variables.
-//
-// @param context : The context
-// @param global : The global variable
-void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
-  SmallVector<Constant *, 8> constantUsers;
-
-  for (User *const user : global->users()) {
-    if (Constant *const constant = dyn_cast<Constant>(user))
-      constantUsers.push_back(constant);
-  }
-
-  for (Constant *const constVal : constantUsers)
-    replaceConstWithInsts(context, constVal);
-}
 
 // =====================================================================================================================
 // Add per-shader lowering passes to pass manager
@@ -193,8 +118,8 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V access chain
   passMgr.addPass(SpirvLowerAccessChain());
 
-  if (lowerFlag.isRayQuery)
-    passMgr.addPass(SpirvLowerRayQueryPostInline());
+  if (lowerFlag.isRayQuery || lowerFlag.usesAdvancedBlend)
+    passMgr.addPass(LowerPostInline());
 
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
@@ -310,16 +235,8 @@ void SpirvLower::registerLoweringPasses(lgc::PassManager &passMgr) {
 // @param original : Replaced global variable
 // @param replacement : Replacing global variable
 void SpirvLower::replaceGlobal(Context *context, GlobalVariable *original, GlobalVariable *replacement) {
-  removeConstantExpr(context, original);
-  Builder *builder = context->getBuilder();
-  SmallVector<User *> users(original->users());
-  for (User *user : users) {
-    Instruction *inst = cast<Instruction>(user);
-    builder->SetInsertPoint(inst);
-    Value *replacedValue = builder->CreateBitCast(replacement, original->getType());
-    user->replaceUsesOfWith(original, replacedValue);
-  }
-  original->dropAllReferences();
+  convertUsersOfConstantsToInstructions(original);
+  original->replaceAllUsesWith(replacement);
   original->eraseFromParent();
 }
 

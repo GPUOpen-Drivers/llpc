@@ -42,25 +42,26 @@ void main()
 // SHADERTEST-LABEL: @lgc.shader.FS.main(
 // SHADERTEST-NEXT:  .entry:
 // SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
-// SHADERTEST-NEXT:    [[TMP1:%.*]] = load <4 x float>, ptr addrspace(7) [[TMP0]], align 16
-// SHADERTEST-NEXT:    [[TMP2:%.*]] = shufflevector <4 x float> [[TMP1]], <4 x float> poison, <2 x i32> <i32 0, i32 poison>
-// SHADERTEST-NEXT:    [[TMP3:%.*]] = fptrunc <2 x float> [[TMP2]] to <2 x half>
-// SHADERTEST-NEXT:    [[TMP4:%.*]] = shufflevector <4 x float> [[TMP1]], <4 x float> poison, <2 x i32> <i32 2, i32 poison>
-// SHADERTEST-NEXT:    [[TMP5:%.*]] = fptrunc <2 x float> [[TMP4]] to <2 x half>
-// SHADERTEST-NEXT:    [[TMP6:%.*]] = extractelement <2 x half> [[TMP3]], i64 0
-// SHADERTEST-NEXT:    [[TMP7:%.*]] = extractelement <2 x half> [[TMP5]], i64 0
-// SHADERTEST-NEXT:    [[TMP8:%.*]] = fcmp oeq half [[TMP6]], [[TMP7]]
-// SHADERTEST-NEXT:    [[TMP9:%.*]] = fcmp une half [[TMP6]], [[TMP7]]
-// SHADERTEST-NEXT:    [[TMP10:%.*]] = or i1 [[TMP8]], [[TMP9]]
-// SHADERTEST-NEXT:    [[TMP11:%.*]] = fcmp olt half [[TMP6]], [[TMP7]]
-// SHADERTEST-NEXT:    [[TMP12:%.*]] = and i1 [[TMP10]], [[TMP11]]
-// SHADERTEST-NEXT:    [[TMP13:%.*]] = fcmp ogt half [[TMP6]], [[TMP7]]
-// SHADERTEST-NEXT:    [[TMP14:%.*]] = or i1 [[TMP12]], [[TMP13]]
-// SHADERTEST-NEXT:    [[TMP15:%.*]] = fcmp ole half [[TMP6]], [[TMP7]]
-// SHADERTEST-NEXT:    [[TMP16:%.*]] = and i1 [[TMP14]], [[TMP15]]
-// SHADERTEST-NEXT:    [[TMP17:%.*]] = fcmp oge half [[TMP6]], [[TMP7]]
-// SHADERTEST-NEXT:    [[TMP18:%.*]] = or i1 [[TMP16]], [[TMP17]]
-// SHADERTEST-NEXT:    [[TMP19:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP18]], <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, <3 x float> zeroinitializer
-// SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<3 x float> [[TMP19]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
+// SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
+// SHADERTEST-NEXT:    [[TMP2:%.*]] = load <4 x float>, ptr addrspace(7) [[TMP0]], align 16
+// SHADERTEST-NEXT:    [[TMP3:%.*]] = shufflevector <4 x float> [[TMP2]], <4 x float> poison, <2 x i32> <i32 0, i32 poison>
+// SHADERTEST-NEXT:    [[TMP4:%.*]] = fptrunc <2 x float> [[TMP3]] to <2 x half>
+// SHADERTEST-NEXT:    [[TMP5:%.*]] = shufflevector <4 x float> [[TMP2]], <4 x float> poison, <2 x i32> <i32 2, i32 poison>
+// SHADERTEST-NEXT:    [[TMP6:%.*]] = fptrunc <2 x float> [[TMP5]] to <2 x half>
+// SHADERTEST-NEXT:    [[TMP7:%.*]] = extractelement <2 x half> [[TMP4]], i64 0
+// SHADERTEST-NEXT:    [[TMP8:%.*]] = extractelement <2 x half> [[TMP6]], i64 0
+// SHADERTEST-NEXT:    [[TMP9:%.*]] = fcmp oeq half [[TMP7]], [[TMP8]]
+// SHADERTEST-NEXT:    [[TMP10:%.*]] = fcmp une half [[TMP7]], [[TMP8]]
+// SHADERTEST-NEXT:    [[TMP11:%.*]] = or i1 [[TMP9]], [[TMP10]]
+// SHADERTEST-NEXT:    [[TMP12:%.*]] = fcmp olt half [[TMP7]], [[TMP8]]
+// SHADERTEST-NEXT:    [[TMP13:%.*]] = and i1 [[TMP11]], [[TMP12]]
+// SHADERTEST-NEXT:    [[TMP14:%.*]] = fcmp ogt half [[TMP7]], [[TMP8]]
+// SHADERTEST-NEXT:    [[TMP15:%.*]] = or i1 [[TMP13]], [[TMP14]]
+// SHADERTEST-NEXT:    [[TMP16:%.*]] = fcmp ole half [[TMP7]], [[TMP8]]
+// SHADERTEST-NEXT:    [[TMP17:%.*]] = and i1 [[TMP15]], [[TMP16]]
+// SHADERTEST-NEXT:    [[TMP18:%.*]] = fcmp oge half [[TMP7]], [[TMP8]]
+// SHADERTEST-NEXT:    [[TMP19:%.*]] = or i1 [[TMP17]], [[TMP18]]
+// SHADERTEST-NEXT:    [[TMP20:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP19]], <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, <3 x float> zeroinitializer
+// SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<3 x float> [[TMP20]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // SHADERTEST-NEXT:    ret void
 //

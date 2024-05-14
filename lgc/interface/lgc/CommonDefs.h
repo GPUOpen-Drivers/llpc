@@ -146,6 +146,15 @@ enum AddrSpace {
   ADDR_SPACE_MAX = ADDR_SPACE_BUFFER_STRIDED_POINTER
 };
 
+// Max number of threads per subgroup in NGG mode.
+constexpr unsigned NggMaxThreadsPerSubgroup = 256;
+
+// Max number of waves per subgroup in NGG mode.
+constexpr unsigned NggMaxWavesPerSubgroup = NggMaxThreadsPerSubgroup / 32;
+
+constexpr unsigned EsVertsOffchipGsOrTess = 250;
+constexpr unsigned GsPrimsOffchipGsOrTess = 126;
+
 } // namespace lgc
 namespace llvm {
 // Enable iteration over shader stages with `lgc::enumRange<lgc::ShaderStageEnum>()`.

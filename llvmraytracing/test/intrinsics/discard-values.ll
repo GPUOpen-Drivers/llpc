@@ -16,7 +16,8 @@ declare !types !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 define float @discard_f32() {
 ; CHECK-LABEL: define float @discard_f32() {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret float poison
+; CHECK-NEXT:    [[TMP0:%.*]] = freeze float poison
+; CHECK-NEXT:    ret float [[TMP0]]
 ;
 entry:
   %result = call float @_AmdGetUninitializedF32()
@@ -26,7 +27,8 @@ entry:
 define i32 @discard_i32() {
 ; CHECK-LABEL: define i32 @discard_i32() {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret i32 poison
+; CHECK-NEXT:    [[TMP0:%.*]] = freeze i32 poison
+; CHECK-NEXT:    ret i32 [[TMP0]]
 ;
 entry:
   %result = call i32 @_AmdGetUninitializedI32()
@@ -36,7 +38,8 @@ entry:
 define %struct.AnyHitData @discard_struct() {
 ; CHECK-LABEL: define %struct.AnyHitData @discard_struct() {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    ret [[STRUCT_ANYHITDATA:%.*]] poison
+; CHECK-NEXT:    [[TMP0:%.*]] = freeze [[STRUCT_ANYHITDATA:%.*]] poison
+; CHECK-NEXT:    ret [[STRUCT_ANYHITDATA]] [[TMP0]]
 ;
 entry:
   %result = call %struct.AnyHitData @_AmdGetUninitializedStruct()

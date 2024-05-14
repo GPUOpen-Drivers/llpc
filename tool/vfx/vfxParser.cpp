@@ -636,6 +636,9 @@ Section *Document::createSection(const char *sectionName) {
   case SectionTypeShader:
     section = new SectionShader(it->second);
     break;
+  case SectionTypFsOutput:
+    section = new SectionFsOutput();
+    break;
   default:
     VFX_NEVER_CALLED();
     break;

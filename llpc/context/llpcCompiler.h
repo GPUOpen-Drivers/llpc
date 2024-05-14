@@ -192,16 +192,17 @@ private:
                                          std::vector<ElfPackage> &pipelineElfs,
                                          std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
                                          IHelperThreadProvider *helperThreadProvider);
-  void addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf);
+  void adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *rtContext,
+                           Vkgc::RayTracingShaderProperty &shaderProp);
   Result buildUnlinkedShaderInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                      Vkgc::UnlinkedShaderStage stage, ElfPackage &elfPackage,
                                      llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
   void dumpCompilerOptions(void *pipelineDumpFile);
+  void dumpFragmentOutputs(void *pipelineDumpFile, const uint8_t *data, unsigned size);
   Result generatePipeline(Context *context, unsigned moduleIndex, std::unique_ptr<llvm::Module> module,
                           ElfPackage &pipelineElf, lgc::Pipeline *pipeline, TimerProfiler &timerProfiler);
 
   std::vector<std::string> m_options;           // Compilation options
-  MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info
   Vkgc::ICache *m_cache;                        // Point to ICache implemented in client
   static unsigned m_instanceCount;              // The count of compiler instance
@@ -231,5 +232,9 @@ std::optional<lgc::rt::RayTracingShaderStage> getLgcRtShaderStage(ShaderStage st
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage mask
 unsigned getLgcShaderStageMask(ShaderStage stage);
+
+// Convert a name to middle-end LGC RT shader stage
+// Returns std::nullopt if cannot determine
+std::optional<lgc::rt::RayTracingShaderStage> tryGetLgcRtShaderStageFromName(llvm::StringRef name);
 
 } // namespace Llpc

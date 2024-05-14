@@ -460,6 +460,7 @@ public:
 
   uint32_t getSymbolCount() const;
   void getSymbol(uint32_t idx, ElfSymbol *symbol) const;
+  uint32_t getSymbolIndexByName(const char *symbolName) const;
 
   bool isValidSymbol(const char *symbolName);
 

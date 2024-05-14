@@ -36,6 +36,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <string>
+#include <vector>
 
 #define VFX_VERSION 0x10000
 #define VFX_REVISION 1
@@ -500,6 +503,15 @@ struct ColorBuffer {
   unsigned blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target at draw time
 };
 
+// =====================================================================================================================
+// Represents the graphics library type.
+enum GraphicsLibraryType : uint32_t {
+  GraphicsLibraryPreRaster,
+  GraphicsLibraryFragment,
+  GraphicsLibraryColorExport,
+  GraphicsLibraryCount
+};
+
 }; // namespace Vfx
 
 #if VFX_SUPPORT_VK_PIPELINE
@@ -509,6 +521,7 @@ enum VfxPipelineType : unsigned {
   VfxPipelineTypeGraphics = 0,
   VfxPipelineTypeCompute,
   VfxPipelineTypeRayTracing,
+  VfxPipelineTypeGraphicsLibrary
 };
 
 // =====================================================================================================================
@@ -521,6 +534,19 @@ struct VfxPipelineState {
   Vkgc::RayTracingPipelineBuildInfo rayPipelineInfo; // Vkgc ray tracing pipeline build info
   unsigned numStages;                                // Number of shader source sections
   Vfx::ShaderSource *stages;                         // Shader source sections
+  std::string graphicsLibFileName[Vfx::GraphicsLibraryCount];
+  std::vector<uint32_t> fsOutputs;
+
+public:
+  VfxPipelineState() : version(0), pipelineType(VfxPipelineTypeGraphics), numStages(0), stages(nullptr) {
+    memset(&gfxPipelineInfo, 0, sizeof(gfxPipelineInfo));
+    memset(&compPipelineInfo, 0, sizeof(compPipelineInfo));
+    memset(&rayPipelineInfo, 0, sizeof(rayPipelineInfo));
+    for (int i = 0; i < Vfx::GraphicsLibraryCount; i++) {
+      graphicsLibFileName[i] = "";
+    }
+    fsOutputs.clear();
+  }
 };
 
 typedef struct VfxPipelineState *VfxPipelineStatePtr;

@@ -40,7 +40,9 @@
 
 namespace lgc {
 
+class LoadBufferAddrOp;
 class LoadBufferDescOp;
+class LoadStridedBufferDescOp;
 
 // =====================================================================================================================
 // Pass to lower buffer descriptor loads.
@@ -50,7 +52,9 @@ public:
   static llvm::StringRef name() { return "Lower buffer descriptor loads"; }
 
 private:
+  void visitLoadBufferAddr(LoadBufferAddrOp &op);
   void visitLoadBufferDesc(LoadBufferDescOp &op);
+  void visitLoadStridedBufferDesc(LoadStridedBufferDescOp &op);
   llvm::SmallVector<llvm::Instruction *> m_toErase;
   PipelineState *m_pipelineState = nullptr;
 };

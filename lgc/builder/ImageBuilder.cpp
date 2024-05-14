@@ -30,6 +30,7 @@
  */
 #include "YCbCrConverter.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
@@ -476,8 +477,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
       if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
         coherent.bits.glc = true;
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
-          coherent.bits.dlc = true;
+        coherent.bits.dlc = true;
       }
     }
 
@@ -1027,8 +1027,7 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
     if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
       coherent.bits.glc = true;
-      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
-        coherent.bits.dlc = true;
+      coherent.bits.dlc = true;
     }
   }
 
@@ -1266,6 +1265,18 @@ Value *BuilderImpl::CreateImageQuerySamples(unsigned dim, unsigned flags, Value 
     Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
     sampleNumber = CreateSelect(isNullDesc, getInt32(0), sampleNumber);
   }
+
+  if (flags & ImageFlagSamplePatternOffset) {
+    Value *descWord6 = CreateExtractElement(imageDesc, 6);
+    // sample pattern index is bit203-206, which is bit11-14 of word 6.
+    Value *samplePatternOffset =
+        CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descWord6, getInt32(11), getInt32(4)});
+    // This is offset in entries, and now it is converted to offset in dwords (each entry has 16 dwords).
+    samplePatternOffset = CreateMul(samplePatternOffset, getInt32(16));
+    // Or the offset to the high 16 bit of sampleNumber.
+    sampleNumber = CreateOr(CreateShl(samplePatternOffset, 16), sampleNumber);
+  }
+
   return sampleNumber;
 }
 
@@ -1316,15 +1327,11 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
     Value *mipDepth = CreateLShr(depth, curLevel);
     mipDepth = CreateSelect(CreateICmpEQ(mipDepth, getInt32(0)), getInt32(1), mipDepth);
 
-    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10) {
-      Value *arrayPitch = proxySqRsrcRegHelper.getReg(SqRsrcRegs::ArrayPitch);
-      Value *baseArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseArray);
-      Value *sliceDepth = CreateSub(depth, baseArray);
-      Value *isSlice = CreateTrunc(arrayPitch, getInt1Ty());
-      depth = CreateSelect(isSlice, sliceDepth, mipDepth);
-    } else {
-      depth = mipDepth;
-    }
+    Value *arrayPitch = proxySqRsrcRegHelper.getReg(SqRsrcRegs::ArrayPitch);
+    Value *baseArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseArray);
+    Value *sliceDepth = CreateSub(depth, baseArray);
+    Value *isSlice = CreateTrunc(arrayPitch, getInt1Ty());
+    depth = CreateSelect(isSlice, sliceDepth, mipDepth);
   }
 
   // Set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
@@ -1435,6 +1442,36 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
                                  getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
 
   return result;
+}
+
+// =====================================================================================================================
+// Create a query of the sample position of given sample id in an image. Returns an v2f32 value.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param sampleId : Sample ID
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateImageGetSamplePosition(unsigned dim, unsigned flags, Value *imageDesc, Value *sampleId,
+                                                 const Twine &instName) {
+  // Add ImageFlagSamplePatternOffset to query back both sample count and sample pattern offset.
+  Value *sampleInfo = CreateImageQuerySamples(dim, flags | ImageFlagSamplePatternOffset, imageDesc);
+  Value *sampleCount = CreateAnd(sampleInfo, 0xFFFF);
+  Value *samplePatternOffset = CreateLShr(sampleInfo, 16);
+
+  Value *validOffset = CreateAdd(samplePatternOffset, sampleId);
+  // offset = (sampleCount > sampleId) ? (samplePatternOffset + sampleId) : 0
+  Value *sampleValid = CreateICmpUGT(sampleCount, sampleId);
+  Value *offset = CreateSelect(sampleValid, validOffset, getInt32(0));
+
+  // Load sample position descriptor.
+  Type *descTy = getDescTy(ResourceNodeType::DescriptorBuffer);
+  Value *desc = create<LoadDriverTableEntryOp>(descTy, SiDrvTableSamplepos);
+  // Load the value using the descriptor.
+  offset = CreateShl(offset, getInt32(4));
+
+  Type *samplePosTy = FixedVectorType::get(getFloatTy(), 2);
+  return CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, samplePosTy, {desc, offset, getInt32(0), getInt32(0)});
 }
 
 // =====================================================================================================================

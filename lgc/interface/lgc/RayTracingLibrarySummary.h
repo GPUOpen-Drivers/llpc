@@ -59,6 +59,10 @@ struct RayTracingLibrarySummary {
   // attributes (no AHS/IS/CHS).
   unsigned maxHitAttributeSize = 0;
 
+  // The maximum occurring number of payload registers in the pipeline, which will be taken into account for Traversal
+  // module so that it sees the correct maximum payload size of a pipeline.
+  unsigned maxUsedPayloadRegisterCount = 0;
+
   // Whether a kernel entry function was built for this library.
   bool hasKernelEntry = false;
 

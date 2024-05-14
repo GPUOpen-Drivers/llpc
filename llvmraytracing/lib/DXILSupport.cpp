@@ -31,9 +31,7 @@
 
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
-#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InstrTypes.h"
@@ -45,12 +43,6 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "dxil-coro-split"
-
-namespace llvm {
-namespace coro {
-bool defaultMaterializable(Instruction &V);
-} // End namespace coro
-} // End namespace llvm
 
 /// Check if a value is in the given resource list.
 /// The metadata argument must be one of the lists from dx.resources, i.e. for
@@ -156,14 +148,8 @@ bool llvm::DXILMaterializable(Instruction &OrigI) {
       break;
   }
 
-  if (coro::defaultMaterializable(*V))
+  if (commonMaterializable(*V))
     return true;
-
-  // Insert into constant.
-  if (isa<InsertElementInst, InsertValueInst>(V) &&
-      isa<Constant>(V->getOperand(0))) {
-    return true;
-  }
 
   // Loads associated with dx.op.createHandle calls
   if (auto *LI = dyn_cast<LoadInst>(V)) {

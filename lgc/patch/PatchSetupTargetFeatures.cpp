@@ -78,10 +78,17 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
     auto shaderStage = lgc::getShaderStage(&*func);
 
-    if (!shaderStage) {
-      errs() << "Invalid shader stage for function " << func->getName() << "\n";
-      report_fatal_error("Got invalid shader stage when setting up features for function");
+    // NOTE: AMDGPU_CS_ChainPreserve is expected to not have shader stage set.
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 465196
+    if (func->getCallingConv() != CallingConv::AMDGPU_CS_ChainPreserve) {
+#endif
+      if (!shaderStage.has_value()) {
+        errs() << "Invalid shader stage for function " << func->getName() << "\n";
+        report_fatal_error("Got invalid shader stage when setting up features for function");
+      }
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 465196
     }
+#endif
 
     if (isShaderEntryPoint(&*func)) {
       bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage.value()).useSiScheduler;
@@ -93,7 +100,8 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       }
     }
 
-    if (func->getCallingConv() == CallingConv::AMDGPU_GS) {
+    auto callingConv = func->getCallingConv();
+    if (callingConv == CallingConv::AMDGPU_GS) {
       // NOTE: For NGG primitive shader, enable 128-bit LDS load/store operations to optimize gvec4 data
       // read/write. This usage must enable the feature of using CI+ additional instructions.
       const auto nggControl = m_pipelineState->getNggControl();
@@ -101,11 +109,16 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
         targetFeatures += ",+ci-insts,+enable-ds128";
     }
 
-    if (func->getCallingConv() == CallingConv::AMDGPU_HS) {
+    if (callingConv == CallingConv::AMDGPU_HS) {
       // Force s_barrier to be present (ignore optimization)
       builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
     }
-    if (func->getCallingConv() == CallingConv::AMDGPU_CS || func->getCallingConv() == CallingConv::AMDGPU_Gfx) {
+
+    if (callingConv == CallingConv::AMDGPU_CS || callingConv == CallingConv::AMDGPU_Gfx
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 465196
+        || callingConv == CallingConv::AMDGPU_CS_Chain
+#endif
+    ) {
       // Set the work group size
       const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
       unsigned flatWorkGroupSize = computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
@@ -113,7 +126,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       builder.addAttribute("amdgpu-flat-work-group-size",
                            (Twine(flatWorkGroupSize) + "," + Twine(flatWorkGroupSize)).toStringRef(attributeBuf));
     }
-    if (func->getCallingConv() == CallingConv::AMDGPU_CS) {
+    if (callingConv == CallingConv::AMDGPU_CS) {
       // Tag the position of MultiDispatchInfo argument, so the backend knows which
       // sgpr needs to be preloaded for COMPUTE_PGM_RSRC2.tg_size_en (Work-Group Info).
       // This is needed for LDS spilling.
@@ -126,13 +139,13 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
-    if (gfxIp.major >= 10) {
-      // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
-      // pass know we are in which wavesize mode. Here, we read back it and append it to finalized target
-      // feature strings.
-      if (func->hasFnAttribute("target-features"))
-        targetFeatures += func->getFnAttribute("target-features").getValueAsString();
+    // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
+    // pass know we are in which wavesize mode. Here, we read back it and append it to finalized target
+    // feature strings.
+    if (func->hasFnAttribute("target-features"))
+      targetFeatures += func->getFnAttribute("target-features").getValueAsString();
 
+    if (shaderStage.has_value()) {
       if (m_pipelineState->getShaderWgpMode(shaderStage.value()))
         targetFeatures += ",-cumode";
       else
@@ -156,7 +169,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
     builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
 
-    if (shaderStage != ShaderStage::CopyShader) {
+    if (shaderStage.has_value() && shaderStage != ShaderStage::CopyShader) {
       const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage.value());
       if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone || shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
           shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn) {

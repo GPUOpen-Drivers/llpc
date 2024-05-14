@@ -63,6 +63,7 @@
 #include "lgc/patch/PatchWorkarounds.h"
 #include "lgc/patch/TcsPassthroughShader.h"
 #include "lgc/patch/VertexFetch.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Debug.h"
@@ -117,6 +118,9 @@
 
 using namespace llvm;
 
+static const char LdsGsName[] = "Lds.GS";
+static const char LdsHsName[] = "Lds.HS";
+
 namespace lgc {
 
 // =====================================================================================================================
@@ -144,7 +148,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
       // that continuation transform does not support are used.
       passMgr.addPass(LowerGpuRt());
     } else {
-      passMgr.addPass(LowerRaytracingPipelinePass());
+      // NOTE: LowerRaytracingPipelinePass should be run before getting into LGC because we will need to collect
+      // metadata added by the pass.
+      // Optimize away the alloca's insert during lower-raytracing pipeline to avoid being put in continuation state.
+      passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass(llvm::SROAOptions::ModifyCFG)));
     }
 
     addLgcContinuationTransform(passMgr);
@@ -435,6 +442,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
                                   .forwardSwitchCondToPhi(true)
                                   .convertSwitchToLookupTable(true)
                                   .needCanonicalLoops(true)
+                                  .hoistCommonInsts(true)
                                   .sinkCommonInsts(true)));
   fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
@@ -473,25 +481,50 @@ void Patch::init(Module *module) {
 //
 // @param pipelineState : Pipeline state
 // @param [in/out] module : Module to get or create LDS in
-GlobalVariable *Patch::getLdsVariable(PipelineState *pipelineState, Module *module) {
+Constant *Patch::getLdsVariable(PipelineState *pipelineState, Function *func, bool rtStack) {
+  auto module = func->getParent();
   auto context = &module->getContext();
 
-  static const char *LdsName = "Lds"; // Name of LDS
+  auto stage = getShaderStage(func);
+  assert(stage && "unable to determine stage for LDS usage");
 
-  // See if this module already has LDS.
-  auto oldLds = module->getNamedValue(LdsName);
-  if (oldLds) {
-    // We already have LDS.
-    return cast<GlobalVariable>(oldLds);
+  unsigned hwStageMask = pipelineState->getShaderHwStageMask(*stage);
+
+  ShaderStageEnum ldsStage;
+  const char *ldsName;
+  if (hwStageMask & Util::Abi::HwShaderGs) {
+    ldsName = LdsGsName;
+    ldsStage = ShaderStage::Geometry;
+  } else if (hwStageMask & Util::Abi::HwShaderHs) {
+    ldsName = LdsHsName;
+    ldsStage = ShaderStage::TessControl;
+  } else {
+    assert(false && "requesting LDS variable for unknown shader type");
+    return nullptr;
   }
-  // Now we can create LDS.
-  // Construct LDS type: [ldsSize * i32], address space 3
-  auto ldsSize = pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
-  auto ldsTy = ArrayType::get(Type::getInt32Ty(*context), ldsSize);
 
-  auto lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, LdsName, nullptr,
+  const unsigned staticLdsSize = pipelineState->getShaderStaticLdsUsage(ldsStage, /*rtStack=*/false);
+  const unsigned rtLdsSize = pipelineState->getShaderStaticLdsUsage(ldsStage, /*rtStack=*/true);
+  const unsigned ldsSize = staticLdsSize + rtLdsSize;
+
+  // See if module already has LDS variable.
+  auto oldLds = func->getParent()->getNamedValue(ldsName);
+  if (oldLds)
+    return cast<GlobalVariable>(oldLds);
+
+  // Else create LDS variable for this function.
+  // LDS type: [ldsSize * i32], address space 3
+  const auto i32Ty = Type::getInt32Ty(*context);
+  const auto ldsTy = ArrayType::get(i32Ty, ldsSize);
+  auto lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, Twine(ldsName), nullptr,
                                 GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);
   lds->setAlignment(MaybeAlign(sizeof(unsigned)));
+
+  if (rtStack) {
+    auto *offset = Constant::getIntegerValue(i32Ty, APInt(32, staticLdsSize));
+    return ConstantExpr::getGetElementPtr(i32Ty, lds, offset);
+  }
+
   return lds;
 }
 

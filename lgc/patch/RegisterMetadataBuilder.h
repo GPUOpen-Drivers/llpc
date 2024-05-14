@@ -36,7 +36,6 @@
 
 namespace lgc {
 
-namespace Gfx9 {
 // =====================================================================================================================
 // Represents the builder to generate register configurations for GFX11 plus chips.
 class RegisterMetadataBuilder : public ConfigBuilderBase {
@@ -66,5 +65,4 @@ private:
   bool m_isNggMode = false;
 };
 
-} // namespace Gfx9
 } // namespace lgc

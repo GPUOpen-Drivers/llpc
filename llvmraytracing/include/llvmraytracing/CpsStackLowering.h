@@ -60,7 +60,11 @@ public:
     BasePointer = llvm::ConstantPointerNull::get(llvm::PointerType::get(
         llvm::Type::getInt8Ty(Context), LoweredCpsStackAddrSpace));
   }
-  llvm::Function *lowerCpsStackOps(llvm::Function &, llvm::Value *);
+  llvm::Function *lowerCpsStackOps(llvm::Function *Func,
+                                   llvm::Function *GetGlobalMemBase,
+                                   bool RequiresIncomingCsp,
+                                   llvm::Value *CspStorage = nullptr);
+
   // Get continuation stack size (in bytes).
   unsigned getStackSizeInBytes() { return StackSizeInBytes; }
 
@@ -71,18 +75,6 @@ public:
   inline unsigned
   getLoweredCpsStackPointerSize(const llvm::DataLayout &Layout) {
     return Layout.getPointerSize(LoweredCpsStackAddrSpace);
-  }
-
-  // Register a base pointer in the CpsStackLowering.
-  // This is used to set the base address when using a stack residing in global
-  // memory. BasePointer is by default a zero pointer in the
-  // @LoweredCpsStackAddrSpace. During the lowering of load / store
-  // instructions, a GEP will be constructed that uses the base pointer and the
-  // corresponding CSP as offset for the source / dest addresses. In case
-  // @setRealBasePointer never was called, this just creates a pointer out of an
-  // offset.
-  void setRealBasePointer(llvm::Value *BasePointer) {
-    this->BasePointer = BasePointer;
   }
 
   static unsigned getContinuationStackAlignment() {
@@ -106,9 +98,26 @@ private:
   void visitLoad(llvm::LoadInst &);
   void visitStore(llvm::StoreInst &);
   llvm::Value *getRealMemoryAddress(llvm::IRBuilder<> &, llvm::Value *);
+  llvm::Function *addOrInitCsp(llvm::Function *F,
+                               llvm::Function *GetGlobalMemBase,
+                               bool RequiresIncomingCsp);
+  void visitContinueCalls(llvm::Function *);
+  void visitContinueCall(llvm::CallInst &);
+
+  // Register a base pointer in the CpsStackLowering.
+  // This is used to set the base address when using a stack residing in global
+  // memory. BasePointer is by default a zero pointer in the
+  // @LoweredCpsStackAddrSpace. During the lowering of load / store
+  // instructions, a GEP will be constructed that uses the base pointer and the
+  // corresponding CSP as offset for the source / dest addresses. In case
+  // @setRealBasePointer never was called, this just creates a pointer out of an
+  // offset.
+  void setRealBasePointer(llvm::Value *BasePointer) {
+    this->BasePointer = BasePointer;
+  }
 
   llvm::Module *Mod;
-  llvm::AllocaInst *CpsStackAlloca;
+  llvm::AllocaInst *CpsStackAlloca = nullptr;
   unsigned LoweredCpsStackAddrSpace;
   unsigned StackSizeInBytes = 0;
   llvm::Value *BasePointer = nullptr;

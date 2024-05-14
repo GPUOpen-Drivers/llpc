@@ -129,7 +129,7 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
     assert(pipelineInfo.pGraphicsInfo);
     UnlinkedShaderStage unlinkedStage = UnlinkedStageCount;
     if (pipelineInfo.pGraphicsInfo->unlinked) {
-      if (pipelineInfo.pGraphicsInfo->fs.pModuleData)
+      if (PipelineDumper::isValidShaderInfo(pipelineInfo.pGraphicsInfo->fs))
         unlinkedStage = UnlinkedStageFragment;
       else
         unlinkedStage = UnlinkedStageVertexProcess;
@@ -168,6 +168,28 @@ void VKAPI_CALL IPipelineDumper::EndPipelineDump(void *dumpFile) {
 // @param pipelineBin : Pipeline binary (ELF)
 void VKAPI_CALL IPipelineDumper::DumpPipelineBinary(void *dumpFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin) {
   PipelineDumper::DumpPipelineBinary(reinterpret_cast<PipelineDumpFile *>(dumpFile), gfxIp, pipelineBin);
+}
+
+// =====================================================================================================================
+/// Dump graphics stage library file name.
+///
+/// @param [in]  pDumpFile        The handle of pipeline dump file
+/// @param [in]  libFileNames     File name array of size three
+void VKAPI_CALL IPipelineDumper::DumpGraphicsLibraryFileName(void *dumpFile, const char **libFileNames) {
+  if (!dumpFile)
+    return;
+
+  PipelineDumpFile *pipelineDumper = reinterpret_cast<PipelineDumpFile *>(dumpFile);
+  pipelineDumper->dumpFile << "\n[GraphicsLibrary]\n";
+  static const char *libTypeName[] = {"preRaster", "fragment", "colorExport"};
+  static const char *pipelineExt = ".pipe";
+  for (unsigned i = 0; i < 3; i++) {
+    std::string tmpStr(libFileNames[i]);
+    if (!tmpStr.empty()) {
+      pipelineDumper->dumpFile << libTypeName[i] << "=" << tmpStr << pipelineExt << "\n";
+    }
+  }
+  pipelineDumper->dumpFile << "\n";
 }
 
 // =====================================================================================================================
@@ -354,6 +376,14 @@ std::string PipelineDumper::getSpirvBinaryFileName(const MetroHash::Hash *hash) 
 }
 
 // =====================================================================================================================
+// Checks whether the pipeline shader info contains valid shader info.
+//
+// @param info : Pipeline shader info
+bool PipelineDumper::isValidShaderInfo(const PipelineShaderInfo &info) {
+  return info.pModuleData != nullptr || info.options.clientHash.lower != 0 || info.options.clientHash.upper != 0;
+}
+
+// =====================================================================================================================
 // Gets the file name of pipeline info file according to the specified pipeline build info and pipeline hash.
 //
 // @param pipelineInfo : Info of the pipeline to be built
@@ -369,31 +399,31 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
     assert(pipelineInfo.pGraphicsInfo);
     const char *fileNamePrefix = nullptr;
     if (pipelineInfo.pGraphicsInfo->unlinked) {
-      if (pipelineInfo.pGraphicsInfo->task.pModuleData)
+      if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->task))
         fileNamePrefix = "PipelineLibTask";
-      else if (pipelineInfo.pGraphicsInfo->vs.pModuleData)
+      else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->vs))
         fileNamePrefix = "PipelineLibVs";
-      else if (pipelineInfo.pGraphicsInfo->tcs.pModuleData)
+      else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->tcs))
         fileNamePrefix = "PipelineLibTcs";
-      else if (pipelineInfo.pGraphicsInfo->tes.pModuleData)
+      else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->tes))
         fileNamePrefix = "PipelineLibTes";
-      else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
+      else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->gs))
         fileNamePrefix = "PipelineLibGs";
-      else if (pipelineInfo.pGraphicsInfo->mesh.pModuleData)
+      else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->mesh))
         fileNamePrefix = "PipelineLibMesh";
-      else if (pipelineInfo.pGraphicsInfo->fs.pModuleData)
+      else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->fs))
         fileNamePrefix = "PipelineLibFs";
       else
         fileNamePrefix = "PipelineLibCes";
-    } else if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
+    } else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->tes) && isValidShaderInfo(pipelineInfo.pGraphicsInfo->gs))
       fileNamePrefix = "PipelineGsTess";
-    else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
+    else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->gs))
       fileNamePrefix = "PipelineGs";
-    else if (pipelineInfo.pGraphicsInfo->tes.pModuleData)
+    else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->tes))
       fileNamePrefix = "PipelineTess";
-    else if (pipelineInfo.pGraphicsInfo->task.pModuleData && pipelineInfo.pGraphicsInfo->mesh.pModuleData)
+    else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->task) && isValidShaderInfo(pipelineInfo.pGraphicsInfo->mesh))
       fileNamePrefix = "PipelineTaskMesh";
-    else if (pipelineInfo.pGraphicsInfo->mesh.pModuleData)
+    else if (isValidShaderInfo(pipelineInfo.pGraphicsInfo->mesh))
       fileNamePrefix = "PipelineMesh";
     else
       fileNamePrefix = "PipelineVsFs";
@@ -591,14 +621,16 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
 // @param shaderInfo : Shader info of specified shader stage
 // @param [out] dumpFile : Dump file
 void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile) {
-  const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
-  auto moduleHash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
 
-  // Output shader binary file
   ShaderStage stage = shaderInfo->entryStage;
+  if (shaderInfo->pModuleData != nullptr) {
+    // Output shader binary file
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+    auto moduleHash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
 
-  dumpFile << "[" << getShaderStageAbbreviation(stage) << "SpvFile]\n";
-  dumpFile << "fileName = " << getSpirvBinaryFileName(moduleHash) << "\n\n";
+    dumpFile << "[" << getShaderStageAbbreviation(stage) << "SpvFile]\n";
+    dumpFile << "fileName = " << getSpirvBinaryFileName(moduleHash) << "\n\n";
+  }
 
   dumpFile << "[" << getShaderStageAbbreviation(stage) << "Info]\n";
   // Output entry point
@@ -762,6 +794,7 @@ void PipelineDumper::DumpPipelineBinary(PipelineDumpFile *dumpFile, GfxIpVersion
 
   ElfReader<Elf64> reader(gfxIp);
   size_t codeSize = pipelineBin->codeSize;
+
   auto result = reader.ReadFromBuffer(pipelineBin->pCode, &codeSize);
   assert(result == Result::Success);
   (void(result)); // unused
@@ -792,6 +825,27 @@ void PipelineDumper::DumpPipelineBinary(PipelineDumpFile *dumpFile, GfxIpVersion
 void PipelineDumper::DumpPipelineExtraInfo(PipelineDumpFile *dumpFile, const std::string *str) {
   if (dumpFile)
     dumpFile->dumpFile << *str;
+}
+
+// =====================================================================================================================
+// Dump fragment outputs info to pipeline file.
+//
+// @param dumpFile : Dump file
+// @param data : fragment output buffer
+// @param size : buffer size
+void PipelineDumper::DumpFragmentOutputs(PipelineDumpFile *dumpFile, const uint8_t *data, uint32_t size) {
+  if (!dumpFile)
+    return;
+
+  assert(size % 4 == 0);
+  const uint32_t *intData = reinterpret_cast<const uint32_t *>(data);
+
+  dumpFile->dumpFile << "\n[FsOutput]\n";
+  dumpFile->dumpFile << "data=";
+  for (unsigned idx = 0; idx < size / 4; idx++) {
+    dumpFile->dumpFile << intData[idx] << ", ";
+  }
+  dumpFile->dumpFile << "\n\n";
 }
 
 // =====================================================================================================================
@@ -1026,6 +1080,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
     dumpFile << "xfbOutInfo[" << idx << "].streamId = " << pXfbOutInfos[idx].streamId << "\n";
   }
   dumpFile << "vbAddressLowBitsKnown = " << pipelineInfo->getGlState().vbAddressLowBitsKnown << "\n";
+  dumpFile << "advancedBlendInfo.enableAdvancedBlend = " << pipelineInfo->advancedBlendInfo.enableAdvancedBlend << "\n";
+  dumpFile << "advancedBlendInfo.binding = " << pipelineInfo->advancedBlendInfo.binding << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -1098,7 +1154,8 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
   // clang-format on
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
     const PipelineShaderInfo *shaderInfo = shaderInfos[stage];
-    if (!shaderInfo->pModuleData)
+    if ((shaderInfo->pModuleData == nullptr) && (shaderInfo->options.clientHash.lower == 0) &&
+        (shaderInfo->options.clientHash.upper == 0))
       continue;
     dumpPipelineShaderInfo(shaderInfo, *dumpFile);
   }
@@ -1494,6 +1551,9 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     }
   }
 
+  hasher.Update(pipeline->advancedBlendInfo.enableAdvancedBlend);
+  hasher.Update(pipeline->advancedBlendInfo.binding);
+
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
@@ -1654,10 +1714,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(pipeline->rsState.provokingVertexMode);
   }
 
-  if (pipeline->gs.pModuleData || pipeline->tcs.pModuleData || pipeline->tes.pModuleData ||
-      pipeline->gs.options.clientHash.lower != 0 || pipeline->gs.options.clientHash.upper != 0 ||
-      pipeline->tcs.options.clientHash.lower != 0 || pipeline->tcs.options.clientHash.upper != 0 ||
-      pipeline->tes.options.clientHash.lower != 0 || pipeline->tes.options.clientHash.upper != 0)
+  if (isValidShaderInfo(pipeline->gs) || isValidShaderInfo(pipeline->tcs) || isValidShaderInfo(pipeline->tes))
     hasher->Update(iaState->patchControlPoints);
   hasher->Update(iaState->disableVertexReuse);
   hasher->Update(iaState->switchWinding);
@@ -1823,8 +1880,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 // @param [in/out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
                                                      bool isCacheHash, MetroHash64 *hasher) {
-  if (shaderInfo->pModuleData || (shaderInfo->options.clientHash.lower != 0) ||
-      (shaderInfo->options.clientHash.upper != 0)) {
+  if (isValidShaderInfo(*shaderInfo)) {
     hasher->Update(stage);
     if ((shaderInfo->options.clientHash.lower != 0) || (shaderInfo->options.clientHash.upper != 0)) {
       hasher->Update(shaderInfo->options.clientHash);

@@ -7,7 +7,7 @@
 ; RUN: count 0 < %t0.stderr
 ; RUN: grep -v lgc.cps.module %s | opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,remove-types-metadata' -S 2> %t1.stderr | FileCheck -check-prefix=CLEANUP %s
 ; RUN: count 0 < %t1.stderr
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,remove-types-metadata' -S %s 2> %t2.stderr | FileCheck -check-prefix=CLEANUP-CPS %s
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata' -S %s 2> %t2.stderr | FileCheck -check-prefix=CLEANUP-CPS %s
 ; RUN: count 0 < %t2.stderr
 ; RUN: grep -v lgc.cps.module %s | opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2> %t3.stderr | FileCheck -check-prefix=DXILCONTPOSTPROCESS %s
 ; RUN: count 0 < %t3.stderr
@@ -29,6 +29,9 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 
 @"\01?Scene@@3URaytracingAccelerationStructure@@A" = external constant %dx.types.Handle, align 4
+
+; Need _cont_ReportHit to get system data type
+declare  !types !206 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
 declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.ResourceProperties) #3
 declare %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32, %dx.types.Handle) #4
@@ -156,8 +159,10 @@ attributes #3 = { nounwind memory(none) }
 !202 = !{!"function", !"void", i32 poison, %dx.types.Handle poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, !102}
 !203 = !{!"function", !"void", !103, i64 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison}
 !204 = !{!"function", !"void", !100}
+!205 = !{i32 0, %struct.AnyHitTraversalData poison}
+!206 = !{!"function", i1 poison, !205, float poison, i32 poison}
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @Miss(
-; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META16:![0-9]+]] !lgc.rt.shaderstage [[META17:![0-9]+]] !continuation.registercount [[META18:![0-9]+]] !continuation [[META19:![0-9]+]] !continuation.stacksize [[META20:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META15:![0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !continuation.registercount [[META17:![0-9]+]] !continuation [[META18:![0-9]+]] !continuation.stacksize [[META19:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[P1:%.*]] = alloca [[STRUCT_SMALLPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[P2:%.*]] = alloca [[STRUCT_MEDIUMPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[P3:%.*]] = alloca [[STRUCT_LARGEPAYLOAD:%.*]], align 8
@@ -167,130 +172,132 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP5]], ptr [[TMP4]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP7]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SMALLPAYLOAD]] zeroinitializer, ptr [[P1]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_MEDIUMPAYLOAD]] zeroinitializer, ptr [[P2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_LARGEPAYLOAD]] zeroinitializer, ptr [[P3]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[T1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T1]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP7]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T1]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP9]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], i64 -1, 5
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[P1]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = load [1 x i32], ptr [[TMP8]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP9]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META18]], !continuation.returnedRegistercount !18
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @await.struct.DispatchSystemData(ptr [[TMP10]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[P1]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP10]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP13]], ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[AWAIT_STRUCT_DISPATCHSYSTEMDATA:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP11]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SMALLPAYLOAD]] poison, ptr [[P1]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[P1]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP13]], ptr [[TMP12]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP11]], ptr [[TMP7]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[P1]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP19]], ptr [[TMP16]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP15]], ptr [[TMP9]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT10:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split10:
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP21]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I2:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I1]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I3:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I2]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I4:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I3]], i64 -1, 5
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = ptrtoint ptr [[PAYLOAD_SPILL_ALLOCA]] to i32
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP16]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [[STRUCT_MEDIUMPAYLOAD]], ptr [[P2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr i32, ptr [[TMP17]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = getelementptr i32, ptr [[TMP18]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP20]], ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr i32, ptr [[TMP18]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP21]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP22]], ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = getelementptr i32, ptr [[TMP18]], i64 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP23]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP24]], ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I4]]), !continuation.registercount [[META14:![0-9]+]], !continuation.returnedRegistercount !14
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @await.struct.DispatchSystemData(ptr [[TMP25]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = ptrtoint ptr [[PAYLOAD_SPILL_ALLOCA]] to i32
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP22]], ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_MEDIUMPAYLOAD]], ptr [[P2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP24]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP28]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i32, ptr [[TMP24]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP29]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP25]], ptr addrspace(32) [[TMP23]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP23]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr [[TMP29]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = load i32, ptr [[TMP34]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP35]], ptr addrspace(32) [[TMP33]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I4]]), !continuation.registercount [[META13:![0-9]+]], !continuation.returnedRegistercount !13
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[AWAIT_STRUCT_DISPATCHSYSTEMDATA]](ptr [[TMP36]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_MEDIUMPAYLOAD]] poison, ptr [[P2]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_MEDIUMPAYLOAD]], ptr [[P2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = getelementptr i32, ptr [[TMP27]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = getelementptr i32, ptr [[TMP28]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP30]], ptr [[TMP29]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = getelementptr i32, ptr [[TMP28]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = load i32, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP32]], ptr [[TMP31]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = getelementptr i32, ptr [[TMP28]], i64 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = load i32, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP34]], ptr [[TMP33]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP26]], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = getelementptr inbounds [[STRUCT_MEDIUMPAYLOAD]], ptr [[P2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP43]], ptr [[TMP39]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = getelementptr inbounds i32, ptr [[TMP39]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(32) [[TMP38]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP31]], ptr [[TMP44]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[TMP44]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP38]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(32) [[TMP49]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP50]], ptr [[TMP48]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP37]], ptr [[TMP21]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT9:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split9:
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I5:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP36]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I5:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP53]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I6:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I5]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I7:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I6]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I8:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I7]], i64 -1, 5
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = ptrtoint ptr [[PAYLOAD_SPILL_ALLOCA]] to i32
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP37]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = getelementptr inbounds [[STRUCT_LARGEPAYLOAD]], ptr [[P3]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = getelementptr i32, ptr [[TMP38]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = getelementptr i32, ptr [[TMP39]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = load i32, ptr [[TMP40]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP41]], ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = getelementptr i32, ptr [[TMP39]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = load i32, ptr [[TMP42]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP43]], ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = getelementptr i32, ptr [[TMP39]], i64 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = load i32, ptr [[TMP44]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP45]], ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr i32, ptr [[TMP39]], i64 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP46]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP47]], ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 4), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr i32, ptr [[TMP39]], i64 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = load i32, ptr [[TMP48]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP49]], ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 5), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I8]]), !continuation.registercount [[META14]], !continuation.returnedRegistercount !14
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @await.struct.DispatchSystemData(ptr [[TMP50]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = ptrtoint ptr [[PAYLOAD_SPILL_ALLOCA]] to i32
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP54]], ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP55:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP56:%.*]] = getelementptr inbounds [[STRUCT_LARGEPAYLOAD]], ptr [[P3]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP60:%.*]] = load i32, ptr [[TMP56]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP60]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = getelementptr inbounds i32, ptr [[TMP56]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = load i32, ptr [[TMP61]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP45]], ptr addrspace(32) [[TMP55]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP65:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP55]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr [[TMP61]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = load i32, ptr [[TMP66]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP67]], ptr addrspace(32) [[TMP65]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP68:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP55]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP69:%.*]] = getelementptr inbounds i32, ptr [[TMP61]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = load i32, ptr [[TMP69]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP70]], ptr addrspace(32) [[TMP68]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP71:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP55]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP72:%.*]] = getelementptr inbounds i32, ptr [[TMP61]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP73:%.*]] = load i32, ptr [[TMP72]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP73]], ptr addrspace(32) [[TMP71]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP74:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I8]]), !continuation.registercount [[META13]], !continuation.returnedRegistercount !13
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP75:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[AWAIT_STRUCT_DISPATCHSYSTEMDATA]](ptr [[TMP74]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_LARGEPAYLOAD]] poison, ptr [[P3]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = getelementptr inbounds [[STRUCT_LARGEPAYLOAD]], ptr [[P3]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = getelementptr i32, ptr [[TMP52]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = getelementptr i32, ptr [[TMP53]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP55:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP55]], ptr [[TMP54]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP56:%.*]] = getelementptr i32, ptr [[TMP53]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP57:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP57]], ptr [[TMP56]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP58:%.*]] = getelementptr i32, ptr [[TMP53]], i64 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP59:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP59]], ptr [[TMP58]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP60:%.*]] = getelementptr i32, ptr [[TMP53]], i64 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 4), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP61]], ptr [[TMP60]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP62:%.*]] = getelementptr i32, ptr [[TMP53]], i64 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP63:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 5), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP63]], ptr [[TMP62]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP51]], ptr [[TMP36]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP76:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP77:%.*]] = getelementptr inbounds [[STRUCT_LARGEPAYLOAD]], ptr [[P3]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP81]], ptr [[TMP77]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP82:%.*]] = getelementptr inbounds i32, ptr [[TMP77]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(32) [[TMP76]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP59]], ptr [[TMP82]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP86:%.*]] = getelementptr inbounds i32, ptr [[TMP82]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP87:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP76]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP88:%.*]] = load i32, ptr addrspace(32) [[TMP87]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP88]], ptr [[TMP86]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP89:%.*]] = getelementptr inbounds i32, ptr [[TMP82]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP90:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP76]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP91:%.*]] = load i32, ptr addrspace(32) [[TMP90]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP91]], ptr [[TMP89]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP92:%.*]] = getelementptr inbounds i32, ptr [[TMP82]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP93:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP76]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(32) [[TMP93]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP94]], ptr [[TMP92]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP95:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP75]], ptr [[TMP53]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split:
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP65:%.*]] = load [1 x i32], ptr [[TMP64]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP65]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP66:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP66]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP67]], !continuation.registercount [[META18]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP96:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP99:%.*]] = load i32, ptr [[TMP96]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP99]], ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP100:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP101:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP100]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP101]], !continuation.registercount [[META17]]
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define i32 @_cont_GetLocalRootIndex(
@@ -299,117 +306,118 @@ attributes #3 = { nounwind memory(none) }
 ;
 ;
 ; CLEANUP-LABEL: define void @Miss(
-; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META16:![0-9]+]] !lgc.rt.shaderstage [[META17:![0-9]+]] !continuation.registercount [[META18:![0-9]+]] !continuation [[META19:![0-9]+]] !continuation.stacksize [[META20:![0-9]+]] !continuation.state [[META21:![0-9]+]] {
+; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META15:![0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !continuation.registercount [[META17:![0-9]+]] !continuation [[META18:![0-9]+]] !continuation.stacksize [[META19:![0-9]+]] !continuation.state [[META20:![0-9]+]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 1
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 28)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[TMP2]], 0
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT_SPILL_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 2
-; CLEANUP-NEXT:    store i32 [[DOTFCA_0_EXTRACT]], ptr addrspace(32) [[DOTFCA_0_EXTRACT_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 2
+; CLEANUP-NEXT:    store i32 [[TMP1]], ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CLEANUP-NEXT:    [[T1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T1]])
-; CLEANUP-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-NEXT:    [[TMP3:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
+; CLEANUP-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T1]])
+; CLEANUP-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-NEXT:    [[TMP2:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
 ; CLEANUP-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], i64 -1, 5
-; CLEANUP-NEXT:    [[DOTFCA_0_INSERT30:%.*]] = insertvalue [1 x i32] poison, i32 0, 0
-; CLEANUP-NEXT:    store [1 x i32] [[DOTFCA_0_INSERT30]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 28)
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @Miss.resume.0 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META18]], !continuation.returnedRegistercount !18
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @Miss.resume.0 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @Miss.resume.0(
-; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META16]] !lgc.rt.shaderstage [[META17]] !continuation.registercount [[META18]] !continuation [[META19]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META15]] !lgc.rt.shaderstage [[META16]] !continuation.registercount [[META17]] !continuation [[META18]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 28)
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT32:%.*]] = extractvalue [1 x i32] [[TMP2]], 0
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT13:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 28)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CLEANUP-NEXT:    [[T110:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-NEXT:    [[T29:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T110]])
-; CLEANUP-NEXT:    [[T38:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T29]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-NEXT:    [[TMP3:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T38]])
-; CLEANUP-NEXT:    [[DIS_DATA_I1_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT13]], 0
+; CLEANUP-NEXT:    [[T29:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T110]])
+; CLEANUP-NEXT:    [[T38:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T29]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-NEXT:    [[TMP2:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T38]])
+; CLEANUP-NEXT:    [[DIS_DATA_I1_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[SYS_DATA_I2:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I1_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA_I3:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I2]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA2_I4:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I3]], i64 -1, 5
-; CLEANUP-NEXT:    [[TMP4:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
-; CLEANUP-NEXT:    store i32 [[TMP4]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 28)
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @Miss.resume.1 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I4]]), !continuation.registercount [[META14:![0-9]+]], !continuation.returnedRegistercount !14
+; CLEANUP-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
+; CLEANUP-NEXT:    store i32 [[TMP3]], ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(32) [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP4]], i32 1
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(32) [[TMP7]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @Miss.resume.1 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I4]]), !continuation.registercount [[META13:![0-9]+]], !continuation.returnedRegistercount !13
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @Miss.resume.1(
-; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META16]] !lgc.rt.shaderstage [[META17]] !continuation.registercount [[META14]] !continuation [[META19]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META15]] !lgc.rt.shaderstage [[META16]] !continuation.registercount [[META13]] !continuation [[META18]] {
 ; CLEANUP-NEXT:  entryresume.1:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 28)
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT15:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 28)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(32) [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 1
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(32) [[TMP6]], align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT12:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CLEANUP-NEXT:    [[T17:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-NEXT:    [[T26:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T17]])
-; CLEANUP-NEXT:    [[T35:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T26]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-NEXT:    [[TMP5:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T35]])
-; CLEANUP-NEXT:    [[DIS_DATA_I5_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT15]], 0
+; CLEANUP-NEXT:    [[T26:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T17]])
+; CLEANUP-NEXT:    [[T35:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T26]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-NEXT:    [[TMP9:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T35]])
+; CLEANUP-NEXT:    [[DIS_DATA_I5_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT12]], 0
 ; CLEANUP-NEXT:    [[SYS_DATA_I6:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I5_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA_I7:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I6]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA2_I8:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I7]], i64 -1, 5
-; CLEANUP-NEXT:    [[TMP6:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
-; CLEANUP-NEXT:    store i32 [[TMP6]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 4), align 4
-; CLEANUP-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 5), align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 28)
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @Miss.resume.2 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I8]]), !continuation.registercount [[META14]], !continuation.returnedRegistercount !14
+; CLEANUP-NEXT:    [[TMP10:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
+; CLEANUP-NEXT:    store i32 [[TMP10]], ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP11:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(32) [[TMP11]], align 4
+; CLEANUP-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP11]], i32 1
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(32) [[TMP14]], align 4
+; CLEANUP-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP11]], i32 2
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(32) [[TMP15]], align 4
+; CLEANUP-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP11]], i32 3
+; CLEANUP-NEXT:    store i32 0, ptr addrspace(32) [[TMP16]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @Miss.resume.2 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I8]]), !continuation.registercount [[META13]], !continuation.returnedRegistercount !13
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @Miss.resume.2(
-; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META16]] !lgc.rt.shaderstage [[META17]] !continuation.registercount [[META14]] !continuation [[META19]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META15]] !lgc.rt.shaderstage [[META16]] !continuation.registercount [[META13]] !continuation [[META18]] {
 ; CLEANUP-NEXT:  entryresume.2:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 28)
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 4), align 4
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 5), align 4
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT17:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 28)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(32) [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 1
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(32) [[TMP6]], align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 2
+; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(32) [[TMP8]], align 4
+; CLEANUP-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 3
+; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(32) [[TMP10]], align 4
+; CLEANUP-NEXT:    [[TMP12:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT14:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT_RELOAD_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 2
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT_RELOAD:%.*]] = load i32, ptr addrspace(32) [[DOTFCA_0_EXTRACT_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 1
+; CLEANUP-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 2
+; CLEANUP-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(32) [[DOTRELOAD_ADDR]], align 4
+; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(32) [[RETURNADDR_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 [[DOTFCA_0_EXTRACT_RELOAD]], 0
-; CLEANUP-NEXT:    store [1 x i32] [[DOTFCA_0_INSERT]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    [[DOTFCA_0_INSERT12:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT17]], 0
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT12]]), !continuation.registercount [[META18]]
+; CLEANUP-NEXT:    store i32 [[DOTRELOAD]], ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT14]], 0
+; CLEANUP-NEXT:    call void @lgc.cps.free(i32 28)
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
@@ -419,108 +427,129 @@ attributes #3 = { nounwind memory(none) }
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @Miss(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.attribute.size [[META16:![0-9]+]] !lgc.rt.shaderstage [[META17:![0-9]+]] !lgc.cps [[META18:![0-9]+]] !continuation [[META19:![0-9]+]] !continuation.stacksize [[META20:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [27 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.attribute.size [[META15:![0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !lgc.cps [[META17:![0-9]+]] !continuation [[META18:![0-9]+]] !continuation.stacksize [[META19:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
-; CLEANUP-CPS-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 20)
+; CLEANUP-CPS-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANUP-CPS-NEXT:    [[RETURN_ADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-CPS-NEXT:    store i32 [[RETURN_ADDR]], ptr addrspace(32) [[RETURN_ADDR_SPILL_ADDR]], align 4
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
+; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[PAYLOAD]], 0
+; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT_SPILL_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 2
+; CLEANUP-CPS-NEXT:    store i32 [[PAYLOAD_FCA_0_EXTRACT]], ptr addrspace(32) [[PAYLOAD_FCA_0_EXTRACT_SPILL_ADDR]], align 4
+; CLEANUP-CPS-NEXT:    [[SYSTEM_DATA_FCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[SYSTEM_DATA]], 0, 0
 ; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
 ; CLEANUP-CPS-NEXT:    [[T1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-CPS-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T1]])
-; CLEANUP-CPS-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-CPS-NEXT:    [[TMP1:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
-; CLEANUP-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
+; CLEANUP-CPS-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T1]])
+; CLEANUP-CPS-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-CPS-NEXT:    [[TMP0:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
+; CLEANUP-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[SYSTEM_DATA_FCA_0_0_EXTRACT]], 0
 ; CLEANUP-CPS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; CLEANUP-CPS-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
 ; CLEANUP-CPS-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], i64 -1, 5
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT28:%.*]] = insertvalue [1 x i32] poison, i32 0, 0
-; CLEANUP-CPS-NEXT:    store [1 x i32] [[DOTFCA_0_INSERT28]], ptr @PAYLOAD, align 4
-; CLEANUP-CPS-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @Miss.resume.0)
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 4, {} poison, i32 [[TMP2]], i32 5), !continuation.returnedRegistercount !18, !continuation.registercount [[META18]]
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT13:%.*]] = insertvalue [1 x i32] poison, i32 0, 0
+; CLEANUP-CPS-NEXT:    [[TMP1:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @Miss.resume.0)
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 4, {} poison, i64 [[TMP1]], i32 5, [30 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT13]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
 ; CLEANUP-CPS-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-CPS-LABEL: define dso_local void @Miss.resume.0(
-; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP3:%.*]]) !lgc.rt.attribute.size [[META16]] !lgc.rt.shaderstage [[META17]] !lgc.cps [[META18]] !continuation [[META19]] !continuation.stacksize [[META20]] {
+; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [27 x i32], [1 x i32] } [[TMP3:%.*]]) !lgc.rt.attribute.size [[META15]] !lgc.rt.shaderstage [[META16]] !lgc.cps [[META17]] !continuation [[META18]] !continuation.stacksize [[META19]] {
 ; CLEANUP-CPS-NEXT:  entryresume.0:
-; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 20)
+; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP4]], i32 0, i32 0
-; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT30:%.*]] = extractvalue [1 x i32] [[TMP5]], 0
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], 0
+; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [1 x i32] } [[TMP3]], 2
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[TMP5]], 0
+; CLEANUP-CPS-NEXT:    [[TMP6:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [1 x i32] } [[TMP3]], 0
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT45:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP6]], 0
 ; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CLEANUP-CPS-NEXT:    [[T110:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-CPS-NEXT:    [[T29:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T110]])
-; CLEANUP-CPS-NEXT:    [[T38:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T29]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-CPS-NEXT:    [[TMP6:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T38]])
-; CLEANUP-CPS-NEXT:    [[DIS_DATA_I1_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
+; CLEANUP-CPS-NEXT:    [[T29:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T110]])
+; CLEANUP-CPS-NEXT:    [[T38:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T29]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-CPS-NEXT:    [[TMP7:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T38]])
+; CLEANUP-CPS-NEXT:    [[DIS_DATA_I1_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT45]], 0
 ; CLEANUP-CPS-NEXT:    [[SYS_DATA_I2:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I1_FCA_0_INSERT]], 0
 ; CLEANUP-CPS-NEXT:    [[TRAV_DATA_I3:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I2]], 0
 ; CLEANUP-CPS-NEXT:    [[TRAV_DATA2_I4:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I3]], i64 -1, 5
-; CLEANUP-CPS-NEXT:    [[TMP7:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
-; CLEANUP-CPS-NEXT:    store i32 [[TMP7]], ptr @PAYLOAD, align 4
-; CLEANUP-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-CPS-NEXT:    [[TMP8:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @Miss.resume.1)
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 4, {} poison, i32 [[TMP8]], i32 5), !continuation.returnedRegistercount !14, !continuation.registercount [[META14:![0-9]+]]
+; CLEANUP-CPS-NEXT:    [[TMP8:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
+; CLEANUP-CPS-NEXT:    [[TMP9:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(32)
+; CLEANUP-CPS-NEXT:    store i32 0, ptr addrspace(32) [[TMP9]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP9]], i32 1
+; CLEANUP-CPS-NEXT:    store i32 0, ptr addrspace(32) [[TMP12]], align 4
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT17:%.*]] = insertvalue [2 x i32] poison, i32 [[TMP8]], 0
+; CLEANUP-CPS-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [2 x i32] [[DOTFCA_0_INSERT17]], i32 0, 1
+; CLEANUP-CPS-NEXT:    [[TMP13:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @Miss.resume.1)
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 4, {} poison, i64 [[TMP13]], i32 5, [30 x i32] poison, [2 x i32] [[DOTFCA_1_INSERT]]), !continuation.registercount [[META13:![0-9]+]], !continuation.returnedRegistercount !13
 ; CLEANUP-CPS-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-CPS-LABEL: define dso_local void @Miss.resume.1(
-; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP3:%.*]]) !lgc.rt.attribute.size [[META16]] !lgc.rt.shaderstage [[META17]] !lgc.cps [[META18]] !continuation [[META19]] !continuation.stacksize [[META20]] {
+; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [27 x i32], [2 x i32] } [[TMP3:%.*]]) !lgc.rt.attribute.size [[META15]] !lgc.rt.shaderstage [[META16]] !lgc.cps [[META17]] !continuation [[META18]] !continuation.stacksize [[META19]] {
 ; CLEANUP-CPS-NEXT:  entryresume.1:
-; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 20)
+; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP4]], i32 0, i32 0
-; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-CPS-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-CPS-NEXT:    [[TMP7:%.*]] = load i32, ptr getelementptr ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT13:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], 0
+; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } [[TMP3]], 2
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT18:%.*]] = extractvalue [2 x i32] [[TMP5]], 0
+; CLEANUP-CPS-NEXT:    [[DOTFCA_1_EXTRACT:%.*]] = extractvalue [2 x i32] [[TMP5]], 1
+; CLEANUP-CPS-NEXT:    [[TMP6:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } [[TMP3]], 0
+; CLEANUP-CPS-NEXT:    [[TMP7:%.*]] = inttoptr i32 [[DOTFCA_0_EXTRACT18]] to ptr addrspace(32)
+; CLEANUP-CPS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(32) [[TMP7]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 1
+; CLEANUP-CPS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(32) [[TMP11]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP13:%.*]] = inttoptr i32 [[DOTFCA_0_EXTRACT18]] to ptr addrspace(32)
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT47:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP6]], 0
 ; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CLEANUP-CPS-NEXT:    [[T17:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-CPS-NEXT:    [[T26:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T17]])
-; CLEANUP-CPS-NEXT:    [[T35:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T26]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-CPS-NEXT:    [[TMP8:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T35]])
-; CLEANUP-CPS-NEXT:    [[DIS_DATA_I5_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT13]], 0
+; CLEANUP-CPS-NEXT:    [[T26:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T17]])
+; CLEANUP-CPS-NEXT:    [[T35:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T26]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-CPS-NEXT:    [[TMP14:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T35]])
+; CLEANUP-CPS-NEXT:    [[DIS_DATA_I5_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT47]], 0
 ; CLEANUP-CPS-NEXT:    [[SYS_DATA_I6:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I5_FCA_0_INSERT]], 0
 ; CLEANUP-CPS-NEXT:    [[TRAV_DATA_I7:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I6]], 0
 ; CLEANUP-CPS-NEXT:    [[TRAV_DATA2_I8:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I7]], i64 -1, 5
-; CLEANUP-CPS-NEXT:    [[TMP9:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
-; CLEANUP-CPS-NEXT:    store i32 [[TMP9]], ptr @PAYLOAD, align 4
-; CLEANUP-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 4), align 4
-; CLEANUP-CPS-NEXT:    store i32 0, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 5), align 4
-; CLEANUP-CPS-NEXT:    [[TMP10:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @Miss.resume.2)
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 4, {} poison, i32 [[TMP10]], i32 5), !continuation.returnedRegistercount !14, !continuation.registercount [[META14]]
+; CLEANUP-CPS-NEXT:    [[TMP15:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
+; CLEANUP-CPS-NEXT:    [[TMP16:%.*]] = inttoptr i32 [[TMP15]] to ptr addrspace(32)
+; CLEANUP-CPS-NEXT:    store i32 0, ptr addrspace(32) [[TMP16]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP16]], i32 1
+; CLEANUP-CPS-NEXT:    store i32 0, ptr addrspace(32) [[TMP19]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP16]], i32 2
+; CLEANUP-CPS-NEXT:    store i32 0, ptr addrspace(32) [[TMP20]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP16]], i32 3
+; CLEANUP-CPS-NEXT:    store i32 0, ptr addrspace(32) [[TMP21]], align 4
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT23:%.*]] = insertvalue [2 x i32] poison, i32 [[TMP15]], 0
+; CLEANUP-CPS-NEXT:    [[DOTFCA_1_INSERT26:%.*]] = insertvalue [2 x i32] [[DOTFCA_0_INSERT23]], i32 0, 1
+; CLEANUP-CPS-NEXT:    [[TMP22:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @Miss.resume.2)
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 4, {} poison, i64 [[TMP22]], i32 5, [30 x i32] poison, [2 x i32] [[DOTFCA_1_INSERT26]]), !continuation.registercount [[META13]], !continuation.returnedRegistercount !13
 ; CLEANUP-CPS-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-CPS-LABEL: define dso_local void @Miss.resume.2(
-; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP3:%.*]]) !lgc.rt.attribute.size [[META16]] !lgc.rt.shaderstage [[META17]] !lgc.cps [[META18]] !continuation [[META19]] !continuation.stacksize [[META20]] {
+; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [27 x i32], [2 x i32] } [[TMP3:%.*]]) !lgc.rt.attribute.size [[META15]] !lgc.rt.shaderstage [[META16]] !lgc.cps [[META17]] !continuation [[META18]] !continuation.stacksize [[META19]] {
 ; CLEANUP-CPS-NEXT:  entryresume.2:
-; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 20)
+; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MISS_FRAME:%.*]], ptr addrspace(32) [[TMP4]], i32 0, i32 0
-; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 1), align 4
-; CLEANUP-CPS-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
-; CLEANUP-CPS-NEXT:    [[TMP7:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 4
-; CLEANUP-CPS-NEXT:    [[TMP8:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 4), align 4
-; CLEANUP-CPS-NEXT:    [[TMP9:%.*]] = load i32, ptr getelementptr ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 5), align 4
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT15:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], 0
+; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } [[TMP3]], 2
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT27:%.*]] = extractvalue [2 x i32] [[TMP5]], 0
+; CLEANUP-CPS-NEXT:    [[DOTFCA_1_EXTRACT29:%.*]] = extractvalue [2 x i32] [[TMP5]], 1
+; CLEANUP-CPS-NEXT:    [[TMP6:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } [[TMP3]], 0
+; CLEANUP-CPS-NEXT:    [[TMP7:%.*]] = inttoptr i32 [[DOTFCA_0_EXTRACT27]] to ptr addrspace(32)
+; CLEANUP-CPS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(32) [[TMP7]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 1
+; CLEANUP-CPS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(32) [[TMP11]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 2
+; CLEANUP-CPS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(32) [[TMP13]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 3
+; CLEANUP-CPS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(32) [[TMP15]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP17:%.*]] = inttoptr i32 [[DOTFCA_0_EXTRACT27]] to ptr addrspace(32)
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT49:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP6]], 0
 ; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT_RELOAD_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[TMP4]], i32 0, i32 2
+; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT_RELOAD:%.*]] = load i32, ptr addrspace(32) [[PAYLOAD_FCA_0_EXTRACT_RELOAD_ADDR]], align 4
 ; CLEANUP-CPS-NEXT:    [[RETURN_ADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[MISS_FRAME]], ptr addrspace(32) [[TMP4]], i32 0, i32 1
 ; CLEANUP-CPS-NEXT:    [[RETURN_ADDR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[RETURN_ADDR_RELOAD_ADDR]], align 4
-; CLEANUP-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 undef, 0
-; CLEANUP-CPS-NEXT:    store [1 x i32] [[DOTFCA_0_INSERT]], ptr @PAYLOAD, align 4
-; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT11:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT15]], 0
-; CLEANUP-CPS-NEXT:    call void @lgc.cps.free(i32 20)
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR_RELOAD]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT11]])
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT44:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT49]], 0
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT_RELOAD]], 0
+; CLEANUP-CPS-NEXT:    call void @lgc.cps.free(i32 24)
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR_RELOAD]], i32 3, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT44]], [27 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
 ; CLEANUP-CPS-NEXT:    unreachable
 ;
 ;
@@ -535,37 +564,31 @@ attributes #3 = { nounwind memory(none) }
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], 16
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 28
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = add i32 [[TMP1]], 16
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP4]], i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[TMP5]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 [[TMP6]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[DOTFCA_0_INSERT]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = add i32 [[TMP2]], 24
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = add i32 [[TMP1]], 24
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = inttoptr i32 [[TMP7]] to ptr addrspace(21)
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP8]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_0_EXTRACT]], ptr addrspace(21) [[TMP9]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP9]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; DXILCONTPOSTPROCESS-NEXT:    [[T1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T1]])
-; DXILCONTPOSTPROCESS-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; DXILCONTPOSTPROCESS-NEXT:    [[T2:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T1]])
+; DXILCONTPOSTPROCESS-NEXT:    [[T3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T2]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], i64 -1, 5
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT30:%.*]] = insertvalue [1 x i32] poison, i32 0, 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT30_FCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[DOTFCA_0_INSERT30]], 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_0_INSERT30_FCA_0_EXTRACT]], ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(20) @REGISTERS, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = add i32 [[TMP11]], 28
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP12]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Miss.resume.0 to i64))
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP13]], i64 [[TMP14]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Miss.resume.0 to i64))
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP11]], i64 [[TMP12]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
 ;
@@ -576,42 +599,30 @@ attributes #3 = { nounwind memory(none) }
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -28
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 [[TMP5]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT32:%.*]] = extractvalue [1 x i32] [[DOTFCA_0_INSERT]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT13:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; DXILCONTPOSTPROCESS-NEXT:    [[T110:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[T29:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T110]])
-; DXILCONTPOSTPROCESS-NEXT:    [[T38:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T29]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T38]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DIS_DATA_I1_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT13]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[T29:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T110]])
+; DXILCONTPOSTPROCESS-NEXT:    [[T38:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T29]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T38]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DIS_DATA_I1_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYS_DATA_I2:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I1_FCA_0_INSERT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA_I3:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I2]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA2_I4:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I3]], i64 -1, 5
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP4]], ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 1) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = add i32 [[TMP8]], 8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = inttoptr i32 [[TMP9]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP10]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP11]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = add i32 [[TMP12]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = add i32 [[TMP13]], 12
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = inttoptr i32 [[TMP14]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP15]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP16]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = add i32 [[TMP17]], 28
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP18]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Miss.resume.1 to i64))
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP19]], i64 [[TMP20]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I4]]), !continuation.registercount [[META13:![0-9]+]], !continuation.returnedRegistercount !13
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP2]], ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 1), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP6]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP7]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP5]], 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP9]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP10]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Miss.resume.1 to i64))
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP11]], i64 [[TMP12]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I4]]), !continuation.registercount [[META13:![0-9]+]], !continuation.returnedRegistercount !13
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
 ;
@@ -622,64 +633,47 @@ attributes #3 = { nounwind memory(none) }
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -28
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_MEDIUMPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 1) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = add i32 [[TMP6]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 8
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 1), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP5]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP6]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP3]], 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(21)
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP9]], i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(21) [[TMP10]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = add i32 [[TMP12]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = add i32 [[TMP13]], 12
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = inttoptr i32 [[TMP14]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP15]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(21) [[TMP16]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT15:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT12:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; DXILCONTPOSTPROCESS-NEXT:    [[T17:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[T26:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[T17]])
-; DXILCONTPOSTPROCESS-NEXT:    [[T35:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[T26]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T35]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DIS_DATA_I5_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT15]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[T26:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[T17]])
+; DXILCONTPOSTPROCESS-NEXT:    [[T35:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[T26]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T35]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DIS_DATA_I5_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT12]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYS_DATA_I6:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I5_FCA_0_INSERT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA_I7:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I6]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA2_I8:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I7]], i64 -1, 5
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP4]], ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 1) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = add i32 [[TMP19]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = add i32 [[TMP20]], 8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = inttoptr i32 [[TMP21]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP22]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP23]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = add i32 [[TMP24]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP26:%.*]] = add i32 [[TMP25]], 12
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = inttoptr i32 [[TMP26]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP27]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP28]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP29]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP31:%.*]] = add i32 [[TMP30]], 16
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP32:%.*]] = inttoptr i32 [[TMP31]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP32]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP33]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP35:%.*]] = add i32 [[TMP34]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], 20
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP37:%.*]] = inttoptr i32 [[TMP36]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP37]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP38]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP39:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP40:%.*]] = add i32 [[TMP39]], 28
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP40]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP41:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP42:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Miss.resume.2 to i64))
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP41]], i64 [[TMP42]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I8]]), !continuation.registercount [[META13]], !continuation.returnedRegistercount !13
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP2]], ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 1), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = inttoptr i32 [[TMP14]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP15]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP16]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = add i32 [[TMP14]], 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = inttoptr i32 [[TMP17]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP18]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP19]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = add i32 [[TMP14]], 8
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = inttoptr i32 [[TMP20]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP21]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP22]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = add i32 [[TMP14]], 12
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = inttoptr i32 [[TMP23]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP24]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i32 0, ptr addrspace(21) [[TMP25]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Miss.resume.2 to i64))
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP26]], i64 [[TMP27]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I8]]), !continuation.registercount [[META13]], !continuation.returnedRegistercount !13
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
 ;
@@ -690,50 +684,41 @@ attributes #3 = { nounwind memory(none) }
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -28
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_LARGEPAYLOAD_ATTR_MAX_2_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 1) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = add i32 [[TMP6]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], 8
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 1), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP5]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP6]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = add i32 [[TMP3]], 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(21)
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP9]], i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(21) [[TMP10]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = add i32 [[TMP12]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = add i32 [[TMP13]], 12
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = inttoptr i32 [[TMP14]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP15]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(21) [[TMP16]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = add i32 [[TMP18]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = add i32 [[TMP19]], 16
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = inttoptr i32 [[TMP20]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP21]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(21) [[TMP22]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = add i32 [[TMP24]], -8
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP26:%.*]] = add i32 [[TMP25]], 20
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = inttoptr i32 [[TMP26]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP27]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(21) [[TMP28]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT17:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = add i32 [[TMP3]], 8
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = inttoptr i32 [[TMP12]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP13]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(21) [[TMP14]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = add i32 [[TMP3]], 12
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = inttoptr i32 [[TMP16]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP17]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(21) [[TMP18]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT14:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP4]], 24
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP31:%.*]] = inttoptr i32 [[TMP30]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP31]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT_RELOAD:%.*]] = load i32, ptr addrspace(21) [[TMP32]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP33:%.*]] = add i32 [[TMP4]], 16
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP34:%.*]] = inttoptr i32 [[TMP33]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP34]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[TMP35]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 [[DOTFCA_0_EXTRACT_RELOAD]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[DOTFCA_0_INSERT]], 0
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_0_INSERT_FCA_0_EXTRACT]], ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT12:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT17]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP36:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP36]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT12]]), !continuation.registercount [[META17]]
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = add i32 [[TMP2]], 24
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = inttoptr i32 [[TMP21]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP22]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(21) [[TMP23]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = add i32 [[TMP2]], 16
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = inttoptr i32 [[TMP24]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP25]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[TMP26]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTRELOAD]], ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT14]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP28:%.*]] = add i32 [[TMP27]], -28
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP28]], ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP29]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
 ;

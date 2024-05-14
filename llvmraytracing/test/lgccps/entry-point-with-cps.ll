@@ -75,7 +75,7 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[CR_0:%.*]] = ptrtoint ptr [[FN]] to i32
 ; CHECK-NEXT:    [[CR_1:%.*]] = or i32 [[CR_0]], 2
 ; CHECK-NEXT:    [[TMP0:%.*]] = inttoptr i32 [[CR_1]] to ptr
-; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @raygen.resume.0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @raygen.resume.0)
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 4, {} poison, i32 [[TMP1]], i32 [[X]], ptr addrspace(1) [[DST]])
 ; CHECK-NEXT:    unreachable
 ;
@@ -93,16 +93,16 @@ declare void @lgc.cps.jump(...)
 ; CHECK-LABEL: define spir_func void @chs(
 ; CHECK-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], i32 [[X:%.*]]) !lgc.shaderstage [[META0]] !lgc.cps [[META3:![0-9]+]] !continuation [[META4:![0-9]+]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
-; CHECK-NEXT:    [[RCR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CHS_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[RCR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CHS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(32) [[RCR_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 24)
 ; CHECK-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; CHECK-NEXT:    [[CR_0:%.*]] = ptrtoint ptr [[FN]] to i32
 ; CHECK-NEXT:    [[CR_1:%.*]] = or i32 [[CR_0]], 1
-; CHECK-NEXT:    [[TMP1:%.*]] = inttoptr i32 [[CR_1]] to ptr
-; CHECK-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @chs.resume.0)
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 2, {} poison, i32 [[TMP2]], i32 [[X]])
+; CHECK-NEXT:    [[TMP0:%.*]] = inttoptr i32 [[CR_1]] to ptr
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @chs.resume.0)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 2, {} poison, i32 [[TMP1]], i32 [[X]])
 ; CHECK-NEXT:    unreachable
 ;
 ;

@@ -27,6 +27,7 @@
 
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/IR/IRBuilder.h"
 #include <optional>
 
 #define GET_INCLUDES
@@ -41,18 +42,11 @@ class Type;
 class Value;
 } // namespace llvm
 
-namespace lgc::cps {
-enum class CpsShaderStage : uint8_t {
-  RayGen = 0,
-  Traversal,
-  Intersection,
-  AnyHit,
-  ClosestHit,
-  Miss,
-  Callable,
-  Count,
-};
+namespace lgc::rt {
+enum class RayTracingShaderStage;
+} // namespace lgc::rt
 
+namespace lgc::cps {
 enum class CpsLevel : uint8_t {
   RayGen = 0,
   ClosestHit_Miss_Callable,
@@ -64,6 +58,15 @@ enum class CpsLevel : uint8_t {
 
 constexpr unsigned stackAddrSpace = 32;
 
+// The maximum amount of dwords usable for passing arguments
+constexpr unsigned MaxArgumentDwords = 32;
+
+// The maximum allowed number of payload VGPRs to be used by RT lowering. Sizes
+// beyond this value should be spilled to memory.
+// TODO: Properly choose a value here, such that the total VGPR number is just
+// below an allocation boundary.
+constexpr unsigned CpsPayloadMaxNumVgprs = MaxArgumentDwords;
+
 unsigned getArgumentDwordCount(const llvm::DataLayout &DL, llvm::Type *type);
 unsigned getArgumentDwordCount(const llvm::DataLayout &DL,
                                llvm::ArrayRef<llvm::Type *> types);
@@ -74,11 +77,15 @@ getRemainingArgumentDwords(const llvm::DataLayout &DL,
 bool isCpsFunction(const llvm::Function &fn);
 void setCpsFunctionLevel(llvm::Function &fn, CpsLevel level);
 CpsLevel getCpsLevelFromFunction(const llvm::Function &fn);
-CpsLevel getCpsLevelForShaderStage(CpsShaderStage stage);
-uint8_t getPotentialCpsReturnLevels(CpsShaderStage stage);
+CpsLevel getCpsLevelForShaderStage(lgc::rt::RayTracingShaderStage stage);
+uint8_t getPotentialCpsReturnLevels(lgc::rt::RayTracingShaderStage stage);
 void pushStateToCpsStack(llvm_dialects::Builder &builder,
                          lgc::cps::JumpOp &jumpOp);
 llvm::Value *popStateFromCpsStack(llvm_dialects::Builder &builder,
                                   const llvm::DataLayout &DL,
                                   llvm::Type *stateType);
+llvm::Value *
+lowerAsContinuationReference(llvm::IRBuilder<> &Builder,
+                             lgc::cps::AsContinuationReferenceOp &AsCROp,
+                             llvm::Value *Relocation = nullptr);
 } // namespace lgc::cps

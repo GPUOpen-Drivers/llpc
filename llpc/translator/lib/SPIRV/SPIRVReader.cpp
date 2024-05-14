@@ -1,4 +1,4 @@
-//===- SPIRVReader.cpp - Converts SPIR-V to LLVM ----------------*- C++ -*-===//
+﻿//===- SPIRVReader.cpp - Converts SPIR-V to LLVM ----------------*- C++ -*-===//
 //
 //                     The LLVM/SPIR-V Translator
 //
@@ -165,6 +165,12 @@ bool isAccelerationStructureType(SPIRVType *type) {
   return type->isTypeAccelerationStructureKHR();
 }
 
+bool isAccelerationStructureMaybeArrayType(SPIRVType *type) {
+  while (type->getOpCode() == OpTypeArray || type->getOpCode() == OpTypeRuntimeArray)
+    type = type->getArrayElementType();
+  return isAccelerationStructureType(type);
+}
+
 SPIRVWord getStd430TypeAlignment(SPIRVType *const spvType) {
   switch (spvType->getOpCode()) {
   case OpTypeInt:
@@ -196,6 +202,8 @@ SPIRVWord getStd430TypeAlignment(SPIRVType *const spvType) {
     auto *columnTy = spvType->getMatrixColumnType();
     return getStd430TypeAlignment(columnTy);
   }
+  case OpTypeImage:
+  case OpTypeSampler:
   case OpTypeSampledImage:
     return 1;
   default:
@@ -223,6 +231,12 @@ SPIRVWord getStd430AlignedTypeSize(SPIRVType *const spvType) {
       accumulatedOffset = roundUpToMultiple(accumulatedOffset, memberAlign);
       accumulatedOffset += size;
     }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 72
+    // Rule 9:
+    // The structure may have padding at the end; the base offset of the member following the
+    // sub-structure is rounded up to the next multiple of the base alignment of the structure.
+    accumulatedOffset = roundUpToMultiple(accumulatedOffset, getStd430TypeAlignment(spvType));
+#endif
     return accumulatedOffset;
   }
   case OpTypeArray: {
@@ -341,12 +355,17 @@ Value *SPIRVToLLVM::mapEntry(const SPIRVEntry *be, Value *v) {
     return m_entryMap[be];
 }
 
-unsigned SPIRVToLLVM::getBlockPredecessorCounts(BasicBlock *block, BasicBlock *predecessor) {
+unsigned SPIRVToLLVM::getBlockPredecessorCounts(Function *func, BasicBlock *block, BasicBlock *predecessor) {
   assert(block);
   // This will create the map entry if it does not already exist.
-  auto it = m_blockPredecessorToCount.find({block, predecessor});
-  if (it != m_blockPredecessorToCount.end())
-    return it->second;
+  auto itfunc = m_blockPredecessorToCount.find(func);
+  if (itfunc != m_blockPredecessorToCount.end()) {
+    BlockPredecessorToCountInFunction &blockPredecessorToCountInFunc = itfunc->second;
+    auto itblock = blockPredecessorToCountInFunc.find({block, predecessor});
+    if (itblock != blockPredecessorToCountInFunc.end()) {
+      return itblock->second;
+    }
+  }
 
   return 0;
 }
@@ -360,12 +379,24 @@ bool SPIRVToLLVM::isSPIRVBuiltinVariable(GlobalVariable *gv, SPIRVBuiltinVariabl
   return true;
 }
 
-SmallVector<Value *> SPIRVToLLVM::getTranslatedValues(SPIRVValue *bv) {
+SmallVector<Value *> SPIRVToLLVM::getTranslatedValues(SPIRVValue *bv, Function *f, BasicBlock *bb) {
+  // We didn't map variable value in m_valueMap
+  if (bv->getOpCode() == OpVariable) {
+    if (!f) {
+      auto itNonImage = m_variableNonImageMap.find(bv);
+      if (itNonImage != m_variableNonImageMap.end())
+        if (itNonImage->second)
+          return {itNonImage->second};
+    }
+    auto it = m_variableMap.find({bv, f});
+    if (it != m_variableMap.end())
+      return it->second;
+  }
   return SmallVector<Value *>(m_valueMap.lookup(bv));
 }
 
-Value *SPIRVToLLVM::getTranslatedValue(SPIRVValue *bv) {
-  auto values = getTranslatedValues(bv);
+Value *SPIRVToLLVM::getTranslatedValue(SPIRVValue *bv, Function *f, BasicBlock *bb) {
+  auto values = getTranslatedValues(bv, f, bb);
   assert(values.size() <= 1);
   return values.empty() ? nullptr : values[0];
 }
@@ -1045,6 +1076,9 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     return mapType(t, FunctionType::get(rt, pt, false));
   }
   case OpTypeImage: {
+    if (layout != LayoutMode::Native)
+      return getBuilder()->getInt8Ty();
+
     auto st = static_cast<SPIRVTypeImage *>(t);
     // A buffer image is represented by a texel buffer descriptor. Any other image is represented by an array
     // of three image descriptors, to allow for multi-plane YCbCr conversion. (The f-mask part of a multi-sampled
@@ -1065,6 +1099,9 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
   }
   case OpTypeSampler:
   case OpTypeSampledImage: {
+    if (layout != LayoutMode::Native)
+      return getBuilder()->getInt8Ty();
+
     // Get sampler type.
     // A sampler is represented by a struct containing the sampler itself, and the convertingSamplerIdx, an i32
     // that is either 0 or the 1-based index into the converting samplers.
@@ -1229,7 +1266,7 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
 }
 
 SmallVector<Value *> SPIRVToLLVM::transValueMulti(SPIRVValue *bv, Function *f, BasicBlock *bb, bool createPlaceHolder) {
-  auto values = m_valueMap.lookup(bv);
+  auto values = getTranslatedValues(bv, f, bb);
 
   if (!values.empty() && (!m_placeholderMap.count(bv) || createPlaceHolder))
     return SmallVector<Value *>(values);
@@ -2933,7 +2970,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
   SPIRVType *spvElementTy = spvImageLoadPtr->getType()->getPointerElementType();
   Type *elementTy = transType(spvElementTy, 0, false, false, LayoutMode::Native);
-  Value *base = transImagePointer(spvImageLoadPtr);
+  BasicBlock *bb = getBuilder()->GetInsertBlock();
+  Value *base = transValue(spvImageLoadPtr, bb->getParent(), bb);
   return loadImageSampler(elementTy, base);
 }
 
@@ -3332,11 +3370,12 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
 //
 // @param spvValue : A SPIR-V value.
 SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
-  SPIRVType *baseType = nullptr;
+  SPIRVValue *spvBase = nullptr;
+  SPIRVType *spvBaseType = nullptr;
   SPIRVType *spvAccessType = nullptr;
+  SPIRVType *spvResultType = nullptr;
+  std::vector<SPIRVValue *> spvIndices;
   SPIRVStorageClassKind storageClass = StorageClassMax;
-  SPIRVValue *baseValue = nullptr;
-  std::vector<SPIRVValue *> indices;
   bool inBound = false;
   bool hasPtrIndex = false;
 
@@ -3344,18 +3383,21 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     assert((spvValue->getOpCode() == OpAccessChain) || (spvValue->getOpCode() == OpInBoundsAccessChain) ||
            (spvValue->getOpCode() == OpPtrAccessChain) || (spvValue->getOpCode() == OpInBoundsPtrAccessChain));
     auto spvAccessChain = static_cast<SPIRVAccessChainBase *>(spvValue);
-    baseType = spvAccessChain->getBase()->getType();
-    spvAccessType = spvAccessChain->getBase()->getType()->getPointerElementType();
-    baseValue = spvAccessChain->getBase();
-    indices = spvAccessChain->getIndices();
+    spvBase = spvAccessChain->getBase();
+    spvBaseType = spvBase->getType();
+    spvAccessType = spvBaseType->getPointerElementType();
+    spvResultType = spvAccessChain->getType()->getPointerElementType();
+    spvIndices = spvAccessChain->getIndices();
     hasPtrIndex = spvAccessChain->hasPtrIndex();
     inBound = spvAccessChain->isInBounds();
   }
 
-  if (baseType->isTypePointer() || baseType->isTypeForwardPointer()) {
-    storageClass = static_cast<SPIRVTypePointer *>(baseType)->getStorageClass();
+  if (spvBaseType->isTypePointer() || spvBaseType->isTypeForwardPointer()) {
+    storageClass = static_cast<SPIRVTypePointer *>(spvBaseType)->getStorageClass();
   }
   LayoutMode layout = LayoutMode::Native;
+  BasicBlock *bb = getBuilder()->GetInsertBlock();
+  Function *f = bb->getParent();
 
   // Special handling for UniformConstant if the ultimate element type is image/sampler/sampledimage.
   if (storageClass == StorageClassUniformConstant) {
@@ -3368,170 +3410,269 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     case OpTypeImage:
     case OpTypeSampler:
     case OpTypeSampledImage:
-      return {transOpAccessChainForImage(static_cast<SPIRVAccessChainBase *>(spvValue))};
+      break;
     default:
       layout = isAccelerationStructureType(spvUltimateElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
       break;
     }
   }
 
-  // Non-image-related handling.
-  Value *base = transValue(baseValue, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  auto srcIndices = transValue(indices, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+  // Special for UniformConstant: determine whether result/base is the mixed image/non-image case
+  bool baseHasImage = false;
+  bool baseHasNonImage = false;
+  bool resultHasImage = false;
+  bool resultHasNonImage = false;
+  if (storageClass == StorageClassUniformConstant) {
+    auto detectImage = [](SPIRVType *type) -> std::pair<bool, bool> {
+      bool hasImage = false;
+      bool hasNonImage = false;
+      SmallVector<SPIRVType *> elementWorklist;
+      elementWorklist.push_back(type);
+      while (!elementWorklist.empty()) {
+        SPIRVType *spvTy = elementWorklist.pop_back_val();
+        switch (spvTy->getOpCode()) {
+        case OpTypeImage:
+        case OpTypeSampler:
+        case OpTypeSampledImage:
+          hasImage = true;
+          break;
+        case OpTypeArray:
+        case OpTypeRuntimeArray:
+          elementWorklist.push_back(spvTy->getArrayElementType());
+          break;
+        case OpTypeStruct:
+          for (int i = 0, e = spvTy->getStructMemberCount(); i < e; i++)
+            elementWorklist.push_back(spvTy->getStructMemberType(i));
+          hasNonImage = true;
+          break;
+        default:
+          hasNonImage = true;
+        }
+      }
+      return std::make_pair(hasImage, hasNonImage);
+    };
 
-  truncConstantIndex(srcIndices, getBuilder()->GetInsertBlock());
+    auto pair = detectImage(spvResultType);
+    resultHasImage = pair.first;
+    resultHasNonImage = pair.second;
+    pair = detectImage(spvAccessType);
+    baseHasImage = pair.first;
+    baseHasNonImage = pair.second;
+  }
 
+  // Translate the base variable and indices
+  auto fullBase = transValueMulti(spvBase, f, bb);
+  auto srcIndices = transValue(spvIndices, f, bb);
+
+  truncConstantIndex(srcIndices, bb);
   if (!hasPtrIndex)
     srcIndices.insert(srcIndices.begin(), getBuilder()->getInt32(0));
 
-  const SPIRVStorageClassKind pointerStorageClass = baseType->getPointerStorageClass();
+  SmallVector<Value *> result;
 
-  const bool typeMaybeRemapped =
-      isStorageClassExplicitlyLaidOut(m_bm, pointerStorageClass) || pointerStorageClass == StorageClassUniformConstant;
+  // First, translate the access chain for any non-image parts.
+  if (!resultHasImage) {
+    Value *base = fullBase[0];
+    const SPIRVStorageClassKind pointerStorageClass = spvBaseType->getPointerStorageClass();
 
-  Type *basePointeeType = nullptr;
-  { basePointeeType = getPointeeType(baseValue, layout); }
+    const bool typeMaybeRemapped = isStorageClassExplicitlyLaidOut(m_bm, pointerStorageClass) ||
+                                   pointerStorageClass == StorageClassUniformConstant;
 
-  SmallVector<Value *, 8> gepIndices;
+    Type *basePointeeType = nullptr;
+    { basePointeeType = getPointeeType(spvBase, layout); }
 
-  if (baseType->isTypeForwardPointer()) {
-    baseType = static_cast<SPIRVTypeForwardPointer *>(baseType)->getPointer();
-  }
-  assert(baseType->isTypePointer());
-  gepIndices.push_back(srcIndices[0]);
+    SmallVector<Value *, 8> gepIndices;
 
-  if (baseType->isTypePointer())
-    spvAccessType = baseType->getPointerElementType();
-
-  auto flushGep = [&]() {
-    if (gepIndices.size() == 1) {
-      if (auto *constant = dyn_cast<ConstantInt>(gepIndices[0])) {
-        if (constant->getZExtValue() == 0)
-          return; // no-op
-      }
+    if (spvBaseType->isTypeForwardPointer()) {
+      spvBaseType = static_cast<SPIRVTypeForwardPointer *>(spvBaseType)->getPointer();
     }
+    assert(spvBaseType->isTypePointer());
+    gepIndices.push_back(srcIndices[0]);
 
-    if (inBound)
-      base = getBuilder()->CreateInBoundsGEP(basePointeeType, base, gepIndices);
-    else
-      base = getBuilder()->CreateGEP(basePointeeType, base, gepIndices);
+    if (spvBaseType->isTypePointer())
+      spvAccessType = spvBaseType->getPointerElementType();
 
-    gepIndices.clear();
-    gepIndices.push_back(getBuilder()->getInt32(0));
-  };
+    auto flushGep = [&]() {
+      if (gepIndices.size() == 1) {
+        if (auto *constant = dyn_cast<ConstantInt>(gepIndices[0])) {
+          if (constant->getZExtValue() == 0)
+            return; // no-op
+        }
+      }
 
-  // Run over the indices and map the SPIR-V level indices to LLVM indices, which may be different because the LLVM
-  // types may contain manual padding fields to model the power of Vulkan's layout options.
-  // Additionally, break up the GEP sequence to handle some special cases like row major matrices.
-  for (Value *index : ArrayRef(srcIndices).drop_front()) {
-    switch (spvAccessType->getOpCode()) {
-    case OpTypeStruct: {
-      ConstantInt *constIndex = cast<ConstantInt>(index);
-      const uint64_t origMemberIndex = constIndex->getZExtValue();
-      Type *castType = nullptr;
+      if (inBound)
+        base = getBuilder()->CreateInBoundsGEP(basePointeeType, base, gepIndices);
+      else
+        base = getBuilder()->CreateGEP(basePointeeType, base, gepIndices);
 
-      if (typeMaybeRemapped) {
-        if (isRemappedTypeElements(spvAccessType)) {
-          const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, origMemberIndex);
-          constIndex = getBuilder()->getInt32(remappedMemberIndex);
+      gepIndices.clear();
+      gepIndices.push_back(getBuilder()->getInt32(0));
+    };
+
+    // Run over the indices and map the SPIR-V level indices to LLVM indices, which may be different because the LLVM
+    // types may contain manual padding fields to model the power of Vulkan's layout options.
+    // Additionally, break up the GEP sequence to handle some special cases like row major matrices.
+    for (Value *index : ArrayRef(srcIndices).drop_front()) {
+      switch (spvAccessType->getOpCode()) {
+      case OpTypeStruct: {
+        ConstantInt *constIndex = cast<ConstantInt>(index);
+        const uint64_t origMemberIndex = constIndex->getZExtValue();
+        Type *castType = nullptr;
+
+        if (typeMaybeRemapped) {
+          if (isRemappedTypeElements(spvAccessType)) {
+            const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, origMemberIndex);
+            constIndex = getBuilder()->getInt32(remappedMemberIndex);
+          }
+
+          // If the struct member was actually overlapping another struct member, we need a split here.
+          const auto structIndexPair = std::make_pair(spvAccessType, origMemberIndex);
+
+          if (m_overlappingStructTypeWorkaroundMap.count(structIndexPair) > 0)
+            castType = m_overlappingStructTypeWorkaroundMap[structIndexPair];
         }
 
-        // If the struct member was actually overlapping another struct member, we need a split here.
-        const auto structIndexPair = std::make_pair(spvAccessType, origMemberIndex);
+        gepIndices.push_back(constIndex);
 
-        if (m_overlappingStructTypeWorkaroundMap.count(structIndexPair) > 0)
-          castType = m_overlappingStructTypeWorkaroundMap[structIndexPair];
+        if (castType) {
+          flushGep();
+          basePointeeType = castType;
+          base = getBuilder()->CreateBitCast(base,
+                                             basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace()));
+        }
+
+        spvAccessType = spvAccessType->getStructMemberType(origMemberIndex);
+        break;
       }
-
-      gepIndices.push_back(constIndex);
-
-      if (castType) {
-        flushGep();
-        basePointeeType = castType;
-        base =
-            getBuilder()->CreateBitCast(base, basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace()));
-      }
-
-      spvAccessType = spvAccessType->getStructMemberType(origMemberIndex);
-      break;
-    }
-    case OpTypeArray:
-    case OpTypeRuntimeArray: {
-      gepIndices.push_back(index);
-
-      if (typeMaybeRemapped && isRemappedTypeElements(spvAccessType)) {
-        // If we have padding in an array, we inserted a struct to add that
-        // padding, and so we need an extra constant 0 index.
-        gepIndices.push_back(getBuilder()->getInt32(0));
-      }
-
-      spvAccessType = spvAccessType->getArrayElementType();
-      break;
-    }
-    case OpTypeMatrix: {
-      // Matrices are represented as an array of columns.
-      Type *const matrixType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
-      assert(matrixType && matrixType->isArrayTy());
-
-      if (typeMaybeRemapped && isTypeWithPadRowMajorMatrix(matrixType)) {
-        // We have a row major matrix, we need to split the access chain here to handle it.
-        flushGep();
-
-        auto pair = createLaunderRowMajorMatrix(matrixType, base);
-        basePointeeType = pair.first;
-        base = pair.second;
-
+      case OpTypeArray:
+      case OpTypeRuntimeArray: {
         gepIndices.push_back(index);
-      } else {
-        gepIndices.push_back(index);
-        if (matrixType->getArrayElementType()->isStructTy()) {
-          // If the type of the column is a struct we had to add padding to align, so need a further index.
+
+        if (typeMaybeRemapped && isRemappedTypeElements(spvAccessType)) {
+          // If we have padding in an array, we inserted a struct to add that
+          // padding, and so we need an extra constant 0 index.
           gepIndices.push_back(getBuilder()->getInt32(0));
         }
+
+        spvAccessType = spvAccessType->getArrayElementType();
+        break;
+      }
+      case OpTypeMatrix: {
+        // Matrices are represented as an array of columns.
+        Type *const matrixType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
+        assert(matrixType && matrixType->isArrayTy());
+
+        if (typeMaybeRemapped && isTypeWithPadRowMajorMatrix(matrixType)) {
+          // We have a row major matrix, we need to split the access chain here to handle it.
+          flushGep();
+
+          auto pair = createLaunderRowMajorMatrix(matrixType, base);
+          basePointeeType = pair.first;
+          base = pair.second;
+
+          gepIndices.push_back(index);
+        } else {
+          gepIndices.push_back(index);
+          if (matrixType->getArrayElementType()->isStructTy()) {
+            // If the type of the column is a struct we had to add padding to align, so need a further index.
+            gepIndices.push_back(getBuilder()->getInt32(0));
+          }
+        }
+
+        spvAccessType = spvAccessType->getMatrixColumnType();
+        break;
+      }
+      case OpTypeVector: {
+        gepIndices.push_back(index);
+        spvAccessType = spvAccessType->getVectorComponentType();
+        break;
+      }
+      case OpTypeCooperativeMatrixKHR: {
+        flushGep();
+        auto use = spvAccessType->getCooperativeMatrixKHRUse();
+        unsigned rows = spvAccessType->getCooperativeMatrixKHRRows();
+        unsigned columns = spvAccessType->getCooperativeMatrixKHRColumns();
+        spvAccessType = spvAccessType->getCooperativeMatrixKHRComponentType();
+        basePointeeType = transType(spvAccessType);
+        lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvAccessType);
+        lgc::CooperativeMatrixLayout layout =
+            getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(use), elemType, rows, columns);
+
+        std::string mangledName(LlpcName::SpirvCooperativeMatrixProxy);
+        Value *args[] = {
+            base,
+            getBuilder()->getInt32((unsigned)elemType),
+            getBuilder()->getInt32((unsigned)layout),
+        };
+        Type *retType = basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace());
+        appendTypeMangling(retType, args, mangledName);
+        base = getBuilder()->CreateNamedCall(mangledName, retType, args, {Attribute::ReadNone, Attribute::NoUnwind});
+
+        gepIndices[0] = index;
+        break;
+      }
+      default:
+        llvm_unreachable("unhandled type in access chain");
+      }
+    }
+
+    Type *finalPointeeType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
+    flushGep();
+
+    tryAddAccessChainRetType(spvValue, finalPointeeType);
+    result.push_back(base);
+  }
+
+  // Second, translate the access chain for any mixed-image parts.
+  if (resultHasImage) {
+    Value *base = fullBase[baseHasNonImage ? 1 : 0];
+
+    if (spvIndices.empty()) {
+      result.push_back(base);
+    } else {
+      // 'proxyType' is the replaced type for struct/array type with image/sampler member.
+      // In which, image/sampler member is replaced by int8 type, and non-image member is replaced by empty sturct.
+      Type *proxyType = transType(spvAccessType, 0, true, true, layout);
+      SPIRVTypeContext ctx(spvAccessType, 0, true, true, layout);
+      auto it = m_imageTypeMap.find(ctx.asTuple());
+      if (it != m_imageTypeMap.end())
+        proxyType = it->second;
+
+      // Calculate the offset:
+      // 1. Calculate the current accessed member in the proxyType: offset = offsetof(proxyType, proxyType[srcIndices]);
+      // 2. Correct offset if 'proxyType' is sturct:
+      //    a. If it has pre OpAccessChain, add the pre offset value from pre OpAccessChain
+      //    b. If not have pre OpAccessChain, the 'offset' value won't be modified.
+      //       Because during transValueMultiWithOpcode<OpVariable>(spvBase), we append a constant value 0, so this
+      //       always add 0.
+      //    c. If 'proxyType' is array type(which means the `baseHasNonImage` is false), we didn't append 0 for base
+      //    variable, so should NOT correct the offset value.
+      Value *proxy = getBuilder()->CreateGEP(proxyType, ConstantPointerNull::get(getBuilder()->getPtrTy()), srcIndices);
+      Value *offset = getBuilder()->CreatePtrToInt(proxy, getBuilder()->getInt32Ty());
+
+      // Translate the image/sampler member pointer.
+      SPIRVType *spvElementType = spvAccessType;
+
+      SmallVector<SPIRVType *> elementWorklist;
+      elementWorklist.push_back(spvElementType);
+      while (!elementWorklist.empty()) {
+        spvElementType = elementWorklist.pop_back_val();
+        if (spvElementType->getOpCode() == OpTypeImage || spvElementType->getOpCode() == OpTypeSampler ||
+            spvElementType->getOpCode() == OpTypeSampledImage)
+          break;
+        else if (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
+          elementWorklist.push_back(spvElementType->getArrayElementType());
+        else if (spvElementType->getOpCode() == OpTypeStruct)
+          for (int i = 0, e = spvElementType->getStructMemberCount(); i < e; i++)
+            elementWorklist.push_back(spvElementType->getStructMemberType(i));
       }
 
-      spvAccessType = spvAccessType->getMatrixColumnType();
-      break;
-    }
-    case OpTypeVector: {
-      gepIndices.push_back(index);
-      spvAccessType = spvAccessType->getVectorComponentType();
-      break;
-    }
-    case OpTypeCooperativeMatrixKHR: {
-      flushGep();
-      auto use = spvAccessType->getCooperativeMatrixKHRUse();
-      unsigned rows = spvAccessType->getCooperativeMatrixKHRRows();
-      unsigned columns = spvAccessType->getCooperativeMatrixKHRColumns();
-      spvAccessType = spvAccessType->getCooperativeMatrixKHRComponentType();
-      basePointeeType = transType(spvAccessType);
-      lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvAccessType);
-      lgc::CooperativeMatrixLayout layout =
-          getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(use), elemType, rows, columns);
-
-      std::string mangledName(LlpcName::SpirvCooperativeMatrixProxy);
-      Value *args[] = {
-          base,
-          getBuilder()->getInt32((unsigned)elemType),
-          getBuilder()->getInt32((unsigned)layout),
-      };
-      Type *retType = basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace());
-      appendTypeMangling(retType, args, mangledName);
-      base = getBuilder()->CreateNamedCall(mangledName, retType, args, {Attribute::ReadNone, Attribute::NoUnwind});
-
-      gepIndices[0] = index;
-      break;
-    }
-    default:
-      llvm_unreachable("unhandled type in access chain");
+      Type *imageSamplerType = transType(spvElementType);
+      result.push_back(indexDescPtr(imageSamplerType, base, offset));
     }
   }
 
-  Type *finalPointeeType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
-  flushGep();
-
-  tryAddAccessChainRetType(spvValue, finalPointeeType);
-  return {base};
+  return result;
 }
 
 // =====================================================================================================================
@@ -3540,38 +3681,6 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
 // @param spvValue : A SPIR-V value.
 template <> SmallVector<Value *> SPIRVToLLVM::transValueMultiWithOpcode<OpAccessChain>(SPIRVValue *const spvValue) {
   return transAccessChain(spvValue);
-}
-
-// =====================================================================================================================
-// Handle OpAccessChain/OpUntypedAccessChain for pointer to (array of) image/sampler/sampledimage
-//
-// @param spvValue : The spvValue
-Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain) {
-  SPIRVType *spvElementType = spvAccessChain->getBase()->getType()->getPointerElementType();
-  std::vector<SPIRVValue *> spvIndicesVec = spvAccessChain->getIndices();
-  ArrayRef<SPIRVValue *> spvIndices = spvIndicesVec;
-  Value *base = transImagePointer(spvAccessChain->getBase());
-
-  if (spvIndices.empty())
-    return base;
-
-  Value *index = transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  spvIndices = spvIndices.slice(1);
-  spvElementType = spvElementType->getArrayElementType();
-
-  while (spvElementType->getOpCode() == OpTypeArray) {
-    index = getBuilder()->CreateMul(
-        index, getBuilder()->getInt32(static_cast<SPIRVTypeArray *>(spvElementType)->getLength()->getZExtIntValue()));
-    if (!spvIndices.empty()) {
-      index = getBuilder()->CreateAdd(index, transValue(spvIndices[0], getBuilder()->GetInsertBlock()->getParent(),
-                                                        getBuilder()->GetInsertBlock()));
-      spvIndices = spvIndices.slice(1);
-    }
-    spvElementType = spvElementType->getArrayElementType();
-  }
-
-  Type *elementTy = transType(spvElementType, 0, false, false, LayoutMode::Native);
-  return indexDescPtr(elementTy, base, index);
 }
 
 // =====================================================================================================================
@@ -3706,6 +3815,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpKill>(SPIRVValue *const s
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDemoteToHelperInvocationEXT>(SPIRVValue *const spvValue) {
+  m_hasDemoteToHelper = true;
   return getBuilder()->CreateDemoteToHelperInvocation();
 }
 
@@ -4155,6 +4265,12 @@ Value *SPIRV::SPIRVToLLVM::createTraceRayDialectOp(SPIRVValue *const spvValue) {
   auto accelStructAsI64 = getBuilder()->CreateBitCast(accelStruct, getBuilder()->getInt64Ty());
 
   Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType());
+
+  // Wrap payload with struct, PAQ handling expects a struct type.
+  // FIXME: We should support non-struct types for PAQ
+  if (getRaytracingContext()->isContinuationsMode() && !payloadTy->isStructTy())
+    payloadTy = StructType::get(*m_context, {payloadTy}, "");
+
   auto paq = getPaqFromSize(getBuilder()->getContext(), alignTo(m_m->getDataLayout().getTypeAllocSize(payloadTy), 4));
 
   CallInst *call = nullptr;
@@ -4183,6 +4299,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRV
   Value *const callableData = transValue(spvOperands[1], func, block);
   Type *callableDataTy = transType(spvOperands[1]->getType()->getPointerElementType());
   unsigned dataByteSize = alignTo(m_m->getDataLayout().getTypeAllocSize(callableDataTy), 4);
+
+  // Wrap payload with struct, PAQ handling expects a struct type.
+  // FIXME: We should support non-struct types for PAQ
+  if (getRaytracingContext()->isContinuationsMode() && !callableDataTy->isStructTy())
+    callableDataTy = StructType::get(*m_context, {callableDataTy}, "");
 
   auto *call = getBuilder()->create<CallCallableShaderOp>(shaderIndex, callableData, dataByteSize);
   // Store a poison value as metadata to track callable data type.
@@ -4838,15 +4959,50 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
 // Handle OpVariable.
 //
 // @param spvValue : A SPIR-V value.
-template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *const spvValue) {
-  return transVariable(spvValue);
+template <>
+SmallVector<Value *> SPIRVToLLVM::transValueMultiWithOpcode<OpVariable>(SPIRVValue *const spvValue, Function *f,
+                                                                        BasicBlock *bb) {
+  auto it = m_variableMap.find({spvValue, f});
+  if (it != m_variableMap.end())
+    return it->second;
+
+  auto itNonImage = m_variableNonImageMap.find(spvValue);
+  if (itNonImage == m_variableNonImageMap.end())
+    itNonImage = m_variableNonImageMap.try_emplace(spvValue, transVariableNonImage(spvValue)).first;
+
+  SmallVector<Value *> values;
+  if (itNonImage->second)
+    values.push_back(itNonImage->second);
+
+  auto spvVar = static_cast<SPIRVBaseVariable *>(spvValue);
+  const SPIRVStorageClassKind storageClass = spvVar->getStorageClass();
+  bool variableHasImage = false;
+  if (storageClass == StorageClassUniformConstant) {
+    SPIRVType *spvElementType = spvVar->getType()->getPointerElementType();
+    while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
+      spvElementType = spvElementType->getArrayElementType();
+    if (spvElementType->getOpCode() == OpTypeImage || spvElementType->getOpCode() == OpTypeSampler ||
+        spvElementType->getOpCode() == OpTypeSampledImage) {
+      variableHasImage = true;
+    }
+  }
+
+  // Add image descriptor parts if required
+  if (f && variableHasImage) {
+    IRBuilderBase::InsertPointGuard ipg(*getBuilder());
+    getBuilder()->SetInsertPointPastAllocas(f);
+    values.push_back(transImagePointer(spvVar, spvVar->getMemObjType()));
+  }
+
+  m_variableMap.try_emplace({spvValue, f}, values);
+  return values;
 }
 
 // =====================================================================================================================
-// Handle OpVariable/OpUntypedVariableKHR.
+// Handle the non-image/sampler aspect of OpVariable/OpUntypedVariableKHR.
 //
 // @param spvValue : A SPIR-V value.
-Value *SPIRVToLLVM::transVariable(SPIRVValue *const spvValue) {
+Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
   auto spvVar = static_cast<SPIRVBaseVariable *>(spvValue);
   const SPIRVStorageClassKind storageClass = spvVar->getStorageClass();
   SPIRVType *spvVarType = spvVar->getMemObjType();
@@ -5634,7 +5790,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       getBuilder()->SetInsertPoint(bb);
       updateDebugLoc(bv, f);
     }
-    return mapValue(bv, transValueWithOpcode<OpVariable>(bv));
+    return transValueMultiWithOpcode<OpVariable>(bv, f, bb);
 
   default:
     // do nothing
@@ -5676,7 +5832,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     else if (br->getBasicBlock()->getLoopMerge())
       setLLVMLoopMetadata(br->getBasicBlock()->getLoopMerge(), bi);
 
-    recordBlockPredecessor(successor, bb);
+    recordBlockPredecessor(f, successor, bb);
     return mapValue(bv, bi);
   }
 
@@ -5688,9 +5844,11 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     // int/float arguments as the branch condition
     if (SPIRVWorkaroundBadSPIRV) {
       if (c->getType()->isFloatTy())
-        c = new llvm::FCmpInst(*bb, llvm::CmpInst::FCMP_ONE, c, llvm::ConstantFP::get(c->getType(), 0.0));
+        c = llvm::CmpInst::Create(llvm::Instruction::FCmp, llvm::CmpInst::FCMP_ONE, c,
+                                  llvm::ConstantFP::get(c->getType(), 0.0), "", bb);
       else if (c->getType()->isIntegerTy() && !c->getType()->isIntegerTy(1))
-        c = new llvm::ICmpInst(*bb, llvm::CmpInst::ICMP_NE, c, llvm::ConstantInt::get(c->getType(), 0));
+        c = llvm::CmpInst::Create(llvm::Instruction::ICmp, llvm::CmpInst::ICMP_NE, c,
+                                  llvm::ConstantInt::get(c->getType(), 0), "", bb);
     }
 
     auto trueSuccessor = cast<BasicBlock>(transValue(br->getTrueLabel(), f, bb));
@@ -5710,8 +5868,8 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     else if (br->getBasicBlock()->getLoopMerge())
       setLLVMLoopMetadata(br->getBasicBlock()->getLoopMerge(), bc);
 
-    recordBlockPredecessor(trueSuccessor, bb);
-    recordBlockPredecessor(falseSuccessor, bb);
+    recordBlockPredecessor(f, trueSuccessor, bb);
+    recordBlockPredecessor(f, falseSuccessor, bb);
     return mapValue(bv, bc);
   }
 
@@ -5824,7 +5982,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     auto bs = static_cast<SPIRVSwitch *>(bv);
     auto select = transValue(bs->getSelect(), f, bb);
     auto defaultSuccessor = dyn_cast<BasicBlock>(transValue(bs->getDefault(), f, bb));
-    recordBlockPredecessor(defaultSuccessor, bb);
+    recordBlockPredecessor(f, defaultSuccessor, bb);
 
     // OpSwitch can branch with OpUndef as condition. The selected jump target is undefined.
     // In LLVM IR, SwitchInst with undef value is fully UB.
@@ -5843,7 +6001,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
 
       auto successor = cast<BasicBlock>(transValue(label, f, bb));
       ls->addCase(ConstantInt::get(dyn_cast<IntegerType>(select->getType()), literal), successor);
-      recordBlockPredecessor(successor, bb);
+      recordBlockPredecessor(f, successor, bb);
     });
     return mapValue(bv, ls);
   }
@@ -6090,12 +6248,6 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     SmallVector<Value *, 8> args;
     for (SPIRVValue *bArg : bc->getArgumentValues()) {
       Value *arg = transValue(bArg, f, bb);
-      if (!arg) {
-        // This arg is a variable that is (array of) image/sampler/sampledimage.
-        // Materialize it.
-        assert(bArg->getOpCode() == OpVariable);
-        arg = transImagePointer(bArg);
-      }
       args.push_back(arg);
     }
     auto call = CallInst::Create(transFunction(bc->getFunction()), args, "", bb);
@@ -6820,7 +6972,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
       for (unsigned i = 0; i != initialNumIncoming; ++i) {
         BasicBlock *predecessor = phi.getIncomingBlock(i);
         Value *incomingValue = phi.getIncomingValue(i);
-        const unsigned numIncomingArcsForPred = getBlockPredecessorCounts(&bb, predecessor);
+        const unsigned numIncomingArcsForPred = getBlockPredecessorCounts(f, &bb, predecessor);
 
         for (unsigned j = 1; j < numIncomingArcsForPred; ++j)
           phi.addIncoming(incomingValue, predecessor);
@@ -6828,7 +6980,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
     }
   }
 
-  m_blockPredecessorToCount.clear();
+  m_blockPredecessorToCount.erase(f);
 
   auto getContArgTy = [&](SPIRVType *argTy) {
     if (argTy->isTypePointer()) {
@@ -6841,18 +6993,13 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
     return ContArgTy(transType(argTy));
   };
 
-  // Special handling for GPURT intrinsic function _Amd* and _cont_
-  if (f->getName().starts_with("_Amd") || f->getName().starts_with("_cont_")) {
-    SmallVector<ContArgTy> argTys;
-
-    for (unsigned i = 0; i < bf->getNumArguments(); ++i) {
-      auto argTy = bf->getArgument(i)->getType();
-      argTys.push_back(getContArgTy(argTy));
-    }
-
-    ContFuncTy funcTys(getContArgTy(bf->getType()), argTys);
-    funcTys.writeMetadata(f);
+  SmallVector<ContArgTy> argTys;
+  for (unsigned i = 0; i < bf->getNumArguments(); ++i) {
+    auto argTy = bf->getArgument(i)->getType();
+    argTys.push_back(getContArgTy(argTy));
   }
+  ContFuncTy funcTys(getContArgTy(bf->getType()), argTys);
+  funcTys.writeMetadata(f);
 
   return f;
 }
@@ -8565,6 +8712,8 @@ bool SPIRVToLLVM::transMetadata() {
             fragmentMode.earlyFragmentTests = true;
         }
 
+        fragmentMode.waveOpsRequireHelperLanes = m_maximallyReconverges && m_hasDemoteToHelper;
+
         Pipeline::setFragmentShaderMode(*m_m, fragmentMode);
 
       } else if (execModel == ExecutionModelGLCompute || execModel == ExecutionModelTaskEXT) {
@@ -8816,7 +8965,8 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
       std::vector<Metadata *> mDs;
       mDs.push_back(ConstantAsMetadata::get(md));
       auto mdNode = MDNode::get(*m_context, mDs);
-      gv->addMetadata(gSPIRVMD::InOut, *mdNode);
+      if (!gv->hasMetadata(gSPIRVMD::InOut))
+        gv->addMetadata(gSPIRVMD::InOut, *mdNode);
 
     } else if (as == SPIRAS_Uniform) {
       // Translate decorations of blocks
@@ -8876,7 +9026,8 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
         resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
         resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
         auto resMdNode = MDNode::get(*m_context, resMDs);
-        gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
+        if (!gv->hasMetadata(gSPIRVMD::Resource))
+          gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
 
         // Build block metadata
         const bool isUniformBlock = bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer &&
@@ -8887,6 +9038,9 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
         if (bv->hasDecorate(DecorationOffset, 0, &atomicCounterOffset)) {
           blockDec.Offset = atomicCounterOffset;
         }
+        if (bv->hasDecorate(DecorationAliased)) {
+          blockDec.Aliased = true;
+        }
 
         blockDec.NonWritable = isUniformBlock;
         Type *blockMdTy = nullptr;
@@ -8896,9 +9050,11 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
         blockMDs.push_back(ConstantAsMetadata::get(blockMd));
         auto blockMdNode = MDNode::get(*m_context, blockMDs);
         if (bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter) {
-          gv->addMetadata(gSPIRVMD::AtomicCounter, *blockMdNode);
+          if (!gv->hasMetadata(gSPIRVMD::AtomicCounter))
+            gv->addMetadata(gSPIRVMD::AtomicCounter, *blockMdNode);
         } else {
-          gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+          if (!gv->hasMetadata(gSPIRVMD::Block))
+            gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
         }
       } else if (bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT) {
         // Setup metadata for task payload
@@ -9447,6 +9603,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     blockMd.Volatile = blockDec.Volatile;
     blockMd.NonWritable = blockDec.NonWritable;
     blockMd.NonReadable = blockDec.NonReadable;
+    blockMd.Aliased = blockDec.Aliased;
 
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
@@ -9503,6 +9660,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     blockMd.Volatile = blockDec.Volatile;
     blockMd.NonWritable = blockDec.NonWritable;
     blockMd.NonReadable = blockDec.NonReadable;
+    blockMd.Aliased = blockDec.Aliased;
 
     std::vector<Constant *> mdValues;
     mdValues.push_back(ConstantInt::get(int32Ty, stride));
@@ -9574,6 +9732,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     ShaderBlockMetadata blockMd = {};
     blockMd.offset = blockDec.Offset;
     blockMd.IsStruct = true;
+    blockMd.Aliased = blockDec.Aliased;
 
     // Construct structure metadata
     std::vector<Type *> mdTys;
@@ -9599,6 +9758,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     blockMd.Volatile = blockDec.Volatile;
     blockMd.NonWritable = blockDec.NonWritable;
     blockMd.NonReadable = blockDec.NonReadable;
+    blockMd.Aliased = blockDec.Aliased;
 
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
@@ -10693,7 +10853,7 @@ void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
           // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
           SPIRVType *bt = bv->getType()->getPointerElementType();
           if (bt->isTypeArray()) {
-            auto output = cast<GlobalVariable>(getTranslatedValue(bv));
+            auto output = cast<GlobalVariable>(getTranslatedValue(bv, nullptr, nullptr));
             MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
             assert(metaNode);
             auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));

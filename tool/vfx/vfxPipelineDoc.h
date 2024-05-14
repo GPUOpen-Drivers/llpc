@@ -43,7 +43,6 @@ class PipelineDocument : public Document {
 public:
   PipelineDocument() {
     initVkSections();
-    memset(&m_pipelineState, 0, sizeof(m_pipelineState));
 
     m_pipelineState.gfxPipelineInfo.options.optimizationLevel = 2;
     m_pipelineState.compPipelineInfo.options.optimizationLevel = 2;
@@ -72,7 +71,6 @@ private:
   void DeduplicateResourceMappingData(Vkgc::ResourceMappingData *resourceMapping);
 
   VfxPipelineState m_pipelineState; // Contains the render state
-  Vkgc::TessellationLevel m_tessellationLevel;
   VkPipelineVertexInputStateCreateInfo m_vertexInputState;
   std::vector<Vfx::ShaderSource> m_shaderSources;
   std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;

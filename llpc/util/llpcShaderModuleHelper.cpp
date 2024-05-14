@@ -166,18 +166,6 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           break;
         }
         }
-      } else if (decoration == DecorationLocation) {
-        auto location = (opCode == OpDecorate) ? codePos[3] : codePos[4];
-        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::ClipVertex))
-          shaderModuleUsage.useClipVertex = true;
-        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::FrontColor))
-          shaderModuleUsage.useFrontColor = true;
-        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::BackColor))
-          shaderModuleUsage.useBackColor = true;
-        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor))
-          shaderModuleUsage.useFrontSecondaryColor = true;
-        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor))
-          shaderModuleUsage.useBackSecondaryColor = true;
       } else if (decoration == DecorationPerVertexKHR) {
         shaderModuleUsage.useBarycentric = true;
       } else if (decoration == DecorationIndex) {

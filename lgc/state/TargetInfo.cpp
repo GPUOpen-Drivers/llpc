@@ -69,7 +69,6 @@ static void setGfx10BaseInfo(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192;
 
   targetInfo->getGpuProperty().ldsSizePerThreadGroup = 16384;
-  targetInfo->getGpuProperty().ldsSizeDwordGranularityShift = 7;
 
   targetInfo->getGpuProperty().maxSgprsAvailable = 102;
   targetInfo->getGpuProperty().supportsDpp = true;
@@ -126,6 +125,7 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
 }
 
+#if LLPC_BUILD_NAVI12
 // gfx1011
 //
 // @param [in/out] targetInfo : Target info
@@ -151,6 +151,7 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
 }
+#endif
 
 // gfx1012
 //
@@ -234,6 +235,7 @@ static void setGfx1034Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
+#if LLPC_BUILD_REMBRANDT
 // gfx1035
 //
 // @param [in/out] targetInfo : Target info
@@ -244,7 +246,9 @@ static void setGfx1035Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 1;
   targetInfo->getGpuWorkarounds().gfx10.waClearWriteCompressBit = 1;
 }
+#endif
 
+#if LLPC_BUILD_RAPHAEL || LLPC_BUILD_MENDOCINO
 // gfx1036
 //
 // @param [in/out] targetInfo : Target info
@@ -254,6 +258,7 @@ static void setGfx1036Info(TargetInfo *targetInfo) {
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
 }
+#endif
 
 // gfx11
 //
@@ -306,7 +311,7 @@ static void setGfx1102Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 2;
 }
 
-#if LLPC_BUILD_PHOENIX1
+#if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
 // gfx1103
 //
 // @param [in/out] targetInfo : Target info
@@ -331,20 +336,26 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
 
   static const GpuNameStringMap GpuNameMap[] = {
     {"gfx1010", &setGfx1010Info}, // gfx1010
+#if LLPC_BUILD_NAVI12
     {"gfx1011", &setGfx1011Info}, // gfx1011, navi12
+#endif
     {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
     {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
     {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
     {"gfx1032", &setGfx1032Info}, // gfx1032, navi23
     {"gfx1034", &setGfx1034Info}, // gfx1034, navi24
+#if LLPC_BUILD_REMBRANDT
     {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
+#endif
+#if LLPC_BUILD_RAPHAEL || LLPC_BUILD_MENDOCINO
     {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
+#endif
     {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
 #if LLPC_BUILD_NAVI32
     {"gfx1101", &setGfx1101Info}, // gfx1101, navi32
 #endif
     {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
-#if LLPC_BUILD_PHOENIX1
+#if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
     {"gfx1103", &setGfx1103Info}, // gfx1103, phoenix1
 #endif
   };
