@@ -482,8 +482,8 @@ Value *LowerCooperativeMatrix::cooperativeMatrixLoadInternal(Value *dataPtr, Val
   bool isTemporal = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
 
   auto props = getTypeProperties(elemType, layout);
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, insertPos);
 
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, insertPos);
   Value *vecVal = PoisonValue::get(FixedVectorType::get(elemTy, props.numFlatElements));
   for (unsigned idx = 0; idx < props.numFlatElements; ++idx) {
     Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(idx / addrInfo.microCount));

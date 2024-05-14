@@ -123,6 +123,7 @@ enum BuilderOpcode : unsigned {
   ImageQuerySamples,
   ImageQuerySize,
   ImageGetLod,
+  ImageGetSamplePosition,
   ImageBvhIntersectRay,
 
   // Input/output
@@ -156,7 +157,6 @@ enum BuilderOpcode : unsigned {
   DemoteToHelperInvocation,
   IsHelperInvocation,
   GetWaveSize,
-  DebugBreak,
 
   // Subgroup
   GetSubgroupSize,

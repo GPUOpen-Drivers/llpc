@@ -726,7 +726,7 @@ uint64_t PipelineContext::getPipelineHashCode() const {
 // =====================================================================================================================
 // Get wave size used for raytracing
 unsigned PipelineContext::getRayTracingWaveSize() const {
-  if ((m_gfxIp.major >= 10) && getPipelineType() != PipelineType::Graphics)
+  if (getPipelineType() != PipelineType::Graphics)
     return 32;
   return 64;
 }

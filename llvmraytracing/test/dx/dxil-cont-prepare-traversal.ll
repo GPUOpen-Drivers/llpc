@@ -24,6 +24,8 @@ declare !types !2 i32 @"\01?_AmdValueGetI32Something@@YA_KXZ"(%struct.TraversalD
 
 declare !types !3 void @"\01?_AmdValueSetI32Something@@YA_KXZ"(%struct.TraversalData*, i32, i32)
 
+declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+
 ; Function Attrs: nounwind
 define void @_cont_Traversal(i32 %stackPtr, %struct.TraversalData* %data) #0 !types !4 {
   %1 = getelementptr inbounds %struct.TraversalData, %struct.TraversalData* %data, i32 0, i32 1
@@ -72,6 +74,8 @@ attributes #2 = { nounwind }
 !4 = !{!"function", !"void", i32 poison, !1}
 !5 = !{!"function", !"void", i64 poison, i64 poison, i32 poison, !6}
 !6 = !{i32 0, %struct.SystemData poison}
+!7 = !{i32 0, %struct.DispatchSystemData poison}
+!8 = !{!"function", i32 poison, !7}
 ; PREPARE-LABEL: define void @_cont_Traversal(
 ; PREPARE-SAME: i32 [[STACKPTR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[DATA:%.*]]) #[[ATTR1:[0-9]+]] !lgc.rt.shaderstage [[META0:![0-9]+]] {
 ; PREPARE-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_TRAVERSALDATA]], align 8
@@ -96,11 +100,11 @@ attributes #2 = { nounwind }
 ; PREPARE-NEXT:    [[ADDR:%.*]] = zext i32 [[A4]] to i64
 ; PREPARE-NEXT:    [[TMP7:%.*]] = load [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP5]], align 4
 ; PREPARE-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 [[ADDR]], i64 -1, i32 [[STACKPTR]], i64 ptrtoint (ptr @_cont_Traversal to i64), [[STRUCT_SYSTEMDATA]] [[TMP7]])
-; PREPARE-NEXT:    br label [[TMP10:%.*]]
+; PREPARE-NEXT:    unreachable
 ; PREPARE:       8:
 ; PREPARE-NEXT:    [[TMP9:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[TMP5]], align 4
 ; PREPARE-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 0, i64 -1, i32 [[STACKPTR]], [[STRUCT_SYSTEMDATA]] [[TMP9]])
-; PREPARE-NEXT:    br label [[TMP10]]
+; PREPARE-NEXT:    unreachable
 ; PREPARE:       10:
 ; PREPARE-NEXT:    ret void
 ;
@@ -146,7 +150,7 @@ attributes #2 = { nounwind }
 ; ALL-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CSP]], align 4
 ; ALL-NEXT:    [[TMP12:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @_cont_Traversal to i64))
 ; ALL-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 [[ADDR]], i64 -1, i32 [[TMP11]], i32 [[STACKPTR]], i64 [[TMP12]], [[STRUCT_SYSTEMDATA]] [[DOTFCA_1_INSERT]]), !continuation.registercount [[META0]]
-; ALL-NEXT:    br label [[TMP15:%.*]]
+; ALL-NEXT:    unreachable
 ; ALL:       13:
 ; ALL-NEXT:    [[DOTFCA_0_0_GEP1:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[TMP5]], i32 0, i32 0, i32 0
 ; ALL-NEXT:    [[DOTFCA_0_0_LOAD2:%.*]] = load i32, ptr [[DOTFCA_0_0_GEP1]], align 4
@@ -156,7 +160,7 @@ attributes #2 = { nounwind }
 ; ALL-NEXT:    [[DOTFCA_1_INSERT6:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT3]], float [[DOTFCA_1_LOAD5]], 1
 ; ALL-NEXT:    [[TMP14:%.*]] = load i32, ptr [[CSP]], align 4
 ; ALL-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 0, i64 -1, i32 [[TMP14]], i32 [[STACKPTR]], [[STRUCT_SYSTEMDATA]] [[DOTFCA_1_INSERT6]]), !continuation.registercount [[META0]]
-; ALL-NEXT:    br label [[TMP15]]
+; ALL-NEXT:    unreachable
 ; ALL:       15:
 ; ALL-NEXT:    ret void
 ;

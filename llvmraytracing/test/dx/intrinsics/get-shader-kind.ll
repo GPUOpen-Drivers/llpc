@@ -29,24 +29,22 @@ define float @_cont_RayTCurrent() {
 ; Note: DXILShaderKind::Miss has value 11
 define void @MyMiss(%struct.Payload* %payload) !types !1 !lgc.rt.shaderstage !16 {
 ; CHECK-LABEL: define %struct.DispatchSystemData @MyMiss
-; CHECK-SAME: ([[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META12:![0-9]+]] !continuation.registercount [[META13:![0-9]+]] !continuation [[META14:![0-9]+]] {
+; CHECK-SAME: ([[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META12:![0-9]+]] !continuation.registercount [[META5:![0-9]+]] !continuation [[META13:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr @PAYLOAD, align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
 ; CHECK-NEXT:    store i32 [[TMP5]], ptr [[TMP4]], align 4
-; CHECK-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP3]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; CHECK-NEXT:    store i32 11, ptr [[TMP6]], align 4
-; CHECK-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[TMP8]], ptr @PAYLOAD, align 4
+; CHECK-NEXT:    store i32 [[TMP8]], ptr addrspace(20) @PAYLOAD, align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], !continuation.registercount [[META13]]
+; CHECK-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], !continuation.registercount [[META5]]
 ;
   %1 = call i32 @_AmdGetShaderKind()
   %2 = getelementptr inbounds %struct.Payload, %struct.Payload* %payload, i32 0, i32 0

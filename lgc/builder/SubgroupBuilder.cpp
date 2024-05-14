@@ -79,7 +79,10 @@ unsigned BuilderImpl::getShaderWaveSize() {
 //
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
-  return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(getTrue()), ""), getInt32(0));
+  bool excludeHelperLanes = false;
+  if (getShaderStage(GetInsertBlock()->getParent()).value() == ShaderStage::Fragment)
+    excludeHelperLanes = m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsExcludeHelperLanes;
+  return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(getTrue(), excludeHelperLanes)), getInt32(0));
 }
 
 // =====================================================================================================================
@@ -95,7 +98,8 @@ Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName)
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
   if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
-    result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
+    result = CreateIntrinsic(fragmentMode.waveOpsRequireHelperLanes ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm,
+                             {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
   }
   return result;
@@ -107,14 +111,25 @@ Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName)
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
-  Value *result = CreateICmpNE(createGroupBallot(value), getInt64(0));
+  bool ballotExcludeHelperLanes = false;
+  bool includeHelperLanes = false;
+  bool requireHelperLanes = false;
+
+  if (getShaderStage(GetInsertBlock()->getParent()).value() == ShaderStage::Fragment) {
+    const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+    ballotExcludeHelperLanes = fragmentMode.waveOpsExcludeHelperLanes;
+    includeHelperLanes = !fragmentMode.waveOpsExcludeHelperLanes;
+    requireHelperLanes = fragmentMode.waveOpsRequireHelperLanes;
+  }
+
+  Value *result = CreateICmpNE(createGroupBallot(value, ballotExcludeHelperLanes), getInt64(0));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
+  if (includeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
-    result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
+    result = CreateIntrinsic(requireHelperLanes ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm, {getInt32Ty()},
+                             {result});
     result = CreateTrunc(result, getInt1Ty());
   }
   return result;
@@ -400,7 +415,14 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
     auto const sameOrOtherHalf = CreateAnd(CreateXor(index, threadId), getInt32(32));
     auto const indexInSameHalf = CreateICmpEQ(sameOrOtherHalf, getInt32(0));
 
-    return CreateSelect(indexInSameHalf, bPermSameHalf, bPermOtherHalf);
+    auto result = CreateSelect(indexInSameHalf, bPermSameHalf, bPermOtherHalf);
+
+    // If required, force inputs of the operation to be computed in WQM.
+    if (m_shaderStage == ShaderStage::Fragment &&
+        m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+      result = createWqm(result);
+
+    return result;
   }
 
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
@@ -459,7 +481,7 @@ Value *BuilderImpl::CreateSubgroupShuffleXor(Value *const value, Value *const ma
         break;
       }
 
-      if (!canOptimize && supportDppRowXmask()) {
+      if (!canOptimize) {
         canOptimize = true;
         switch (maskValue) {
         case 4:
@@ -500,7 +522,7 @@ Value *BuilderImpl::CreateSubgroupShuffleXor(Value *const value, Value *const ma
   if (maskValue < 32) {
     if (canOptimize)
       return createDppMov(value, dppCtrl, 0xF, 0xF, true);
-    if (supportPermLaneDpp() && (maskValue >= 16)) {
+    if (maskValue >= 16) {
       static const unsigned LaneSelBits[16][2] = {
           {0x76543210, 0xfedcba98}, {0x67452301, 0xefcdab89}, {0x54761032, 0xdcfe98ba}, {0x45670123, 0xcdef89ab},
           {0x32107654, 0xba98fedc}, {0x23016745, 0xab89efcd}, {0x10325476, 0x98badcfe}, {0x1234567, 0x89abcdef},
@@ -593,58 +615,34 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
                        groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowMirror, 0xF, 0xF, true)),
                    result);
 
-  if (supportPermLaneDpp()) {
-    // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
-    result =
-        CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
-                     createGroupArithmeticOperation(
-                         groupArithOp, result, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false)),
-                     result);
+  // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+  result =
+      CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
+                   createGroupArithmeticOperation(
+                       groupArithOp, result, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false)),
+                   result);
 
-    if (supportPermLane64Dpp()) {
-      result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                            createGroupArithmeticOperation(groupArithOp, result, createPermLane64(result)), result);
-    } else {
-      Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
-      Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
-
-      // Combine broadcast from the 31st and 63rd for the final result.
-      result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                            createGroupArithmeticOperation(groupArithOp, broadcast31, broadcast63), result);
-    }
+  if (supportPermLane64Dpp()) {
+    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
+                          createGroupArithmeticOperation(groupArithOp, result, createPermLane64(result)), result);
   } else {
-    // Use a row broadcast to move the 15th element in each cluster of 16 to the next cluster. The row mask is
-    // set to 0xa (0b1010) so that only the 2nd and 4th clusters of 16 perform the calculation.
-    result = CreateSelect(
-        CreateICmpUGE(clusterSize, getInt32(32)),
-        createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, true)),
-        result);
-
-    // Use a row broadcast to move the 31st element from the lower cluster of 32 to the upper cluster. The row
-    // mask is set to 0x8 (0b1000) so that only the upper cluster of 32 perform the calculation.
-    result = CreateSelect(
-        CreateICmpEQ(clusterSize, getInt32(64)),
-        createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0x8, 0xF, true)),
-        result);
-
     Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
     Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
 
-    // If the cluster size is 64 we always read the value from the last invocation in the subgroup.
-    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)), broadcast63, result);
-
-    Value *const laneIdLessThan32 = CreateICmpULT(CreateSubgroupMbcnt(getInt64(UINT64_MAX), ""), getInt32(32));
-
-    // If the cluster size is 32 we need to check where our invocation is in the subgroup, and conditionally use
-    // invocation 31 or 63's value.
-    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(32)),
-                          CreateSelect(laneIdLessThan32, broadcast31, broadcast63), result);
+    // Combine broadcast from the 31st and 63rd for the final result.
+    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
+                          createGroupArithmeticOperation(groupArithOp, broadcast31, broadcast63), result);
   }
 
   // Finish the WWM section by calling the intrinsic.
-  return createWwm(result);
+  result = createWwm(result);
+
+  // If required, force inputs of the operation to be computed in WQM.
+  if (m_shaderStage == ShaderStage::Fragment &&
+      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+    result = createWqm(result);
+
+  return result;
 }
 
 // =====================================================================================================================
@@ -699,44 +697,32 @@ Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, 
                             groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0)),
                         result);
 
-  if (supportPermLaneDpp()) {
-    Value *const threadMask = createThreadMask();
+  Value *const threadMask = createThreadMask();
 
-    Value *const maskedPermLane =
-        createThreadMaskedSelect(threadMask, 0xFFFF0000FFFF0000,
-                                 createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+  Value *const maskedPermLane = createThreadMaskedSelect(
+      threadMask, 0xFFFF0000FFFF0000, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
 
-    // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
-    result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
-                          createGroupArithmeticOperation(groupArithOp, result, maskedPermLane), result);
+  // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
+                        createGroupArithmeticOperation(groupArithOp, result, maskedPermLane), result);
 
-    Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
+  Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
 
-    Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
+  Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
 
-    // Combine broadcast of 31 with the top two rows only.
-    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                          createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast), result);
-  } else {
-    // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
-    // operation.
-    result = CreateSelect(
-        CreateICmpUGE(clusterSize, getInt32(32)),
-        createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, true)),
-        result);
-
-    // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the
-    // operation.
-    result = CreateSelect(
-        CreateICmpEQ(clusterSize, getInt32(64)),
-        createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0xC, 0xF, true)),
-        result);
-  }
+  // Combine broadcast of 31 with the top two rows only.
+  result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
+                        createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast), result);
 
   // Finish the WWM section by calling the intrinsic.
-  return createWwm(result);
+  result = createWwm(result);
+
+  // If required, force inputs of the operation to be computed in WQM.
+  if (m_shaderStage == ShaderStage::Fragment &&
+      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+    result = createWqm(result);
+
+  return result;
 }
 
 // =====================================================================================================================
@@ -765,33 +751,27 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 
   Value *shiftRight = nullptr;
 
-  if (supportPermLaneDpp()) {
-    Value *const threadMask = createThreadMask();
+  Value *const threadMask = createThreadMask();
 
-    // Shift right within each row:
-    // 0b0110,0101,0100,0011,0010,0001,0000,1111 = 0x6543210F
-    // 0b1110,1101,1100,1011,1010,1001,1000,0111 = 0xEDCBA987
-    shiftRight = createPermLane16(setInactive, setInactive, 0x6543210F, 0xEDCBA987, true, false);
+  // Shift right within each row:
+  // 0b0110,0101,0100,0011,0010,0001,0000,1111 = 0x6543210F
+  // 0b1110,1101,1100,1011,1010,1001,1000,0111 = 0xEDCBA987
+  shiftRight = createPermLane16(setInactive, setInactive, 0x6543210F, 0xEDCBA987, true, false);
 
-    // Only needed for wave size 64.
-    if (getShaderWaveSize() == 64) {
-      // Need to write the value from the 16th invocation into the 48th.
-      shiftRight = CreateSubgroupWriteInvocation(shiftRight, CreateSubgroupBroadcast(shiftRight, getInt32(16), ""),
-                                                 getInt32(48), "");
-    }
-
-    shiftRight = CreateSubgroupWriteInvocation(shiftRight, identity, getInt32(16), "");
-
-    // Exchange first column value cross rows(row 1<--> row 0, row 3<-->row2)
-    // Only first column value from each row join permlanex
-    shiftRight =
-        createThreadMaskedSelect(threadMask, 0x0001000100010001,
-                                 createPermLaneX16(shiftRight, shiftRight, 0, UINT32_MAX, true, false), shiftRight);
-  } else {
-    // Shift the whole subgroup right by one, using a DPP update operation. This will ensure that the identity
-    // value is in the 0th invocation and all other values are shifted up. All rows and banks are active (0xF).
-    shiftRight = createDppUpdate(identity, setInactive, DppCtrl::DppWfSr1, 0xF, 0xF, 0);
+  // Only needed for wave size 64.
+  if (getShaderWaveSize() == 64) {
+    // Need to write the value from the 16th invocation into the 48th.
+    shiftRight = CreateSubgroupWriteInvocation(shiftRight, CreateSubgroupBroadcast(shiftRight, getInt32(16), ""),
+                                               getInt32(48), "");
   }
+
+  shiftRight = CreateSubgroupWriteInvocation(shiftRight, identity, getInt32(16), "");
+
+  // Exchange first column value cross rows(row 1<--> row 0, row 3<-->row2)
+  // Only first column value from each row join permlanex
+  shiftRight =
+      createThreadMaskedSelect(threadMask, 0x0001000100010001,
+                               createPermLaneX16(shiftRight, shiftRight, 0, UINT32_MAX, true, false), shiftRight);
 
   // The DPP operation has all rows active and all banks in the rows active (0xF).
   Value *result = CreateSelect(
@@ -828,44 +808,30 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
                             groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0)),
                         result);
 
-  if (supportPermLaneDpp()) {
-    Value *const threadMask = createThreadMask();
+  Value *const maskedPermLane = createThreadMaskedSelect(
+      threadMask, 0xFFFF0000FFFF0000, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
 
-    Value *const maskedPermLane =
-        createThreadMaskedSelect(threadMask, 0xFFFF0000FFFF0000,
-                                 createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+  // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
+                        createGroupArithmeticOperation(groupArithOp, result, maskedPermLane), result);
 
-    // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
-    result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
-                          createGroupArithmeticOperation(groupArithOp, result, maskedPermLane), result);
+  Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
 
-    Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
+  Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
 
-    Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
-
-    // Combine broadcast of 31 with the top two rows only.
-    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                          createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast), result);
-  } else {
-    // The DPP operation has a row mask of 0xa (0b1010) so only the 2nd and 4th clusters of 16 perform the
-    // operation.
-    result = CreateSelect(
-        CreateICmpUGE(clusterSize, getInt32(32)),
-        createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowBcast15, 0xA, 0xF, true)),
-        result);
-
-    // The DPP operation has a row mask of 0xc (0b1100) so only the 3rd and 4th clusters of 16 perform the
-    // operation.
-    result = CreateSelect(
-        CreateICmpEQ(clusterSize, getInt32(64)),
-        createGroupArithmeticOperation(groupArithOp, result,
-                                       createDppUpdate(identity, result, DppCtrl::DppRowBcast31, 0xC, 0xF, true)),
-        result);
-  }
+  // Combine broadcast of 31 with the top two rows only.
+  result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
+                        createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast), result);
 
   // Finish the WWM section by calling the intrinsic.
-  return createWwm(result);
+  result = createWwm(result);
+
+  // If required, force inputs of the operation to be computed in WQM.
+  if (m_shaderStage == ShaderStage::Fragment &&
+      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+    result = createWqm(result);
+
+  return result;
 }
 
 // =====================================================================================================================
@@ -1425,15 +1391,15 @@ Value *BuilderImpl::createThreadMaskedSelect(Value *const threadMask, uint64_t a
 // Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
 //
 // @param value : The value to contribute to the SGPR, must be an boolean type.
-Value *BuilderImpl::createGroupBallot(Value *const value) {
+// @param excludeHelperLanes : exclude helper lanes.
+Value *BuilderImpl::createGroupBallot(Value *const value, bool excludeHelperLanes) {
   // Check the type is definitely an boolean.
   assert(value->getType()->isIntegerTy(1));
 
   Value *result = value;
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (excludeHelperLanes) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateAnd(isLive, result);
   }
@@ -1446,6 +1412,18 @@ Value *BuilderImpl::createGroupBallot(Value *const value) {
     result = CreateZExt(result, getInt64Ty());
 
   return result;
+}
+
+// =====================================================================================================================
+// Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
+//
+// @param value : The value to contribute to the SGPR, must be an boolean type.
+Value *BuilderImpl::createGroupBallot(Value *const value) {
+  // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
+  bool excludeHelperLanes = false;
+  if (m_shaderStage == ShaderStage::Fragment)
+    excludeHelperLanes = m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsExcludeHelperLanes;
+  return createGroupBallot(value, excludeHelperLanes);
 }
 
 // =====================================================================================================================

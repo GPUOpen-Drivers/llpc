@@ -2,7 +2,7 @@
 ; Test to check that dummy sgpr user data registers are inserted when required
 ; This test checks wave32 compute shaders
 
-; RUN: amdllpc %gfxip -o - -filetype=asm %s | FileCheck -check-prefix=CHECK %s
+; RUN: amdllpc -gfxip=11.0 -o - -filetype=asm %s | FileCheck -check-prefix=CHECK %s
 
 [Version]
 version = 54
@@ -140,8 +140,9 @@ options.threadGroupSwizzleMode = Default
 ; CHECK-NEXT:    v_mov_b32_e32 v2, 0
 ; CHECK-NEXT:    s_load_b256 s[0:7], s[0:1], 0x0
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
-; CHECK-NEXT:    buffer_load_b64 v[0:1], off, s[4:7], 0
-; CHECK-NEXT:    s_waitcnt vmcnt(0)
+; CHECK-NEXT:    s_buffer_load_b64 s[4:5], s[4:7], 0x0
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    v_dual_mov_b32 v0, s4 :: v_dual_mov_b32 v1, s5
 ; CHECK-NEXT:    buffer_store_format_xy v[0:1], v2, s[0:3], 0 idxen
 ; CHECK-NEXT:    s_nop 0
 ; CHECK-NEXT:    s_sendmsg sendmsg(MSG_DEALLOC_VGPRS)

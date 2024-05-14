@@ -26,23 +26,23 @@ declare void @lgc.cps.jump(...)
 ; CHECK-LABEL: define void @test
 ; CHECK-SAME: ({} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]], i32 [[ARG1:%.*]]) !lgc.cps [[META0:![0-9]+]] !continuation [[META1:![0-9]+]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 20)
-; CHECK-NEXT:    [[A1:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
-; CHECK-NEXT:    [[A2:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
-; CHECK-NEXT:    [[ARG1_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 4
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 20)
+; CHECK-NEXT:    [[A1:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CHECK-NEXT:    [[A2:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
+; CHECK-NEXT:    [[ARG1_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 4
 ; CHECK-NEXT:    store i32 [[ARG1]], ptr addrspace(32) [[ARG1_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 3
+; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 3
 ; CHECK-NEXT:    store float [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[RCR_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 2
+; CHECK-NEXT:    [[RCR_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 2
 ; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(32) [[RCR_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[COND:%.*]] = icmp ult i32 [[ARG1]], 0
 ; CHECK-NEXT:    [[P:%.*]] = select i1 [[COND]], ptr addrspace(32) [[A1]], ptr addrspace(32) [[A2]]
 ; CHECK-NEXT:    store i32 111, ptr addrspace(32) [[P]], align 4
 ; CHECK-NEXT:    [[T0:%.*]] = fadd float [[ARG]], 1.000000e+00
 ; CHECK-NEXT:    [[CR:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @callee)
-; CHECK-NEXT:    [[TMP1:%.*]] = inttoptr i32 [[CR]] to ptr
-; CHECK-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.0)
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, {} poison, i32 [[TMP2]], float [[T0]])
+; CHECK-NEXT:    [[TMP0:%.*]] = inttoptr i32 [[CR]] to ptr
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @test.resume.0)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, {} poison, i32 [[TMP1]], float [[T0]])
 ; CHECK-NEXT:    unreachable
 ;
 ;

@@ -28,15 +28,16 @@ void main()
 // SHADERTEST-LABEL: @lgc.shader.FS.main(
 // SHADERTEST-NEXT:  .entry:
 // SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
-// SHADERTEST-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(7) [[TMP0]], align 4
-// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds {{i8|<{ i32, [[]4 x i8], [[]2 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{8|0, i32 2, i32 0}}
-// SHADERTEST-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(7) [[TMP2]], align 4
-// SHADERTEST-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[TMP1]], [[TMP3]]
-// SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr inbounds {{i8|<{ i32, [[]4 x i8], [[]2 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{12|0, i32 2, i32 1}}
-// SHADERTEST-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(7) [[TMP5]], align 4
-// SHADERTEST-NEXT:    [[TMP7:%.*]] = icmp ne i32 [[TMP1]], [[TMP6]]
-// SHADERTEST-NEXT:    [[TMP8:%.*]] = and i1 {{%4|%7}}, {{%7|%4}}
-// SHADERTEST-NEXT:    [[TMP9:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP8]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
-// SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP9]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
+// SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
+// SHADERTEST-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(7) [[TMP0]], align 4
+// SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 8
+// SHADERTEST-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(7) [[TMP3]], align 4
+// SHADERTEST-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[TMP2]], [[TMP4]]
+// SHADERTEST-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 12
+// SHADERTEST-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(7) [[TMP6]], align 4
+// SHADERTEST-NEXT:    [[TMP8:%.*]] = icmp ne i32 [[TMP2]], [[TMP7]]
+// SHADERTEST-NEXT:    [[TMP9:%.*]] = and i1 [[TMP8]], [[TMP5]]
+// SHADERTEST-NEXT:    [[TMP10:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP9]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+// SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP10]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // SHADERTEST-NEXT:    ret void
 //

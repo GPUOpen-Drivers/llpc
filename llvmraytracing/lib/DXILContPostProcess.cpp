@@ -39,8 +39,8 @@
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "llpc/GpurtEnums.h"
 #include "llvm-dialects/Dialect/Builder.h"
-#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/ContinuationsUtil.h"
@@ -55,13 +55,12 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
-#include "llvm/InitializePasses.h"
-#include "llvm/Support/Error.h"
 #include <cassert>
 
 using namespace llvm;
@@ -106,16 +105,10 @@ public:
     bool IsStart = true;
     Type *SystemDataTy = nullptr;
     unsigned SystemDataArgumentIndex = std::numeric_limits<unsigned>::max();
-
-    Value *CspStorage = nullptr;
-    Value *CspInitializerArg = nullptr;
-    Value *BasePointer = nullptr;
   };
 
 private:
-  bool addIncomingCsp();
   void lowerGetResumePointAddr(Function &F);
-  bool passOutgoingCsp();
   void handleRegisterBufferGetPointer(Function &F, GlobalVariable *Payload);
   void handleValueI32Count(Function &F);
   void handleValueGetI32(Function &F);
@@ -134,6 +127,7 @@ private:
   bool handleIntrinsicCalls(llvm::ModuleAnalysisManager &AnalysisManager);
   bool replaceIntrinsicCallsAndSetupRayGen();
   bool lowerCpsOps();
+  void lowerJumpOp(lgc::cps::JumpOp &JumpOp);
   bool unfoldGlobals();
   bool handleAmdInternals();
 
@@ -150,7 +144,7 @@ private:
   // For performance reasons, we keep this list of continuation.{wait}Continue
   // calls here and update it when required.
   SmallVector<CallInst *> ContinueCalls;
-  Function *GlobalMemBase = nullptr;
+  Function *GetGlobalMemBase = nullptr;
 };
 
 // Collects all calls to continuation.[wait]continue
@@ -196,7 +190,7 @@ static void reportContStateSizes(Module &M) {
       continue;
 
     DXILShaderKind ShaderKind =
-        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
+        ShaderStageHelper::rtShaderStageToDxilShaderKind(*Stage);
     dbgs() << "Continuation state size of \"" << F.getName() << "\" ("
            << ShaderKind << "): " << OptStateSize.value() << " bytes\n";
   }
@@ -221,7 +215,7 @@ static void reportPayloadSizes(Module &M, ArrayRef<CallInst *> ContinueCalls) {
       continue;
 
     DXILShaderKind ShaderKind =
-        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
+        ShaderStageHelper::rtShaderStageToDxilShaderKind(*Stage);
     auto OptIncomingPayloadRegisterCount =
         ContHelper::tryGetIncomingRegisterCount(&F);
     bool HasIncomingPayload = OptIncomingPayloadRegisterCount.has_value();
@@ -310,9 +304,7 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
 
   for (auto &F : M.functions()) {
     // Speed-up: Skip F if it cannot be used as pointer, e.g. dx intrinsics.
-    // Skip CPS functions here as well since they use
-    // lgc.cps.as.continuation.reference instead of getAddrAndMD.
-    if (!canBeUsedAsPtr(F) || lgc::cps::isCpsFunction(F))
+    if (!canBeUsedAsPtr(F))
       continue;
 
     CEWorkList.clear();
@@ -336,8 +328,10 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
 
     while (!CEWorkList.empty()) {
       auto *CE = CEWorkList.pop_back_val();
-      assert((isa<BitCastOperator, PtrToIntOperator>(CE)) &&
-             "Unexpected use of function!");
+      assert(
+          (isa<BitCastOperator, PtrToIntOperator, ConstantExpr, BinaryOperator>(
+              CE)) &&
+          "Unexpected use of function!");
 
       // Copy the users of CE into a local SmallVector before traversing it,
       // because we are going to add new users of CE that we do *not* want to
@@ -361,8 +355,9 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
         assert(CE->getType() == Type::getInt64Ty(M.getContext()) &&
                "Function use should be as an i64!");
         B.SetInsertPoint(I);
-        auto *AddrWithMD =
-            B.CreateCall(GetAddrAndMD, {B.CreatePtrToInt(CE, B.getInt64Ty())});
+
+        auto *AddrWithMD = B.CreateCall(GetAddrAndMD, {CE});
+
         // Can't RAUW because the CE might be used by different instructions.
         // Instead, manually replace the instruction's operand.
         [[maybe_unused]] bool Found = false;
@@ -404,6 +399,19 @@ checkContinuationsModule(const Module &M,
             "Found a function with more than one setLocalRootIndex");
     });
   }
+
+  // Check that resume functions do not have a stack size set.
+  for (auto &Func : M) {
+    if (auto *MD = dyn_cast_or_null<MDTuple>(
+            Func.getMetadata(ContHelper::MDContinuationName))) {
+      auto *StartFunc = extractFunctionOrNull(MD->getOperand(0));
+      bool IsStart = (&Func == StartFunc);
+      bool HasStackSizeMetadata =
+          ContHelper::tryGetStackSize(&Func).has_value();
+      if (!IsStart && HasStackSizeMetadata)
+        report_fatal_error("Found resume function with stack size metadata!");
+    }
+  }
 }
 
 /// Replace a global with a part of another global.
@@ -424,137 +432,6 @@ static void replaceGlobal(const DataLayout &DL, GlobalVariable *Registers,
 
   G->replaceAllUsesWith(Repl);
   G->eraseFromParent();
-}
-
-bool DXILContPostProcessPassImpl::addIncomingCsp() {
-  SmallVector<Function *> Candidates;
-
-  for (Function &Func : *Mod) {
-    if (Func.isDeclaration())
-      continue;
-
-    if (Func.hasMetadata(ContHelper::MDContinuationName)) {
-      Candidates.push_back(&Func);
-      continue;
-    }
-
-    if (lgc::cps::isCpsFunction(Func)) {
-      Candidates.push_back(&Func);
-      continue;
-    }
-  }
-
-  SmallVector<std::pair<Function *, Function *>> MappedFuncs;
-  for (auto &F : Candidates) {
-    Function *Func = F;
-
-    Value *Initializer = nullptr;
-    Builder.SetInsertPointPastAllocas(Func);
-
-    Value *Csp = Builder.CreateAlloca(Builder.getInt32Ty());
-    Csp->setName("csp");
-
-    // Do an early lookup to avoid cluttering the code with conditional lookups.
-    // This will only be abandoned if F is cloned.
-    // Store a pointer to the function data for convenience reasons.
-    auto FuncIt = ToProcess.find(F);
-    FunctionData *FuncData =
-        FuncIt != ToProcess.end() ? &FuncIt->second : nullptr;
-
-    if (!ContHelper::isLegacyEntryFunction(F)) {
-      auto *FTy = F->getFunctionType();
-      SmallVector<Type *> NewArgTys{FTy->params()};
-
-      const size_t CspArgIndex = lgc::cps::isCpsFunction(*F) ? 1 : 0;
-      NewArgTys.insert(NewArgTys.begin() + CspArgIndex, Builder.getInt32Ty());
-
-      Function *NewFunc = CompilerUtils::mutateFunctionArguments(
-          *Func, Func->getReturnType(), NewArgTys, Func->getAttributes());
-
-      Argument *CspArg = NewFunc->getArg(CspArgIndex);
-      CspArg->setName("cspInit");
-      Initializer = CspArg;
-
-      MappedFuncs.push_back({Func, NewFunc});
-
-      for (unsigned Idx = 0; Idx < Func->arg_size(); ++Idx) {
-        // Skip the CSP argument during remapping.
-        Value *OldArg = Func->getArg(Idx);
-        Value *NewArg = NewFunc->getArg(Idx >= CspArgIndex ? Idx + 1 : Idx);
-        NewArg->takeName(OldArg);
-        OldArg->replaceAllUsesWith(NewArg);
-      }
-
-      // Finally, update the function pointer so we operate on the newly created
-      // function.
-      Func = NewFunc;
-
-      // Do some bookkeeping to avoid issues with iterator invalidation possibly
-      // caused by inserting NewFunc into ToProcess.
-
-      // If the function data exists, insert a new element, try to move the
-      // contents and return a pointer to the new space. If this invalidates the
-      // iterator, a new iterator is returned. Otherwise, just return a pointer
-      // to the possibly newly allocated storage.
-      if (FuncData)
-        FuncData =
-            &ToProcess.insert({NewFunc, std::move(*FuncData)}).first->second;
-      else
-        FuncData = &ToProcess.insert({NewFunc, {}}).first->second;
-
-      FuncData->CspInitializerArg = CspArg;
-    } else {
-      // Init csp through intrinsic
-      auto *InitFun = GpurtLibrary->getFunction(
-          ContDriverFunc::GetContinuationStackAddrName);
-      assert(InitFun && "DXILContPostProcessPassImpl::addIncomingCsp: "
-                        "_cont_GetContinuationStackAddr not found.");
-      assert(InitFun->arg_size() == 0 &&
-             InitFun->getReturnType()->isIntegerTy(32));
-
-      Initializer = CrossInliner.inlineCall(Builder, InitFun).returnValue;
-    }
-
-    Builder.CreateStore(Initializer, Csp);
-
-    assert(FuncData && "DXILContPostProcessPassImpl::addIncomingCsp: Expected "
-                       "FuncData to point to existing storage!");
-    FuncData->CspStorage = Csp;
-
-    // Store the global memory base address.
-    if (StackAddrspace == ContStackAddrspace::Global) {
-      assert(GlobalMemBase && "DXILContPostProcessPassImpl::addIncomingCsp: "
-                              "GlobalMemBase cannot be nullptr!");
-
-      auto *Base = CrossInliner.inlineCall(Builder, GlobalMemBase).returnValue;
-      auto *CspTy = Builder.getInt8Ty()->getPointerTo(
-          StackLowering->getLoweredCpsStackAddrSpace());
-      FuncData->BasePointer = Builder.CreateIntToPtr(Base, CspTy);
-    }
-  }
-
-  // Replace references to the old function with references to the new (mapped)
-  // function.
-  while (!MappedFuncs.empty()) {
-    auto [OldFunc, NewFunc] = MappedFuncs.pop_back_val();
-    for (User *U : make_early_inc_range(OldFunc->users())) {
-      if (auto *AsCRUser = dyn_cast<lgc::cps::AsContinuationReferenceOp>(U)) {
-        Builder.SetInsertPoint(AsCRUser);
-        auto *NewAsCROp =
-            Builder.create<lgc::cps::AsContinuationReferenceOp>(NewFunc);
-        U->replaceAllUsesWith(NewAsCROp);
-        AsCRUser->eraseFromParent();
-      }
-    }
-
-    OldFunc->replaceAllUsesWith(
-        ConstantExpr::getBitCast(NewFunc, OldFunc->getType()));
-    OldFunc->eraseFromParent();
-
-    ToProcess.erase(OldFunc);
-  }
-
-  return !Candidates.empty();
 }
 
 void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
@@ -665,68 +542,6 @@ void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
     CInst->eraseFromParent();
     ContinueCall->eraseFromParent();
   }
-}
-
-// Append the CSP argument to all continuation.continue and
-// continuation.waitContinue calls.
-bool DXILContPostProcessPassImpl::passOutgoingCsp() {
-  bool Changed = false;
-
-  collectContinueCalls(*Mod, ContinueCalls);
-
-  Function *ContContinueFunc = Mod->getFunction("continuation.continue");
-  Function *ContWaitContinueFunc =
-      Mod->getFunction("continuation.waitContinue");
-
-  SmallVector<CallInst *> NewContinueCalls;
-  NewContinueCalls.reserve(ContinueCalls.size());
-
-  for (auto *CInst : make_early_inc_range(ContinueCalls)) {
-    Function *Parent = CInst->getFunction();
-
-    auto Data = ToProcess.find(Parent);
-    if (Data == ToProcess.end()) {
-      LLVM_DEBUG(
-          dbgs()
-          << "DXILContPostProcessPassImpl::passOutgoingCsp: Did not find "
-             "function data for function "
-          << Parent->getName() << "!");
-      continue;
-    }
-
-    Value *CspStorage = Data->second.CspStorage;
-
-    SmallVector<Value *> NewCallArgs{CInst->args()};
-    Builder.SetInsertPoint(CInst);
-
-    // If the function does not use the stack, pass-through the CSP argument.
-    Value *Csp = nullptr;
-
-    if (!CspStorage)
-      Csp = Data->second.CspInitializerArg;
-    else
-      Csp = Builder.CreateLoad(Builder.getInt32Ty(), CspStorage);
-
-    bool IsWaitContinue =
-        CInst->getCalledFunction()->getName().contains("waitContinue");
-    const size_t CspInsertIndex = IsWaitContinue ? 2 : 1;
-    NewCallArgs.insert(NewCallArgs.begin() + CspInsertIndex, Csp);
-
-    auto *NewCall = Builder.CreateCall(
-        IsWaitContinue ? ContWaitContinueFunc : ContContinueFunc, NewCallArgs);
-    CInst->replaceAllUsesWith(NewCall);
-    NewCall->copyMetadata(*CInst);
-    CInst->eraseFromParent();
-
-    NewContinueCalls.push_back(NewCall);
-
-    Changed = true;
-  }
-
-  // The list of continue calls is now final.
-  ContinueCalls = std::move(NewContinueCalls);
-
-  return Changed;
 }
 
 void DXILContPostProcessPassImpl::handleRegisterBufferGetPointer(
@@ -992,6 +807,19 @@ void DXILContPostProcessPassImpl::initializeProcessableFunctionData() {
     if (!Stage)
       continue;
 
+    // For the kernel entry function in GPURT, we only care about its existence
+    // in @ToProcess, since we only want to create an alloca for the
+    // continuation stack pointer later (and do the lgc.cps lowering).
+    if (lgc::rt::getLgcRtShaderStage(&F) ==
+        lgc::rt::RayTracingShaderStage::KernelEntry) {
+      FunctionData Data;
+      Data.Kind = DXILShaderKind::Compute;
+      [[maybe_unused]] bool DidInsert =
+          ToProcess.insert({&F, std::move(Data)}).second;
+      assert(DidInsert);
+      continue;
+    }
+
     // Handle entry functions first
     if (auto *MD = dyn_cast_or_null<MDTuple>(
             F.getMetadata(ContHelper::MDContinuationName))) {
@@ -1003,7 +831,7 @@ void DXILContPostProcessPassImpl::initializeProcessableFunctionData() {
     }
 
     DXILShaderKind Kind =
-        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
+        ShaderStageHelper::rtShaderStageToDxilShaderKind(*Stage);
     const bool IsCpsFunction = lgc::cps::isCpsFunction(F);
 
     switch (Kind) {
@@ -1145,8 +973,10 @@ bool DXILContPostProcessPassImpl::replaceIntrinsicCalls(
   Builder.CreateStore(SystemDataArgument, SystemDataPtr);
 
   for (auto *Call : Data.IntrinsicCalls)
-    replaceIntrinsicCall(Builder, Data.SystemDataTy, SystemDataPtr, Data.Kind,
-                         Call, GpurtLibrary, CrossInliner);
+    replaceIntrinsicCall(
+        Builder, Data.SystemDataTy, SystemDataPtr,
+        ShaderStageHelper::dxilShaderKindToRtShaderStage(Data.Kind).value(),
+        Call, GpurtLibrary, CrossInliner);
 
   return true;
 }
@@ -1222,40 +1052,108 @@ bool DXILContPostProcessPassImpl::replaceIntrinsicCallsAndSetupRayGen() {
 // Entry point for all lgc.cps lowering.
 //
 bool DXILContPostProcessPassImpl::lowerCpsOps() {
-  SmallVector<Function *> CpsFuncs;
-
   bool Changed = false;
+
+  struct CpsVisitorState {
+    DXILContPostProcessPassImpl &Self;
+    bool &Changed;
+    llvm_dialects::Builder &Builder;
+  };
+
+  // Note: It is a bit unlucky that we are using both a visitor for
+  // lgc.cps.as.continuation.reference and lgc.cps.jump and a loop for the
+  // actual stack lowering. It would be nice to use a visitor for both of them,
+  // but currently, there seems to be no support in dialects for marrying both
+  // approaches: we would need a visitor that supports visiting function
+  // definitions as well.
+  static const auto CpsVisitor =
+      llvm_dialects::VisitorBuilder<CpsVisitorState>()
+          .add<lgc::cps::AsContinuationReferenceOp>(
+              [](CpsVisitorState &State,
+                 lgc::cps::AsContinuationReferenceOp &AsCrOp) {
+                Value *LoweredReference =
+                    lgc::cps::lowerAsContinuationReference(State.Builder,
+                                                           AsCrOp);
+                AsCrOp.replaceAllUsesWith(LoweredReference);
+                AsCrOp.eraseFromParent();
+                State.Changed = true;
+              })
+          .add<lgc::cps::JumpOp>(
+              [](CpsVisitorState &State, lgc::cps::JumpOp &JumpOp) {
+                State.Self.lowerJumpOp(JumpOp);
+                State.Changed = true;
+              })
+          .build();
+
+  CpsVisitorState State{*this, Changed, Builder};
+
+  struct CspCandidateInfo {
+    bool RequiresCspArgument = false;
+    Function *Func = nullptr;
+  };
+
+  SmallVector<CspCandidateInfo> CandidateInfo;
 
   for (Function &Func : *Mod) {
     if (Func.isDeclaration())
       continue;
 
-    auto FuncData = ToProcess.find(&Func);
-    Value *CspStorage = nullptr;
-    if (FuncData != ToProcess.end())
-      CspStorage = FuncData->second.CspStorage;
-
-    if (!CspStorage) {
-      LLVM_DEBUG(dbgs() << "DXILContPostProcessPassImpl::lowerCpsOps: Did not "
-                           "find the CSP storage alloca for "
-                        << Func.getName() << ".\n");
+    if (Func.hasMetadata(ContHelper::MDContinuationName)) {
+      CandidateInfo.push_back(
+          {!ContHelper::isLegacyEntryFunction(&Func), &Func});
       continue;
     }
 
-    // Do the actual stack lowering.
-    if (*StackAddrspace == ContStackAddrspace::Global) {
-      // Ensure loads and stores are getting mapped to global memory (by adding
-      // the global memory base address).
-      assert(FuncData->second.BasePointer &&
-             "DXILContPostProcessPassImpl::lowerCpsOps: Requested access to "
-             "global memory but no base pointer provided!");
-      StackLowering->setRealBasePointer(FuncData->second.BasePointer);
+    if (lgc::rt::getLgcRtShaderStage(&Func) ==
+        lgc::rt::RayTracingShaderStage::KernelEntry) {
+      CandidateInfo.push_back({false, &Func});
+      continue;
     }
 
-    StackLowering->lowerCpsStackOps(Func, CspStorage);
+    if (lgc::cps::isCpsFunction(Func)) {
+      CandidateInfo.push_back(
+          {!ContHelper::isLegacyEntryFunction(&Func), &Func});
+      continue;
+    }
   }
 
+  for (auto &[RequiresCspArgument, F] : CandidateInfo) {
+    // Lower lgc.cps.jump and lgc.cps.as.continuation.reference ops.
+    CpsVisitor.visit(State, *F);
+
+    auto Data = std::move(ToProcess[F]);
+    ToProcess.erase(F);
+
+    auto *NewFunc = StackLowering->lowerCpsStackOps(F, GetGlobalMemBase,
+                                                    RequiresCspArgument);
+
+    ToProcess.insert({NewFunc, Data});
+  }
+
+  collectContinueCalls(*Mod, ContinueCalls);
+
   return Changed;
+}
+
+void DXILContPostProcessPassImpl::lowerJumpOp(lgc::cps::JumpOp &JumpOp) {
+  Builder.SetInsertPoint(&JumpOp);
+  Value *RCR = JumpOp.getTarget();
+
+  Function *Continue = ContHelper::isWaitAwaitCall(JumpOp)
+                           ? llvm::getContinuationWaitContinue(*Mod)
+                           : llvm::getContinuationContinue(*Mod);
+
+  SmallVector<Value *, 4> Args;
+  Args.push_back(Builder.CreateZExt(RCR, Builder.getInt64Ty()));
+
+  // If this is a wait call, then the wait mask is at the start of the tail
+  // argument list.
+  Args.append(JumpOp.getTail().begin(), JumpOp.getTail().end());
+
+  CallInst *ContinueCall = Builder.CreateCall(Continue, Args);
+  ContinueCall->copyMetadata(JumpOp);
+  ContHelper::removeIsWaitAwaitMetadata(*ContinueCall);
+  JumpOp.eraseFromParent();
 }
 
 bool DXILContPostProcessPassImpl::unfoldGlobals() {
@@ -1335,7 +1233,7 @@ bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
                         static_cast<uint32_t>(StackAddrspace.value()));
 
   if (*StackAddrspace == ContStackAddrspace::Global)
-    GlobalMemBase = getContinuationStackGlobalMemBase(*GpurtLibrary);
+    GetGlobalMemBase = getContinuationStackGlobalMemBase(*GpurtLibrary);
 
   initializeProcessableFunctionData();
 
@@ -1344,7 +1242,6 @@ bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
   Changed |= handleAmdInternals();
   Changed |= handleIntrinsicCalls(AnalysisManager);
   Changed |= replaceIntrinsicCallsAndSetupRayGen();
-  Changed |= addIncomingCsp();
 
   for (auto &F : make_early_inc_range(*Mod)) {
     auto FuncName = F.getName();
@@ -1359,7 +1256,6 @@ bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
     }
   }
 
-  Changed |= passOutgoingCsp();
   Changed |= lowerCpsOps();
 
   Changed |= fixupDxilMetadata(*Mod);

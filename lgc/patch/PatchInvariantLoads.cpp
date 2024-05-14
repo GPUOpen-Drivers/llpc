@@ -98,7 +98,7 @@ PreservedAnalyses PatchInvariantLoads::run(Function &function, FunctionAnalysisM
   bool clearInvariants = options.aggressiveInvariantLoads == ClearInvariants;
   bool aggressiveInvariants = options.aggressiveInvariantLoads == EnableOptimization;
 
-  if (options.aggressiveInvariantLoads == Auto && pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+  if (options.aggressiveInvariantLoads == Auto) {
     switch (function.getCallingConv()) {
     case CallingConv::AMDGPU_HS:
     case CallingConv::AMDGPU_LS:

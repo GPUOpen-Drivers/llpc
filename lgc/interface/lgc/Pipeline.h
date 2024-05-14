@@ -127,7 +127,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[42];
+  unsigned u32All[44];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -188,10 +188,14 @@ union Options {
     unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
     bool useGpurt;                           // Whether GPURT is used
     bool reserved21;
-    bool disablePerCompFetch;              // Disable per component fetch in uber fetch shader.
-    bool maskOffNullDescriptorTypeField;   // If true, mask off the type field of word3 from a null descriptor.
-    bool vbAddressLowBitsKnown;            // Use vertex buffer offset low bits from driver.
-    bool enableExtendedRobustBufferAccess; // Enable the extended robust buffer access
+    bool disablePerCompFetch;                      // Disable per component fetch in uber fetch shader.
+    bool maskOffNullDescriptorTypeField;           // If true, mask off the type field of word3 from a null descriptor.
+    bool vbAddressLowBitsKnown;                    // Use vertex buffer offset low bits from driver.
+    bool enableExtendedRobustBufferAccess;         // Enable the extended robust buffer access
+    bool sampleMaskExportOverridesAlphaToCoverage; // Whether to use sample mask export overriding alpha to coverage
+    bool disableSampleCoverageAdjust;              // Disable the adjustment of sample coverage
+    bool forceFragColorDummyExport;                // Force dummy export is added to fragment shader color export.
+    unsigned reserved22;
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -675,6 +679,7 @@ struct FragmentShaderMode {
   ConservativeDepth conservativeDepth;
   ConservativeDepth conservativeStencilFront;
   ConservativeDepth conservativeStencilBack;
+  unsigned waveOpsRequireHelperLanes;
 };
 
 // Kind of derivativeMode:

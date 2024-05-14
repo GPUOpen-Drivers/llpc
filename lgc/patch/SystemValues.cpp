@@ -267,7 +267,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
       const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
       // Geometry shader, using GS-VS ring for output.
-      Value *desc = loadDescFromDriverTable(SiDrvTableGsRingOuT0Offs + streamId, builder);
+      Value *desc = loadDescFromDriverTable(SiDrvTableGsRingOuT0Offs + streamId * 4, builder);
 
       unsigned outLocStart = 0;
       for (int i = 0; i < streamId; ++i)
@@ -496,13 +496,12 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
 // getInternalGlobalTablePtr(). Otherwise there is a danger that code is inserted in the wrong order, giving
 // invalid IR.
 //
-// @param tableOffset : Byte offset in driver table
+// @param tableOffset : DWORD offset in driver table
 // @param builder : Builder to use for insertion
 Instruction *ShaderSystemValues::loadDescFromDriverTable(unsigned tableOffset, BuilderBase &builder) {
   auto globalTable = getInternalGlobalTablePtr();
+  Value *descPtr = builder.CreateConstGEP1_32(builder.getInt8Ty(), globalTable, tableOffset * 4);
   Type *descTy = FixedVectorType::get(builder.getInt32Ty(), 4);
-  globalTable = cast<Instruction>(builder.CreateBitCast(globalTable, descTy->getPointerTo(ADDR_SPACE_CONST)));
-  Value *descPtr = builder.CreateGEP(descTy, globalTable, builder.getInt32(tableOffset));
   LoadInst *desc = builder.CreateLoad(descTy, descPtr);
   return desc;
 }

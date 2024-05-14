@@ -42,9 +42,6 @@ namespace Util {
 
 namespace Abi {
 
-constexpr unsigned PipelineMetadataMajorVersion = 2; // Pipeline Metadata Major Version
-constexpr unsigned PipelineMetadataMinorVersion = 6; // Pipeline Metadata Minor Version
-
 // TODO: Remove and update the version to [3,0] after switching to new register metadata layout
 constexpr unsigned PipelineMetadataMajorVersionNew = 3; // Pipeline Metadata Major Version
 constexpr unsigned PipelineMetadataMinorVersionNew = 0; // Pipeline Metadata Minor Version
@@ -70,9 +67,7 @@ enum PipelineType : unsigned {
 
 // Hardware shader stage
 enum class HardwareStage : unsigned {
-  Ls = 0, // Hardware LS stage
-  Hs,     // Hardware hS stage
-  Es,     // Hardware ES stage
+  Hs = 0, // Hardware HS stage
   Gs,     // Hardware GS stage
   Vs,     // Hardware VS stage
   Ps,     // Hardware PS stage
@@ -83,9 +78,7 @@ enum class HardwareStage : unsigned {
 
 // Used to represent hardware shader stage.
 enum HardwareStageFlagBits : unsigned {
-  HwShaderLs = (1 << static_cast<unsigned>(HardwareStage::Ls)),
   HwShaderHs = (1 << static_cast<unsigned>(HardwareStage::Hs)),
-  HwShaderEs = (1 << static_cast<unsigned>(HardwareStage::Es)),
   HwShaderGs = (1 << static_cast<unsigned>(HardwareStage::Gs)),
   HwShaderVs = (1 << static_cast<unsigned>(HardwareStage::Vs)),
   HwShaderPs = (1 << static_cast<unsigned>(HardwareStage::Ps)),
@@ -154,6 +147,7 @@ static constexpr char PsSampleMask[] = ".ps_sample_mask";
 static constexpr char GraphicsRegisters[] = ".graphics_registers";
 static constexpr char ComputeRegisters[] = ".compute_registers";
 static constexpr char PsInputSemantic[] = ".ps_input_semantic";
+static constexpr char PsDummyExport[] = ".ps_dummy_export";
 static constexpr char PrerasterOutputSemantic[] = ".preraster_output_semantic";
 static constexpr char ShaderFunctions[] = ".shader_functions";
 }; // namespace PipelineMetadataKey
@@ -187,6 +181,7 @@ static constexpr char OffchipLdsEn[] = ".offchip_lds_en";
 static constexpr char UserDataRegMap[] = ".user_data_reg_map";
 static constexpr char ImageOp[] = ".image_op";
 static constexpr char FrontendStackSize[] = ".frontend_stack_size";
+static constexpr char ShaderSpillThreshold[] = ".shader_spill_threshold";
 }; // namespace HardwareStageMetadataKey
 
 namespace ShaderMetadataKey {
@@ -626,7 +621,8 @@ static const char *const ApiStageNames[] = {".task",     ".vertex", ".hull",  ".
                                             ".geometry", ".mesh",   ".pixel", ".compute"};
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
-static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".ps", ".cs"};
+static const char *const HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Count)] = {".hs", ".gs", ".vs",
+                                                                                                 ".ps", ".cs"};
 
 // The name of the metadata node containing PAL metadata. This name is part of the interface from LGC into
 // the LLVM AMDGPU back-end when compiling for PAL ABI.
@@ -635,27 +631,18 @@ static const char PalMetadataName[] = "amdgpu.pal.metadata.msgpack";
 // PAL metadata SPI register numbers for the start of user data.
 //
 // Note on LS/HS confusion:
-// <=GFX8 claims LS registers are from 0x2D4C and HS registers are from 0x2D0C
-// GFX9 claims LS registers are from 0x2D0C, and the LS-HS merged shader uses them
 // GFX10 claims HS registers are from 0x2D0C, and the LS-HS merged shader uses them.
 // So here we call the registers from 0x2D0C "HS" and have the LS-HS merged shader using them, for
-// consistency. That contradicts the GFX9 docs, but has the same effect.
+// consistency.
 //
-// First the ones that only apply up to GFX8
-constexpr unsigned int mmSPI_SHADER_USER_DATA_LS_0 = 0x2D4C;
-// Up to GFX9 only
-constexpr unsigned int mmSPI_SHADER_USER_DATA_ES_0 = 0x2CCC; // For GXF9, used for ES-GS merged shader
-// Then the ones that apply to all hardware.
 constexpr unsigned int mmCOMPUTE_USER_DATA_0 = 0x2E40;
-constexpr unsigned int mmSPI_SHADER_USER_DATA_GS_0 = 0x2C8C; // For GFX10, used for ES-GS merged shader and NGG
-constexpr unsigned int mmSPI_SHADER_USER_DATA_HS_0 = 0x2D0C; // For GFX9+, Used for LS-HS merged shader
+constexpr unsigned int mmSPI_SHADER_USER_DATA_GS_0 = 0x2C8C; // Used for ES-GS merged shader and NGG
+constexpr unsigned int mmSPI_SHADER_USER_DATA_HS_0 = 0x2D0C; // Used for LS-HS merged shader
 constexpr unsigned int mmSPI_SHADER_USER_DATA_PS_0 = 0x2C0C;
 constexpr unsigned int mmSPI_SHADER_USER_DATA_VS_0 = 0x2C4C;
 
 // The RSRC1 registers.
-constexpr unsigned mmSPI_SHADER_PGM_RSRC1_LS = 0x2D4A;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_HS = 0x2D0A;
-constexpr unsigned mmSPI_SHADER_PGM_RSRC1_ES = 0x2CCA;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_GS = 0x2C8A;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_VS = 0x2C4A;
 constexpr unsigned mmSPI_SHADER_PGM_RSRC1_PS = 0x2C0A;
@@ -684,6 +671,8 @@ constexpr unsigned mmPA_SC_AA_CONFIG = 0xA2F8;
 // GS register numbers in PAL metadata
 constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE = 0xA29B;
 constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE_GFX11 = 0xC266;
+
+constexpr unsigned mmSPI_SHADER_PGM_LO_GS = 0x2C88;
 
 // Register bitfield layout.
 
@@ -822,5 +811,168 @@ union SPI_PS_INPUT_CNTL_0 {
   } bits, bitfields;
   unsigned u32All;
 };
+
+typedef enum SPI_PNT_SPRITE_OVERRIDE {
+  SPI_PNT_SPRITE_SEL_0 = 0x00000000,
+  SPI_PNT_SPRITE_SEL_1 = 0x00000001,
+  SPI_PNT_SPRITE_SEL_S = 0x00000002,
+  SPI_PNT_SPRITE_SEL_T = 0x00000003,
+  SPI_PNT_SPRITE_SEL_NONE = 0x00000004,
+} SPI_PNT_SPRITE_OVERRIDE;
+
+typedef enum SPI_SHADER_FORMAT {
+  SPI_SHADER_NONE = 0x00000000,
+  SPI_SHADER_1COMP = 0x00000001,
+  SPI_SHADER_2COMP = 0x00000002,
+  SPI_SHADER_4COMPRESS = 0x00000003,
+  SPI_SHADER_4COMP = 0x00000004,
+} SPI_SHADER_FORMAT;
+
+typedef enum VGT_GS_CUT_MODE {
+  GS_CUT_1024__HASHWVS = 0x00000000,
+  GS_CUT_512__HASHWVS = 0x00000001,
+  GS_CUT_256__HASHWVS = 0x00000002,
+  GS_CUT_128__HASHWVS = 0x00000003,
+} VGT_GS_CUT_MODE;
+
+typedef enum VGT_GS_MODE_TYPE {
+  GS_OFF = 0x00000000,
+  GS_SCENARIO_A = 0x00000001,
+  GS_SCENARIO_B = 0x00000002,
+  GS_SCENARIO_G = 0x00000003,
+  GS_SCENARIO_C = 0x00000004,
+  SPRITE_EN = 0x00000005,
+} VGT_GS_MODE_TYPE;
+
+typedef enum VGT_GS_OUTPRIM_TYPE {
+  POINTLIST = 0x00000000,
+  LINESTRIP = 0x00000001,
+  TRISTRIP = 0x00000002,
+  RECTLIST__GFX09 = 0x00000003,
+  RECT_2D__GFX10PLUS = 0x00000003,
+  RECTLIST__GFX10PLUS = 0x00000004,
+} VGT_GS_OUTPRIM_TYPE;
+
+typedef enum ZOrder {
+  LATE_Z = 0x00000000,
+  EARLY_Z_THEN_LATE_Z = 0x00000001,
+  RE_Z = 0x00000002,
+  EARLY_Z_THEN_RE_Z = 0x00000003,
+} ZOrder;
+
+typedef enum VGT_STAGES_ES_EN {
+  ES_STAGE_OFF = 0x00000000,
+  ES_STAGE_DS = 0x00000001,
+  ES_STAGE_REAL = 0x00000002,
+  RESERVED_ES = 0x00000003,
+} VGT_STAGES_ES_EN;
+
+typedef enum VGT_STAGES_GS_EN {
+  GS_STAGE_OFF = 0x00000000,
+  GS_STAGE_ON = 0x00000001,
+} VGT_STAGES_GS_EN;
+
+typedef enum VGT_STAGES_HS_EN {
+  HS_STAGE_OFF = 0x00000000,
+  HS_STAGE_ON = 0x00000001,
+} VGT_STAGES_HS_EN;
+
+typedef enum VGT_STAGES_LS_EN {
+  LS_STAGE_OFF = 0x00000000,
+  LS_STAGE_ON = 0x00000001,
+  CS_STAGE_ON = 0x00000002,
+  RESERVED_LS = 0x00000003,
+} VGT_STAGES_LS_EN;
+typedef enum VGT_STAGES_VS_EN {
+  VS_STAGE_REAL = 0x00000000,
+  VS_STAGE_DS = 0x00000001,
+  VS_STAGE_COPY_SHADER = 0x00000002,
+  RESERVED_VS = 0x00000003,
+} VGT_STAGES_VS_EN;
+
+typedef enum ConservativeZExport {
+  EXPORT_ANY_Z = 0x00000000,
+  EXPORT_LESS_THAN_Z = 0x00000001,
+  EXPORT_GREATER_THAN_Z = 0x00000002,
+  EXPORT_RESERVED = 0x00000003,
+} ConservativeZExport;
+
+typedef enum VGT_TESS_TYPE {
+  TESS_ISOLINE = 0x00000000,
+  TESS_TRIANGLE = 0x00000001,
+  TESS_QUAD = 0x00000002,
+} VGT_TESS_TYPE;
+
+typedef enum VGT_TESS_PARTITION {
+  PART_INTEGER = 0x00000000,
+  PART_POW2 = 0x00000001,
+  PART_FRAC_ODD = 0x00000002,
+  PART_FRAC_EVEN = 0x00000003,
+} VGT_TESS_PARTITION;
+
+typedef enum VGT_TESS_TOPOLOGY {
+  OUTPUT_POINT = 0x00000000,
+  OUTPUT_LINE = 0x00000001,
+  OUTPUT_TRIANGLE_CW = 0x00000002,
+  OUTPUT_TRIANGLE_CCW = 0x00000003,
+} VGT_TESS_TOPOLOGY;
+
+typedef enum VGT_DIST_MODE {
+  NO_DIST = 0x00000000,
+  PATCHES = 0x00000001,
+  DONUTS = 0x00000002,
+  TRAPEZOIDS = 0x00000003,
+} VGT_DIST_MODE;
+
+typedef enum SWIZZLE_MODE_ENUM {
+  SW_LINEAR = 0x00000000,
+  SW_256B_S = 0x00000001,
+  SW_256B_D = 0x00000002,
+  SW_256B_R = 0x00000003,
+  SW_4KB_Z = 0x00000004,
+  SW_4KB_S = 0x00000005,
+  SW_4KB_D = 0x00000006,
+  SW_4KB_R = 0x00000007,
+  SW_64KB_Z = 0x00000008,
+  SW_64KB_S = 0x00000009,
+  SW_64KB_D = 0x0000000a,
+  SW_64KB_R = 0x0000000b,
+  SW_64KB_Z_T = 0x00000010,
+  SW_64KB_S_T = 0x00000011,
+  SW_64KB_D_T = 0x00000012,
+  SW_64KB_R_T = 0x00000013,
+  SW_4KB_Z_X = 0x00000014,
+  SW_4KB_S_X = 0x00000015,
+  SW_4KB_D_X = 0x00000016,
+  SW_4KB_R_X = 0x00000017,
+  SW_64KB_Z_X = 0x00000018,
+  SW_64KB_S_X = 0x00000019,
+  SW_64KB_D_X = 0x0000001a,
+  SW_64KB_R_X = 0x0000001b,
+  SW_VAR_Z__GFX09 = 0x0000000c,
+  SW_VAR_S__GFX09 = 0x0000000d,
+  SW_VAR_D__GFX09 = 0x0000000e,
+  SW_VAR_R__GFX09 = 0x0000000f,
+  SW_VAR_S_X__GFX09 = 0x0000001d,
+  SW_VAR_D_X__GFX09 = 0x0000001e,
+  SW_VAR_Z_X__GFX09_10 = 0x0000001c,
+  SW_VAR_R_X__GFX09_10 = 0x0000001f,
+  SW_VAR_Z__GFX10CORE = 0x0000000c,
+  SW_VAR_S__GFX10CORE = 0x0000000d,
+  SW_VAR_D__GFX10CORE = 0x0000000e,
+  SW_VAR_R__GFX10CORE = 0x0000000f,
+  SW_VAR_S_X__GFX10CORE = 0x0000001d,
+  SW_VAR_D_X__GFX10CORE = 0x0000001e,
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI32 || CHIP_HDR_NAVI33 || CHIP_HDR_PHOENIX1
+  SW_256KB_Z__GFX11 = 0x0000000c,
+  SW_256KB_S__GFX11 = 0x0000000d,
+  SW_256KB_D__GFX11 = 0x0000000e,
+  SW_256KB_R__GFX11 = 0x0000000f,
+  SW_256KB_Z_X__GFX11 = 0x0000001c,
+  SW_256KB_S_X__GFX11 = 0x0000001d,
+  SW_256KB_D_X__GFX11 = 0x0000001e,
+  SW_256KB_R_X__GFX11 = 0x0000001f,
+#endif
+} SWIZZLE_MODE_ENUM;
 
 } // namespace lgc

@@ -29,7 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "YCbCrAddressHandler.h"
-#include "chip/gfx9/gfx9_plus_merged_enum.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/util/GfxRegHandler.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
@@ -64,8 +64,7 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   }
   case 10: {
     // Judge if current swizzle mode is SW_64KB_R_X
-    Value *isSw64KbRxMode =
-        m_builder->CreateICmpEQ(m_swizzleMode, m_builder->getInt32(Pal::Gfx9::Chip::SWIZZLE_MODE_ENUM::SW_64KB_R_X));
+    Value *isSw64KbRxMode = m_builder->CreateICmpEQ(m_swizzleMode, m_builder->getInt32(SWIZZLE_MODE_ENUM::SW_64KB_R_X));
 
     const unsigned pipesLog2 = 3;
     const unsigned columnBits = 2;

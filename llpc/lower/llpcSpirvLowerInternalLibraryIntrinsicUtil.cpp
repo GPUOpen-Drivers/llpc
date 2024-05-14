@@ -349,6 +349,24 @@ static void createStoreDwordAtAddrUncached(Function *func, Builder *builder) {
 }
 
 // =====================================================================================================================
+// Create coordinates of the current fragment
+//
+// @param func : The function to process
+// @param builder : The IR builder
+static void createFragCoord(Function *func, Builder *builder) {
+  builder->CreateRet(builder->CreateReadBuiltInInput(lgc::BuiltInFragCoord, {}, nullptr, nullptr, ""));
+}
+
+// =====================================================================================================================
+// Create sample ID of the current fragment
+//
+// @param func : The function to process
+// @param builder : The IR builder
+static void createSampleId(Function *func, Builder *builder) {
+  builder->CreateRet(builder->CreateReadBuiltInInput(lgc::BuiltInSampleId, {}, nullptr, nullptr, ""));
+}
+
+// =====================================================================================================================
 // Initialize library function pointer table
 InternalLibraryIntrinsicUtil::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdExtLaneIndex"] = &createLaneIndex;
@@ -375,6 +393,8 @@ InternalLibraryIntrinsicUtil::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdExtLoadDwordAtAddrUncached"] = &createLoadDwordAtAddrUncached;
   m_libFuncPtrs["AmdExtStoreDwordAtAddr"] = &createStoreDwordAtAddr;
   m_libFuncPtrs["AmdExtStoreDwordAtAddrUncached"] = &createStoreDwordAtAddrUncached;
+  m_libFuncPtrs["AmdExtFragCoord"] = &createFragCoord;
+  m_libFuncPtrs["AmdExtSampleId"] = &createSampleId;
 }
 
 } // namespace Llpc

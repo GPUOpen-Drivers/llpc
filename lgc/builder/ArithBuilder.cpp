@@ -941,10 +941,12 @@ Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const T
     result->setName(instName);
   } else {
     // For double, use a combination of fmin and fmax.
-    CallInst *max = CreateMaxNum(x, minVal);
-    max->setFastMathFlags(getFastMathFlags());
-    CallInst *min = CreateMinNum(max, maxVal, instName);
-    min->setFastMathFlags(getFastMathFlags());
+    Value *max = CreateMaxNum(x, minVal);
+    if (auto *call = dyn_cast<CallInst>(max))
+      call->setFastMathFlags(getFastMathFlags());
+    Value *min = CreateMinNum(max, maxVal, instName);
+    if (auto *call = dyn_cast<CallInst>(min))
+      call->setFastMathFlags(getFastMathFlags());
     result = min;
   }
 
@@ -961,12 +963,12 @@ Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const T
 // @param value2 : Second value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFMin(Value *value1, Value *value2, const Twine &instName) {
-  CallInst *min = CreateMinNum(value1, value2);
-  min->setFastMathFlags(getFastMathFlags());
-  Value *result = min;
+  Value *min = CreateMinNum(value1, value2);
+  if (auto *call = dyn_cast<CallInst>(min))
+    call->setFastMathFlags(getFastMathFlags());
 
-  result->setName(instName);
-  return result;
+  min->setName(instName);
+  return min;
 }
 
 // =====================================================================================================================
@@ -978,12 +980,12 @@ Value *BuilderImpl::CreateFMin(Value *value1, Value *value2, const Twine &instNa
 // @param value2 : Second value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFMax(Value *value1, Value *value2, const Twine &instName) {
-  CallInst *max = CreateMaxNum(value1, value2);
-  max->setFastMathFlags(getFastMathFlags());
-  Value *result = max;
+  Value *max = CreateMaxNum(value1, value2);
+  if (auto *call = dyn_cast<CallInst>(max))
+    call->setFastMathFlags(getFastMathFlags());
 
-  result->setName(instName);
-  return result;
+  max->setName(instName);
+  return max;
 }
 
 // =====================================================================================================================
@@ -996,14 +998,16 @@ Value *BuilderImpl::CreateFMax(Value *value1, Value *value2, const Twine &instNa
 // @param value3 : Third value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFMin3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
-  CallInst *min1 = CreateMinNum(value1, value2);
-  min1->setFastMathFlags(getFastMathFlags());
-  CallInst *min2 = CreateMinNum(min1, value3);
-  min2->setFastMathFlags(getFastMathFlags());
-  Value *result = min2;
+  Value *min1 = CreateMinNum(value1, value2);
+  if (auto *call = dyn_cast<CallInst>(min1))
+    call->setFastMathFlags(getFastMathFlags());
 
-  result->setName(instName);
-  return result;
+  Value *min2 = CreateMinNum(min1, value3);
+  if (auto *call = dyn_cast<CallInst>(min2))
+    call->setFastMathFlags(getFastMathFlags());
+
+  min2->setName(instName);
+  return min2;
 }
 
 // =====================================================================================================================
@@ -1016,14 +1020,16 @@ Value *BuilderImpl::CreateFMin3(Value *value1, Value *value2, Value *value3, con
 // @param value3 : Third value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFMax3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
-  CallInst *max1 = CreateMaxNum(value1, value2);
-  max1->setFastMathFlags(getFastMathFlags());
-  CallInst *max2 = CreateMaxNum(max1, value3);
-  max2->setFastMathFlags(getFastMathFlags());
-  Value *result = max2;
+  Value *max1 = CreateMaxNum(value1, value2);
+  if (auto *call = dyn_cast<CallInst>(max1))
+    call->setFastMathFlags(getFastMathFlags());
 
-  result->setName(instName);
-  return result;
+  Value *max2 = CreateMaxNum(max1, value3);
+  if (auto *call = dyn_cast<CallInst>(max2))
+    call->setFastMathFlags(getFastMathFlags());
+
+  max2->setName(instName);
+  return max2;
 }
 
 // =====================================================================================================================
@@ -1046,14 +1052,21 @@ Value *BuilderImpl::CreateFMid3(Value *value1, Value *value2, Value *value3, con
     });
   } else {
     // For double, use a combination of fmin and fmax.
-    CallInst *min1 = CreateMinNum(value1, value2);
-    min1->setFastMathFlags(getFastMathFlags());
-    CallInst *max1 = CreateMaxNum(value1, value2);
-    max1->setFastMathFlags(getFastMathFlags());
-    CallInst *min2 = CreateMinNum(max1, value3);
-    min2->setFastMathFlags(getFastMathFlags());
-    CallInst *max2 = CreateMaxNum(min1, min2, instName);
-    max2->setFastMathFlags(getFastMathFlags());
+    Value *min1 = CreateMinNum(value1, value2);
+    if (auto *call = dyn_cast<CallInst>(min1))
+      call->setFastMathFlags(getFastMathFlags());
+
+    Value *max1 = CreateMaxNum(value1, value2);
+    if (auto *call = dyn_cast<CallInst>(max1))
+      call->setFastMathFlags(getFastMathFlags());
+
+    Value *min2 = CreateMinNum(max1, value3);
+    if (auto *call = dyn_cast<CallInst>(min2))
+      call->setFastMathFlags(getFastMathFlags());
+
+    Value *max2 = CreateMaxNum(min1, min2, instName);
+    if (auto *call = dyn_cast<CallInst>(max2))
+      call->setFastMathFlags(getFastMathFlags());
     result = max2;
   }
 

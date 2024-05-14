@@ -50,7 +50,8 @@ enum class RayTracingShaderStage {
   Callable,
   // Not an input shader stage but we need to annotate it as well
   Traversal,
-  KernelEntry
+  KernelEntry,
+  Count
 };
 
 // Set shader stage metadata on a LLVM function and erase it by setting
@@ -88,7 +89,7 @@ void setShaderArgSize(llvm::Function *func, size_t size);
 
 // Get attribute size (in bytes) metadata for a ray-tracing shader
 // function.
-size_t getShaderHitAttributeSize(const llvm::Function *func);
+std::optional<size_t> getShaderHitAttributeSize(const llvm::Function *func);
 
 // Set attribute size (in bytes) metadata for a ray-tracing shader
 // function.

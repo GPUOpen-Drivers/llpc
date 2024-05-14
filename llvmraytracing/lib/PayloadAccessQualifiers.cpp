@@ -1863,19 +1863,20 @@ PAQSerializationInfoManager::PAQSerializationInfoManager(
 
 PAQSerializationInfoBase &
 PAQSerializationInfoManager::getOrCreateSerializationInfo(
-    const PAQPayloadConfig &PayloadConfig, DXILShaderKind ShaderKind) {
+    const PAQPayloadConfig &PayloadConfig,
+    lgc::rt::RayTracingShaderStage ShaderKind) {
   switch (ShaderKind) {
-  case DXILShaderKind::RayGeneration:
+  case lgc::rt::RayTracingShaderStage::RayGeneration:
     llvm_unreachable("RayGen does not have an incoming payload");
-  case DXILShaderKind::Intersection:
-  case DXILShaderKind::AnyHit:
-  case DXILShaderKind::ClosestHit:
-  case DXILShaderKind::Miss:
+  case lgc::rt::RayTracingShaderStage::Intersection:
+  case lgc::rt::RayTracingShaderStage::AnyHit:
+  case lgc::rt::RayTracingShaderStage::ClosestHit:
+  case lgc::rt::RayTracingShaderStage::Miss:
     return getOrCreateTraceRaySerializationInfo(PayloadConfig);
-  case DXILShaderKind::Callable:
+  case lgc::rt::RayTracingShaderStage::Callable:
     return getOrCreateCallShaderSerializationInfo(PayloadConfig);
   default:
-    llvm_unreachable("Unexpected DXILShaderKind");
+    llvm_unreachable("Unexpected lgc::rt::RayTracingShaderStage");
   }
 }
 
@@ -2003,18 +2004,19 @@ PAQSerializationInfoManager::getOrCreateTraceRayLayout(
 
 const PAQSerializationLayout &
 PAQSerializationInfoManager::getOrCreateShaderStartSerializationLayout(
-    PAQSerializationInfoBase &SerializationInfo, DXILShaderKind ShaderKind,
-    Type *HitAttributesTy) {
+    PAQSerializationInfoBase &SerializationInfo,
+    lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy) {
 
-  assert(ShaderKind != DXILShaderKind::RayGeneration &&
-         ShaderKind != DXILShaderKind::Intersection && "Invalid shader kind!");
-  if (ShaderKind == DXILShaderKind::Callable)
+  assert(ShaderKind != lgc::rt::RayTracingShaderStage::RayGeneration &&
+         ShaderKind != lgc::rt::RayTracingShaderStage::Intersection &&
+         "Invalid shader kind!");
+  if (ShaderKind == lgc::rt::RayTracingShaderStage::Callable)
     return cast<PAQCallShaderSerializationInfo>(SerializationInfo)
         .CallShaderSerializationLayout;
 
   // Always set for non-intersection
   PAQShaderStage ShaderStage =
-      dxilShaderKindToPAQShaderStage(ShaderKind).value();
+      rtShaderStageToPAQShaderStage(ShaderKind).value();
   // Always set for non-caller, non-intersection read access
   PAQSerializationLayoutKind LayoutKind =
       tryDetermineLayoutKind(ShaderStage, PAQAccessKind::Read).value();
@@ -2025,17 +2027,19 @@ PAQSerializationInfoManager::getOrCreateShaderStartSerializationLayout(
 
 const PAQSerializationLayout &
 PAQSerializationInfoManager::getOrCreateShaderExitSerializationLayout(
-    PAQSerializationInfoBase &SerializationInfo, DXILShaderKind ShaderKind,
-    Type *HitAttributesTy, AnyHitExitKind AHExitKind) {
+    PAQSerializationInfoBase &SerializationInfo,
+    lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy,
+    AnyHitExitKind AHExitKind) {
 
-  assert(ShaderKind != DXILShaderKind::RayGeneration &&
-         ShaderKind != DXILShaderKind::Intersection && "Invalid shader kind!");
-  if (ShaderKind == DXILShaderKind::Callable)
+  assert(ShaderKind != lgc::rt::RayTracingShaderStage::RayGeneration &&
+         ShaderKind != lgc::rt::RayTracingShaderStage::Intersection &&
+         "Invalid shader kind!");
+  if (ShaderKind == lgc::rt::RayTracingShaderStage::Callable)
     return cast<PAQCallShaderSerializationInfo>(SerializationInfo)
         .CallShaderSerializationLayout;
 
   PAQShaderStage ShaderStage =
-      dxilShaderKindToPAQShaderStage(ShaderKind).value();
+      rtShaderStageToPAQShaderStage(ShaderKind).value();
   std::optional<PAQSerializationLayoutKind> OptLayoutKind =
       tryDetermineLayoutKind(ShaderStage, PAQAccessKind::Write);
   if (!OptLayoutKind) {

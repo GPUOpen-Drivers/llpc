@@ -3,9 +3,9 @@
 ; RUN: count 0 < %t0.stderr
 ; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S %s 2> %t1.stderr | FileCheck -check-prefix=LOWERRAYTRACINGPIPELINE-CPS %s
 ; RUN: count 0 < %t1.stderr
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,register-buffer,lint,remove-types-metadata' -S %s 2> %t2.stderr | FileCheck -check-prefix=REGISTERBUFFER-CPS %s
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,register-buffer,lint,remove-types-metadata' -S %s 2> %t2.stderr | FileCheck -check-prefix=REGISTERBUFFER-CPS %s
 ; RUN: count 0 < %t2.stderr
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2> %t3.stderr | FileCheck -check-prefix=POSTPROCESS-CPS %s
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2> %t3.stderr | FileCheck -check-prefix=POSTPROCESS-CPS %s
 ; RUN: count 0 < %t3.stderr
 
 target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
@@ -14,6 +14,9 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %struct.DispatchSystemData = type { i32 }
 %struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 %struct.SystemData = type { %struct.DispatchSystemData }
+%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float }
+%struct.HitData = type { float, i32 }
+%struct.AnyHitTraversalData = type { %struct.TraversalData, %struct.HitData }
 %struct.TheirParams = type { i32 }
 %"class.RWTexture2D<vector<float, 4> >" = type { <4 x float> }
 
@@ -24,6 +27,9 @@ declare i32 @_cont_GetContinuationStackAddr()
 define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) !types !13 {
   ret i32 5
 }
+
+; Need _cont_ReportHit to get system data type
+declare  !types !22 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
 declare %struct.DispatchSystemData @_cont_SetupRayGen()
 
@@ -80,30 +86,32 @@ attributes #0 = { nounwind }
 !18 = !{!"function", !"void", !14, i32 poison}
 !19 = !{!"function", !"void", i32 poison, i32 poison, !20}
 !20 = !{i32 0, %struct.TheirParams poison}
+!21 = !{i32 0, %struct.AnyHitTraversalData poison}
+!22 = !{!"function", i1 poison, !21, float poison, i32 poison}
 ; LOWERRAYTRACINGPIPELINE-LABEL: define i32 @_cont_GetLocalRootIndex(
 ; LOWERRAYTRACINGPIPELINE-SAME: ptr [[DATA:%.*]]) {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret i32 5
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @main(
-; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META17:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META18:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8:![0-9]+]] !continuation.entry [[META16:![0-9]+]] !continuation.registercount [[META8]] !continuation [[META17:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP3]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call ptr inttoptr (i64 2 to ptr)([[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]]), !continuation.registercount [[META15:![0-9]+]], !continuation.returnedRegistercount !15
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @await.struct.DispatchSystemData(ptr [[TMP4]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP2]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP5]], ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = call ptr inttoptr (i64 2 to ptr)([[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]]), !continuation.registercount [[META14:![0-9]+]], !continuation.returnedRegistercount !14
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[AWAIT_STRUCT_DISPATCHSYSTEMDATA:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP6]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_THEIRPARAMS]] poison, ptr [[PARAMS]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = load i32, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP11]], ptr [[TMP8]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP7]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void, !continuation.registercount [[META14:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret void, !continuation.registercount [[META13:![0-9]+]]
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define i32 @_cont_GetLocalRootIndex(
@@ -112,21 +120,26 @@ attributes #0 = { nounwind }
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @main(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !lgc.cps [[META9]] !continuation [[META17:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8:![0-9]+]] !lgc.cps [[META8]] !continuation [[META16:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[PAYLOAD_ALLOCA:%.*]] = alloca [30 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP3]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] (...) @lgc.cps.await__s_struct.DispatchSystemDatas(i32 2, i32 2, i32 5), !continuation.returnedRegistercount !15, !continuation.registercount [[META15:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP3]], ptr [[PAYLOAD_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = load [1 x i32], ptr [[PAYLOAD_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa19i32a1i32s(i32 2, i32 2, i32 5, [20 x i32] poison, [1 x i32] [[TMP8]]), !continuation.returnedRegistercount !14, !continuation.registercount [[META14:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP9]], 2
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [1 x i32] [[TMP10]], ptr [[PAYLOAD_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP9]], 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_THEIRPARAMS]] poison, ptr [[PARAMS]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = load i32, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP6]], ptr [[TMP5]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = load i32, ptr [[PAYLOAD_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP13]], ptr [[TMP12]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP11]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
 ;
@@ -139,20 +152,22 @@ attributes #0 = { nounwind }
 ; REGISTERBUFFER-CPS-LABEL: define void @main(
 ; REGISTERBUFFER-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8:![0-9]+]] !lgc.cps [[META8]] !continuation [[META16:![0-9]+]] {
 ; REGISTERBUFFER-CPS-NEXT:  AllocaSpillBB:
-; REGISTERBUFFER-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; REGISTERBUFFER-CPS-NEXT:    [[DOTFCA_0_EXTRACT3:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; REGISTERBUFFER-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; REGISTERBUFFER-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
-; REGISTERBUFFER-CPS-NEXT:    store i32 undef, ptr addrspace(20) @PAYLOAD, align 4
-; REGISTERBUFFER-CPS-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @main.resume.0)
-; REGISTERBUFFER-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 2, i32 2, {} poison, i32 [[TMP1]], i32 5), !continuation.returnedRegistercount !14, !continuation.registercount [[META14:![0-9]+]]
+; REGISTERBUFFER-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT3]], 0
+; REGISTERBUFFER-CPS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 undef, 0
+; REGISTERBUFFER-CPS-NEXT:    [[TMP1:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @main.resume.0)
+; REGISTERBUFFER-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 2, i32 2, {} poison, i64 [[TMP1]], i32 5, [20 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT]]), !continuation.returnedRegistercount !14, !continuation.registercount [[META14:![0-9]+]]
 ; REGISTERBUFFER-CPS-NEXT:    unreachable
 ;
 ;
 ; REGISTERBUFFER-CPS-LABEL: define dso_local void @main.resume.0(
-; REGISTERBUFFER-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP3:%.*]]) !lgc.rt.shaderstage [[META8]] !lgc.cps [[META8]] !continuation [[META16]] {
+; REGISTERBUFFER-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [19 x i32], [1 x i32] } [[TMP3:%.*]]) !lgc.rt.shaderstage [[META8]] !lgc.cps [[META8]] !continuation [[META16]] {
 ; REGISTERBUFFER-CPS-NEXT:  entryresume.0:
-; REGISTERBUFFER-CPS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
-; REGISTERBUFFER-CPS-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], 0
+; REGISTERBUFFER-CPS-NEXT:    [[TMP4:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP3]], 2
+; REGISTERBUFFER-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[TMP4]], 0
+; REGISTERBUFFER-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP3]], 0
+; REGISTERBUFFER-CPS-NEXT:    [[DOTFCA_0_EXTRACT4:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], 0
 ; REGISTERBUFFER-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; REGISTERBUFFER-CPS-NEXT:    ret void
 ;
@@ -167,23 +182,26 @@ attributes #0 = { nounwind }
 ; POSTPROCESS-CPS-NEXT:  AllocaSpillBB:
 ; POSTPROCESS-CPS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POSTPROCESS-CPS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; POSTPROCESS-CPS-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @_cont_SetupRayGen()
-; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], 0
+; POSTPROCESS-CPS-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[_CONT_SETUPRAYGEN:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]]()
+; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_EXTRACT3:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], 0
 ; POSTPROCESS-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; POSTPROCESS-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
-; POSTPROCESS-CPS-NEXT:    store i32 undef, ptr addrspace(20) @REGISTERS, align 4
-; POSTPROCESS-CPS-NEXT:    [[TMP3:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @main.resume.0)
-; POSTPROCESS-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 2, i32 2, {} poison, i32 [[TMP3]], i32 5), !continuation.returnedRegistercount !14, !continuation.registercount [[META14:![0-9]+]]
+; POSTPROCESS-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT3]], 0
+; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 undef, 0
+; POSTPROCESS-CPS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
+; POSTPROCESS-CPS-NEXT:    [[TMP4:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @main.resume.0 to i64))
+; POSTPROCESS-CPS-NEXT:    call void (i64, ...) @continuation.continue(i64 2, i32 [[TMP3]], i64 [[TMP4]], i32 5, [20 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT]]), !continuation.returnedRegistercount !14, !continuation.registercount [[META14:![0-9]+]]
 ; POSTPROCESS-CPS-NEXT:    unreachable
 ;
 ;
 ; POSTPROCESS-CPS-LABEL: define dso_local void @main.resume.0(
-; POSTPROCESS-CPS-SAME: {} [[TMP0:%.*]], i32 [[CSPINIT:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP3:%.*]]) !lgc.rt.shaderstage [[META8]] !lgc.cps [[META8]] !continuation [[META16]] {
+; POSTPROCESS-CPS-SAME: {} [[TMP0:%.*]], i32 [[CSPINIT:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [19 x i32], [1 x i32] } [[TMP3:%.*]]) !lgc.rt.shaderstage [[META8]] !lgc.cps [[META8]] !continuation [[META16]] {
 ; POSTPROCESS-CPS-NEXT:  entryresume.0:
 ; POSTPROCESS-CPS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POSTPROCESS-CPS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; POSTPROCESS-CPS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], 0
+; POSTPROCESS-CPS-NEXT:    [[TMP4:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP3]], 2
+; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[TMP4]], 0
+; POSTPROCESS-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP3]], 0
+; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_EXTRACT4:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], 0
 ; POSTPROCESS-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; POSTPROCESS-CPS-NEXT:    ret void
 ;

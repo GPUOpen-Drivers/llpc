@@ -100,6 +100,7 @@ private:
   void createEnqueue(llvm::Function *func);
   void createContinuationStackIsGlobal(llvm::Function *func);
   void createGetRtip(llvm::Function *func);
+  void createShaderMarker(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

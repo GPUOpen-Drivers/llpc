@@ -17,11 +17,10 @@ define { i8*, %continuation.token* } @simple_await(i8* %0) !continuation !0 !con
 ; CHECK-LABEL: define void @simple_await(
 ; CHECK-SAME: ) !continuation [[META1:![0-9]+]] !continuation.registercount [[META2:![0-9]+]] !continuation.stacksize [[META3:![0-9]+]] !continuation.state [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[TMP0]] to ptr addrspace(32)
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    store i64 -1, ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
-; CHECK-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CHECK-NEXT:    unreachable
 ;
@@ -38,12 +37,12 @@ define internal { i8*, %continuation.token* } @simple_await.resume.0(i8* noalias
 ; CHECK-LABEL: define dso_local void @simple_await.resume.0(
 ; CHECK-SAME: ) !continuation [[META1]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:  entryresume.0:
-; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[TMP0]] to ptr addrspace(32)
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr addrspace(32) [[FRAMEPTR]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr addrspace(32) [[DOTRELOAD_ADDR]], align 4
+; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]]), !continuation.registercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
@@ -60,9 +59,8 @@ define { i8*, %continuation.token* } @simple_await_entry(i8* %0) !continuation.e
 ; CHECK-LABEL: define void @simple_await_entry(
 ; CHECK-SAME: ) !continuation [[META4:![0-9]+]] !continuation.registercount [[META2]] !continuation.entry [[META5:![0-9]+]] !continuation.stacksize [[META3]] !continuation.state [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[TMP0]] to ptr addrspace(32)
-; CHECK-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CHECK-NEXT:    unreachable
 ;
@@ -79,10 +77,10 @@ define internal { i8*, %continuation.token* } @simple_await_entry.resume.0(i8* n
 ; CHECK-LABEL: define dso_local void @simple_await_entry.resume.0(
 ; CHECK-SAME: ) !continuation [[META4]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:  entryresume.0:
-; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[TMP0]] to ptr addrspace(32)
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr addrspace(32) [[FRAMEPTR]] to ptr addrspace(32)
+; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    ret void
 ; CHECK:       entryresume.0.split:
 ; CHECK-NEXT:    unreachable
@@ -97,11 +95,10 @@ entryresume.0:
 define { i8*, %continuation.token* } @await_with_ret_value(i8* %0) !continuation !1 !continuation.registercount !4 {
 ; CHECK-LABEL: define void @await_with_ret_value(
 ; CHECK-SAME: ) !continuation [[META6:![0-9]+]] !continuation.registercount [[META2]] !continuation.stacksize [[META3]] !continuation.state [[META3]] {
-; CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[TMP1]] to ptr addrspace(32)
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    store i64 -1, ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
-; CHECK-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @await_with_ret_value.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CHECK-NEXT:    unreachable
 ;
@@ -116,12 +113,12 @@ define { i8*, %continuation.token* } @await_with_ret_value(i8* %0) !continuation
 define internal { i8*, %continuation.token* } @await_with_ret_value.resume.0(i8* noalias nonnull align 16 dereferenceable(8) %0, i1 %1) !continuation !1 {
 ; CHECK-LABEL: define dso_local void @await_with_ret_value.resume.0(
 ; CHECK-SAME: i32 [[RES1:%.*]]) !continuation [[META6]] !continuation.registercount [[META2]] {
-; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
-; CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[TMP1]] to ptr addrspace(32)
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr addrspace(32) [[FRAMEPTR]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr addrspace(32) [[DOTRELOAD_ADDR]], align 4
+; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i32 [[RES1]]), !continuation.registercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
@@ -147,8 +144,8 @@ attributes #0 = { nounwind }
 ;.
 ; CHECK: attributes #[[ATTR0:[0-9]+]] = { nounwind }
 ; CHECK: attributes #[[ATTR1:[0-9]+]] = { noreturn }
-; CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: read) }
-; CHECK: attributes #[[ATTR3:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: readwrite) }
+; CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: readwrite) }
+; CHECK: attributes #[[ATTR3:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: read) }
 ;.
 ; CHECK: [[META0:![0-9]+]] = !{i32 21}
 ; CHECK: [[META1]] = !{ptr @simple_await}

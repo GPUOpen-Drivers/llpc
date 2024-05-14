@@ -54,9 +54,10 @@ using namespace llvm;
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
+// @param stride : stride for index mode access
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
-                                     const Twine &instName) {
+Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
+                                     unsigned stride, const Twine &instName) {
   Value *desc = nullptr;
   bool return64Address = false;
   descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
@@ -117,7 +118,7 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
     Value *descPtr = getDescPtr(node->concreteType, topNode, node, binding);
     if (return64Address)
       return descPtr;
-    desc = buildInlineBufferDesc(descPtr);
+    desc = buildInlineBufferDesc(descPtr, stride);
   } else {
     ResourceNodeType resType = node->concreteType;
     ResourceNodeType abstractType = node->abstractType;
@@ -165,8 +166,9 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
   }
 
   if (node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
-               node->concreteType == ResourceNodeType::DescriptorConstBufferCompact))
-    desc = buildBufferCompactDesc(desc);
+               node->concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
+    desc = buildBufferCompactDesc(desc, stride);
+  }
 
   if (!instName.isTriviallyEmpty())
     desc->setName(instName);
@@ -369,19 +371,21 @@ Value *BuilderImpl::scalarizeIfUniform(Value *value, bool isNonUniform) {
 // Calculate a buffer descriptor for an inline buffer
 //
 // @param descPtr : Pointer to inline buffer
-Value *BuilderImpl::buildInlineBufferDesc(Value *descPtr) {
+// @param stride :  stride for the buffer descriptor to access in index mode
+Value *BuilderImpl::buildInlineBufferDesc(Value *descPtr, unsigned stride) {
   // Bitcast the pointer to v2i32
   descPtr = CreatePtrToInt(descPtr, getInt64Ty());
   descPtr = CreateBitCast(descPtr, FixedVectorType::get(getInt32Ty(), 2));
 
-  return buildBufferCompactDesc(descPtr);
+  return buildBufferCompactDesc(descPtr, stride);
 }
 
 // =====================================================================================================================
 // Build buffer compact descriptor
 //
 // @param desc : The buffer descriptor base to build for the buffer compact descriptor
-Value *BuilderImpl::buildBufferCompactDesc(Value *desc) {
+// @param stride :  stride for the buffer descriptor to access in index mode
+Value *BuilderImpl::buildBufferCompactDesc(Value *desc, unsigned stride) {
   const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // Extract compact buffer descriptor
@@ -397,6 +401,11 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc) {
   SqBufRsrcWord1 sqBufRsrcWord1 = {};
   sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
   descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
+  if (stride) {
+    SqBufRsrcWord1 sqBufRsrcWord1Stride = {};
+    sqBufRsrcWord1Stride.bits.stride = stride;
+    descElem1 = CreateOr(descElem1, getInt32(sqBufRsrcWord1Stride.u32All));
+  }
   bufDesc = CreateInsertElement(bufDesc, descElem1, 1);
 
   // Dword 2
@@ -413,12 +422,12 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc) {
   if (gfxIp.major == 10) {
     sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
     sqBufRsrcWord3.gfx10.resourceLevel = 1;
-    sqBufRsrcWord3.gfx10.oobSelect = 2;
-    assert(sqBufRsrcWord3.u32All == 0x21014FAC);
+    sqBufRsrcWord3.gfx10.oobSelect = stride ? 3 : 2;
+    assert(sqBufRsrcWord3.u32All == 0x21014FAC || sqBufRsrcWord3.u32All == 0x31014FAC);
   } else if (gfxIp.major >= 11) {
     sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
-    sqBufRsrcWord3.gfx11.oobSelect = 2;
-    assert(sqBufRsrcWord3.u32All == 0x20014FAC);
+    sqBufRsrcWord3.gfx11.oobSelect = stride ? 3 : 2;
+    assert(sqBufRsrcWord3.u32All == 0x20014FAC || sqBufRsrcWord3.u32All == 0x30014FAC);
   } else {
     llvm_unreachable("Not implemented!");
   }

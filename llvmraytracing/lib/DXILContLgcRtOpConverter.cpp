@@ -504,7 +504,7 @@ bool DXILContLgcRtOpConverterPass::prepareEntryPointShaders() {
   analyzeShaderKinds(*M, ShaderKinds);
 
   for (auto &[Func, Kind] : ShaderKinds) {
-    auto Stage = ShaderStageHelper::dxilShaderKindToShaderStage(Kind);
+    auto Stage = ShaderStageHelper::dxilShaderKindToRtShaderStage(Kind);
 
     // Ignore non-raytracing shader stages
     if (!Stage.has_value())

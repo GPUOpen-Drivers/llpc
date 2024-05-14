@@ -196,6 +196,25 @@ template <class Elf> void ElfReader<Elf>::getSymbol(unsigned idx, ElfSymbol *sym
 }
 
 // =====================================================================================================================
+// Gets index of the symbol in the symbol table section according to the specified name.
+//
+// @param symbolName : Symbol name
+template <class Elf> uint32_t ElfReader<Elf>::getSymbolIndexByName(const char *symbolName) const {
+  auto &section = m_sections[m_symSecIdx];
+  const char *strTab = reinterpret_cast<const char *>(m_sections[m_strtabSecIdx]->data);
+
+  auto symbols = reinterpret_cast<const typename Elf::Symbol *>(section->data);
+  unsigned symCount = getSymbolCount();
+  for (unsigned idx = 0; idx < symCount; ++idx) {
+    auto name = strTab + symbols[idx].st_name;
+    if (strcmp(name, symbolName) == 0) {
+      return idx;
+    }
+  }
+  return InvalidValue;
+}
+
+// =====================================================================================================================
 // Gets the count of relocations in the relocation section.
 template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() const {
   unsigned relocCount = 0;

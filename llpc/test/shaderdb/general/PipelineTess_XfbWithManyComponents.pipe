@@ -1,0 +1,100 @@
+; This test is to check transform feedback from TES while 32 outputs are fully used and they are scalarized to 128
+; components. Therefore, in this case, we have 128 transform feedback write calls. This test is to check if we can
+; pack such trasnform feedback outputs correctly in LDS space on GFX11+.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v -gfxip=11 %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: LLPC geometry calculation factor results
+; SHADERTEST: ES-GS ring item size (in dwords): 129
+
+; SHADERTEST-LABEL: .fetchXfbOutput
+; Write v4[31] = 4.0 -> LDS
+; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
+; SHADERTEST-NEXT: store i32 1082130432, ptr addrspace(3) [[ldsPtr1]], align 4
+
+; Write v3[31] = 3.0 -> LDS
+; SHADERTEST: [[ldsPtr2:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 128
+; SHADERTEST-NEXT: store i32 1077936128, ptr addrspace(3) [[ldsPtr2]], align 4
+
+; Write v2[31] = 2.0 -> LDS
+; SHADERTEST: [[ldsPtr3:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 256
+; SHADERTEST-NEXT: store i32 1073741824, ptr addrspace(3) [[ldsPtr3]], align 4
+
+; Write v1[31] = 1.0 -> LDS
+; SHADERTEST: [[ldsPtr4:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 384
+; SHADERTEST-NEXT: store i32 1065353216, ptr addrspace(3) [[ldsPtr4]], align 4
+
+; SHADERTEST-LABEL: .exportXfbOutput
+; Read v4[31] <- LDS
+; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
+; SHADERTEST-NEXT: [[v4:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr1]], align 4
+; SHADERTEST-NEXT: [[offset1:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
+; SHADERTEST-NEXT: [[offset2:%[0-9]*]] = or disjoint i32 [[offset1]], 508
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v4]], <4 x i32> %{{[0-9]*}}, i32 [[offset2]], i32 %{{[0-9]*}}, i32 22, i32 3)
+
+; Read v3[31] <- LDS
+; SHADERTEST: [[ldsPtr2:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 128
+; SHADERTEST-NEXT: [[v3:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr2]], align 4
+; SHADERTEST-NEXT: [[offset3:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
+; SHADERTEST-NEXT: [[offset4:%[0-9]*]] = or disjoint i32 [[offset3]], 380
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v3]], <4 x i32> %{{[0-9]*}}, i32 [[offset4]], i32 %{{[0-9]*}}, i32 22, i32 3)
+  
+; Read v2[31] <- LDS
+; SHADERTEST: [[ldsPtr3:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 256
+; SHADERTEST-NEXT: [[v2:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr3]], align 4
+; SHADERTEST-NEXT: [[offset5:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
+; SHADERTEST-NEXT: [[offset6:%[0-9]*]] = or disjoint i32 [[offset5]], 252
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v2]], <4 x i32> %{{[0-9]*}}, i32 [[offset6]], i32 %{{[0-9]*}}, i32 22, i32 3)
+
+: Read v1[31] <- LDS
+; SHADERTEST: [[ldsPtr4:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 384
+; SHADERTEST-NEXT: [[v1:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr4]], align 4
+; SHADERTEST-NEXT: [[offset7:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
+; SHADERTEST-NEXT: [[offset8:%[0-9]*]] = or disjoint i32 [[offset7]], 124
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v1]], <4 x i32> %{{[0-9]*}}, i32 [[offset8]], i32 %{{[0-9]*}}, i32 22, i32 3)
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[TcsGlsl]
+#version 450 core
+
+layout(vertices = 3) out;
+
+void main (void) {
+  gl_TessLevelInner[0] = 1.0;
+  gl_TessLevelInner[1] = 1.0;
+  gl_TessLevelOuter[0] = 1.0;
+  gl_TessLevelOuter[1] = 1.0;
+  gl_TessLevelOuter[2] = 1.0;
+  gl_TessLevelOuter[3] = 2.0;
+}
+
+[TcsInfo]
+entryPoint = main
+
+[TesGlsl]
+#version 450 core
+
+layout(triangles) in;
+
+layout(location = 0, component = 0, xfb_buffer = 0, xfb_offset = 0)   out float v1[32];
+layout(location = 0, component = 1, xfb_buffer = 0, xfb_offset = 128) out float v2[32];
+layout(location = 0, component = 2, xfb_buffer = 0, xfb_offset = 256) out float v3[32];
+layout(location = 0, component = 3, xfb_buffer = 0, xfb_offset = 384) out float v4[32];
+
+void main() {
+  for (int i = 0; i < 32; ++i) {
+    v1[i] = 1.0;
+    v2[i] = 2.0;
+    v3[i] = 3.0;
+    v4[i] = 4.0;
+  }
+}
+
+[TesInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+patchControlPoints = 32

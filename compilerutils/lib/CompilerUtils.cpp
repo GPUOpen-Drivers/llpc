@@ -33,6 +33,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
@@ -135,6 +136,20 @@ Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType,
   return cloneFunctionHeader(f, newType, attributes, targetModule);
 }
 
+void CompilerUtils::createUnreachable(llvm::IRBuilder<> &b) {
+  auto *unreachable = b.CreateUnreachable();
+  auto it = ++unreachable->getIterator();
+  auto *bb = unreachable->getParent();
+  if (it == bb->end())
+    return;
+
+  // Remove rest of BB
+  auto *oldCode = BasicBlock::Create(b.getContext(), "", bb->getParent());
+  oldCode->splice(oldCode->end(), bb, it, bb->end());
+  oldCode->replaceSuccessorsPhiUsesWith(bb, oldCode);
+  DeleteDeadBlock(oldCode);
+}
+
 namespace {
 
 // Get the name of a global that is copied to a different module for inlining.
@@ -220,6 +235,7 @@ private:
 iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall(CallBase &cb) {
   auto *calleeFunc = cb.getCalledFunction();
   assert(calleeFunc && "Cannot find called function");
+  checkTargetModule(*cb.getFunction()->getParent());
   LLVM_DEBUG(dbgs() << "Inlining '" << calleeFunc->getName() << "' across modules\n");
 
   Function *targetFunc = cb.getFunction();
@@ -346,6 +362,7 @@ CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *ca
 GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &sourceGv, Module &targetModule) {
   assert(sourceGv.getParent() != &targetModule && "This function only finds copies across modules");
   assert(sourceGv.hasName() && "Cannot find a global value that does not have a name");
+  checkTargetModule(targetModule);
 
   if (auto found = mappedGlobals.find(&sourceGv); found != mappedGlobals.end()) {
     assert(found->second->getParent() == &targetModule &&
@@ -357,4 +374,127 @@ GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &so
   if (gv)
     assert(gv->getValueType() == sourceGv.getValueType());
   return gv;
+}
+
+PointerType *llvm::getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 482880
+  return PointerType::getWithSamePointeeType(ptrTy, addressSpace);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  return PointerType::get(ptrTy->getContext(), addressSpace);
+#endif
+}
+
+void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointerValue, Value *newPointerValue,
+                                          SmallVectorImpl<Instruction *> &toBeRemoved) {
+  // Note: The implementation explicitly supports typed pointers, which
+  //       complicates some of the code below.
+
+  // Assert that both types are pointers that only differ in the address space.
+  PointerType *oldPtrTy = cast<PointerType>(oldPointerValue->getType());
+  (void)oldPtrTy;
+  PointerType *newPtrTy = cast<PointerType>(newPointerValue->getType());
+  unsigned newAS = newPtrTy->getAddressSpace();
+  assert(newAS != oldPtrTy->getAddressSpace());
+  assert(getWithSamePointeeType(oldPtrTy, newAS) == newPtrTy);
+
+  oldPointerValue->mutateType(newPtrTy);
+
+  // Traverse through the users and setup the addrspace
+  SmallVector<Use *> worklist(make_pointer_range(oldPointerValue->uses()));
+  oldPointerValue->replaceAllUsesWith(newPointerValue);
+
+  // Given a pointer type, get a pointer with the same pointee type (possibly
+  // opaque) as the given type that uses the newAS address space.
+  auto getMutatedPtrTy = [newAS](Type *ty) {
+    PointerType *ptrTy = cast<PointerType>(ty);
+    // Support typed pointers:
+    return getWithSamePointeeType(ptrTy, newAS);
+  };
+
+  while (!worklist.empty()) {
+    Use *ptrUse = worklist.pop_back_val();
+    Value *ptr = cast<Value>(ptrUse);
+    Instruction *inst = cast<Instruction>(ptrUse->getUser());
+    LLVM_DEBUG(dbgs() << "Visiting " << *inst << '\n');
+    // In the switch below, "break" means to continue with replacing
+    // the users of the current value, while "continue" means to stop at
+    // the current value, and proceed with next one from the work list.
+    auto usesRange = make_pointer_range(inst->uses());
+    switch (inst->getOpcode()) {
+    default:
+      LLVM_DEBUG(inst->dump());
+      llvm_unreachable("Unhandled instruction\n");
+      break;
+    case Instruction::Call: {
+      if (inst->isLifetimeStartOrEnd()) {
+        // The lifetime marker is not useful anymore.
+        inst->eraseFromParent();
+      } else {
+        LLVM_DEBUG(inst->dump());
+        llvm_unreachable("Unhandled call instruction\n");
+      }
+      // No further processing needed for the users.
+      continue;
+    }
+    case Instruction::Load:
+    case Instruction::Store:
+      // No further processing needed for the users.
+      continue;
+    case Instruction::InsertValue:
+      // For insertvalue, there could be 2 cases:
+      // Assume %ptr = ptrtoint ... to i32
+      // (1) %inserted = insertvalue [2 x i32] poison, i32 %ptr, 0
+      // (2) %0 = bitcast i32 %ptr to [2 x i16]
+      //     %inserted = insertvalue [2 x i16], i32 1, 0
+      // For (1), no further handling is needed; For (2), we are modifying the
+      // pointer and need to track all users of %inserted.
+      if (cast<InsertValueInst>(inst)->getAggregateOperand() == ptr) {
+        break;
+      }
+      continue;
+    case Instruction::And:
+    case Instruction::Add:
+    case Instruction::PtrToInt:
+      break;
+    case Instruction::BitCast: {
+      // This can happen with typed pointers
+      assert(cast<BitCastOperator>(inst)->getSrcTy()->isPointerTy() &&
+             cast<BitCastOperator>(inst)->getDestTy()->isPointerTy());
+      inst->mutateType(getMutatedPtrTy(inst->getType()));
+      break;
+    }
+    case Instruction::AddrSpaceCast:
+      // Check that the pointer operand has already been fixed
+      assert(inst->getOperand(0)->getType()->getPointerAddressSpace() == newAS);
+      // Push the correct users before RAUW.
+      worklist.append(usesRange.begin(), usesRange.end());
+      inst->mutateType(getMutatedPtrTy(inst->getType()));
+      // Since we are mutating the address spaces of users as well,
+      // we can just use the (already mutated) cast operand.
+      inst->replaceAllUsesWith(inst->getOperand(0));
+      toBeRemoved.push_back(inst);
+      continue;
+    case Instruction::IntToPtr:
+    case Instruction::GetElementPtr: {
+      inst->mutateType(getMutatedPtrTy(inst->getType()));
+      break;
+    }
+    case Instruction::Select: {
+      auto *oldType = inst->getType();
+      if (oldType->isPointerTy()) {
+        Type *newType = getMutatedPtrTy(oldType);
+        // No further processing if the type has the correct pointer type
+        if (newType == oldType)
+          continue;
+
+        inst->mutateType(newType);
+      }
+      break;
+    }
+    }
+
+    worklist.append(usesRange.begin(), usesRange.end());
+  }
 }

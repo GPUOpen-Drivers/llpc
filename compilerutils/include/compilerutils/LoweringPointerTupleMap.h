@@ -71,7 +71,7 @@ template <typename KeyT, typename ValueT, bool TrackReverse> class LoweringPoint
   using ReverseMap = std::conditional_t<TrackReverse, llvm::DenseMap<ValueT, llvm::SmallVector<uintptr_t>>, Empty>;
 
   /// If requested, track the locations in which each value is mentioned.
-  [[no_unique_address]] ReverseMap m_reverseMap;
+  ReverseMap m_reverseMap;
 
   /// Map keys to values.
   ///

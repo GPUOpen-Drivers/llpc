@@ -37,6 +37,12 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     72.0 | Enable std430 layout rule 9 to the OpenGL default uniform block                                       |
+//  |     71.4 | Add PixelOpInternalBinding to InternalBinding. Add GlCompatibilityDrawPixelsType. Add enableBitmap to |
+//  |          | glState. Add enableBitmapLsb to glState. Add enableTwoSideLighting to glState. Add drawPixelsType to  |
+//  |          | glState. Add pixelTransferScale to glState. Add pixelTransferBias to glState.                         |
+//  |     71.3 | Add IPipelineDumper::DumpGraphicsLibraryFileName.                                                     |
+//  |     71.2 | Add AdvancedBlendInfo to GraphicsPipelineBuildInfo                                                    |
 //  |     71.1 | Add GraphNodeName to the GraphicsPipelineBuildInfo                                                    |
 //  |     71.0 | Add glState to GraphicsPipelineBuildInfo. And move OGL status to glState.                             |
 //  |     70.5 | Add vbAddressLowBitsKnown to Options. Add vbAddrLowBits to VertexInputDescription.                    |
@@ -172,10 +178,10 @@
 #pragma once
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 70
+#define LLPC_INTERFACE_MAJOR_VERSION 72
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 3
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

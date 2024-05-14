@@ -72,7 +72,6 @@ private:
   void DeduplicateResourceMappingData(Vkgc::ResourceMappingData *resourceMapping);
 
   VfxPipelineState m_pipelineState; // Contains the render state
-  Vkgc::TessellationLevel m_tessellationLevel;
   VkPipelineVertexInputStateCreateInfo m_vertexInputState;
   std::vector<Vfx::ShaderSource> m_shaderSources;
   std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;

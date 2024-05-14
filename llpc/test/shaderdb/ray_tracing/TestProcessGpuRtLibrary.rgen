@@ -1,0 +1,13 @@
+// RUN: amdllpc %gfxip --print-after=llpc-spirv-lower-gpurt-library 2>&1 %s | FileCheck -check-prefix=CHECK %s
+// Disable this test for now as continuations part of GPURT is not opensourced yet.
+// REQUIRES: do-not-run-me
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+void main()
+{
+}
+// Check these _Amd intrinsics's bodies are deleted.
+// CHECK: declare dso_local spir_func i32 @_AmdGetShaderKind()
+// CHECK: declare dso_local spir_func i64 @_AmdGetResumePointAddr()
+// CHECK: declare dso_local spir_func {{.*}} @_AmdAwait{{.*}}(

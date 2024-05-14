@@ -84,6 +84,8 @@ struct CompileInfo {
   Llpc::GfxIpVersion gfxIp;                                                  // Graphics IP version info
   llvm::SmallVector<InputSpec> inputSpecs;                                   // Input shader specification
   VkFlags stageMask;                                                         // Shader stage mask
+  bool isGraphicsLibrary;                                                    // Whether it is graphics library
+  std::vector<uint32_t> fsOutputs;                                           // Fragment outputs
   llvm::SmallVector<StandaloneCompiler::ShaderModuleData> shaderModuleDatas; // ShaderModule Data
   Llpc::GraphicsPipelineBuildInfo gfxPipelineInfo;                           // Info to build graphics pipeline
   Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                             // Output of building graphics pipeline

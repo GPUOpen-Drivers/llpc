@@ -220,8 +220,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "barrier";
   case BuilderOpcode::Kill:
     return "kill";
-  case BuilderOpcode::DebugBreak:
-    return "debug.break";
   case BuilderOpcode::ReadClock:
     return "read.clock";
   case BuilderOpcode::Derivative:
@@ -254,6 +252,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "image.query.size";
   case BuilderOpcode::ImageGetLod:
     return "image.get.lod";
+  case BuilderOpcode::ImageGetSamplePosition:
+    return "image.get.sample.position";
   case BuilderOpcode::ImageBvhIntersectRay:
     return "image.bvh.intersect.ray";
   case BuilderOpcode::GetWaveSize:
@@ -492,14 +492,6 @@ Value *Builder::CreateMatrixInverse(Value *const matrix, const Twine &instName) 
 // @param instName : Name to give final instruction
 Instruction *Builder::CreateReadClock(bool realtime, const Twine &instName) {
   return record(BuilderOpcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
-}
-
-// =====================================================================================================================
-// Create a "debug break halt"
-//
-// @param instName : Name to give final instruction
-Instruction *Builder::CreateDebugBreak(const Twine &instName) {
-  return record(BuilderOpcode::DebugBreak, getVoidTy(), {}, instName);
 }
 
 // =====================================================================================================================
@@ -1354,6 +1346,20 @@ Value *Builder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc
 }
 
 // =====================================================================================================================
+// Create a query of the sample position of given sample id in an image. Returns an v2f32 value.
+//
+// @param dim : Image dimension
+// @param flags : ImageFlag* flags
+// @param imageDesc : Image descriptor or texel buffer descriptor
+// @param sampleId : Sample ID
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateImageGetSamplePosition(unsigned dim, unsigned flags, Value *imageDesc, Value *sampleId,
+                                             const llvm::Twine &instName) {
+  return record(BuilderOpcode::ImageGetSamplePosition, FixedVectorType::get(getFloatTy(), 2),
+                {getInt32(dim), getInt32(flags), imageDesc, sampleId}, instName);
+}
+
+// =====================================================================================================================
 // Create a read of (part of) a user input value, passed from the previous shader stage.
 //
 // @param resultTy : Type of value to read
@@ -2138,13 +2144,13 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::EmitVertex:
     case BuilderOpcode::EndPrimitive:
     case BuilderOpcode::ImageGetLod:
+    case BuilderOpcode::ImageGetSamplePosition:
     case BuilderOpcode::ImageQueryLevels:
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
     case BuilderOpcode::IsHelperInvocation:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:
-    case BuilderOpcode::DebugBreak:
     case BuilderOpcode::WriteBuiltInOutput:
     case BuilderOpcode::WriteGenericOutput:
     case BuilderOpcode::ImageBvhIntersectRay:

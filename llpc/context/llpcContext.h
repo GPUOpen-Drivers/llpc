@@ -124,6 +124,8 @@ public:
 
   void ensureGpurtLibrary();
 
+  void ensureGfxRuntimeLibrary();
+
 private:
   Context() = delete;
   Context(const Context &) = delete;

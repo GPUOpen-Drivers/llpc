@@ -1225,14 +1225,12 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
 
   // Input components' type
   Type *inputCompTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
-  unsigned inputCompBytes = std::max(inputCompTy->getScalarSizeInBits() / 8, compFormatInfo->compByteSize);
+  unsigned inputCompBytes = inputCompTy->getScalarSizeInBits() / 8;
 
   // Location size of components. If its type is Double, each component consumes 2 locations.
-  const unsigned compLocationSize = (inputCompBytes + 3) / 4;
-  compIdx *= compLocationSize;
-
   // For Double type, we still do 32 bit fetch.
-  inputCompBytes /= compLocationSize;
+  const unsigned compLocationSize = (std::max(inputCompBytes, compFormatInfo->compByteSize) + 3) / 4;
+  compIdx *= compLocationSize;
 
   // Whether it is fetching with a packed format.
   bool isPacked = (compFormatInfo->compByteSize == 0);
@@ -1460,7 +1458,7 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
         auto descPtr = builderImpl.CreateBufferDesc(InternalDescriptorSetId, CurrentAttributeBufferBinding,
                                                     builderImpl.getInt32(0), lgc::Builder::BufferFlagAddress);
         // Create descriptor by a 64-bits pointer
-        m_curAttribBufferDescr = builderImpl.buildInlineBufferDesc(descPtr);
+        m_curAttribBufferDescr = builderImpl.buildInlineBufferDesc(descPtr, 0);
       }
       vtxDesc = m_curAttribBufferDescr;
     } else {
@@ -1618,12 +1616,11 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *s
                                          unsigned fetchCompBytes, bool isSigned, bool isPacked, bool fetchInByte,
                                          BuilderImpl &builderImpl, Value **ppFetch) const {
   Intrinsic::ID instId = Intrinsic::amdgcn_struct_tbuffer_load;
-  Value *instOffset = builderImpl.getInt32(offset);
+  Value *instOffset = builderImpl.getInt32(0);
   if (m_useSoftwareVertexBufferDescriptors) {
     // Generated offset delta will always be aligned.
     instId = Intrinsic::amdgcn_raw_tbuffer_load;
-    auto index2Offset = builderImpl.CreateMul(vbIndex, srdStride);
-    instOffset = builderImpl.CreateAdd(index2Offset, instOffset);
+    instOffset = builderImpl.CreateMul(vbIndex, srdStride);
   }
 
   // For tbuffer_load, only support two types (could be vector) of fetch : d16 or i32, depending on input type.

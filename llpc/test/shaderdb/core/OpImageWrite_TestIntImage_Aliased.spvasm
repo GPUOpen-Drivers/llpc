@@ -1,0 +1,64 @@
+
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-NOT: call ptr @llvm.invariant.start.p7
+; SHADERTEST: AMDLLPC SUCCESS
+
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos Glslang Reference Front End; 11
+; Bound: 30
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %img2Di %_ %img2Du
+               OpExecutionMode %main LocalSize 1 1 1
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %img2Di "img2Di"
+               OpName %BO "BO"
+               OpMemberName %BO 0 "mIn"
+               OpName %_ ""
+               OpName %img2Du "img2Du"
+               OpDecorate %img2Di DescriptorSet 0
+               OpDecorate %img2Di Binding 0
+               OpMemberDecorate %BO 0 Offset 0
+               OpDecorate %BO Block
+               OpDecorate %_ DescriptorSet 1
+               OpDecorate %_ Binding 0
+               OpDecorate %_ Aliased
+               OpDecorate %img2Du DescriptorSet 0
+               OpDecorate %img2Du Binding 1
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+          %7 = OpTypeImage %int 2D 0 0 0 2 Rgba8i
+%_ptr_UniformConstant_7 = OpTypePointer UniformConstant %7
+     %img2Di = OpVariable %_ptr_UniformConstant_7 UniformConstant
+      %v2int = OpTypeVector %int 2
+      %int_0 = OpConstant %int 0
+         %13 = OpConstantComposite %v2int %int_0 %int_0
+      %v4int = OpTypeVector %int 4
+         %BO = OpTypeStruct %v4int
+%_ptr_StorageBuffer_BO = OpTypePointer StorageBuffer %BO
+          %_ = OpVariable %_ptr_StorageBuffer_BO StorageBuffer
+%_ptr_StorageBuffer_v4int = OpTypePointer StorageBuffer %v4int
+       %uint = OpTypeInt 32 0
+         %22 = OpTypeImage %uint 2D 0 0 0 2 Rgba8ui
+%_ptr_UniformConstant_22 = OpTypePointer UniformConstant %22
+     %img2Du = OpVariable %_ptr_UniformConstant_22 UniformConstant
+     %v4uint = OpTypeVector %uint 4
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %10 = OpLoad %7 %img2Di
+         %19 = OpAccessChain %_ptr_StorageBuffer_v4int %_ %int_0
+         %20 = OpLoad %v4int %19
+               OpImageWrite %10 %13 %20 SignExtend
+         %25 = OpLoad %22 %img2Du
+         %26 = OpAccessChain %_ptr_StorageBuffer_v4int %_ %int_0
+         %27 = OpLoad %v4int %26
+         %29 = OpBitcast %v4uint %27
+               OpImageWrite %25 %13 %29 ZeroExtend
+               OpReturn
+               OpFunctionEnd

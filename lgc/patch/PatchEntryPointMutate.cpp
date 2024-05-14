@@ -56,9 +56,11 @@
 #include "lgc/patch/PatchEntryPointMutate.h"
 #include "ShaderMerger.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/ShaderInputs.h"
+#include "lgc/patch/SystemValues.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -160,6 +162,7 @@ PreservedAnalyses PatchEntryPointMutate::run(Module &module, ModuleAnalysisManag
   m_cpsShaderInputCache.clear();
 
   processGroupMemcpy(module);
+  processDriverTableLoad(module);
   return PreservedAnalyses::none();
 }
 
@@ -235,6 +238,41 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
   for (auto *src : input)
     vec = builder.CreateInsertElement(vec, src, idx++);
   return vec;
+}
+
+// =====================================================================================================================
+void PatchEntryPointMutate::processDriverTableLoad(Module &module) {
+  SmallVector<CallInst *> toBeErased;
+  struct Payload {
+    SmallVectorImpl<CallInst *> &toBeErased;
+    PatchEntryPointMutate *self;
+  };
+  Payload payload = {toBeErased, this};
+
+  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<LoadDriverTableEntryOp>([](auto &payload, auto &op) {
+                              payload.self->lowerDriverTableLoad(op);
+                              payload.toBeErased.push_back(&op);
+                            })
+                            .build();
+  visitor.visit(payload, module);
+  for (auto call : payload.toBeErased)
+    call->eraseFromParent();
+}
+
+// =====================================================================================================================
+void PatchEntryPointMutate::lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp) {
+  BuilderBase builder(&loadDriverTablePtrOp);
+  Function *entryPoint = loadDriverTablePtrOp.getFunction();
+  builder.SetInsertPoint(&loadDriverTablePtrOp);
+
+  PipelineSystemValues pipelineSysValues;
+  pipelineSysValues.initialize(m_pipelineState);
+
+  unsigned offset = loadDriverTablePtrOp.getOffset();
+  Value *desc = pipelineSysValues.get(entryPoint)->loadDescFromDriverTable(offset, builder);
+  loadDriverTablePtrOp.replaceAllUsesWith(desc);
 }
 
 // =====================================================================================================================
@@ -445,14 +483,16 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
 void PatchEntryPointMutate::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp) {
   BuilderBase builder(&asCpsReferenceOp);
 
-  Value *ref = nullptr;
-  Function &callee = cast<Function>(*asCpsReferenceOp.getFn());
-  auto level = cps::getCpsLevelFromFunction(callee);
+  Value *reloc = nullptr;
+  Function &callee = *cast<Function>(asCpsReferenceOp.getFn());
 
-  { ref = builder.CreatePtrToInt(&callee, builder.getInt32Ty()); }
-  ref = builder.CreateAdd(ref, builder.getInt32(static_cast<uint32_t>(level)));
+  Value *loweredReference = lgc::cps::lowerAsContinuationReference(builder, asCpsReferenceOp, reloc);
 
-  asCpsReferenceOp.replaceAllUsesWith(ref);
+  loweredReference =
+      builder.CreateAdd(loweredReference, builder.getIntN(loweredReference->getType()->getScalarSizeInBits(),
+                                                          static_cast<uint64_t>(cps::getCpsLevelFromFunction(callee))));
+
+  asCpsReferenceOp.replaceAllUsesWith(loweredReference);
 }
 
 // =====================================================================================================================
@@ -511,8 +551,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
     numUserdata = argTys.size() - 1;
   } else {
     numShaderArg = m_cpsShaderInputCache.getTypes().size();
-    assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
     numUserdata = haveLocalInvocationId ? numShaderArg - 1 : numShaderArg;
+    assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
   }
 
   // Get all the return instructions.
@@ -572,10 +612,10 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   // Packing VGPR arguments.
   Value *vgprArg = mergeIntoStruct(builder, newVgpr);
 
-  // Packing SGPR arguments (user data) into vector of i32s.
-  SmallVector<Value *> userData;
+  // Packing SGPR arguments (user data + internal used SGPRs) into vector of i32s.
+  SmallVector<Value *> sgprArgs;
   for (unsigned idx = 0; idx != numUserdata; ++idx)
-    userData.push_back(func->getArg(idx));
+    sgprArgs.push_back(func->getArg(idx));
 
   //    tail:
   //      Merge vgpr values from different exits.
@@ -641,11 +681,11 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
 
   const DataLayout &layout = func->getParent()->getDataLayout();
-  SmallVector<Value *> userDataI32;
-  splitIntoI32(layout, builder, userData, userDataI32);
-  Value *userDataVec = mergeDwordsIntoVector(builder, userDataI32);
+  SmallVector<Value *> sgprI32;
+  splitIntoI32(layout, builder, sgprArgs, sgprI32);
+  Value *sgprVec = mergeDwordsIntoVector(builder, sgprI32);
 
-  SmallVector<Value *> chainArgs = {jumpTarget, execMask, userDataVec, vgprArg};
+  SmallVector<Value *> chainArgs = {jumpTarget, execMask, sgprVec, vgprArg};
 
   {
     // No flags
@@ -654,7 +694,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465197
   // Old version of the code
-  SmallVector<Type *> chainArgTys = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(),
+  SmallVector<Type *> chainArgTys = {builder.getPtrTy(), builder.getIntNTy(waveSize), sgprVec->getType(),
                                      vgprArg->getType(), builder.getInt32Ty()};
 
   FunctionType *chainFuncTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
@@ -664,7 +704,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 #else
   // New version of the code (also handles unknown version, which we treat as
   // latest)
-  Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType()};
+  Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), sgprVec->getType(), vgprArg->getType()};
   auto *chainCall = builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
   // Add inreg attribute for (fn, exec, sgprs).
   for (unsigned arg = 0; arg < 3; arg++)
@@ -675,7 +715,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   auto *doc = m_pipelineState->getPalMetadata()->getDocument();
   auto funcName = doc->getNode(func->getName(), /*copy=*/true);
   // Lower cps stack operations
-  stackLowering->lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
+  Value *cspStorage = m_funcCpsStackMap[func];
+  stackLowering->lowerCpsStackOps(func, nullptr, false, cspStorage);
 
   stackSize += stackLowering->getStackSizeInBytes();
   // Set per-function .frontend_stack_size PAL metadata.
@@ -722,7 +763,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   AttributeSet inRegAttrSet = emptyAttrSet.addAttribute(func->getContext(), Attribute::InReg);
 
   bool haveLocalInvocationId = !m_pipelineState->getShaderModes()->getComputeShaderMode().noLocalInvocationIdInCalls;
-  assert(haveLocalInvocationId == (argNames.back() == "LocalInvocationId"));
+  assert(haveLocalInvocationId == (argNames.back() == "LocalInvocationId") ||
+         (argNames[argNames.size() - 2] == "LocalInvocationId"));
 
   AttributeList oldAttrs = func->getAttributes();
   SmallVector<AttributeSet, 8> argAttrs;
@@ -945,7 +987,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
 
             if (haveDynamicUser) {
               userDataUsage->haveDynamicUserDataLoads = true;
-              self.m_pipelineState->getPalMetadata()->setUserDataSpillUsage(op.getOffset() / 4);
+              self.m_pipelineState->getPalMetadata()->setUserDataSpillUsage(op.getOffset() / 4, stage);
             }
           })
           .add<LoadUserDataOp>([](PatchEntryPointMutate &self, LoadUserDataOp &op) {
@@ -1227,6 +1269,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     // Create the new function and transfer code and attributes to it.
     Function *newFunc = nullptr;
     // For continufy based ray-tracing, we still need to add shader inputs like workgroupId and LocalInvocationId.
+    // TODO: All codes related to noLocalInvocationIdInCalls should be removed once we don't pass LocalInvocationId in
+    // legacy/continufy RT any more.
     bool haveLocalInvocationIdInCalls =
         !m_pipelineState->getShaderModes()->getComputeShaderMode().noLocalInvocationIdInCalls;
     if (cps::isCpsFunction(*origFunc)) {
@@ -1375,20 +1419,16 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
     bool hasColorExport = false;
     // SpiShaderColFormat / mmSPI_SHADER_COL_FORMAT is used for fully compiled shaders
     unsigned colFormat = EXP_FORMAT_ZERO;
-    if (m_pipelineState->useRegisterFieldFormat()) {
-      auto &colFormatNode = m_pipelineState->getPalMetadata()
-                                ->getPipelineNode()
-                                .getMap(true)[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
-                                .getMap(true);
-      for (auto iter = colFormatNode.begin(); iter != colFormatNode.end(); ++iter) {
-        if (iter->second.getUInt() != EXP_FORMAT_ZERO) {
-          colFormat = iter->second.getUInt();
-          break;
-        }
+    auto &colFormatNode = m_pipelineState->getPalMetadata()
+                              ->getPipelineNode()
+                              .getMap(true)[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                              .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
+                              .getMap(true);
+    for (auto iter = colFormatNode.begin(); iter != colFormatNode.end(); ++iter) {
+      if (iter->second.getUInt() != EXP_FORMAT_ZERO) {
+        colFormat = iter->second.getUInt();
+        break;
       }
-    } else {
-      colFormat = m_pipelineState->getPalMetadata()->getRegister(mmSPI_SHADER_COL_FORMAT);
     }
     if (colFormat != EXP_FORMAT_ZERO)
       hasColorExport = true;
@@ -1557,12 +1597,8 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
       // Most of user data metadata entries is 1 except for root push descriptors.
       bool isSystemUserData = isSystemUserDataValue(userDataArg.userDataValue);
-      unsigned numEntries = isSystemUserData ? 1 : dwordSize;
       assert((!isUnlinkedDescriptorSetValue(userDataArg.userDataValue) || dwordSize == 1) &&
              "Expecting descriptor set values to be one dword.  The linker cannot handle anything else.");
-      if (!m_pipelineState->useRegisterFieldFormat())
-        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
-                                                            numEntries);
       if (isSystemUserData) {
         unsigned index = userDataArg.userDataValue - static_cast<unsigned>(UserDataMapping::GlobalTable);
         auto &specialUserData = getUserDataUsage(m_shaderStage)->specialUserData;
@@ -1602,7 +1638,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, m_computeWithCalls, argTys,
                                                argNames, argOffset);
 
-  if (updateUserDataMap && m_pipelineState->useRegisterFieldFormat()) {
+  if (updateUserDataMap) {
     constexpr unsigned NumUserSgprs = 32;
     constexpr unsigned InvalidMapVal = static_cast<unsigned>(UserDataMapping::Invalid);
     SmallVector<unsigned, NumUserSgprs> userDataMap;
@@ -1914,13 +1950,13 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
         userDataArgs.emplace_back(builder.getInt32Ty(), "pad" + Twine(i));
     }
     if (userDataSgprs < userDataDwords)
-      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(userDataSgprs);
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(userDataSgprs, m_shaderStage);
 
     // We must conservatively assume that there are functions with dynamic push constant accesses, and that therefore
     // the push constants must be fully available in the spill region even if they fit (partially) into SGPRs.
     const ResourceNode *node = m_pipelineState->findSingleRootResourceNode(ResourceNodeType::PushConst, m_shaderStage);
     if (node)
-      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords, m_shaderStage);
   } else {
     // Greedily fit as many generic user data arguments as possible.
     // Pre-allocate entryArgIdxs since we rely on stable pointers.
@@ -1946,14 +1982,14 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
             userDataArgs.erase(userDataArgs.end() - lastSize, userDataArgs.end());
             userDataEnd -= lastSize;
             assert(userDataEnd <= userDataAvailable);
-            m_pipelineState->getPalMetadata()->setUserDataSpillUsage(lastIdx);
+            m_pipelineState->getPalMetadata()->setUserDataSpillUsage(lastIdx, m_shaderStage);
 
             // Retry since the current load may now fit.
             continue;
           }
         }
 
-        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(i);
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(i, m_shaderStage);
 
         if (userDataEnd >= userDataAvailable)
           break; // All SGPRs in use, may as well give up.

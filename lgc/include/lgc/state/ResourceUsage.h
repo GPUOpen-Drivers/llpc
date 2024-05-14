@@ -458,18 +458,14 @@ struct ResourceUsage {
     } gs;
 
     struct {
-      // Map from IDs of built-in outputs to locations of generic per-vertex outputs (used by vertex export to export
-      // built-in outputs to fragment shader)
-      std::map<BuiltInKind, unsigned> builtInExportLocs;
+      // Map from built-in output IDs to their export slots (to fragment shader): <builtIn, exportSlot>
+      std::map<BuiltInKind, unsigned> vertexBuiltInExportSlots;
+      std::map<BuiltInKind, unsigned> primitiveBuiltInExportSlots;
 
-      // Map from IDs of per-primitive built-in outputs to locations of generic per-primitive outputs (used by vertex
-      // export to export built-in outputs to fragment shader)
-      std::map<BuiltInKind, unsigned> perPrimitiveBuiltInExportLocs;
-
-      // Count of mapped location for generic outputs (excluding those special locations to which the built-ins
-      // are mapped)
-      unsigned genericOutputMapLocCount = 0;
-      unsigned perPrimitiveGenericOutputMapLocCount = 0;
+      // Map from output locations to their number of components: <location, <numComponents, forBuiltIn>> (including
+      // those special outputs to which built-ins are mapped)
+      std::map<unsigned, std::pair<unsigned, BuiltInKind>> vertexOutputComponents;
+      std::map<unsigned, std::pair<unsigned, BuiltInKind>> primitiveOutputComponents;
     } mesh;
 
     struct {

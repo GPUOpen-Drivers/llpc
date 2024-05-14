@@ -165,6 +165,9 @@ private:
   void processGroupMemcpy(llvm::Module &module);
   void lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
 
+  void processDriverTableLoad(llvm::Module &module);
+  void lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp);
+
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass

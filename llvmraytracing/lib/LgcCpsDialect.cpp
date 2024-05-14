@@ -24,9 +24,11 @@
  **********************************************************************************************************************/
 
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -39,11 +41,9 @@
 #include "LgcCpsDialect.cpp.inc"
 
 using namespace llvm;
+using namespace lgc::rt;
 
 constexpr const char CpsMetadata[] = "lgc.cps";
-
-// The maximum amount of dwords usable for passing arguments
-constexpr int MaxArgumentDwords = 32;
 
 // =====================================================================================================================
 // Helper to determine how many dwords we require to store a variable of a given
@@ -160,21 +160,23 @@ lgc::cps::CpsLevel lgc::cps::getCpsLevelFromFunction(const Function &fn) {
 
 // =====================================================================================================================
 // Transform a shader type into the corresponding CPS level.
-lgc::cps::CpsLevel lgc::cps::getCpsLevelForShaderStage(CpsShaderStage stage) {
-  if (stage == CpsShaderStage::RayGen)
+lgc::cps::CpsLevel
+lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage stage) {
+  if (stage == RayTracingShaderStage::RayGeneration)
     return CpsLevel::RayGen;
 
-  if (stage == CpsShaderStage::Traversal)
+  if (stage == RayTracingShaderStage::Traversal)
     return CpsLevel::Traversal;
 
-  if (stage == CpsShaderStage::ClosestHit || stage == CpsShaderStage::Miss ||
-      stage == CpsShaderStage::Callable)
+  if (stage == RayTracingShaderStage::ClosestHit ||
+      stage == RayTracingShaderStage::Miss ||
+      stage == RayTracingShaderStage::Callable)
     return CpsLevel::ClosestHit_Miss_Callable;
 
-  if (stage == CpsShaderStage::AnyHit)
+  if (stage == RayTracingShaderStage::AnyHit)
     return CpsLevel::AnyHit_CombinedIntersection_AnyHit;
 
-  if (stage == CpsShaderStage::Intersection)
+  if (stage == RayTracingShaderStage::Intersection)
     return CpsLevel::Intersection;
 
   llvm_unreachable("Cannot determine CPS level.");
@@ -183,31 +185,40 @@ lgc::cps::CpsLevel lgc::cps::getCpsLevelForShaderStage(CpsShaderStage stage) {
 // =====================================================================================================================
 // Tries to convert a shader stage into the corresponding CPS levels in which
 // the continued-to function can operate.
-uint8_t lgc::cps::getPotentialCpsReturnLevels(lgc::cps::CpsShaderStage stage) {
+uint8_t lgc::cps::getPotentialCpsReturnLevels(RayTracingShaderStage stage) {
   std::bitset<8> CpsLevels;
 
   auto SetLevel = [&CpsLevels](CpsLevel Level) -> void {
     CpsLevels.set(static_cast<uint8_t>(Level));
   };
 
-  if (stage == CpsShaderStage::RayGen) {
+  switch (stage) {
+  case RayTracingShaderStage::RayGeneration:
+    llvm_unreachable("RayGen does not return.");
+    break;
+  case RayTracingShaderStage::Callable:
+    // Callable returns to wherever CallShader is called (all stages except AHS
+    // and IS).
+  case RayTracingShaderStage::ClosestHit:
+  case RayTracingShaderStage::Miss:
+  case RayTracingShaderStage::Traversal:
+    // These stages returns to wherever TraceRay is called (RGS, CHS and miss).
+    SetLevel(CpsLevel::RayGen);
+    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+    break;
+  case RayTracingShaderStage::AnyHit:
+    // AHS returns to Traversal (triangle intersection) or IS (procedural
+    // intersection).
     SetLevel(CpsLevel::Traversal);
-  } else if (stage == CpsShaderStage::ClosestHit) {
-    SetLevel(CpsLevel::Traversal);
-    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
-  } else if (stage == CpsShaderStage::Callable) {
-    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
-  } else if (stage == CpsShaderStage::AnyHit) {
-    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
     SetLevel(CpsLevel::Intersection);
-  } else if (stage == CpsShaderStage::Intersection) {
-    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
-    SetLevel(CpsLevel::AnyHit_CombinedIntersection_AnyHit);
-  } else if (stage == CpsShaderStage::Miss) {
+    break;
+  case RayTracingShaderStage::Intersection:
+    // IS returns to Traversal only.
     SetLevel(CpsLevel::Traversal);
-    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
-  } else {
+    break;
+  default:
     llvm_unreachable("Cannot determine CPS level.");
+    break;
   }
 
   return static_cast<uint8_t>(CpsLevels.to_ulong());
@@ -249,4 +260,22 @@ Value *lgc::cps::popStateFromCpsStack(llvm_dialects::Builder &builder,
   builder.create<lgc::cps::FreeOp>(StateSize);
 
   return NewState;
+}
+
+// =====================================================================================================================
+// Lower lgc.cps.as.continuation.reference operations into an integer
+// representation of the pointer or a passed relocation. Return the new
+// reference.
+Value *lgc::cps::lowerAsContinuationReference(
+    IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCrOp,
+    Value *Relocation) {
+  Builder.SetInsertPoint(&AsCrOp);
+  Value *Reference = nullptr;
+
+  if (Relocation)
+    Reference = Relocation;
+  else
+    Reference = Builder.CreatePtrToInt(AsCrOp.getFn(), AsCrOp.getType());
+
+  return Reference;
 }

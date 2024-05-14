@@ -129,6 +129,8 @@ if(ICD_BUILD_LLPC)
     add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
 endif()
 
+add_subdirectory(gfxruntime ${PROJECT_BINARY_DIR}/gfxruntime)
+
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
     include("cmake/compilerutils.cmake")
@@ -169,6 +171,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 
     if (TARGET vfx)
         set_property(TARGET vfx PROPERTY FOLDER Compiler)
+    endif()
+
+    if (TARGET gfxruntime)
+        set_property(TARGET gfxruntime PROPERTY FOLDER Compiler)
     endif()
 
     if(ICD_BUILD_LLPC)
@@ -212,8 +218,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             endif()
             set_property(TARGET check-amdllpc PROPERTY FOLDER "LLPC Tests")
             set_property(TARGET check-amdllpc-units PROPERTY FOLDER "LLPC Tests")
-            set_property(TARGET check-continuations PROPERTY FOLDER "Continuations Tests")
-            set_property(TARGET check-continuations-units PROPERTY FOLDER "Continuations Tests")
+            set_property(TARGET check-llvmraytracing PROPERTY FOLDER "LLVMRaytracing Tests")
+            set_property(TARGET check-llvmraytracing-units PROPERTY FOLDER "LLVMRaytracing Tests")
             set_property(TARGET check-lgc-units PROPERTY FOLDER "LGC Tests")
         endif()
     endif()

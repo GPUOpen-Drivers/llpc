@@ -27,8 +27,7 @@
 //
 // This file implements the frontend part for coroutine support for lgc.rt ops.
 // - Add a global for the continuation stack pointer.
-// - Introduce a global for the payload. Mark the payload global to be
-//   transformed by the RegisterBufferPass.
+// - Introduce a global for the payload.
 // - Replace traceRay or callShader function calls with a compiler generated
 //   code snippet. The snippets call setup and teardown hooks and calls await to
 //   mark the continuation point
@@ -61,7 +60,6 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
-#include "llvm/IR/Verifier.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -82,6 +80,24 @@ using namespace lgc::cps;
 using namespace lgc::rt;
 
 namespace {
+
+// Create a GEP if I is non-null, otherwise return the pointer.
+static Value *SimplifyingCreateConstGEP1_32(IRBuilder<> &B, Type *Ty,
+                                            Value *Ptr, uint32_t I) {
+  // A GEP with a single zero index is redundant with opaque pointers
+  if (I == 0)
+    return Ptr;
+  return B.CreateConstGEP1_32(Ty, Ptr, I);
+}
+
+static Value *SimplifyingCreateConstInBoundsGEP1_32(IRBuilder<> &B, Type *Ty,
+                                                    Value *Ptr, uint32_t I) {
+  // A GEP with a single zero index is redundant with opaque pointers
+  if (I == 0)
+    return Ptr;
+  return B.CreateConstInBoundsGEP1_32(Ty, Ptr, I);
+}
+
 // Helper struct to avoid recursively passing these arguments
 struct PayloadCopyHelper {
   Module &M;
@@ -97,6 +113,10 @@ struct PayloadCopyHelper {
   SmallDenseSet<const PAQNode *, 16> *CopiedNodes;
   Value *Serialization;
   const PAQSerializationLayout *Layout;
+  // Pointer to the spilled payload (loaded from LocalPayload)
+  Value *SpilledPayloadPtr;
+  // Number of registers/dwords that are stored in registers
+  uint32_t PayloadRegisterCount;
 
   void copyPayloadRecursively(const PAQNode *Node) {
     if (CopiedNodes && CopiedNodes->contains(Node)) {
@@ -132,70 +152,59 @@ struct PayloadCopyHelper {
   // Perform copy for each index interval (i.e, for each contiguous range of
   // storage memory)
   void copyField(Type *FieldTy, const PAQIndexIntervals &Intervals) {
-    auto *I32 = Type::getInt32Ty(M.getContext());
     // Pointer to the node field in the local payload
     auto *LocalFieldPtr =
         B.CreateInBoundsGEP(&PayloadTy, LocalPayload, PayloadIdxList);
-
-    // If the field is serialized in multiple intervals in the global,
-    // we perform a manual bytewise copy using i32 and i8.
-    // However, if the field is serialized using a single, contiguous interval
-    // and does not have stricter alignment requirements than i32,
-    // then we can just load/store the field type from/to the global storage.
-    //
-    // We currently restrict this mechanism to single-DWord fields to avoid
-    // issues with the RegisterBuffer pass which struggles with loads and stores
-    // of large vector types, leading to bad IR with additional allocas.
-    // TODO: Remove this restriction once we have moved to LLPC-style
-    //       continuations without the RegisterBuffer pass.
-    const DataLayout &DL = M.getDataLayout();
-    if (Intervals.size() == 1 &&
-        DL.getABITypeAlign(FieldTy) <= DL.getABITypeAlign(I32) &&
-        Intervals[0].size() == 1) {
-
-      // Do a single load+store
-      Value *Src = LocalFieldPtr;
-
-      auto *GlobalIntervalI32Ptr = B.CreateInBoundsGEP(
-          Layout->SerializationTy, Serialization,
-          {B.getInt32(0), B.getInt32(0), B.getInt32(Intervals[0].Begin)});
-      Value *Dst = B.CreateBitCast(
-          GlobalIntervalI32Ptr,
-          FieldTy->getPointerTo(
-              GlobalIntervalI32Ptr->getType()->getPointerAddressSpace()));
-
-      if (GlobalAccessKind != PAQAccessKind::Write)
-        std::swap(Src, Dst);
-
-      auto *Val = B.CreateLoad(FieldTy, Src);
-      B.CreateStore(Val, Dst);
-      return;
-    }
-
-    // I32 pointer to start of field in local payload
-    Value *FieldI32Ptr = B.CreateBitCast(
-        LocalFieldPtr,
-        I32->getPointerTo(LocalFieldPtr->getType()->getPointerAddressSpace()));
 
     // Counts how many bytes have already been copied
     unsigned FieldByteOffset = 0;
     unsigned FieldNumBytes =
         M.getDataLayout().getTypeStoreSize(FieldTy).getFixedValue();
-    for (unsigned IntervalIdx = 0; IntervalIdx < Intervals.size();
-         ++IntervalIdx) {
-      const PAQIndexInterval &Interval = Intervals[IntervalIdx];
-      // I32 pointer to start of current interval in global payload
-      auto *GlobalIntervalI32Ptr = B.CreateInBoundsGEP(
-          Layout->SerializationTy, Serialization,
-          {B.getInt32(0), B.getInt32(0), B.getInt32(Interval.Begin)});
+
+    for (auto [IntervalIdx, CompleteInterval] : enumerate(Intervals)) {
+      copyFieldInterval(LocalFieldPtr, &FieldByteOffset, FieldNumBytes,
+                        CompleteInterval);
+    }
+
+    assert(FieldByteOffset == FieldNumBytes && "Inconsistent storage size!");
+  }
+
+  void copyFieldInterval(Value *LocalFieldPtr, unsigned *FieldByteOffset,
+                         unsigned FieldNumBytes,
+                         const PAQIndexInterval CompleteInterval) {
+    auto *I32 = Type::getInt32Ty(M.getContext());
+    // Split interval into registers and memory part.
+    // Map an interval to its register or memory pointer.
+    SmallVector<std::pair<PAQIndexInterval, Value *>, 2> TmpIntervals;
+
+    if (CompleteInterval.Begin < PayloadRegisterCount) {
+      PAQIndexInterval Interval = {
+          CompleteInterval.Begin,
+          std::min(CompleteInterval.End, PayloadRegisterCount)};
+      // Pointer to start of current interval in global payload
+      auto *GlobalIntervalI32Ptr = SimplifyingCreateConstInBoundsGEP1_32(
+          B, I32, Serialization, Interval.Begin);
+      TmpIntervals.push_back({Interval, GlobalIntervalI32Ptr});
+    }
+    if (CompleteInterval.End > PayloadRegisterCount) {
+      PAQIndexInterval Interval = {
+          std::max(CompleteInterval.Begin, PayloadRegisterCount),
+          CompleteInterval.End};
+      // Pointer to start of current interval in global payload
+      auto *GlobalIntervalI32Ptr = SimplifyingCreateConstInBoundsGEP1_32(
+          B, I32, SpilledPayloadPtr, Interval.Begin - PayloadRegisterCount);
+      TmpIntervals.push_back({Interval, GlobalIntervalI32Ptr});
+    }
+
+    for (auto [Interval, GlobalIntervalI32Ptr] : TmpIntervals) {
       // Obtain i32-based index from byte-offset. We only expect
       // to increase FieldByteOffset by a non-multiple of RegisterBytes
       // in the last iteration, so here it should always be divisible
-      unsigned FieldI32Offset = divideCeil(FieldByteOffset, RegisterBytes);
-      assert(FieldByteOffset == FieldI32Offset * RegisterBytes);
+      unsigned FieldI32Offset = *FieldByteOffset / RegisterBytes;
+      assert(*FieldByteOffset == FieldI32Offset * RegisterBytes);
       // I32 pointer into field, offset by FieldI32Offset
-      auto *FieldIntervalI32Ptr =
-          B.CreateConstGEP1_32(I32, FieldI32Ptr, FieldI32Offset);
+      auto *FieldIntervalI32Ptr = SimplifyingCreateConstInBoundsGEP1_32(
+          B, I32, LocalFieldPtr, FieldI32Offset);
 
       // Determine Src and Dst
       auto *Src = FieldIntervalI32Ptr;
@@ -205,18 +214,14 @@ struct PayloadCopyHelper {
 
       unsigned NumCopyBytes = RegisterBytes * Interval.size();
 
-      unsigned FieldNumRemainingBytes = FieldNumBytes - FieldByteOffset;
+      unsigned FieldNumRemainingBytes = FieldNumBytes - *FieldByteOffset;
       if (NumCopyBytes > FieldNumRemainingBytes) {
-        assert(IntervalIdx + 1 == Intervals.size() &&
-               "Partial storage interval is only allowed for last interval!");
         NumCopyBytes = FieldNumRemainingBytes;
       }
 
       copyBytes(B, Dst, Src, NumCopyBytes);
-      FieldByteOffset += NumCopyBytes;
+      *FieldByteOffset += NumCopyBytes;
     }
-
-    assert(FieldByteOffset == FieldNumBytes && "Inconsistent storage size!");
   }
 };
 
@@ -293,7 +298,7 @@ private:
   };
 
   struct FunctionData {
-    DXILShaderKind Kind = DXILShaderKind::Invalid;
+    RayTracingShaderStage Kind = RayTracingShaderStage::Count;
     SmallVector<CallInst *> TraceRayCalls;
     SmallVector<CallInst *> ReportHitCalls;
     SmallVector<CallInst *> CallShaderCalls;
@@ -301,6 +306,7 @@ private:
     SmallVector<CallInst *> IntrinsicCalls;
     SmallVector<CallInst *> ShaderIndexCalls;
     SmallVector<CallInst *> ShaderRecordBufferCalls;
+    SmallVector<JumpOp *> JumpCalls;
 
     /// Pointer to the alloca'd system data object in this function
     AllocaInst *SystemData = nullptr;
@@ -327,6 +333,12 @@ private:
     /// hit attributes type, incoming for AnyHit and ClosestHit, outgoing for
     /// Intersection
     Type *HitAttributes = nullptr;
+
+    /// The payload storage and its type belongs to this function.
+    Value *PayloadStorage = nullptr;
+    Type *PayloadStorageTy = nullptr;
+    /// The starting dword of payload storage argument
+    uint32_t FirstPayloadArgumentDword = 0;
   };
 
   /// Needed data for handling the end of a function
@@ -364,14 +376,13 @@ private:
 
   void collectGpuRtFunctions();
 
-  // Copy the payload content between global payload and local payload.
-  // Excludes the stack pointer or hit attributes which may also reside in
-  // payload storage. If Stage is not set, all fields in SerializationInfo are
-  // copied. Used for CallShader accesses which are not PAQ qualified and do not
-  // have PAQShaderStage values.
-  // If CopiedNodes is set, nodes contained will not be copied, and all copied
-  // nodes are added to it.
-  void copyPayload(Type &PayloadTy, Value *LocalPayload,
+  // Copy the payload content between (global) payload storage and local
+  // payload. Excludes the stack pointer or hit attributes which may also reside
+  // in payload storage. If Stage is not set, all fields in SerializationInfo
+  // are copied. Used for CallShader accesses which are not PAQ qualified and do
+  // not have PAQShaderStage values. If CopiedNodes is set, nodes contained will
+  // not be copied, and all copied nodes are added to it.
+  void copyPayload(Type &PayloadTy, Value *LocalPayload, Value *PayloadStorage,
                    std::optional<PAQShaderStage> Stage,
                    PAQAccessKind GlobalAccessKind,
                    const PAQSerializationLayout &Layout,
@@ -385,7 +396,7 @@ private:
   // copied (i.e. only copying write(miss) : read(caller) fields).
   void copyTraceRayPayloadIncomingToCaller(
       const PAQTraceRaySerializationInfo &PAQSerializationInfo,
-      Value *LocalPayload);
+      Value *LocalPayload, Value *PayloadStorage);
 
   // Caller-save payload registers before CallShader() or TraceRay(),
   // which can override payload registers. A register needs to be saved
@@ -393,12 +404,14 @@ private:
   // This includes the payload memory pointer if present.
   // SavedRegisters maps indices of payload registers to their saved values.
   void savePayloadRegistersBeforeRecursion(
-      DXILShaderKind Kind, const PAQSerializationLayout &IncomingLayout,
+      Value *PayloadStorage, RayTracingShaderStage Kind,
+      const PAQSerializationLayout &IncomingLayout,
       const PAQSerializationLayout &OutgoingLayout,
       SmallVectorImpl<Value *> &SavedRegisterValues);
 
   // Restore previously saved registers.
   void restorePayloadRegistersAfterRecursion(
+      Value *PayloadStorage,
       const SmallVectorImpl<Value *> &SavedRegisterValues);
 
   void createPayloadGlobal();
@@ -421,7 +434,7 @@ private:
   Instruction *insertCpsAwait(Type *ReturnTy, Value *ShaderAddr,
                               Instruction *Call, ArrayRef<Value *> Args,
                               ContinuationCallType CallType,
-                              lgc::cps::CpsShaderStage ShaderStage);
+                              RayTracingShaderStage ShaderStage);
 
   MapVector<Function *, FunctionData> ToProcess;
   Module *Mod;
@@ -438,7 +451,10 @@ private:
   Type *TraversalDataTy;
   /// System data type passed to ClosestHit and Miss
   Type *HitMissDataTy;
-  GlobalVariable *Payload;
+  /// Dispatch system data type passed to RayGen and others
+  Type *DispatchSystemDataTy;
+
+  GlobalVariable *PayloadStorageGlobal;
 
   // Function definitions and declarations from HLSL
   // Driver implementation that returns if AcceptHitAndEndSearch was called
@@ -449,15 +465,12 @@ private:
   Function *SetTriangleHitAttributes;
   Function *GetLocalRootIndex;
   Function *SetLocalRootIndex;
-  Function *SetupRayGen;
   Function *TraceRay;
   Function *CallShader;
   Function *ReportHit;
   Function *AcceptHit;
   Function *GetSbtAddress;
   Function *GetSbtStride;
-
-  Function *RegisterBufferSetPointerBarrier;
 };
 
 } // namespace
@@ -499,33 +512,11 @@ void ModuleMetadataState::updateModuleMetadata() const {
   ContHelper::setStackAddrspace(Mod, StackAddrspace);
 }
 
-lgc::cps::CpsShaderStage
-convertShaderKindToCpsShaderStage(DXILShaderKind Kind) {
-  switch (Kind) {
-  case DXILShaderKind::RayGeneration:
-    return CpsShaderStage::RayGen;
-  case DXILShaderKind::Intersection:
-    return CpsShaderStage::Intersection;
-  case DXILShaderKind::AnyHit:
-    return CpsShaderStage::AnyHit;
-  case DXILShaderKind::ClosestHit:
-    return CpsShaderStage::ClosestHit;
-  case DXILShaderKind::Miss:
-    return CpsShaderStage::Miss;
-  case DXILShaderKind::Callable:
-    return CpsShaderStage::Callable;
-  default:
-    llvm_unreachable(
-        "convertShaderKindToCpsShaderStage: Invalid shader kind provided!");
-    break;
-  }
-}
-
 // Create a lgc.cps.await operation for a given shader address.
 Instruction *LowerRaytracingPipelinePassImpl::insertCpsAwait(
     Type *ReturnTy, Value *ShaderAddr, Instruction *Call,
     ArrayRef<Value *> Args, ContinuationCallType CallType,
-    CpsShaderStage ShaderStage) {
+    RayTracingShaderStage ShaderStage) {
   Builder.SetInsertPoint(Call);
 
   Value *CR = nullptr;
@@ -534,15 +525,15 @@ Instruction *LowerRaytracingPipelinePassImpl::insertCpsAwait(
   else
     CR = ShaderAddr;
 
-  CpsShaderStage CallStage = CpsShaderStage::Count;
+  RayTracingShaderStage CallStage = RayTracingShaderStage::Count;
   if (CallType == ContinuationCallType::Traversal)
-    CallStage = CpsShaderStage::Traversal;
+    CallStage = RayTracingShaderStage::Traversal;
   else if (CallType == ContinuationCallType::CallShader)
-    CallStage = CpsShaderStage::Callable;
+    CallStage = RayTracingShaderStage::Callable;
   else if (CallType == ContinuationCallType::AnyHit)
-    CallStage = CpsShaderStage::AnyHit;
+    CallStage = RayTracingShaderStage::AnyHit;
 
-  assert(CallStage != CpsShaderStage::Count &&
+  assert(CallStage != RayTracingShaderStage::Count &&
          "LowerRaytracingPipelinePassImpl::insertCpsAwait: Invalid "
          "call stage before inserting lgc.cps.await operation!");
 
@@ -712,15 +703,14 @@ void LowerRaytracingPipelinePassImpl::handleRestoreSystemData(CallInst *Call) {
   auto *SystemData = Call->getArgOperand(0);
 
   // Set local root signature on re-entry
-  assert(GetLocalRootIndex && "Could not find GetLocalRootIndex function");
   auto *LocalIndexSystemDataTy =
       cast<StructType>(getFuncArgPtrElementType(GetLocalRootIndex, 0));
   auto *LocalIndexSystemData = getDXILSystemData(
       Builder, SystemData, SystemDataTy, LocalIndexSystemDataTy);
 
-  auto Stage = lgc::rt::getLgcRtShaderStage(Call->getFunction());
+  auto Stage = getLgcRtShaderStage(Call->getFunction());
   Value *LocalIndex = nullptr;
-  if (Stage == lgc::rt::RayTracingShaderStage::RayGeneration)
+  if (Stage == RayTracingShaderStage::RayGeneration)
     LocalIndex = Builder.getInt32(0);
   else
     LocalIndex =
@@ -736,7 +726,6 @@ void LowerRaytracingPipelinePassImpl::handleRestoreSystemData(CallInst *Call) {
 void LowerRaytracingPipelinePassImpl::replaceReportHitCall(FunctionData &Data,
                                                            CallInst *Call) {
   assert(ReportHit && "ReportHit not found");
-  Function *F = Call->getFunction();
 
   replaceCall(Data, Call, ReportHit, ContinuationCallType::AnyHit);
 
@@ -750,37 +739,10 @@ void LowerRaytracingPipelinePassImpl::replaceReportHitCall(FunctionData &Data,
   Instruction *Then =
       SplitBlockAndInsertIfThen(IsEnd, &*Builder.GetInsertPoint(), true);
   Builder.SetInsertPoint(Then);
-  SystemData = getDXILSystemData(Builder, Data.SystemData, Data.SystemDataTy,
-                                 cast<StructType>(Data.ReturnTy));
-  Value *RetSystemData = Builder.CreateLoad(Data.ReturnTy, SystemData);
 
-  Instruction *Ret = nullptr;
-  if (MetadataState.isInLgcCpsMode()) {
-    uint32_t CpsRetLevel = getPotentialCpsReturnLevels(
-        convertShaderKindToCpsShaderStage(Data.Kind));
-    // When jumping to the ReturnAddress of parent function (i.e. the resume
-    // part of the caller of the parent function), the RCR and ShaderIndex
-    // are not important anymore, just pass Poison.
-    // Argument list: %rcr, %shader-index, %system-data.
-    SmallVector<Value *> TailArgs = {PoisonValue::get(I32),
-                                     PoisonValue::get(I32), RetSystemData};
-    Ret = Builder.create<JumpOp>(
-        F->getArg(CpsArgIdxReturnAddr), CpsRetLevel,
-        PoisonValue::get(StructType::get(Builder.getContext())), TailArgs);
-    Builder.CreateUnreachable();
-  } else {
-    Ret = Builder.CreateRet(RetSystemData);
-  }
-
-  // Assume worst-case payload size for Intersection. See the note on the
-  // incoming payload size.
-  ContHelper::setOutgoingRegisterCount(
-      Ret, MetadataState.getMaxPayloadRegisterCount());
-  // Intentionally do NOT update MaxUsedPayloadRegisterCount: Intersection
-  // assumes the worst-case size, but this doesn't mean it actually occurs.
-
-  // Remove trailing unreachable
-  Then->eraseFromParent();
+  FunctionEndData EData;
+  EData.Terminator = Then;
+  processFunctionEnd(Data, EData);
 }
 
 /// Replace a call to Await with
@@ -860,21 +822,19 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
 
       // Copy to payload storage
       Value *CastPayload = Builder.CreateBitCast(
-          Payload, I32->getPointerTo(Payload->getAddressSpace()));
+          Data.PayloadStorage,
+          I32->getPointerTo(
+              Data.PayloadStorage->getType()->getPointerAddressSpace()));
 
       Builder.CreateStore(LocalPayloadMem, CastPayload);
-      // Barrier to ensure that accesses to the potentially in-memory parts of
-      // the payload are not re-ordered before this store. More precisely, later
-      // we will insert a load to the payload memory pointer at these accesses.
-      // These loads must be after the store.
-      Builder.CreateCall(RegisterBufferSetPointerBarrier, {Payload});
       // Set stacksize metadata on F
       setStacksizeMetadata(*Call->getFunction(), Data.PayloadSpillSize);
     }
     // Copy local payload to global payload, before await call (e.g. TraceRay,
     // CallShader)
-    copyPayload(*PayloadOrAttrsTy, PayloadOrAttrs, ShaderStage,
-                PAQAccessKind::Write, *OutgoingSerializationLayout);
+    copyPayload(*PayloadOrAttrsTy, PayloadOrAttrs, Data.PayloadStorage,
+                ShaderStage, PAQAccessKind::Write,
+                *OutgoingSerializationLayout);
   }
 
   auto *ShaderAddr = Call->getArgOperand(0);
@@ -883,11 +843,21 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
   SmallVector<Type *, 2> ArgTys;
   SmallVector<Value *, 2> Args;
 
+  bool IsWait =
+      (Call->getCalledFunction()->getName().starts_with("_AmdWaitAwait"));
+
   if (MetadataState.isInLgcCpsMode()) {
-    // For LgcCps, skip function-addr and also return-addr/wait-mask, the
-    // return-addr will be filled at late stage of continuation transform. Add
-    // shader-index so that the callee cps function get correct shader-index
-    // being passed in.
+    // For LgcCps, skip function-addr, the return address will be filled at late
+    // stage of continuation transform. Add shader index so that the callee cps
+    // function get correct shader-index being passed in.
+
+    // Append the wait mask to the begin of the tail args.
+    if (IsWait) {
+      constexpr static uint32_t WaitMaskIdx = 1;
+      ArgTys.push_back(FTy->getParamType(WaitMaskIdx));
+      Args.push_back(Call->getArgOperand(WaitMaskIdx));
+    }
+
     ArgTys.push_back(I32);
     auto *ShaderIndex =
         CrossInliner
@@ -906,7 +876,7 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
     Args.append(Call->arg_begin() + 1, Call->arg_end());
   }
 
-  auto *SystemDataTy = SetupRayGen->getReturnType();
+  auto *SystemDataTy = DispatchSystemDataTy;
   if (CallType == ContinuationCallType::AnyHit) {
     assert(TraversalDataTy && "Failed to detect traversal system data type");
     SystemDataTy = TraversalDataTy;
@@ -917,11 +887,48 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
   }
 
   Instruction *Annotatable = nullptr;
-  Instruction *NewCall = nullptr;
+  Value *NewCall = nullptr;
+
   if (MetadataState.isInLgcCpsMode()) {
-    NewCall = insertCpsAwait(Call->getType(), ShaderAddr, Call, Args, CallType,
-                             convertShaderKindToCpsShaderStage(Data.Kind));
-    Annotatable = NewCall;
+    // Add padding so that payload starts at a fixed dword.
+    // NOTE: Minus 1 as return address is not included
+    ContHelper::addPaddingType(*DL, *Context, ArgTys,
+                               Data.FirstPayloadArgumentDword - 1);
+    Args.push_back(PoisonValue::get(ArgTys.back()));
+
+    // Put payload at last
+    auto OutgoingPayloadI32s =
+        std::min(OutgoingSerializationLayout
+                     ? OutgoingSerializationLayout->NumStorageI32s
+                     : MetadataState.getMaxPayloadRegisterCount(),
+                 MetadataState.getMaxPayloadRegisterCount());
+    auto *OutgoingPayloadTy = ArrayType::get(I32, OutgoingPayloadI32s);
+    ArgTys.push_back(OutgoingPayloadTy);
+    Args.push_back(Builder.CreateLoad(OutgoingPayloadTy, Data.PayloadStorage));
+
+    auto *OrigRetTy = Call->getType();
+
+    // Add padding so that returned payload starts at a fixed dword.
+    // NOTE: Minus 2 as return address and shader index are not included.
+    auto *PaddingTy = ContHelper::getPaddingType(
+        *DL, *Context, OrigRetTy, Data.FirstPayloadArgumentDword - 2);
+
+    // Also need to return payload
+    auto *NewRetTy =
+        StructType::get(Builder.getContext(),
+                        {OrigRetTy, PaddingTy,
+                         ArrayType::get(I32, ReturnedRegisterCount.value())});
+
+    Annotatable =
+        insertCpsAwait(NewRetTy, ShaderAddr, Call, Args, CallType, Data.Kind);
+
+    NewCall = Annotatable;
+
+    auto *ReturnedPayload = Builder.CreateExtractValue(NewCall, 2);
+    // Store returned payload to make the payload argument being updated.
+    Builder.CreateStore(ReturnedPayload, Data.PayloadStorage);
+
+    NewCall = Builder.CreateExtractValue(NewCall, 0);
   } else {
     auto *ShaderTy = FunctionType::get(TokenTy, ArgTys, false);
     auto *ShaderFun =
@@ -932,12 +939,12 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
         getContinuationAwait(*Mod, TokenTy, cast<StructType>(SystemDataTy));
     NewCall = Builder.CreateCall(Await, {Token});
     Annotatable = Token;
-
-    // For WaitAwait, add metadata indicating that we wait. After coroutine
-    // passes, we then generate a waitContinue on the awaited function.
-    if (Call->getCalledFunction()->getName().starts_with("_AmdWaitAwait"))
-      ContHelper::setIsWaitAwaitCall(*Token);
   }
+
+  // For WaitAwait, add metadata indicating that we wait. After coroutine
+  // passes, we then generate a waitContinue on the awaited function.
+  if (IsWait)
+    ContHelper::setIsWaitAwaitCall(*cast<CallInst>(Annotatable));
 
   ContHelper::setReturnedRegisterCount(Annotatable,
                                        ReturnedRegisterCount.value());
@@ -963,12 +970,13 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
     if (CallType == ContinuationCallType::CallShader) {
       // For CallShader, there is only a single layout
       // Copy global payload to local payload, after CallShader call
-      copyPayload(*PayloadOrAttrsTy, PayloadOrAttrs, ShaderStage,
-                  PAQAccessKind::Read, *OutgoingSerializationLayout);
+      copyPayload(*PayloadOrAttrsTy, PayloadOrAttrs, Data.PayloadStorage,
+                  ShaderStage, PAQAccessKind::Read,
+                  *OutgoingSerializationLayout);
     } else {
       copyTraceRayPayloadIncomingToCaller(
           *cast<PAQTraceRaySerializationInfo>(OutgoingSerializationInfo),
-          PayloadOrAttrs);
+          PayloadOrAttrs, Data.PayloadStorage);
     }
   }
 
@@ -981,7 +989,7 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
 /// for LgcCps mode or get the value from system data for non-LgcCps mode.
 void LowerRaytracingPipelinePassImpl::replaceShaderIndexCall(FunctionData &Data,
                                                              CallInst *Call) {
-  if (Data.Kind == DXILShaderKind::RayGeneration) {
+  if (Data.Kind == RayTracingShaderStage::RayGeneration) {
     Call->replaceAllUsesWith(Builder.getInt32(0));
   } else {
     Value *ShaderIndex = nullptr;
@@ -1006,37 +1014,37 @@ void LowerRaytracingPipelinePassImpl::replaceShaderIndexCall(FunctionData &Data,
 /// Replace a call to lgc.rt.shader.record.buffer with loading the resource.
 void LowerRaytracingPipelinePassImpl::replaceShaderRecordBufferCall(
     FunctionData &Data, CallInst *Call) {
-  auto shaderRecordBufferOp = cast<ShaderRecordBufferOp>(Call);
-  auto tableIndex = shaderRecordBufferOp->getShaderIndex();
+  auto *ShaderRecordBuffer = cast<ShaderRecordBufferOp>(Call);
+  auto *TableIndex = ShaderRecordBuffer->getShaderIndex();
 
   assert(GetSbtAddress && "Could not find GetSbtAddress function");
   assert(GetSbtStride && "Could not find GetSbtStride function");
 
-  Value *tableAddr =
+  Value *TableAddr =
       CrossInliner.inlineCall(Builder, GetSbtAddress).returnValue;
-  Value *tableStride =
+  Value *TableStride =
       CrossInliner.inlineCall(Builder, GetSbtStride).returnValue;
 
   // SBT starts with shader group handle (aka shader identifier), which is 32
   // bytes, then the data for shader record buffer.
   constexpr unsigned ShaderIdEntrySizeInBytes = 32;
-  Value *shaderIdsSizeVal = Builder.getInt32(ShaderIdEntrySizeInBytes);
+  Value *ShaderIdsSizeVal = Builder.getInt32(ShaderIdEntrySizeInBytes);
 
   // Byte offset = (tableStride * tableIndex) + shaderIdsSize
-  Value *offset = Builder.CreateMul(tableIndex, tableStride);
-  offset = Builder.CreateAdd(offset, shaderIdsSizeVal);
+  Value *Offset = Builder.CreateMul(TableIndex, TableStride);
+  Offset = Builder.CreateAdd(Offset, ShaderIdsSizeVal);
 
   // Zero-extend offset value to 64 bit
-  offset = Builder.CreateZExt(offset, Builder.getInt64Ty());
+  Offset = Builder.CreateZExt(Offset, Builder.getInt64Ty());
 
   // Final addr
-  tableAddr = Builder.CreateAdd(tableAddr, offset);
+  TableAddr = Builder.CreateAdd(TableAddr, Offset);
 
-  Type *gpuAddrAsPtrTy =
+  Type *GpuAddrAsPtrTy =
       PointerType::get(Builder.getContext(), 1 /* ADDR_SPACE_GLOBAL */);
-  tableAddr = Builder.CreateIntToPtr(tableAddr, gpuAddrAsPtrTy);
+  TableAddr = Builder.CreateIntToPtr(TableAddr, GpuAddrAsPtrTy);
 
-  Call->replaceAllUsesWith(tableAddr);
+  Call->replaceAllUsesWith(TableAddr);
   Call->eraseFromParent();
 }
 
@@ -1067,7 +1075,7 @@ void LowerRaytracingPipelinePassImpl::handleGetShaderKind(Function &Func) {
 
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
     Function *F = CInst.getFunction();
-    auto Stage = lgc::rt::getLgcRtShaderStage(F);
+    auto Stage = getLgcRtShaderStage(F);
 
     // Ignore GetShaderKind calls where we cannot find the shader kind.
     // This happens e.g. in gpurt-implemented intrinsics that got inlined,
@@ -1076,7 +1084,7 @@ void LowerRaytracingPipelinePassImpl::handleGetShaderKind(Function &Func) {
       return;
 
     DXILShaderKind ShaderKind =
-        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
+        ShaderStageHelper::rtShaderStageToDxilShaderKind(*Stage);
     auto *ShaderKindVal = ConstantInt::get(Func.getReturnType(),
                                            static_cast<uint64_t>(ShaderKind));
     CInst.replaceAllUsesWith(ShaderKindVal);
@@ -1091,8 +1099,16 @@ void LowerRaytracingPipelinePassImpl::handleGetCurrentFuncAddr(Function &Func) {
           Func.getReturnType()->isIntegerTy(64)));
 
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    auto *FuncPtrToInt =
-        ConstantExpr::getPtrToInt(CInst.getFunction(), Func.getReturnType());
+    auto *F = CInst.getFunction();
+    auto *RetTy = Func.getReturnType();
+    Value *FuncPtrToInt = nullptr;
+    if (MetadataState.isInLgcCpsMode()) {
+      // Add CPS level to function address
+      Builder.SetInsertPoint(&CInst);
+      FuncPtrToInt = Builder.create<AsContinuationReferenceOp>(RetTy, F);
+    } else {
+      FuncPtrToInt = ConstantExpr::getPtrToInt(F, RetTy);
+    }
     CInst.replaceAllUsesWith(FuncPtrToInt);
     CInst.eraseFromParent();
   });
@@ -1107,50 +1123,51 @@ void llvm::copyBytes(IRBuilder<> &B, Value *Dst, Value *Src,
   uint64_t NumFullI32s = NumBytes / RegisterBytes;
   // Copy full I32s
   for (uint64_t I32Index = 0; I32Index < NumFullI32s; ++I32Index) {
-    auto *DstPtr = B.CreateConstGEP1_64(I32, Dst, I32Index);
-    auto *SrcPtr = B.CreateConstGEP1_64(I32, Src, I32Index);
+    auto *DstPtr = SimplifyingCreateConstInBoundsGEP1_32(B, I32, Dst, I32Index);
+    auto *SrcPtr = SimplifyingCreateConstInBoundsGEP1_32(B, I32, Src, I32Index);
     auto *Val = B.CreateLoad(I32, SrcPtr);
     B.CreateStore(Val, DstPtr);
   }
 
   // Copy remaining bytes
-  uint64_t NumRemainingBytes = NumBytes - (NumFullI32s * RegisterBytes);
+  uint64_t NumRemainingBytes = NumBytes % RegisterBytes;
   if (NumRemainingBytes == 0)
     return;
 
-  // Create a packed struct containing NumRemainingBytes many i8, bitcast src
-  // and dst pointers (+ offset) to the packed struct, and load/store the
-  // struct. A similar technique is used in RegisterBufferPass.
+  // Create i8 loads and stores for the remaining bytes
   Type *I8 = B.getIntNTy(8);
-  SmallVector<Type *, RegisterBytes> Elements;
-  Elements.resize(NumRemainingBytes, I8);
-  Type *StructTy = StructType::create(Elements, "", /* isPacked */ true);
-
-  // Note: These pointers may not be dereferenced as I32s, because the I32s
-  // overlap past the end of the Dst and Src range
-  auto *DstStructPtr = B.CreateBitCast(
-      B.CreateConstGEP1_64(I32, Dst, NumFullI32s),
-      StructTy->getPointerTo(Dst->getType()->getPointerAddressSpace()));
-  auto *SrcStructPtr = B.CreateBitCast(
-      B.CreateConstGEP1_64(I32, Src, NumFullI32s),
-      StructTy->getPointerTo(Src->getType()->getPointerAddressSpace()));
-
-  auto *Val = B.CreateLoad(StructTy, SrcStructPtr);
-  B.CreateStore(Val, DstStructPtr);
+  for (uint64_t I8Index = NumFullI32s * RegisterBytes; I8Index < NumBytes;
+       ++I8Index) {
+    auto *DstPtr = SimplifyingCreateConstGEP1_32(B, I8, Dst, I8Index);
+    auto *SrcPtr = SimplifyingCreateConstGEP1_32(B, I8, Src, I8Index);
+    auto *Val = B.CreateLoad(I8, SrcPtr);
+    B.CreateStore(Val, DstPtr);
+  }
 }
 
 void LowerRaytracingPipelinePassImpl::copyPayload(
-    Type &PayloadTy, Value *LocalPayload, std::optional<PAQShaderStage> Stage,
-    PAQAccessKind GlobalAccessKind, const PAQSerializationLayout &Layout,
+    Type &PayloadTy, Value *LocalPayload, Value *PayloadStorage,
+    std::optional<PAQShaderStage> Stage, PAQAccessKind GlobalAccessKind,
+    const PAQSerializationLayout &Layout,
     SmallDenseSet<const PAQNode *, 16> *CopiedNodes) {
   // Nothing to do if there is no serialization type, i.e. the layout is empty
   if (!Layout.SerializationTy)
     return;
 
-  // Obtain pointer to global payload serialization struct
-  Value *PayloadSerialization = Builder.CreateBitCast(
-      Payload,
-      Layout.SerializationTy->getPointerTo(Payload->getAddressSpace()));
+  LLVM_DEBUG(dbgs() << (GlobalAccessKind == PAQAccessKind::Read ? "Incoming"
+                                                                : "Outgoing")
+                    << " serialization layout of "
+                    << cast<Instruction>(LocalPayload)->getFunction()->getName()
+                    << ": " << *Layout.SerializationTy << "\n");
+
+  Value *SpilledPayloadPtr = nullptr;
+  if (Layout.PayloadMemPointerNode) {
+    auto *SpillPtr = SimplifyingCreateConstInBoundsGEP1_32(
+        Builder, Builder.getInt8Ty(), PayloadStorage,
+        FirstPayloadMemoryPointerRegister);
+    SpilledPayloadPtr = Builder.CreateLoad(
+        Builder.getPtrTy(lgc::cps::stackAddrSpace), SpillPtr);
+  }
 
   PayloadCopyHelper Helper{
       *Mod,
@@ -1161,15 +1178,17 @@ void LowerRaytracingPipelinePassImpl::copyPayload(
       GlobalAccessKind,
       {Builder.getInt32(0)},
       CopiedNodes,
-      PayloadSerialization,
+      PayloadStorage,
       &Layout,
+      SpilledPayloadPtr,
+      MetadataState.getMaxPayloadRegisterCount(),
   };
   Helper.copyPayloadRecursively(Layout.PayloadRootNode);
 }
 
 void LowerRaytracingPipelinePassImpl::copyTraceRayPayloadIncomingToCaller(
-    const PAQTraceRaySerializationInfo &SerializationInfo,
-    Value *LocalPayload) {
+    const PAQTraceRaySerializationInfo &SerializationInfo, Value *LocalPayload,
+    Value *PayloadStorage) {
   SmallDenseSet<const PAQNode *, 16> CopiedNodes;
 
   for (auto LayoutKind : {PAQSerializationLayoutKind::ClosestHitOut,
@@ -1177,13 +1196,14 @@ void LowerRaytracingPipelinePassImpl::copyTraceRayPayloadIncomingToCaller(
     const PAQSerializationLayout &Layout =
         SerializationInfo.LayoutsByKind[LayoutKind];
     copyPayload(*SerializationInfo.PayloadRootNode->Ty, LocalPayload,
-                PAQShaderStage::Caller, PAQAccessKind::Read, Layout,
-                &CopiedNodes);
+                PayloadStorage, PAQShaderStage::Caller, PAQAccessKind::Read,
+                Layout, &CopiedNodes);
   }
 }
 
 void LowerRaytracingPipelinePassImpl::savePayloadRegistersBeforeRecursion(
-    DXILShaderKind Kind, const PAQSerializationLayout &IncomingLayout,
+    Value *PayloadStorage, RayTracingShaderStage Kind,
+    const PAQSerializationLayout &IncomingLayout,
     const PAQSerializationLayout &OutgoingLayout,
     SmallVectorImpl<Value *> &SavedRegisterValues) {
 
@@ -1192,7 +1212,7 @@ void LowerRaytracingPipelinePassImpl::savePayloadRegistersBeforeRecursion(
 
   SavedRegisterValues.resize(MetadataState.getMaxPayloadRegisterCount());
 
-  std::optional<PAQShaderStage> Stage = dxilShaderKindToPAQShaderStage(Kind);
+  std::optional<PAQShaderStage> Stage = rtShaderStageToPAQShaderStage(Kind);
   auto *RegTy = Builder.getIntNTy(RegisterBytes * 8);
 
   for (const auto &NodeWithStorageInfo : OutgoingLayout.NodeStorageInfos) {
@@ -1218,7 +1238,7 @@ void LowerRaytracingPipelinePassImpl::savePayloadRegistersBeforeRecursion(
            ++I) {
         // Create backup of the I-th payload register
         auto *LoadPtr =
-            Builder.CreateConstGEP2_32(Payload->getValueType(), Payload, 0, I);
+            SimplifyingCreateConstGEP1_32(Builder, I32, PayloadStorage, I);
         auto *OldValue = Builder.CreateLoad(RegTy, LoadPtr);
         // As long as we keep a 32 bit alignment of all fields, all fields
         // get disjoint registers, and we should never save a register twice.
@@ -1239,13 +1259,13 @@ void LowerRaytracingPipelinePassImpl::savePayloadRegistersBeforeRecursion(
 }
 
 void LowerRaytracingPipelinePassImpl::restorePayloadRegistersAfterRecursion(
+    Value *PayloadStorage,
     const SmallVectorImpl<Value *> &SavedRegisterValues) {
   for (unsigned I = 0; I < SavedRegisterValues.size(); ++I) {
     Value *OldValue = SavedRegisterValues[I];
     if (OldValue) {
       auto *StorePtr =
-          Builder.CreateGEP(Payload->getValueType(), Payload,
-                            {Builder.getInt32(0), Builder.getInt32(I)});
+          SimplifyingCreateConstGEP1_32(Builder, I32, PayloadStorage, I);
       Builder.CreateStore(SavedRegisterValues[I], StorePtr);
     }
   }
@@ -1304,8 +1324,9 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(
 
       // Obtain pointer to global payload serialization struct
       Value *PayloadSerialization = Builder.CreateBitCast(
-          Payload,
-          Layout->SerializationTy->getPointerTo(Payload->getAddressSpace()));
+          Data.PayloadStorage,
+          Layout->SerializationTy->getPointerTo(
+              Data.PayloadStorage->getType()->getPointerAddressSpace()));
       // Last zero yields pointer to the first element of the i32 array
       PayloadHitAttrs = Builder.CreateInBoundsGEP(
           Layout->SerializationTy, PayloadSerialization,
@@ -1316,7 +1337,7 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(
       // Inline attributes suffice, nothing to do.
     }
   } else {
-    assert(Data.Kind == DXILShaderKind::Intersection &&
+    assert(Data.Kind == RayTracingShaderStage::Intersection &&
            "Unexpected shader kind");
     // We are in an intersection shader, which does not know the payload type.
     // Assume maximum possible size
@@ -1324,8 +1345,8 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(
         Data.FuncConfig.MaxHitAttributeBytes - InlineHitAttrsBytes;
     // Use hit attribute storage at fixed index
     PayloadHitAttrs =
-        Builder.CreateConstGEP2_32(Payload->getValueType(), Payload, 0,
-                                   FirstPayloadHitAttributeStorageRegister);
+        SimplifyingCreateConstGEP1_32(Builder, I32, Data.PayloadStorage,
+                                      FirstPayloadHitAttributeStorageRegister);
   }
 
   uint64_t HitAttrsBytes =
@@ -1337,14 +1358,15 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(
   LocalHitAttributes = Builder.CreateBitCast(LocalHitAttributes, RegTyPtr);
   auto *I8Ty = Builder.getInt8Ty();
   for (unsigned I = 0; I < divideCeil(HitAttrsBytes, RegisterBytes); I++) {
-    auto *LocalPtr =
-        Builder.CreateConstInBoundsGEP1_64(RegTy, LocalHitAttributes, I);
+    auto *LocalPtr = SimplifyingCreateConstInBoundsGEP1_32(
+        Builder, RegTy, LocalHitAttributes, I);
     Value *GlobalPtr;
     if (I < InlineRegSize)
-      GlobalPtr = Builder.CreateConstInBoundsGEP1_64(RegTy, InlineHitAttrs, I);
+      GlobalPtr = SimplifyingCreateConstInBoundsGEP1_32(Builder, RegTy,
+                                                        InlineHitAttrs, I);
     else
-      GlobalPtr = Builder.CreateConstInBoundsGEP1_64(RegTy, PayloadHitAttrs,
-                                                     I - InlineRegSize);
+      GlobalPtr = SimplifyingCreateConstInBoundsGEP1_32(
+          Builder, RegTy, PayloadHitAttrs, I - InlineRegSize);
 
     auto *LoadPtr = GlobalToLocal ? GlobalPtr : LocalPtr;
     auto *StorePtr = GlobalToLocal ? LocalPtr : GlobalPtr;
@@ -1358,10 +1380,11 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(
       auto *ByteStorePtr =
           Builder.CreateBitCast(StorePtr, I8Ty->getPointerTo());
       for (unsigned J = 0; J < HitAttrsBytes % RegisterBytes; J++) {
-        auto *Val = Builder.CreateLoad(
-            I8Ty, Builder.CreateConstInBoundsGEP1_64(I8Ty, ByteLoadPtr, J));
-        Builder.CreateStore(
-            Val, Builder.CreateConstInBoundsGEP1_64(I8Ty, ByteStorePtr, J));
+        auto *Val =
+            Builder.CreateLoad(I8Ty, SimplifyingCreateConstInBoundsGEP1_32(
+                                         Builder, I8Ty, ByteLoadPtr, J));
+        Builder.CreateStore(Val, SimplifyingCreateConstInBoundsGEP1_32(
+                                     Builder, I8Ty, ByteStorePtr, J));
       }
     }
   }
@@ -1395,24 +1418,15 @@ void LowerRaytracingPipelinePassImpl::createPayloadGlobal() {
           std::max(MaxPayloadI32s,
                    FuncData.IncomingPayloadSerializationInfo->MaxStorageI32s);
   }
-  auto *PayloadTy = ArrayType::get(I32, MaxPayloadI32s);
+  auto *PayloadTy =
+      ArrayType::get(I32, MetadataState.getMaxPayloadRegisterCount());
 
-  Payload = cast<GlobalVariable>(
+  PayloadStorageGlobal = cast<GlobalVariable>(
       Mod->getOrInsertGlobal(ContHelper::GlobalPayloadName, PayloadTy, [&] {
-        auto *Payload = new GlobalVariable(
+        return new GlobalVariable(
             *Mod, PayloadTy, false, GlobalVariable::ExternalLinkage, nullptr,
             ContHelper::GlobalPayloadName, nullptr,
-            GlobalVariable::NotThreadLocal);
-
-        // Add registerbuffer metadata unconditionally to split all accesses
-        // into i32s
-        RegisterBufferMD RMD;
-        RMD.RegisterCount = MetadataState.getMaxPayloadRegisterCount();
-        RMD.Addrspace = lgc::cps::stackAddrSpace;
-        auto *MD = createRegisterBufferMetadata(*Context, RMD);
-        Payload->addMetadata("registerbuffer", *MD);
-
-        return Payload;
+            GlobalVariable::NotThreadLocal, GlobalRegisterAddrspace);
       }));
 }
 
@@ -1438,19 +1452,14 @@ void LowerRaytracingPipelinePassImpl::setGpurtEntryRegisterCountMetadata() {
       uint32_t InRegisterCount = 0;
       uint32_t OutRegisterCount = 0;
       auto *Func = CI->getFunction();
-      switch (lgc::rt::getLgcRtShaderStage(Func).value()) {
-      case lgc::rt::RayTracingShaderStage::Traversal:
+      switch (getLgcRtShaderStage(Func).value()) {
+      case RayTracingShaderStage::Traversal:
         InRegisterCount = MaxRegisterCount;
         OutRegisterCount = MaxRegisterCount;
         break;
-      case lgc::rt::RayTracingShaderStage::KernelEntry:
+      case RayTracingShaderStage::KernelEntry:
         InRegisterCount = 0;
-        // Technically, we could likely use zero registers instead, but it
-        // shouldn't make a difference for performance, and assuming the
-        // worst-case avoids nasty errors in case we do use payload registers
-        // for some reason. Longer term, we'll get rid of the REGISTERS global
-        // and register count metadata anyways.
-        OutRegisterCount = MaxRegisterCount;
+        OutRegisterCount = 0;
         break;
       default:
         continue;
@@ -1472,7 +1481,6 @@ void LowerRaytracingPipelinePassImpl::setGpurtEntryRegisterCountMetadata() {
 
 void LowerRaytracingPipelinePassImpl::processContinuations() {
   TokenTy = StructType::create(*Context, "continuation.token")->getPointerTo();
-  RegisterBufferSetPointerBarrier = getRegisterBufferSetPointerBarrier(*Mod);
 
   for (auto &FuncData : ToProcess) {
     processFunction(FuncData.first, FuncData.second);
@@ -1499,7 +1507,7 @@ void LowerRaytracingPipelinePassImpl::processFunctionEntry(
 void LowerRaytracingPipelinePassImpl::processFunctionEnd(
     FunctionData &Data, FunctionEndData &EData) {
   AnyHitExitKind AHExitKind = AnyHitExitKind::None;
-  bool IsAnyHit = Data.Kind == DXILShaderKind::AnyHit;
+  bool IsAnyHit = Data.Kind == RayTracingShaderStage::AnyHit;
 
   if (IsAnyHit) {
     // Default to AcceptHit, which is only implicitly represented by
@@ -1519,8 +1527,9 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(
   Builder.SetInsertPoint(EData.Terminator);
 
   auto *PayloadTy = Data.IncomingPayload;
-  if (Data.Kind != DXILShaderKind::RayGeneration &&
-      Data.Kind != DXILShaderKind::Intersection) {
+  if (Data.Kind != RayTracingShaderStage::RayGeneration &&
+      Data.Kind != RayTracingShaderStage::Intersection &&
+      Data.Kind != RayTracingShaderStage::Traversal) {
     assert(PayloadTy && "Missing payload type!");
 
     if (IsAnyHit) {
@@ -1543,13 +1552,14 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(
 
     // Restore saved registers. This needs to be done *before* copying
     // back the payload, which depends on the restored memory pointer!
-    restorePayloadRegistersAfterRecursion(EData.SavedRegisterValues);
+    restorePayloadRegistersAfterRecursion(Data.PayloadStorage,
+                                          EData.SavedRegisterValues);
 
     // Copy local payload into global payload at end of shader
     if (EData.OutgoingSerializationLayout->NumStorageI32s) {
-      Builder.CreateCall(RegisterBufferSetPointerBarrier, {Payload});
-      copyPayload(*PayloadTy, EData.NewPayload, EData.ShaderStage,
-                  PAQAccessKind::Write, *EData.OutgoingSerializationLayout);
+      copyPayload(*PayloadTy, EData.NewPayload, Data.PayloadStorage,
+                  EData.ShaderStage, PAQAccessKind::Write,
+                  *EData.OutgoingSerializationLayout);
     }
 
     if (IsAnyHit) {
@@ -1581,14 +1591,17 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(
   }
 
   Instruction *Ret = nullptr;
+  unsigned OutgoingRegisterCount =
+      EData.OutgoingSerializationLayout
+          ? std::min(EData.OutgoingSerializationLayout->NumStorageI32s,
+                     MetadataState.getMaxPayloadRegisterCount())
+          : MetadataState.getMaxPayloadRegisterCount();
   if (MetadataState.isInLgcCpsMode()) {
-    uint32_t CpsRetLevel = getPotentialCpsReturnLevels(
-        convertShaderKindToCpsShaderStage(Data.Kind));
-
-    if (Data.Kind == DXILShaderKind::RayGeneration) {
+    if (Data.Kind == RayTracingShaderStage::RayGeneration) {
       assert(!RetValue && "RayGen cannot return anything");
       Builder.CreateRetVoid();
     } else {
+      uint32_t CpsRetLevel = getPotentialCpsReturnLevels(Data.Kind);
       // Jump to resume point of caller, pass Poison Rcr and ShaderIndex as they
       // are not meaningful for the case.
       SmallVector<Value *> TailArgs = {PoisonValue::get(I32),
@@ -1596,7 +1609,14 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(
       if (RetValue)
         TailArgs.push_back(RetValue);
 
-      Builder.create<JumpOp>(
+      // Add padding so that payload starts at a fixed dword.
+      ContHelper::addPaddingValue(*DL, *Context, TailArgs,
+                                  Data.FirstPayloadArgumentDword);
+
+      TailArgs.push_back(Builder.CreateLoad(
+          ArrayType::get(I32, OutgoingRegisterCount), Data.PayloadStorage));
+
+      Ret = Builder.create<JumpOp>(
           EData.Terminator->getFunction()->getArg(CpsArgIdxReturnAddr),
           CpsRetLevel, PoisonValue::get(StructType::get(Builder.getContext())),
           TailArgs);
@@ -1610,11 +1630,6 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(
     // Annotate the terminator with number of outgoing payload registers.
     // This annotation will be passed along the following transformations,
     // ending up at the final continuation call.
-    unsigned OutgoingRegisterCount =
-        EData.OutgoingSerializationLayout
-            ? std::min(EData.OutgoingSerializationLayout->NumStorageI32s,
-                       MetadataState.getMaxPayloadRegisterCount())
-            : MetadataState.getMaxPayloadRegisterCount();
     ContHelper::setOutgoingRegisterCount(Ret, OutgoingRegisterCount);
     if (EData.OutgoingSerializationLayout)
       MetadataState.updateMaxUsedPayloadRegisterCount(OutgoingRegisterCount);
@@ -1631,6 +1646,7 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
   SmallVector<Type *> AllArgTypes;
   Type *NewRetTy;
   Type *SystemDataTy = nullptr;
+  Type *CpsArgPayloadTy = nullptr;
 
   if (MetadataState.isInLgcCpsMode()) {
     // Create the CPS function header.
@@ -1640,30 +1656,82 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
     //  * Return continuation reference (RCR): i32
     //  * Shader index
     //  * Remaining arguments (system data, optionally hit attributes)
+    // We need to determine the starting dword of payload storage in arguments,
+    // so that payload starts at a fixed VGPR across all shaders in a pipeline.
+    // The overall layout is:
+    // | returnAddr | shaderIndex | systemData | hitAttrs | padding | payload |
+    // For systemData and hitAttrs, use the max possible sizes for calculation.
 
     AllArgTypes.push_back(StructType::get(Mod->getContext()));
     AllArgTypes.push_back(Builder.getInt32Ty());
     AllArgTypes.push_back(Builder.getInt32Ty());
+
+    // Determine payload storage type
+    uint32_t PayloadStorageI32s = MetadataState.getMaxPayloadRegisterCount();
+    PayloadStorageI32s =
+        std::max(PayloadStorageI32s, Data.MaxOutgoingPayloadI32s);
+    if (Data.IncomingPayloadSerializationInfo)
+      PayloadStorageI32s =
+          std::max(PayloadStorageI32s,
+                   Data.IncomingPayloadSerializationInfo->MaxStorageI32s);
+    Data.PayloadStorageTy = ArrayType::get(I32, PayloadStorageI32s);
+
+    // Determine payload starting dword
+    // NOTE: _AmdEnqueueAnyHit always passes a 2 dword barycentrics, need to
+    // take that into account in the situation that hit attributes are not used
+    // or less than 2 dwords.
+    assert(TraversalDataTy && "Failed to detect traversal system data type");
+    Data.FirstPayloadArgumentDword =
+        1 + 1 + getArgumentDwordCount(*DL, TraversalDataTy) +
+        std::max(
+            divideCeil(Data.FuncConfig.MaxHitAttributeBytes, RegisterBytes),
+            uint64_t(2));
+
+    unsigned IncomingStorageI32s = 0;
+    if (Data.Kind != RayTracingShaderStage::RayGeneration &&
+        Data.Kind != RayTracingShaderStage::Intersection &&
+        Data.Kind != RayTracingShaderStage::Traversal) {
+      const PAQSerializationLayout &IncomingSerializationLayout =
+          PAQManager.getOrCreateShaderStartSerializationLayout(
+              *Data.IncomingPayloadSerializationInfo, Data.Kind,
+              Data.HitAttributes);
+      IncomingStorageI32s =
+          std::min(IncomingSerializationLayout.NumStorageI32s,
+                   MetadataState.getMaxPayloadRegisterCount());
+    } else if (Data.Kind == RayTracingShaderStage::Traversal) {
+      // We should have set up preserved register count for Traversal, if not,
+      // fall back to max count.
+      // Even if PreservedPayloadRegisterCount is set, there may be additional
+      // shaders in the current module whose usage is recorded in
+      // MaxUsedPayloadRegisterCount, to take the max with it.
+      IncomingStorageI32s =
+          std::max(MetadataState.tryGetPreservedPayloadRegisterCount().value_or(
+                       MetadataState.getMaxPayloadRegisterCount()),
+                   MetadataState.getMaxUsedPayloadRegisterCount());
+    } else {
+      // For IS, use max size
+      IncomingStorageI32s = MetadataState.getMaxPayloadRegisterCount();
+    }
+    CpsArgPayloadTy = ArrayType::get(I32, IncomingStorageI32s);
   }
 
   const auto SystemDataArgumentIndex = AllArgTypes.size();
 
   switch (Data.Kind) {
-  case DXILShaderKind::RayGeneration: {
-    assert(SetupRayGen && "Could not find SetupRayGen function");
-    SystemDataTy = SetupRayGen->getReturnType();
+  case RayTracingShaderStage::RayGeneration: {
+    SystemDataTy = DispatchSystemDataTy;
     AllArgTypes.push_back(SystemDataTy);
     NewRetTy = Builder.getVoidTy();
     break;
   }
-  case DXILShaderKind::Intersection: {
+  case RayTracingShaderStage::Intersection: {
     assert(TraversalDataTy && "Failed to detect traversal system data type");
     SystemDataTy = TraversalDataTy;
     AllArgTypes.push_back(SystemDataTy);
     NewRetTy = SystemDataTy;
     break;
   }
-  case DXILShaderKind::AnyHit: {
+  case RayTracingShaderStage::AnyHit: {
     assert(TraversalDataTy && "Failed to detect traversal system data type");
     SystemDataTy = TraversalDataTy;
     AllArgTypes.push_back(SystemDataTy);
@@ -1671,18 +1739,22 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
     NewRetTy = SystemDataTy;
     break;
   }
-  case DXILShaderKind::ClosestHit:
-  case DXILShaderKind::Miss: {
+  case RayTracingShaderStage::ClosestHit:
+  case RayTracingShaderStage::Miss: {
     assert(HitMissDataTy && "Failed to detect hit/miss system data type");
-    assert(SetupRayGen && "Could not find SetupRayGen function");
     SystemDataTy = HitMissDataTy;
     AllArgTypes.push_back(SystemDataTy);
-    NewRetTy = SetupRayGen->getReturnType();
+    NewRetTy = DispatchSystemDataTy;
     break;
   }
-  case DXILShaderKind::Callable: {
-    assert(SetupRayGen && "Could not find SetupRayGen function");
-    SystemDataTy = SetupRayGen->getReturnType();
+  case RayTracingShaderStage::Callable: {
+    SystemDataTy = DispatchSystemDataTy;
+    AllArgTypes.push_back(SystemDataTy);
+    NewRetTy = SystemDataTy;
+    break;
+  }
+  case RayTracingShaderStage::Traversal: {
+    SystemDataTy = getFuncArgPtrElementType(F, 0);
     AllArgTypes.push_back(SystemDataTy);
     NewRetTy = SystemDataTy;
     break;
@@ -1691,10 +1763,32 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
     llvm_unreachable("Unhandled ShaderKind");
   }
 
+  if (MetadataState.isInLgcCpsMode() &&
+      Data.Kind != RayTracingShaderStage::RayGeneration) {
+    auto *DummyArgTy = StructType::get(*Context, {});
+
+    if (Data.Kind != RayTracingShaderStage::AnyHit) {
+      // Add a dummy argument for CpsArgIdxHitAttributes so that the arg index
+      // of payload matches CpsArgIdxPayload
+      AllArgTypes.push_back(DummyArgTy);
+    }
+
+    // Add padding so that payload starts at a fixed dword.
+    ContHelper::addPaddingType(*DL, *Context, AllArgTypes,
+                               Data.FirstPayloadArgumentDword);
+    // Place payload at the end
+    AllArgTypes.push_back(CpsArgPayloadTy);
+  }
+
   Data.PayloadSpillSize = computeNeededStackSizeForRegisterBuffer(
       Data.MaxOutgoingPayloadI32s, MetadataState.getMaxPayloadRegisterCount());
   assert(Data.PayloadSpillSize == 0 ||
-         Data.Kind != DXILShaderKind::Intersection);
+         Data.Kind != RayTracingShaderStage::Intersection);
+
+  if (!MetadataState.isInLgcCpsMode()) {
+    Data.PayloadStorage = PayloadStorageGlobal;
+    Data.PayloadStorageTy = PayloadStorageGlobal->getValueType();
+  }
 
   auto *FunctionTypeRetTy =
       MetadataState.isInLgcCpsMode() ? Builder.getVoidTy() : NewRetTy;
@@ -1717,15 +1811,42 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
     NewFunc->getArg(CpsArgIdxContState)->setName("cont.state");
     NewFunc->getArg(CpsArgIdxReturnAddr)->setName("return.addr");
     NewFunc->getArg(CpsArgIdxShaderIndex)->setName("shader.index");
+    if (Data.Kind != RayTracingShaderStage::RayGeneration) {
+      NewFunc->getArg(CpsArgIdxSystemData)->setName("system.data");
+      NewFunc->getArg(CpsArgIdxHitAttributes)->setName("hit.attrs");
+      NewFunc->getArg(CpsArgIdxPadding)->setName("padding");
+      NewFunc->getArg(CpsArgIdxPayload)->setName("payload");
+    }
 
     // Mark as CPS function with the corresponding level.
-    CpsLevel Level =
-        getCpsLevelForShaderStage(convertShaderKindToCpsShaderStage(Data.Kind));
+    CpsLevel Level = getCpsLevelForShaderStage(Data.Kind);
     setCpsFunctionLevel(*NewFunc, Level);
+
+    if (Data.Kind == RayTracingShaderStage::Traversal) {
+      // Compute here means Traversal.
+      assert(F->arg_size() == 1);
+      // System data
+      // NOTE: Pointer address space may not match based on data layout, mutate
+      // the address space here to keep later GEP valid.
+      Data.SystemData->mutateType(getWithSamePointeeType(
+          Data.SystemData->getType(),
+          F->getArg(0)->getType()->getPointerAddressSpace()));
+      F->getArg(0)->replaceAllUsesWith(Data.SystemData);
+    } else {
+      // Create local payload storage for non-Traversal shader.
+      IRBuilder<>::InsertPointGuard Guard(Builder);
+      Builder.SetInsertPointPastAllocas(NewFunc);
+      Data.PayloadStorage = Builder.CreateAlloca(Data.PayloadStorageTy);
+      Data.PayloadStorage->setName("payload.alloca");
+      // TODO: We shouldn't need to create the alloca for RGS.
+      if (Data.Kind != RayTracingShaderStage::RayGeneration)
+        Builder.CreateStore(NewFunc->getArg(CpsArgIdxPayload),
+                            Data.PayloadStorage);
+    }
   }
 
   FunctionEndData EData;
-  if (Data.Kind == DXILShaderKind::RayGeneration) {
+  if (Data.Kind == RayTracingShaderStage::RayGeneration) {
     if (!MetadataState.isInLgcCpsMode()) {
       NewFunc->setMetadata(ContHelper::MDEntryName, MDTuple::get(*Context, {}));
 
@@ -1742,7 +1863,7 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
 
     Type *PayloadTy = Data.IncomingPayload;
     std::optional<PAQShaderStage> ShaderStage =
-        dxilShaderKindToPAQShaderStage(Data.Kind);
+        rtShaderStageToPAQShaderStage(Data.Kind);
     PAQSerializationInfoBase *SerializationInfo =
         Data.IncomingPayloadSerializationInfo;
 
@@ -1754,12 +1875,13 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
     // recursive TraceRay or CallShader)
     SmallVector<Value *, 32> SavedRegisterValues{};
 
-    if (Data.Kind != DXILShaderKind::Intersection) {
+    if (Data.Kind != RayTracingShaderStage::Intersection &&
+        Data.Kind != RayTracingShaderStage::Traversal) {
       assert(PayloadTy && "Missing payload type!");
 
       // For AnyHit, the layout depends on whether we accept or ignore, which
       // we do not know yet. In that case, the layout is determined later.
-      if (Data.Kind != DXILShaderKind::AnyHit) {
+      if (Data.Kind != RayTracingShaderStage::AnyHit) {
         OutgoingSerializationLayout =
             &PAQManager.getOrCreateShaderExitSerializationLayout(
                 *SerializationInfo, Data.Kind, Data.HitAttributes,
@@ -1780,36 +1902,31 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
         FPayload->replaceAllUsesWith(NewPayload);
       }
 
-      if (MetadataState.isInLgcCpsMode()) {
-        // TODO Read payload argument for lgc continuations
-      } else {
+      auto IncomingRegisterCount =
+          std::min(IncomingSerializationLayout.NumStorageI32s,
+                   MetadataState.getMaxPayloadRegisterCount());
+      MetadataState.updateMaxUsedPayloadRegisterCount(IncomingRegisterCount);
+      if (!MetadataState.isInLgcCpsMode()) {
         // Annotate function with the number of registers for incoming payload
-        auto IncomingRegisterCount =
-            std::min(IncomingSerializationLayout.NumStorageI32s,
-                     MetadataState.getMaxPayloadRegisterCount());
         ContHelper::setIncomingRegisterCount(NewFunc, IncomingRegisterCount);
-        MetadataState.updateMaxUsedPayloadRegisterCount(IncomingRegisterCount);
+      }
 
-        // Copy global payload into local payload at start of shader
-        if (IncomingSerializationLayout.NumStorageI32s) {
-          copyPayload(*PayloadTy, NewPayload, ShaderStage, PAQAccessKind::Read,
-                      IncomingSerializationLayout);
-          // Add barrier so no stores that may overwrite the memory pointer
-          // are put before the payload is read
-          Builder.CreateCall(RegisterBufferSetPointerBarrier, {Payload});
-        }
+      // Copy global payload into local payload at start of shader
+      if (IncomingSerializationLayout.NumStorageI32s) {
+        copyPayload(*PayloadTy, NewPayload, Data.PayloadStorage, ShaderStage,
+                    PAQAccessKind::Read, IncomingSerializationLayout);
+      }
 
-        if (!Data.CallShaderCalls.empty() || !Data.TraceRayCalls.empty()) {
-          assert(OutgoingSerializationLayout &&
-                 "Missing outgoing serialization layout!");
-          savePayloadRegistersBeforeRecursion(
-              Data.Kind, IncomingSerializationLayout,
-              *OutgoingSerializationLayout, SavedRegisterValues);
-        }
+      if (!Data.CallShaderCalls.empty() || !Data.TraceRayCalls.empty()) {
+        assert(OutgoingSerializationLayout &&
+               "Missing outgoing serialization layout!");
+        savePayloadRegistersBeforeRecursion(
+            Data.PayloadStorage, Data.Kind, IncomingSerializationLayout,
+            *OutgoingSerializationLayout, SavedRegisterValues);
       }
 
       // Handle hit attributes
-      if (Data.Kind == DXILShaderKind::AnyHit) {
+      if (Data.Kind == RayTracingShaderStage::AnyHit) {
         assert(F->arg_size() == 2 && "Shader has more arguments than expected");
         auto *HitAttrs = F->getArg(1);
 
@@ -1831,10 +1948,12 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
                           &IncomingSerializationLayout);
 
         // Copy new hit attributes from argument
-        Builder.CreateStore(NewFunc->getArg(NewFunc->arg_size() - 1),
-                            HitAttrsAlloca);
+        unsigned HitAttributesIdx = MetadataState.isInLgcCpsMode()
+                                        ? CpsArgIdxHitAttributes
+                                        : NewFunc->arg_size() - 1;
+        Builder.CreateStore(NewFunc->getArg(HitAttributesIdx), HitAttrsAlloca);
         HitAttrs->replaceAllUsesWith(HitAttrsAlloca);
-      } else if (Data.Kind == DXILShaderKind::ClosestHit) {
+      } else if (Data.Kind == RayTracingShaderStage::ClosestHit) {
         assert(F->arg_size() == 2 && "Shader has more arguments than expected");
         auto *OrigHitAttrs = F->getArg(1);
 
@@ -1879,16 +1998,37 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
   // Modify function ends
   // While iterating over function ends, basic blocks are inserted by inlining
   // functions, so we copy them beforehand.
-  SmallVector<BasicBlock *> BBs(make_pointer_range(*NewFunc));
-  for (auto *BB : BBs) {
-    auto *I = BB->getTerminator();
-    assert(I && "BB must have terminator");
-    // Replace the end of the BB if it terminates the function
-    bool IsFunctionEnd = (I->getOpcode() == Instruction::Ret ||
-                          I->getOpcode() == Instruction::Unreachable);
-    if (IsFunctionEnd) {
-      EData.Terminator = I;
-      processFunctionEnd(Data, EData);
+  if (MetadataState.isInLgcCpsMode() &&
+      Data.Kind == RayTracingShaderStage::Traversal) {
+    // Fixup lgc.cps.jump
+    for (auto *Jump : Data.JumpCalls) {
+      Builder.SetInsertPoint(Jump);
+      SmallVector<Value *> NewTailArgs(Jump->getTail());
+
+      // Add padding so that payload starts at a fixed dword.
+      ContHelper::addPaddingValue(*DL, *Context, NewTailArgs,
+                                  Data.FirstPayloadArgumentDword);
+
+      // Insert payload into tail args.
+      NewTailArgs.push_back(NewFunc->getArg(CpsArgIdxPayload));
+
+      Builder.create<JumpOp>(Jump->getTarget(), Jump->getLevels(),
+                             Jump->getState(), NewTailArgs);
+      Jump->dropAllReferences();
+      Jump->eraseFromParent();
+    }
+  } else {
+    SmallVector<BasicBlock *> BBs(make_pointer_range(*NewFunc));
+    for (auto *BB : BBs) {
+      auto *I = BB->getTerminator();
+      assert(I && "BB must have terminator");
+      // Replace the end of the BB if it terminates the function
+      bool IsFunctionEnd = (I->getOpcode() == Instruction::Ret ||
+                            I->getOpcode() == Instruction::Unreachable);
+      if (IsFunctionEnd) {
+        EData.Terminator = I;
+        processFunctionEnd(Data, EData);
+      }
     }
   }
 
@@ -1937,7 +2077,7 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
 
 #ifndef NDEBUG
   if (!MetadataState.isInLgcCpsMode() &&
-      Data.Kind != DXILShaderKind::RayGeneration) {
+      Data.Kind != RayTracingShaderStage::RayGeneration) {
     // Check that all returns have registercount metadata
     for (const auto &BB : *F) {
       auto *Terminator = BB.getTerminator();
@@ -1952,9 +2092,8 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
 static uint32_t getMaxHitAttributeByteCount(const Function &F) {
   // Use max hit attribute size from metadata, or use globally max allowed
   // value for the max if metadata is not set
-  uint32_t Result = lgc::rt::getShaderHitAttributeSize(&F);
-  if (Result == 0)
-    Result = GlobalMaxHitAttributeBytes;
+  auto HitAttributeSizeFromMD = getShaderHitAttributeSize(&F);
+  uint32_t Result = HitAttributeSizeFromMD.value_or(GlobalMaxHitAttributeBytes);
 
   if (Result % RegisterBytes != 0) {
     auto AlignedSize = alignTo(Result, RegisterBytes);
@@ -1967,27 +2106,38 @@ static uint32_t getMaxHitAttributeByteCount(const Function &F) {
 
 void LowerRaytracingPipelinePassImpl::collectProcessableFunctions() {
   for (auto &Func : *Mod) {
-    auto Stage = lgc::rt::getLgcRtShaderStage(&Func);
+    auto Stage = getLgcRtShaderStage(&Func);
     if (!Stage || Func.isDeclaration())
       continue;
 
-    DXILShaderKind Kind =
-        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
+    // Skip kernel entry
+    if (Stage == RayTracingShaderStage::KernelEntry)
+      continue;
+
+    // Skip Traversal for non-lgc.cps
+    if (Stage == RayTracingShaderStage::Traversal &&
+        !MetadataState.isInLgcCpsMode())
+      continue;
+
+    RayTracingShaderStage Kind = *Stage;
     switch (Kind) {
-    case DXILShaderKind::RayGeneration:
-    case DXILShaderKind::Intersection:
-    case DXILShaderKind::AnyHit:
-    case DXILShaderKind::ClosestHit:
-    case DXILShaderKind::Miss:
-    case DXILShaderKind::Callable: {
+    case RayTracingShaderStage::RayGeneration:
+    case RayTracingShaderStage::Intersection:
+    case RayTracingShaderStage::AnyHit:
+    case RayTracingShaderStage::ClosestHit:
+    case RayTracingShaderStage::Miss:
+    case RayTracingShaderStage::Callable:
+    case RayTracingShaderStage::Traversal: {
       FunctionData Data;
       Data.Kind = Kind;
       Data.FuncConfig.MaxHitAttributeBytes = getMaxHitAttributeByteCount(Func);
       LLVM_DEBUG(dbgs() << "Shader " << Func.getName()
                         << " uses max hit attribute size of "
                         << Data.FuncConfig.MaxHitAttributeBytes << "\n");
-      if (Kind != DXILShaderKind::Intersection &&
-          Kind != DXILShaderKind::RayGeneration) {
+
+      if (Kind != RayTracingShaderStage::Intersection &&
+          Kind != RayTracingShaderStage::RayGeneration &&
+          Kind != RayTracingShaderStage::Traversal) {
         assert(!Func.arg_empty() && "Shader must have at least one argument");
         Data.IncomingPayload = getFuncArgPtrElementType(&Func, 0);
         PAQPayloadConfig PAQConfig = {Data.IncomingPayload,
@@ -1997,15 +2147,15 @@ void LowerRaytracingPipelinePassImpl::collectProcessableFunctions() {
         assert(Data.IncomingPayloadSerializationInfo != nullptr &&
                "Missing serialization info!");
       }
-      if (Kind == DXILShaderKind::AnyHit ||
-          Kind == DXILShaderKind::ClosestHit) {
+      if (Kind == RayTracingShaderStage::AnyHit ||
+          Kind == RayTracingShaderStage::ClosestHit) {
         assert(Func.arg_size() >= 2 &&
                "Shader must have at least two arguments");
         Data.HitAttributes =
             getFuncArgPtrElementType(&Func, Func.arg_size() - 1);
       }
 
-      if (Kind == DXILShaderKind::Intersection) {
+      if (Kind == RayTracingShaderStage::Intersection) {
         Data.MaxOutgoingPayloadI32s =
             MetadataState.getMaxPayloadRegisterCount();
       }
@@ -2067,7 +2217,8 @@ void LowerRaytracingPipelinePassImpl::handleUnrematerializableCandidates() {
 
     static const llvm_dialects::OpSet NonRematerializableDialectOps =
         llvm_dialects::OpSet::get<TraceRayOp, ReportHitOp, CallCallableShaderOp,
-                                  ShaderIndexOp, ShaderRecordBufferOp>();
+                                  ShaderIndexOp, ShaderRecordBufferOp,
+                                  JumpOp>();
     if (!NonRematerializableDialectOps.contains(Func)) {
       llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
         auto Data = ToProcess.find(CInst.getFunction());
@@ -2119,21 +2270,16 @@ void LowerRaytracingPipelinePassImpl::collectGpuRtFunctions() {
 
   GetLocalRootIndex =
       GpurtLibrary->getFunction(ContDriverFunc::GetLocalRootIndexName);
-  if (GetLocalRootIndex)
-    assert(
-        GetLocalRootIndex->getReturnType() ==
-            Type::getInt32Ty(Mod->getContext()) &&
-        GetLocalRootIndex->arg_size() == 1
-        // Dispatch data
-        &&
-        GetLocalRootIndex->getFunctionType()->getParamType(0)->isPointerTy());
+
+  assert(GetLocalRootIndex && "Could not find GetLocalRootIndex function");
+  assert(GetLocalRootIndex->getReturnType() ==
+             Type::getInt32Ty(Mod->getContext()) &&
+         GetLocalRootIndex->arg_size() == 1
+         // Dispatch data
+         &&
+         GetLocalRootIndex->getFunctionType()->getParamType(0)->isPointerTy());
 
   SetLocalRootIndex = getSetLocalRootIndex(*Mod);
-
-  SetupRayGen = GpurtLibrary->getFunction(ContDriverFunc::SetupRayGenName);
-  if (SetupRayGen)
-    assert(SetupRayGen->getReturnType()->isStructTy() &&
-           SetupRayGen->arg_empty());
 
   TraceRay = GpurtLibrary->getFunction(ContDriverFunc::TraceRayName);
   if (TraceRay)
@@ -2186,6 +2332,10 @@ LowerRaytracingPipelinePassImpl::LowerRaytracingPipelinePassImpl(
 
 bool LowerRaytracingPipelinePassImpl::run() {
   collectGpuRtFunctions();
+  DispatchSystemDataTy = getFuncArgPtrElementType(GetLocalRootIndex, 0);
+  assert(DispatchSystemDataTy && "LowerRaytracingPipelinePassImpl::run: Could "
+                                 "not derive DispatchSystemData "
+                                 "type from GetLocalRootIndex!");
 
   collectProcessableFunctions();
 
@@ -2198,8 +2348,8 @@ bool LowerRaytracingPipelinePassImpl::run() {
       llvm_dialects::VisitorBuilder<VisitorState>()
           .setStrategy(llvm_dialects::VisitorStrategy::ByInstruction)
           .addSet<TraceRayOp, CallCallableShaderOp, ReportHitOp, ShaderIndexOp,
-                  ShaderRecordBufferOp>([](VisitorState &State,
-                                           Instruction &Op) {
+                  ShaderRecordBufferOp, JumpOp>([](VisitorState &State,
+                                                   Instruction &Op) {
             auto *CInst = cast<CallInst>(&Op);
             auto Data = State.Processables.find(CInst->getFunction());
             if (Data == State.Processables.end())
@@ -2212,6 +2362,11 @@ bool LowerRaytracingPipelinePassImpl::run() {
 
             if (isa<ShaderRecordBufferOp>(Op)) {
               Data->second.ShaderRecordBufferCalls.push_back(CInst);
+              return;
+            }
+
+            if (auto *Jump = dyn_cast<JumpOp>(CInst)) {
+              Data->second.JumpCalls.push_back(Jump);
               return;
             }
 
@@ -2305,20 +2460,20 @@ bool LowerRaytracingPipelinePassImpl::run() {
 }
 
 std::optional<PAQShaderStage>
-llvm::dxilShaderKindToPAQShaderStage(DXILShaderKind ShaderKind) {
+llvm::rtShaderStageToPAQShaderStage(RayTracingShaderStage ShaderKind) {
   switch (ShaderKind) {
-  case DXILShaderKind::RayGeneration:
+  case RayTracingShaderStage::RayGeneration:
     return PAQShaderStage::Caller;
-  case DXILShaderKind::Intersection:
+  case RayTracingShaderStage::Intersection:
     // Explicit: PAQ do not apply to Intersection
     return {};
-  case DXILShaderKind::AnyHit:
+  case RayTracingShaderStage::AnyHit:
     return PAQShaderStage::AnyHit;
-  case DXILShaderKind::ClosestHit:
+  case RayTracingShaderStage::ClosestHit:
     return PAQShaderStage::ClosestHit;
-  case DXILShaderKind::Miss:
+  case RayTracingShaderStage::Miss:
     return PAQShaderStage::Miss;
-  case DXILShaderKind::Callable:
+  case RayTracingShaderStage::Callable:
     // Explicit: PAQ do not apply to Callable
     return {};
   default:

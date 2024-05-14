@@ -886,7 +886,7 @@ public:
   // getOrCreateCallShaderSerializationInfo depending on ShaderKind.
   PAQSerializationInfoBase &
   getOrCreateSerializationInfo(const PAQPayloadConfig &PayloadConfig,
-                               DXILShaderKind ShaderKind);
+                               lgc::rt::RayTracingShaderStage ShaderKind);
 
   // Check whether a serialization info for the given
   // payload type has already been computed (or imported from DXIL metadata).
@@ -912,12 +912,14 @@ public:
   // Convenience wrapper that selects the layout to be used for the payload
   // incoming to a shader on shader entry.
   const PAQSerializationLayout &getOrCreateShaderStartSerializationLayout(
-      PAQSerializationInfoBase &SerializationInfo, DXILShaderKind ShaderKind,
+      PAQSerializationInfoBase &SerializationInfo,
+      lgc::rt::RayTracingShaderStage ShaderKind,
       Type *HitAttributesTy = nullptr);
   // Convenience wrapper that selects the layout to be used for the payload
   // outgoing of a shader on shader exit.
   const PAQSerializationLayout &getOrCreateShaderExitSerializationLayout(
-      PAQSerializationInfoBase &SerializationInfo, DXILShaderKind ShaderKind,
+      PAQSerializationInfoBase &SerializationInfo,
+      lgc::rt::RayTracingShaderStage ShaderKind,
       Type *HitAttributesTy = nullptr,
       AnyHitExitKind AHExitKind = AnyHitExitKind::None);
 

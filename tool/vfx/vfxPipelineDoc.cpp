@@ -67,11 +67,16 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeResourceMapping:
     maxSectionCount = 1;
     break;
+  case SectionTypeGraphicsLibrary:
+    maxSectionCount = 1;
   case SectionTypeShader:
     maxSectionCount = UINT32_MAX;
     break;
   case SectionTypeShaderInfo:
     maxSectionCount = UINT32_MAX;
+    break;
+  case SectionTypFsOutput:
+    maxSectionCount = 1;
     break;
   default:
     break;
@@ -99,6 +104,16 @@ bool PipelineDocument::checkVersion(unsigned ver) {
 VfxPipelineStatePtr PipelineDocument::getDocument() {
   // Section "Version"
   m_pipelineState.version = Version;
+
+  // Section "GraphicsLibrary"
+  if (m_sections[SectionTypeGraphicsLibrary].size() > 0) {
+    m_pipelineState.pipelineType = VfxPipelineTypeGraphicsLibrary;
+    reinterpret_cast<SectionGraphicsLibrary *>(m_sections[SectionTypeGraphicsLibrary][0])
+        ->getSubState(m_fileName, m_pipelineState.graphicsLibFileName);
+
+    // If a pipeline contains this section, we will compile these libraries separately.
+    return &m_pipelineState;
+  }
 
   // Section "GraphicsPipelineState"
   if (m_sections[SectionTypeGraphicsState].size() > 0) {
@@ -232,6 +247,11 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     DeduplicateResourceMappingData(resourceMapping);
   }
 
+  if (m_sections[SectionTypFsOutput].size() > 0) {
+    auto section = reinterpret_cast<SectionFsOutput *>(m_sections[SectionTypFsOutput][0]);
+    section->getSubState(m_pipelineState.fsOutputs);
+  }
+
   return &m_pipelineState;
 }
 
@@ -256,11 +276,6 @@ bool PipelineDocument::validate() {
         return false;
       }
     }
-  }
-
-  if (stageMask == 0) {
-    PARSE_ERROR(m_errorMsg, 0, "No Shader source section in pipeline!\n");
-    return false;
   }
 
   const unsigned graphicsStageMask = ShaderStageBit::ShaderStageAllGraphicsBit;
@@ -353,6 +368,9 @@ Section *PipelineDocument::createSection(const char *sectionName) {
   case SectionTypeResourceMapping:
     section = new SectionResourceMapping();
     break;
+  case SectionTypeGraphicsLibrary:
+    section = new SectionGraphicsLibrary();
+    break;
   default:
     section = Document::createSection(sectionName);
     break;
@@ -393,6 +411,7 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypeGpurtFuncTable, SectionGpurtFuncTable)
 #endif
     CASE_SUBSECTION(MemberTypeExtendedRobustness, SectionExtendedRobustness)
+    CASE_SUBSECTION(MemberTypeAdvancedBlendInfo, SectionAdvancedBlendInfo)
   default:
     result = Document::getPtrOfSubSection(section, lineNum, memberName, memberType, isWriteAccess, arrayIndex, ptrOut,
                                           errorMsg);

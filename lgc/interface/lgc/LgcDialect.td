@@ -120,6 +120,17 @@ def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
   }];
 }
 
+def LoadBufferAddrOp : LgcOp<"load.buffer.addr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI64:$desc_set, AttrI32:$binding, I32:$desc_index,
+      AttrI32:$flags);
+  let results = (outs I64:$result);
+
+  let summary = "create a load of a buffer descriptor and convert to 64-bit address";
+  let description = [{
+    Return the i64 address. This works whether the descriptor is compact or not.
+  }];
+}
+
 def LoadBufferDescOp : LgcOp<"load.buffer.desc", [Memory<[]>, WillReturn]> {
   let arguments = (ins AttrI64:$desc_set, AttrI32:$binding, I32:$desc_index,
       AttrI32:$flags);
@@ -128,6 +139,22 @@ def LoadBufferDescOp : LgcOp<"load.buffer.desc", [Memory<[]>, WillReturn]> {
   let summary = "create a load of a buffer descriptor";
   let description = [{
     Return the buffer descriptor pointer.
+
+    `flags` must not contain `BufferFlagAddress` for this Op.
+  }];
+}
+
+def LoadStridedBufferDescOp : LgcOp<"load.strided.buffer.desc", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI64:$desc_set, AttrI32:$binding, I32:$desc_index, AttrI32:$flags, AttrI32:$stride);
+  let results = (outs BufferStridedPointer:$result);
+
+  let summary = "create a load of a strided buffer descriptor";
+  let description = [{
+    Return the strided buffer descriptor pointer.
+
+    'stride' If stride is 0, then the descriptor must be a full descriptor in memory (can't be inline or compact), and must be a strided descriptor.
+    Otherwise, the descriptor must either be a full strided descriptor in memory, in which case the descriptor's stride is used;
+    alternatively, the descriptor can be an inline or compact buffer, in which case stride is used for the stride of the returned buffer.
 
     `flags` must not contain `BufferFlagAddress` for this Op.
   }];
@@ -227,30 +254,19 @@ def GetMeshBuiltinInputOp : LgcOp<"get.mesh.builtin.input", [Memory<[]>, WillRet
   }];
 }
 
-def WriteMeshVertexOutputOp : LgcOp<"write.mesh.vertex.output", [Memory<[]>]> {
-  let arguments = (ins I32:$output_offset, I32:$vertex_index, value:$output_value);
+def WriteMeshOutputOp : LgcOp<"write.mesh.output", [Memory<[]>]> {
+  let arguments = (ins AttrI1:$is_primitive, AttrI32:$location, I32:$location_offset, I32:$component_index, I32:$prim_or_vertex_index, value:$output_value);
   let results = (outs);
 
-  let summary = "Write mesh shader vertex outputs";
+  let summary = "Write mesh shader primitive/vertex outputs";
   let description = [{
-    In the mesh shader, write mesh shader vertex outputs to LDS.
+    In the mesh shader, write mesh shader primitive/vertex outputs to LDS.
 
-    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed vertex.
-    `vertex_index` is the vertex index specifying which vertex to write.
-    `output_value` is the output value to write.
-  }];
-}
-
-def WriteMeshPrimitiveOutputOp : LgcOp<"write.mesh.primitive.output", [Memory<[]>]> {
-  let arguments = (ins I32:$output_offset, I32:$primitive_index, value:$output_value);
-  let results = (outs);
-
-  let summary = "Write mesh shader primitive outputs";
-  let description = [{
-    In the mesh shader, write mesh shader primitive outputs to LDS.
-
-    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed primitive.
-    `primitive_index` is the primitive index specifying which primitive to write.
+    `is_primitive` indicates if this write is for a primitive output or for a vertex output.
+    `location` is the start location of this output.
+    `location_offset` is the relative location offset of this output, used by arrayed outputs.
+    `component_index` is the component index of this output when component addressing is involved.
+    `prim_or_vertex_index` is the primitive/vertex index specifying which primitive/vertex to write.
     `output_value` is the output value to write.
   }];
 }
@@ -552,5 +568,18 @@ def CooperativeRowAccExpandOp : LgcOp<"cooperative.rowacc.expand", [Memory<[]>, 
     'matrix_elem_type' is the element type for the output cooperative matrix.
     'matrix_layout' is the element type for the output cooperative matrix.
     'col_major' indicate how to expand the cooperative row acculumlator data by row or col.
+  }];
+}
+
+def LoadDriverTableEntryOp : LgcOp<"load.driver.table.entry", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI32:$offset);
+  let results = (outs value:$entry);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "load a driver table entry from specified offset.";
+  let description = [{
+    The driver table is setup by PAL and contains global information such as descriptors for tessellation ring buffers, attributes-through-memory buffer, etc.
+    `offset` is the offset into the driver table, in unit of dwords.
   }];
 }

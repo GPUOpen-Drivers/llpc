@@ -43,6 +43,7 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
 using namespace lgc;
@@ -100,6 +101,7 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 #else
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
 #endif
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ShaderMarker"] = &SpirvProcessGpuRtLibrary::createShaderMarker;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
       &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
   m_libFuncPtrs["AmdExtDispatchThreadIdFlat"] = &SpirvProcessGpuRtLibrary::createDispatchThreadIdFlat;
@@ -174,39 +176,6 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   assert(!getObjToWorldTrans.empty());
   assert(!getWorldToObjTrans.empty());
 
-  bool isAmdAwaitLike = funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait");
-  if (funcName.starts_with("_cont_") || isAmdAwaitLike) {
-    func->setLinkage(GlobalValue::WeakAnyLinkage);
-    // Delete function body of _Amd*Await, it will be handled in LowerRaytracingPipeline.
-    if (isAmdAwaitLike)
-      func->deleteBody();
-
-    // The function might not have types metadata like _cont_SetupRayGen or _AmdAwait which is a declaration, nothing
-    // needs to be done.
-    if (!func->getMetadata(ContHelper::MDTypesName))
-      return;
-
-    SmallBitVector promotionMask(func->arg_size());
-    for (unsigned argNo = 0; argNo < func->arg_size(); argNo++) {
-      auto *arg = func->getArg(argNo);
-      ContArgTy argTy = ContArgTy::get(func, arg);
-      auto funcName = func->getName();
-
-      if (!argTy.isPointerTy())
-        continue;
-
-      // Change the pointer type to its value type for non-struct types.
-      // Amd*Await, use value types for all arguments.
-      // For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
-      if (!isa<StructType>(argTy.getPointerElementType()) || isAmdAwaitLike ||
-          (funcName == ContDriverFunc::SetTriangleHitAttributesName && argNo == 1))
-        promotionMask.set(argNo);
-    }
-
-    promotePointerArguments(func, promotionMask);
-    return;
-  }
-
   // Set external linkage for library entry functions
   if (funcName.starts_with(traceRayFuncName) || funcName.starts_with(rayQueryInitializeFuncName) ||
       funcName.starts_with(rayQueryProceedFuncName) ||
@@ -242,14 +211,11 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     return;
   } else if (funcName.starts_with("_AmdGetUninitialized")) {
     m_builder->SetInsertPoint(clearBlock(func));
-    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
+    Value *FrozenPoison = m_builder->CreateFreeze(PoisonValue::get(func->getReturnType()));
+    m_builder->CreateRet(FrozenPoison);
     return;
-  } else if (funcName.starts_with("_AmdGetShaderKind") || funcName.starts_with("_AmdGetCurrentFuncAddr") ||
-             funcName.starts_with("_AmdGetResumePointAddr")) {
-    // These _Amd* functions are handled in later continuation transformations, delete the function body to preserve the
-    // call.
-    func->deleteBody();
-    func->setLinkage(GlobalValue::WeakAnyLinkage);
+  } else if (funcName.starts_with("_AmdRestoreSystemData")) {
+    // We don't need this, leave it as dummy function so that it does nothing.
     return;
   }
 
@@ -269,6 +235,58 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     auto funcPtr = commonFuncIt->second;
     m_builder->SetInsertPoint(clearBlock(func));
     (*funcPtr)(func, m_builder);
+    return;
+  }
+
+  bool isAmdAwaitLike = funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait");
+  if (funcName.starts_with("_cont_") || funcName.starts_with("_Amd")) {
+    func->setLinkage(GlobalValue::WeakAnyLinkage);
+
+    // Skip _AmdAwaitTraversal function resulting from calls to _AmdWaitAwaitTraversal.
+    if (!func->hasMetadata(ContHelper::MDTypesName) && !func->arg_empty())
+      return;
+
+    SmallBitVector promotionMask(func->arg_size());
+    for (unsigned argNo = 0; argNo < func->arg_size(); argNo++) {
+      auto *arg = func->getArg(argNo);
+      ContArgTy argTy = ContArgTy::get(func, arg);
+      auto funcName = func->getName();
+
+      if (!argTy.isPointerTy())
+        continue;
+
+      // Change the pointer type to its value type for non-struct types.
+      // Amd*Await, use value types for all arguments.
+      // For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
+      if (!isa<StructType>(argTy.getPointerElementType()) || isAmdAwaitLike ||
+          (funcName == ContDriverFunc::SetTriangleHitAttributesName && argNo == 1))
+        promotionMask.set(argNo);
+    }
+
+    auto *newFunc = promotePointerArguments(func, promotionMask);
+
+    // Delete function body of _Amd* intrinsics that survive here, they will be handled in LowerRaytracingPipeline.
+    if (funcName.starts_with("_Amd"))
+      newFunc->deleteBody();
+
+    if (newFunc->getName().starts_with("_AmdWaitAwait")) {
+      llvm::forEachCall(*newFunc, [&](CallInst &CInst) {
+        SmallVector<Value *> args(CInst.args());
+        // NOTE: Theoretically we should remove the wait mask so that the function signature matches
+        // _AmdAwait*(addr, returnAddr, SystemData, ...). However, _AmdWaitAwaitTraversal's arguments are defined as
+        // (addr, waitMask, SystemData, ...), thus we need to keep the waitMask as a dummy returnAddr so that
+        // LowerRaytracingPipeline can handle it correctly.
+        if (!newFunc->getName().starts_with("_AmdWaitAwaitTraversal"))
+          args.erase(args.begin() + 1);
+
+        m_builder->SetInsertPoint(&CInst);
+        auto *newValue = m_builder->CreateNamedCall("_AmdAwait", CInst.getType(), args, {});
+        CInst.replaceAllUsesWith(newValue);
+        CInst.eraseFromParent();
+      });
+    }
+
+    return;
   }
 }
 
@@ -608,19 +626,25 @@ Value *SpirvProcessGpuRtLibrary::createGetBvhSrd(llvm::Value *expansion, llvm::V
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSampleGpuTimer(llvm::Function *func) {
-  Value *timerHiPtr = func->getArg(0);
-  Value *timerLoPtr = func->getArg(1);
+  if (func->arg_size() == 2) {
+    Value *timerHiPtr = func->getArg(0);
+    Value *timerLoPtr = func->getArg(1);
 
-  Value *const readClock = m_builder->CreateReadClock(true);
-  Value *clocksLo = m_builder->CreateAnd(readClock, m_builder->getInt64(UINT32_MAX));
-  clocksLo = m_builder->CreateTrunc(clocksLo, m_builder->getInt32Ty());
-  Value *clocksHi = m_builder->CreateLShr(readClock, m_builder->getInt64(32));
-  clocksHi = m_builder->CreateTrunc(clocksHi, m_builder->getInt32Ty());
+    Value *const readClock = m_builder->CreateReadClock(true);
+    Value *clocksLo = m_builder->CreateAnd(readClock, m_builder->getInt64(UINT32_MAX));
+    clocksLo = m_builder->CreateTrunc(clocksLo, m_builder->getInt32Ty());
+    Value *clocksHi = m_builder->CreateLShr(readClock, m_builder->getInt64(32));
+    clocksHi = m_builder->CreateTrunc(clocksHi, m_builder->getInt32Ty());
 
-  m_builder->CreateStore(clocksLo, timerLoPtr);
-  m_builder->CreateStore(clocksHi, timerHiPtr);
+    m_builder->CreateStore(clocksLo, timerLoPtr);
+    m_builder->CreateStore(clocksHi, timerHiPtr);
 
-  m_builder->CreateRetVoid();
+    m_builder->CreateRetVoid();
+  } else {
+    assert(func->arg_empty());
+    Value *const readClock = m_builder->CreateReadClock(true);
+    m_builder->CreateRet(readClock);
+  }
 }
 
 // =====================================================================================================================
@@ -926,6 +950,16 @@ void SpirvProcessGpuRtLibrary::createGetRtip(llvm::Function *func) {
   auto rtip = m_context->getPipelineContext()->getRayTracingState()->rtIpVersion;
   // The version is encoded as <major><minor> in decimal digits, so 11 is rtip 1.1, 20 is rtip 2.0
   m_builder->CreateRet(m_builder->getInt32(rtip.major * 10 + rtip.minor));
+}
+
+// =====================================================================================================================
+// Fill in function to write shader marker
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createShaderMarker(llvm::Function *func) {
+  Value *dataPtr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata, {}, dataPtr);
+  m_builder->CreateRetVoid();
 }
 
 } // namespace Llpc

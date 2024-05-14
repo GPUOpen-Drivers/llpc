@@ -67,6 +67,8 @@ enum SectionType : unsigned {
   SectionTypeResourceMapping,         // Resource mapping section
   SectionTypeUniformConstantMapEntry, // UniformConstantMapEntry section
   SectionTypeUniformConstantMap,      // UniformConstantMap section
+  SectionTypeGraphicsLibrary,         // Graphics library section
+  SectionTypFsOutput,                 // Fragment output section
   // GL pipeline
   SectionTypeGlProgramParameter, // GL program parameter section
   SectionTypeGlGraphicsState,    // GL graphic pipeline state section
@@ -128,6 +130,7 @@ enum MemberType : unsigned {
   MemberTypeIndirectCalleeSavedRegs,      // VFX member type: SectionIndirectCalleeSavedRegs
   MemberTypeGpurtFuncTable,               // VFX member type: SectionGpurtFuncTable
   MemberTypeExtendedRobustness,           // VFX member type: SectionExtendedRobustness
+  MemberTypeAdvancedBlendInfo,            // VFX member type: SectionAdvancedBlendInfo
   MemberTypeGlAttribLocation,             // GL vertex attribute location
   MemberTypeGlShaderInfo,                 // GL SPIRV parameters
   MemberTypeGlVertexAttrib,               // GL vertex input attribute
@@ -927,6 +930,57 @@ private:
 
   std::vector<uint8_t> m_bufMem;                        // Buffer memory
   std::vector<VkSpecializationMapEntry> m_vkMapEntries; // Vulkan specialization map entry
+};
+
+// =====================================================================================================================
+// Represents the sub section GraphicsLibrary
+class SectionGraphicsLibrary : public Section {
+public:
+  typedef std::string SubState[Vfx::GraphicsLibraryCount];
+
+  SectionGraphicsLibrary() : Section(getAddrTable(), SectionTypeGraphicsLibrary, "GraphicsLibrary") {}
+
+  void getSubState(const std::string &docFileName, SubState &state);
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsLibrary, m_preRaster, MemberTypeString, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsLibrary, m_fragment, MemberTypeString, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsLibrary, m_colorExport, MemberTypeString, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  std::string m_preRaster;   // Pre-Raster library file name
+  std::string m_fragment;    // Fragment library file name
+  std::string m_colorExport; // Color export library file name
+};
+
+// =====================================================================================================================
+// Represents the sub section Metadata
+class SectionFsOutput : public Section {
+public:
+  typedef std::vector<uint32_t> SubState;
+
+  SectionFsOutput() : Section(getAddrTable(), SectionTypFsOutput, nullptr) { m_data = &m_bufMem; }
+
+  void getSubState(SubState &state) { state = *m_data; }
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_MEMBER_NAME_TO_ADDR(SectionFsOutput, m_data, MemberTypeUArray, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState *m_data;               // Fragment output
+  std::vector<uint32_t> m_bufMem; // Buffer
 };
 
 } // namespace Vfx

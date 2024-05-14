@@ -239,6 +239,7 @@ void Section::initSectionInfo() {
 
   INIT_SECTION_INFO("Version", SectionTypeVersion, 0)
   INIT_SECTION_INFO("CompileLog", SectionTypeCompileLog, 0)
+  INIT_SECTION_INFO("FsOutput", SectionTypFsOutput, 0)
 }
 
 // =====================================================================================================================
@@ -734,6 +735,18 @@ void SectionShader::getSubState(SectionShader::SubState &state) {
   state.dataSize = static_cast<unsigned>(m_spvBin.size());
   state.pData = state.dataSize > 0 ? &m_spvBin[0] : nullptr;
   state.stage = m_shaderStage;
+}
+
+void SectionGraphicsLibrary::getSubState(const std::string &docFileName, SubState &state) {
+  // Prepend directory from "docFilename" to the given filename.
+  std::string path;
+  auto separatorIndex = docFileName.find_last_of("/\\");
+  if (separatorIndex != std::string::npos)
+    path = docFileName.substr(0, separatorIndex + 1);
+
+  state[GraphicsLibraryPreRaster] = path + m_preRaster;
+  state[GraphicsLibraryFragment] = path + m_fragment;
+  state[GraphicsLibraryColorExport] = path + m_colorExport;
 }
 
 } // namespace Vfx

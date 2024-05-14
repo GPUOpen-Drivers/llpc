@@ -30,6 +30,7 @@
  */
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
+#include "continuations/ContinuationsUtil.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcGraphicsContext.h"
@@ -55,12 +56,6 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 using namespace lgc::rt;
-
-namespace RtName {
-static const char *HitAttribute = "HitAttribute";
-static const char *IncomingRayPayLoad = "IncomingRayPayloadKHR";
-static const char *IncomingCallableData = "IncomingCallableDataKHR";
-} // namespace RtName
 
 namespace Llpc {
 
@@ -216,7 +211,7 @@ PreservedAnalyses SpirvLowerGlobal::run(Module &module, ModuleAnalysisManager &a
     if (addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output) {
       // Remove constant indexing expression and remove any proxy variables that are needed. (But the proxies aren't
       // used yet for inputs/outputs.)
-      removeConstantExpr(m_context, &global);
+      convertUsersOfConstantsToInstructions(&global);
 
       if (addrSpace == SPIRAS_Private)
         mapGlobalVariableToProxy(&global);
@@ -600,38 +595,27 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   Type *globalVarTy = globalVar->getValueType();
 
   Value *proxy = nullptr;
-  // Handle special globals, regular allocas will be removed by SROA pass.
-  if (globalVar->getName().starts_with(RtName::HitAttribute)) {
-    proxy = m_entryPoint->getArg(1);
-    globalVar->replaceAllUsesWith(proxy);
-  } else if (globalVar->getName().starts_with(RtName::IncomingRayPayLoad)) {
-    proxy = m_entryPoint->getArg(0);
-    globalVar->replaceAllUsesWith(proxy);
-  } else if (globalVar->getName().starts_with(RtName::IncomingCallableData)) {
-    proxy = m_entryPoint->getArg(0);
-    globalVar->replaceAllUsesWith(proxy);
-  } else {
-    // Collect used functions
-    SmallSet<Function *, 4> funcs;
-    for (User *user : globalVar->users()) {
-      auto inst = cast<Instruction>(user);
-      funcs.insert(inst->getFunction());
-    }
-    for (Function *func : funcs) {
-      m_builder->SetInsertPointPastAllocas(func);
-      proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
-                                      Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
-      if (globalVar->hasInitializer()) {
-        auto initializer = globalVar->getInitializer();
-        m_builder->CreateStore(initializer, proxy);
-      }
-      globalVar->mutateType(proxy->getType());
-      globalVar->replaceUsesWithIf(proxy, [func](Use &U) {
-        Instruction *userInst = cast<Instruction>(U.getUser());
-        return userInst->getFunction() == func;
-      });
+  // Collect used functions
+  SmallSet<Function *, 4> funcs;
+  for (User *user : globalVar->users()) {
+    auto inst = cast<Instruction>(user);
+    funcs.insert(inst->getFunction());
+  }
+  for (Function *func : funcs) {
+    m_builder->SetInsertPointPastAllocas(func);
+    proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                    Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
+
+    if (globalVar->hasInitializer()) {
+      auto initializer = globalVar->getInitializer();
+      m_builder->CreateStore(initializer, proxy);
     }
+    globalVar->mutateType(proxy->getType());
+    globalVar->replaceUsesWithIf(proxy, [func](Use &U) {
+      Instruction *userInst = cast<Instruction>(U.getUser());
+      return userInst->getFunction() == func;
+    });
   }
 
   m_globalsToErase.push_back(globalVar);
@@ -1794,13 +1778,19 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     }
 
     bool isAccelerationStructure = false;
+    bool isAliased = false;
     MDNode *blockMetaNode = global.getMetadata(gSPIRVMD::Block);
     if (blockMetaNode) {
       ShaderBlockMetadata blockMeta = {};
       auto blockMetaNodeVal = mdconst::dyn_extract<Constant>(blockMetaNode->getOperand(0));
-      if (auto meta = dyn_cast<ConstantInt>(blockMetaNodeVal))
+      if (auto meta = dyn_cast<ConstantInt>(blockMetaNodeVal)) {
         blockMeta.U64All = meta->getZExtValue();
+      } else if (auto metaStruct = dyn_cast<ConstantStruct>(blockMetaNodeVal)) {
+        const Constant *metaStructVal = metaStruct->getOperand(0);
+        blockMeta.U64All = cast<ConstantInt>(metaStructVal)->getZExtValue();
+      }
       isAccelerationStructure = blockMeta.IsAccelerationStructure;
+      isAliased = blockMeta.Aliased;
     }
 
     if (global.getAddressSpace() == SPIRAS_Constant && !isAccelerationStructure)
@@ -1811,7 +1801,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
 
     const unsigned descSet = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
     const unsigned binding = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
-    SmallVector<Constant *, 8> constantUsers;
 
     // AtomicCounter is emulated following same impl of SSBO, only qualifier 'offset' will be used in its
     // MD now. Using a new MD kind to detect it. AtomicCounter's type should be uint, not a structure.
@@ -1823,13 +1812,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           cast<ConstantInt>(mdconst::dyn_extract<Constant>(atomicCounterMD->getOperand(0)))->getZExtValue();
     }
 
-    for (User *const user : global.users()) {
-      if (Constant *const constVal = dyn_cast<Constant>(user))
-        constantUsers.push_back(constVal);
-    }
-
-    for (Constant *const constVal : constantUsers)
-      replaceConstWithInsts(m_context, constVal);
+    convertUsersOfConstantsToInstructions(&global);
 
     // Record of all the functions that our global is used within.
     SmallSet<Function *, 4> funcsUsedIn;
@@ -1841,7 +1824,39 @@ void SpirvLowerGlobal::lowerBufferBlock() {
 
     // Collect the instructions to be replaced per-global
     SmallVector<ReplaceInstsInfo> instructionsToReplace;
+    bool isConstant = false;
+    bool isReadOnly = true;
+
     for (Function *const func : funcsUsedIn) {
+      SmallVector<Value *, 4> worklist;
+      for (User *const user : global.users())
+        worklist.push_back(user);
+
+      while (!worklist.empty()) {
+        Value *current = worklist.pop_back_val();
+        if (auto inst = dyn_cast<Instruction>(current)) {
+          if (inst->getFunction() != func)
+            continue;
+
+          if (auto *GEP = dyn_cast<GetElementPtrInst>(inst)) {
+            for (auto *gepUser : GEP->users())
+              worklist.push_back(gepUser);
+            continue;
+          }
+
+          if (auto load = dyn_cast<LoadInst>(inst))
+            if (!load->isAtomic())
+              continue;
+
+          // Anything that is not a load prevents the buffer being treated as readonly.
+          isReadOnly = false;
+          break;
+        }
+      }
+
+      if (global.isConstant() || (isReadOnly && !isAliased))
+        isConstant = true;
+
       // Check if our block is an array of blocks.
       if (!atomicCounterMD && global.getValueType()->isArrayTy()) {
         Type *const elementType = global.getValueType()->getArrayElementType();
@@ -1890,7 +1905,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                     : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
 
             // If the global variable is a constant, the data it points to is invariant.
-            if (global.isConstant())
+            if (isConstant)
               m_builder->CreateInvariantStart(bufferDesc);
 
             replaceInstsInfo.otherInst->replaceUsesOfWith(&global, bufferDesc);
@@ -2008,7 +2023,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                       m_builder->create<lgc::LoadBufferDescOp>(descSets[idx], bindings[idx], blockIndex, bufferFlags);
                 }
                 // If the global variable is a constant, the data it points to is invariant.
-                if (global.isConstant())
+                if (isConstant)
                   m_builder->CreateInvariantStart(bufferDescs[idx]);
               }
 
@@ -2056,12 +2071,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
                 : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
 
-        // If the global variable is a constant, the data it points to is invariant.
-        if (global.isConstant())
-          m_builder->CreateInvariantStart(bufferDesc);
-
         SmallVector<Instruction *, 8> usesToReplace;
-
         for (User *const user : global.users()) {
           // Skip over non-instructions that we've already made useless.
           if (!isa<Instruction>(user))
@@ -2075,6 +2085,10 @@ void SpirvLowerGlobal::lowerBufferBlock() {
 
           usesToReplace.push_back(inst);
         }
+
+        // If the global variable is a constant, the data it points to is invariant.
+        if (isConstant)
+          m_builder->CreateInvariantStart(bufferDesc);
 
         Value *newLoadPtr = bufferDesc;
         if (atomicCounterMD) {
@@ -2189,15 +2203,7 @@ void SpirvLowerGlobal::lowerPushConsts() {
     // There should only be a single push constant variable!
     assert(globalsToRemove.empty());
 
-    SmallVector<Constant *, 8> constantUsers;
-
-    for (User *const user : global.users()) {
-      if (Constant *const constVal = dyn_cast<Constant>(user))
-        constantUsers.push_back(constVal);
-    }
-
-    for (Constant *const constVal : constantUsers)
-      replaceConstWithInsts(m_context, constVal);
+    convertUsersOfConstantsToInstructions(&global);
 
     // Record of all the functions that our global is used within.
     SmallSet<Function *, 4> funcsUsedIn;
@@ -2255,15 +2261,7 @@ void SpirvLowerGlobal::lowerUniformConstants() {
     if (global.getAddressSpace() != SPIRAS_Uniform || !global.hasMetadata(gSPIRVMD::UniformConstant))
       continue;
 
-    SmallVector<Constant *, 8> constantUsers;
-
-    for (User *const user : global.users()) {
-      if (Constant *const constVal = dyn_cast<Constant>(user))
-        constantUsers.push_back(constVal);
-    }
-
-    for (Constant *const constVal : constantUsers)
-      replaceConstWithInsts(m_context, constVal);
+    convertUsersOfConstantsToInstructions(&global);
 
     // A map from the function to the instructions inside it which access the global variable.
     SmallMapVector<Function *, SmallVector<Instruction *>, 8> globalUsers;
@@ -2469,7 +2467,7 @@ void SpirvLowerGlobal::lowerShaderRecordBuffer() {
     if (!global.getName().starts_with(ShaderRecordBuffer))
       continue;
 
-    removeConstantExpr(m_context, &global);
+    convertUsersOfConstantsToInstructions(&global);
 
     m_builder->SetInsertPointPastAllocas(m_entryPoint);
     auto shaderRecordBufferPtr = m_builder->create<ShaderRecordBufferOp>(m_builder->create<ShaderIndexOp>());
@@ -2560,11 +2558,14 @@ void SpirvLowerGlobal::changeRtFunctionSignature() {
   Type *pointerTy = PointerType::get(*m_context, SPIRAS_Private);
   switch (m_shaderStage) {
   case ShaderStageRayTracingIntersect:
+    // We don't have hit attribute in argument for IS in continuations mode.
+    if (rayTracingContext->isContinuationsMode())
+      break;
+    LLVM_FALLTHROUGH; // Fall through: Legacy RT still requires hit attribute in argument
   case ShaderStageRayTracingAnyHit:
   case ShaderStageRayTracingClosestHit:
     // Hit attribute
     argTys.push_back(pointerTy);
-    setShaderHitAttributeSize(m_entryPoint, rayTracingContext->getAttributeDataSizeInBytes());
     LLVM_FALLTHROUGH; // Fall through: Handle payload
   case ShaderStageRayTracingMiss:
     // Payload
@@ -2590,6 +2591,67 @@ void SpirvLowerGlobal::changeRtFunctionSignature() {
   assert(m_entryPoint->use_empty());
   m_entryPoint->eraseFromParent();
   m_entryPoint = newFunc;
+
+  GlobalVariable *hitAttributeVar = nullptr;
+  GlobalVariable *incomingPayloadVar = nullptr;
+  GlobalVariable *incomingCallableDataVar = nullptr;
+
+  // NOTE: There could be multiple definitions of these variables in a SPIR-V file, but there could only have one of
+  // each in used in current entry point.
+  for (auto &global : m_module->globals()) {
+    if (global.getNumUses() == 0)
+      continue;
+    if (global.getName().starts_with(SPIRVStorageClassNameMap::map(StorageClassHitAttributeKHR))) {
+      assert(hitAttributeVar == nullptr);
+      hitAttributeVar = &global;
+    } else if (global.getName().starts_with(SPIRVStorageClassNameMap::map(StorageClassIncomingRayPayloadKHR))) {
+      assert(incomingPayloadVar == nullptr);
+      incomingPayloadVar = &global;
+    } else if (global.getName().starts_with(SPIRVStorageClassNameMap::map(StorageClassIncomingCallableDataKHR))) {
+      assert(incomingCallableDataVar == nullptr);
+      incomingCallableDataVar = &global;
+    }
+  }
+
+  if (hitAttributeVar && m_entryPoint->arg_size() == 2) {
+    assert(!rayTracingContext->isContinuationsMode() || m_shaderStage != ShaderStageRayTracingIntersect);
+    convertUsersOfConstantsToInstructions(hitAttributeVar);
+    hitAttributeVar->replaceAllUsesWith(m_entryPoint->getArg(1));
+    m_globalsToErase.push_back(hitAttributeVar);
+  }
+
+  if (incomingPayloadVar) {
+    convertUsersOfConstantsToInstructions(incomingPayloadVar);
+    incomingPayloadVar->replaceAllUsesWith(m_entryPoint->getArg(0));
+    m_globalsToErase.push_back(incomingPayloadVar);
+  } else if (incomingCallableDataVar) {
+    convertUsersOfConstantsToInstructions(incomingCallableDataVar);
+    incomingCallableDataVar->replaceAllUsesWith(m_entryPoint->getArg(0));
+    m_globalsToErase.push_back(incomingCallableDataVar);
+  }
+
+  if (rayTracingContext->isContinuationsMode()) {
+    SmallVector<ContArgTy> contArgTys;
+
+    auto var = m_shaderStage == ShaderStageRayTracingCallable ? incomingCallableDataVar : incomingPayloadVar;
+    auto payloadTy = var ? var->getValueType() : StructType::get(*m_context);
+    if (!isa<StructType>(payloadTy))
+      payloadTy = StructType::get(*m_context, {payloadTy}, false);
+    contArgTys.push_back(ContArgTy(pointerTy, payloadTy));
+    if ((m_shaderStage == ShaderStageRayTracingAnyHit) || (m_shaderStage == ShaderStageRayTracingClosestHit)) {
+      auto type = ArrayType::get(m_builder->getInt32Ty(), rayTracingContext->getAttributeDataSize());
+      contArgTys.push_back(ContArgTy(pointerTy, type));
+    }
+
+    ContFuncTy contFuncTy(m_builder->getVoidTy(), contArgTys);
+    contFuncTy.writeMetadata(newFunc);
+  }
+
+  for (auto globalVar : m_globalsToErase) {
+    globalVar->dropAllReferences();
+    globalVar->eraseFromParent();
+  }
+  m_globalsToErase.clear();
 }
 
 } // namespace Llpc

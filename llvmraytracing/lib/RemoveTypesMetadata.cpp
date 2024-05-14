@@ -30,12 +30,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvmraytracing/Continuations.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-#include "llvm/InitializePasses.h"
 #include <cassert>
 
 using namespace llvm;

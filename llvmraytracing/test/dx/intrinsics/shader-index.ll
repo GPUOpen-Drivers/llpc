@@ -19,9 +19,10 @@ define i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hit
 
 define void @main() !lgc.rt.shaderstage !24 {
 ; CHECK-LABEL: define void @main(
-; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META11:![0-9]+]] !lgc.cps [[META11]] !continuation [[META14:![0-9]+]] {
+; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META13:![0-9]+]] !lgc.cps [[META13]] !continuation [[META14:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; CHECK-NEXT:    [[PAYLOAD_ALLOCA:%.*]] = alloca [30 x i32], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CHECK-NEXT:    store i32 0, ptr @debug_global, align 4
@@ -35,19 +36,24 @@ entry:
 
 define void @callable(%struct.Payload* %payload) !types !22 !lgc.rt.shaderstage !25 {
 ; CHECK-LABEL: define void @callable(
-; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META15:![0-9]+]] !lgc.cps [[META16:![0-9]+]] !continuation [[META17:![0-9]+]] {
+; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META15:![0-9]+]] !lgc.cps [[META10:![0-9]+]] !continuation [[META16:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
-; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    [[PAYLOAD_ALLOCA:%.*]] = alloca [30 x i32], align 4
+; CHECK-NEXT:    [[TMP0:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
+; CHECK-NEXT:    store [1 x i32] [[PAYLOAD]], ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    store i32 [[TMP2]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
 ; CHECK-NEXT:    store i32 [[SHADER_INDEX]], ptr @debug_global, align 4
-; CHECK-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP1]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
-; CHECK-NEXT:    store i32 [[TMP3]], ptr @PAYLOAD, align 4
-; CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 2, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP4]])
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    store i32 [[TMP5]], ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = load [1 x i32], ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 3, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP7]], [8 x i32] poison, [1 x i32] [[TMP8]]), !continuation.registercount [[META10]]
 ; CHECK-NEXT:    unreachable
 ;
 entry:

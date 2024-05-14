@@ -155,6 +155,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   newFunc->takeName(oldFunc);
   newFunc->setSubprogram(oldFunc->getSubprogram());
   newFunc->setDLLStorageClass(oldFunc->getDLLStorageClass());
+  newFunc->copyMetadata(oldFunc, 0);
   // Always insert the new function after the old function
   oldFunc->getParent()->getFunctionList().insertAfter(oldFunc->getIterator(), newFunc);
 

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerRayQueryPostInline.h
- * @brief LLPC header file: contains declaration of Llpc::SpirvLowerRayQueryPostInline
+ * @file  ProcessGfxRuntimeLibrary.h
+ * @brief LLPC header file: contains declaration of Llpc::ProcessGfxRuntimeLibrary
  ***********************************************************************************************************************
  */
 #pragma once
@@ -34,13 +34,25 @@
 #include "llvm/IR/PassManager.h"
 
 namespace Llpc {
-
-// Represents the pass of SPIR-V lowering ray query post inline.
-class SpirvLowerRayQueryPostInline : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerRayQueryPostInline> {
+class ProcessGfxRuntimeLibrary : public SpirvLower, public llvm::PassInfoMixin<ProcessGfxRuntimeLibrary> {
 public:
+  ProcessGfxRuntimeLibrary();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V RayQueryPostInline operations"; }
+private:
+  typedef void (ProcessGfxRuntimeLibrary::*LibraryFuncPtr)(llvm::Function *);
+  struct LibraryFunctionTable {
+    llvm::DenseMap<llvm::StringRef, LibraryFuncPtr> m_libFuncPtrs;
+    LibraryFunctionTable();
+    static const LibraryFunctionTable &get() {
+      static LibraryFunctionTable instance;
+      return instance;
+    }
+  };
+  void processLibraryFunction(llvm::Function *&func);
+  void createTexelLoad(llvm::Function *func);
+  void createTexelLoadFmask(llvm::Function *func);
+  void createCoherentTexelLoad(llvm::Function *func);
+  void createCoherentTexelStore(llvm::Function *func);
 };
-
 } // namespace Llpc

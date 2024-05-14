@@ -35,6 +35,7 @@
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include <algorithm>
 #include <string.h>
+#include <variant>
 
 #define DEBUG_TYPE "llpc-elf-writer"
 
@@ -49,6 +50,9 @@ static const char *const ApiStageNames[] = {".task",     ".vertex", ".hull",  ".
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
 static const char *const HwStageNames[] = {".ls", ".hs", ".es", ".gs", ".vs", ".ps", ".cs"};
+
+// The names for spill threshold for shader.
+static const char ShaderSpillThreshold[] = ".shader_spill_threshold";
 
 // The suffix added to the rodata sections from the cached elf bin
 static const char CachedRodataSectionSuffix[] = ".cached";
@@ -241,10 +245,30 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
     destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::NumInterpolants] = srcNumIterpIt->second;
 
   // Copy .spill_threshold
-  auto destSpillThreshold = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
-  auto srcSpillThreshold = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
+  // Fix the issue for run noiub.nouab.task.noia.0+noiub.nouab.task.noia.2 cases:
+  // 1. After running noia.0 case, it will has two elfs: fs+non_fs in cache
+  // 2. Then run noia.2 case, which fs is same with fs@noia.0 then this function will be triggered.
+  // 3. Then it will merge non-fs generated in noia.2 and fs which is saved in cached after noia.0
+  // There will be a merge on threshold here, just merge fs_threshold@fs_in_cache not
+  // Pipelinelevel_threshold@fs_in_cache
+  unsigned srcSpillValue = USHRT_MAX;
+  if (pContext->getGfxIpVersion().major > 10) {
+    auto srcPsHwStage = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages]
+                            .getMap(true)[static_cast<unsigned>(Util::Abi::HardwareStage::Ps)]
+                            .getMap(true);
+    auto srcSpillThreshold = &srcPsHwStage[ShaderSpillThreshold];
+    if (!srcSpillThreshold->isEmpty()) {
+      srcSpillValue = srcPsHwStage[ShaderSpillThreshold].getUInt();
+    }
+  } else {
+    // This is to revert and keep legacy behavior on gfx10 as to fix the block issue: hang on PAL for
+    // gfx_bench. Todo: Needs to keep same with gfx10+
+    srcSpillValue = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
+  }
+
+  unsigned destSpillThreshold = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
   destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold] =
-      destDocument.getNode(std::min(srcSpillThreshold, destSpillThreshold));
+      destDocument.getNode(std::min(srcSpillValue, destSpillThreshold));
 
   // Copy .user_data_limit
   auto destUserDataLimit = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit].getUInt();
@@ -608,6 +632,79 @@ template <class Elf> void ElfWriter<Elf>::writeToBuffer(ElfPackage *pElf) {
   }
 
   assert((buffer - data) == reqSize);
+}
+
+// =====================================================================================================================
+// Fixups one relocation.
+//
+// @param relocIdx : The index of relocation fixup
+// @param relocValue : The value to be added to the relocation
+// @param targetSymbol : The target symbol index to change this relocation to point to
+// @param modifyMask : The mask to apply to the relocation value
+template <class Elf>
+void ElfWriter<Elf>::fixupRelocation(unsigned relocIdx, unsigned relocValue, unsigned targetSymbolIdx,
+                                     unsigned modifyMask) {
+  assert(m_relocSecIdx >= 0);
+  assert((relocValue & ~modifyMask) == 0 && "Relocation fixup value overflow");
+  uint8_t *textData = const_cast<uint8_t *>(m_sections[m_textSecIdx].data);
+  uint8_t *relocData = const_cast<uint8_t *>(m_sections[m_relocSecIdx].data);
+
+  bool isRela = false;
+  if (m_sections[m_relocSecIdx].secHead.sh_type == SHT_RELA)
+    isRela = true;
+  else
+    assert(m_sections[m_relocSecIdx].secHead.sh_type == SHT_REL);
+
+  std::variant<typename Elf::RelocA *, typename Elf::Reloc *> relocPtr;
+  Util::Abi::RelocationType relocType;
+  if (isRela) {
+    auto reloc = &reinterpret_cast<typename Elf::RelocA *>(relocData)[relocIdx];
+    relocType = static_cast<Util::Abi::RelocationType>(reloc->r_type);
+    relocPtr = reloc;
+  } else {
+    auto reloc = &reinterpret_cast<typename Elf::Reloc *>(relocData)[relocIdx];
+    relocType = static_cast<Util::Abi::RelocationType>(reloc->r_type);
+    relocPtr = reloc;
+  }
+
+  switch (relocType) {
+  case Util::Abi::RelocationType::Abs32:
+  case Util::Abi::RelocationType::Abs32Lo:
+  case Util::Abi::RelocationType::Rel32:
+  case Util::Abi::RelocationType::Rel32Lo:
+    if (isRela) {
+      auto *reloc = std::get<typename Elf::RelocA *>(relocPtr);
+      assert((reloc->r_addend & modifyMask) == 0 && "Modifying bits should be zero");
+      reloc->r_addend |= (relocValue & modifyMask);
+      if (targetSymbolIdx != InvalidValue) {
+        reloc->r_symbol = targetSymbolIdx;
+      }
+    } else {
+      auto *reloc = std::get<typename Elf::Reloc *>(relocPtr);
+      unsigned *targetDword = reinterpret_cast<unsigned *>(textData + reloc->r_offset);
+      assert((*targetDword & modifyMask) == 0 && "Modifying bits should be zero");
+      *targetDword |= (relocValue & modifyMask);
+      if (targetSymbolIdx != InvalidValue) {
+        reloc->r_symbol = targetSymbolIdx;
+      }
+    }
+    break;
+  case Util::Abi::RelocationType::Abs32Hi:
+  case Util::Abi::RelocationType::Rel32Hi:
+    // Only change the relocation symbol for high part relocation if required
+    if (targetSymbolIdx != InvalidValue) {
+      if (isRela) {
+        auto *reloc = std::get<typename Elf::RelocA *>(relocPtr);
+        reloc->r_symbol = targetSymbolIdx;
+      } else {
+        auto *reloc = std::get<typename Elf::Reloc *>(relocPtr);
+        reloc->r_symbol = targetSymbolIdx;
+      }
+    }
+    break;
+  default:
+    llvm_unreachable("Unsupported relocation type");
+  }
 }
 
 // =====================================================================================================================

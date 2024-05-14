@@ -103,7 +103,7 @@ PreservedAnalyses PatchInitializeWorkgroupMemory::run(Module &module, ModuleAnal
     GlobalVariable *global = globalOffsetPair.first;
     Value *offset = globalOffsetPair.second;
 
-    Value *pointer = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), offset});
+    Value *pointer = builder.CreateGEP(builder.getInt32Ty(), lds, offset);
     pointer = builder.CreateBitCast(pointer, global->getType());
 
     global->replaceAllUsesWith(pointer);
@@ -213,7 +213,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
       // ldsOffset = (threadId * loopCount) + loopIdx
       Value *ldsOffset = builder.CreateMul(threadId, loopCount);
       ldsOffset = builder.CreateAdd(ldsOffset, loopIdxPhi);
-      Value *writePtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
+      Value *writePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
       builder.CreateAlignedStore(builder.getInt32(0), writePtr, Align(4));
 
       // Update loop index

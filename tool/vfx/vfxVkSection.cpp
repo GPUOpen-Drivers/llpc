@@ -39,6 +39,7 @@ public:
     INIT_SECTION_INFO("missInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingMiss)
     INIT_SECTION_INFO("callInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingCallable)
     INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
+    INIT_SECTION_INFO("GraphicsLibrary", SectionTypeGraphicsLibrary, 0)
   };
 
   void initEnumMap() {

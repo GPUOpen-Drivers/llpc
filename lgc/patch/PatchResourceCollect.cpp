@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchResourceCollect.h"
-#include "Gfx9Chip.h"
 #include "MeshTaskShader.h"
 #include "NggPrimShader.h"
 #include "lgc/Builder.h"
@@ -58,6 +57,15 @@ using namespace lgc;
 cl::opt<bool> DisableGsOnChip("disable-gs-onchip", cl::desc("Disable geometry shader on-chip mode"), cl::init(false));
 
 namespace lgc {
+
+// Max size of primitives per subgroup for adjacency primitives or when GS instancing is used. This restriction is
+// applicable only when onchip GS is used.
+constexpr unsigned OnChipGsMaxPrimPerSubgroup = 255;
+constexpr unsigned OnChipGsMaxPrimPerSubgroupAdj = 127;
+constexpr unsigned OnChipGsMaxEsVertsPerSubgroup = 255;
+
+// Default value for the maximum LDS size per GS subgroup, in dword's.
+constexpr unsigned DefaultLdsSizePerSubgroup = 8192;
 
 // =====================================================================================================================
 PatchResourceCollect::PatchResourceCollect() : m_resUsage(nullptr) {
@@ -150,7 +158,6 @@ PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManage
 // @param [in/out] module : Module
 void PatchResourceCollect::setNggControl(Module *module) {
   assert(m_pipelineState->isGraphics());
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
   // If mesh pipeline, skip NGG control settings
   const bool meshPipeline =
       m_pipelineState->hasShaderStage(ShaderStage::Task) || m_pipelineState->hasShaderStage(ShaderStage::Mesh);
@@ -192,8 +199,8 @@ void PatchResourceCollect::setNggControl(Module *module) {
 
   nggControl.backfaceExponent = options.nggBackfaceExponent;
   nggControl.subgroupSizing = options.nggSubgroupSizing;
-  nggControl.primsPerSubgroup = std::min(options.nggPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
-  nggControl.vertsPerSubgroup = std::min(options.nggVertsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup);
+  nggControl.primsPerSubgroup = std::min(options.nggPrimsPerSubgroup, NggMaxThreadsPerSubgroup);
+  nggControl.vertsPerSubgroup = std::min(options.nggVertsPerSubgroup, NggMaxThreadsPerSubgroup);
 
   if (nggControl.enableNgg) {
     if (options.nggFlags & NggFlagForceCullingMode)
@@ -259,7 +266,6 @@ void PatchResourceCollect::setNggControl(Module *module) {
 // @param [in/out] module : Module
 bool PatchResourceCollect::canUseNgg(Module *module) {
   assert(m_pipelineState->isGraphics());
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
 
   // Always enable NGG for GFX11+
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11)
@@ -289,7 +295,7 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
     // NGG subgroup is implicitly 3 (specified by HW). Thus, the maximum primitive amplification factor is therefore
     // 256/3 = 85.
     if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waLimitedMaxOutputVertexCount) {
-      static const unsigned MaxOutputVertices = Gfx9::NggMaxThreadsPerSubgroup / 3;
+      static const unsigned MaxOutputVertices = NggMaxThreadsPerSubgroup / 3;
       if (geometryMode.outputVertices > MaxOutputVertices)
         return false;
     }
@@ -297,7 +303,7 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
     // NOTE: On GFX10, the bit VGT_GS_INSTANCE_CNT.EN_MAX_VERT_OUT_PER_GS_INSTANCE provided by HW allows each GS
     // instance to emit maximum vertices (256). But this mode is not supported when tessellation is enabled.
     if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waGeNggMaxVertOutWithGsInstancing) {
-      if (geometryMode.invocations * geometryMode.outputVertices > Gfx9::NggMaxThreadsPerSubgroup)
+      if (geometryMode.invocations * geometryMode.outputVertices > NggMaxThreadsPerSubgroup)
         return false;
     }
   }
@@ -312,7 +318,6 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
 // @param [in/out] module : Module
 bool PatchResourceCollect::canUseNggCulling(Module *module) {
   assert(m_pipelineState->isGraphics());
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
 
   const bool hasTs = m_pipelineState->hasShaderStage(ShaderStage::TessControl) ||
                      m_pipelineState->hasShaderStage(ShaderStage::TessEval);
@@ -498,11 +503,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
     unsigned primAmpFactor = std::max(numMeshThreads, std::max(meshMode.outputVertices, meshMode.outputPrimitives));
 
-    const unsigned ldsSizeDwordGranularity =
-        1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-    auto ldsSizeDwords =
+    const unsigned ldsSizeDwords =
         MeshTaskShader::layoutMeshShaderLds(m_pipelineState, m_pipelineShaders->getEntryPoint(ShaderStage::Mesh));
-    ldsSizeDwords = alignTo(ldsSizeDwords, ldsSizeDwordGranularity);
 
     // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
     unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
@@ -521,7 +523,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
     gsOnChip = true; // For mesh shader, GS is always on-chip
   } else if (nggControl->enableNgg) {
-    unsigned esGsRingItemSize = NggPrimShader::calcEsGsRingItemSize(m_pipelineState); // In dwords
+    unsigned esGsRingItemSize = NggPrimShader::calcEsGsRingItemSize(
+        m_pipelineState,
+        m_pipelineShaders->getEntryPoint(hasTs ? ShaderStage::TessEval : ShaderStage::Vertex)); // In dwords
 
     const unsigned gsVsRingItemSize =
         hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
@@ -542,15 +546,15 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     // The numbers below come from hardware guidance and most likely require further tuning.
     switch (nggControl->subgroupSizing) {
     case NggSubgroupSizing::HalfSize:
-      esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-      gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+      esVertsPerSubgroup = NggMaxThreadsPerSubgroup / 2;
+      gsPrimsPerSubgroup = NggMaxThreadsPerSubgroup / 2;
       break;
     case NggSubgroupSizing::OptimizeForVerts:
-      esVertsPerSubgroup = hasTs ? Gfx9::NggMaxThreadsPerSubgroup / 2 : (Gfx9::NggMaxThreadsPerSubgroup / 2 - 2);
-      gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
+      esVertsPerSubgroup = hasTs ? NggMaxThreadsPerSubgroup / 2 : (NggMaxThreadsPerSubgroup / 2 - 2);
+      gsPrimsPerSubgroup = hasTs || needsLds ? 192 : NggMaxThreadsPerSubgroup;
       break;
     case NggSubgroupSizing::OptimizeForPrims:
-      esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+      esVertsPerSubgroup = NggMaxThreadsPerSubgroup;
       gsPrimsPerSubgroup = 128;
       break;
     case NggSubgroupSizing::Explicit:
@@ -559,18 +563,18 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       break;
     case NggSubgroupSizing::Auto:
       if (m_pipelineState->getTargetInfo().getGfxIpVersion().isGfx(10, 1)) {
-        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
-        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+        esVertsPerSubgroup = NggMaxThreadsPerSubgroup / 2 - 2;
+        gsPrimsPerSubgroup = NggMaxThreadsPerSubgroup / 2;
       } else {
         // Newer hardware performs the decrement on esVertsPerSubgroup for us already.
-        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+        esVertsPerSubgroup = NggMaxThreadsPerSubgroup / 2;
+        gsPrimsPerSubgroup = NggMaxThreadsPerSubgroup / 2;
       }
       break;
     case NggSubgroupSizing::MaximumSize:
     default:
-      esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-      gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+      esVertsPerSubgroup = NggMaxThreadsPerSubgroup;
+      gsPrimsPerSubgroup = NggMaxThreadsPerSubgroup;
       break;
     }
 
@@ -587,19 +591,19 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // from a different thread. Note that maxVertOut does not account for additional amplification due
       // to GS instancing.
       gsPrimsPerSubgroup =
-          std::max(1u, std::min(gsPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
+          std::max(1u, std::min(gsPrimsPerSubgroup, NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
 
       // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
       // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
       // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
       // primitive per subgroup and create 1 subgroup per GS instance.
-      if ((maxVertOut * gsInstanceCount) > Gfx9::NggMaxThreadsPerSubgroup) {
+      if ((maxVertOut * gsInstanceCount) > NggMaxThreadsPerSubgroup) {
         enableMaxVertOut = true;
         gsInstanceCount = 1;
         gsPrimsPerSubgroup = 1;
       }
 
-      esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, Gfx9::NggMaxThreadsPerSubgroup);
+      esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, NggMaxThreadsPerSubgroup);
 
       if (hasTs)
         esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
@@ -635,9 +639,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
     unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
 
-    const unsigned ldsSizeDwordGranularity =
-        1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-    unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
+    unsigned ldsSizeDwords = expectedEsLdsSize + expectedGsLdsSize;
 
     unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
     maxHwGsLdsSizeDwords -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
@@ -678,8 +680,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       // inVertsPerPrim is the minimum number of vertices we must have per subgroup.
       esVertsPerSubgroup =
-          std::max(inVertsPerPrim, std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio),
-                                            Gfx9::NggMaxThreadsPerSubgroup));
+          std::max(inVertsPerPrim,
+                   std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio), NggMaxThreadsPerSubgroup));
 
       // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
       if (gfxIp.isGfx(10, 3))
@@ -698,7 +700,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // And then recalculate our LDS usage.
       expectedEsLdsSize = (esVertsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
       expectedGsLdsSize = (gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize) + gsExtraLdsSize;
-      ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
+      ldsSizeDwords = expectedEsLdsSize + expectedGsLdsSize;
     }
 
     // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
@@ -727,9 +729,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
     gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
   } else {
-    unsigned ldsSizeDwordGranularity =
-        static_cast<unsigned>(1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift);
-
     // gsPrimsPerSubgroup shouldn't be bigger than wave size.
     unsigned gsPrimsPerSubgroup =
         std::min(m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
@@ -748,7 +747,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
     // TODO: Confirm no ES-GS extra LDS space used.
     const unsigned esGsExtraLdsDwords = 0;
-    const unsigned maxEsVertsPerSubgroup = Gfx9::OnChipGsMaxEsVertsPerSubgroup;
+    const unsigned maxEsVertsPerSubgroup = OnChipGsMaxEsVertsPerSubgroup;
 
     unsigned esMinVertsPerSubgroup = inVertsPerPrim;
 
@@ -756,12 +755,12 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     if (useAdjacency)
       esMinVertsPerSubgroup >>= 1;
 
-    unsigned maxGsPrimsPerSubgroup = Gfx9::OnChipGsMaxPrimPerSubgroup;
+    unsigned maxGsPrimsPerSubgroup = OnChipGsMaxPrimPerSubgroup;
 
     // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
     // OnChipGsMaxPrimPerSubgroup for adjacency primitive or when GS instanceing is used.
     if (useAdjacency || gsInstanceCount > 1)
-      maxGsPrimsPerSubgroup = (Gfx9::OnChipGsMaxPrimPerSubgroupAdj / gsInstanceCount);
+      maxGsPrimsPerSubgroup = (OnChipGsMaxPrimPerSubgroupAdj / gsInstanceCount);
 
     gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
 
@@ -769,10 +768,10 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     unsigned worstCaseEsVertsPerSubgroup =
         std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
-    unsigned esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
+    unsigned esGsLdsSize = esGsRingItemSize * worstCaseEsVertsPerSubgroup;
 
-    // Total LDS use per subgroup aligned to the register granularity.
-    unsigned gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+    // Total LDS use per subgroup.
+    unsigned gsOnChipLdsSize = esGsLdsSize + esGsExtraLdsDwords;
 
     // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
     // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -786,7 +785,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to
     // choose a reasonable default. The final amount must be 128-dword aligned.
     // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
-    unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
+    unsigned maxLdsSize = DefaultLdsSizePerSubgroup;
     maxLdsSize -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
 
     // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
@@ -804,7 +803,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       assert(gsPrimsPerSubgroup > 0);
 
       esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
-      gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+      gsOnChipLdsSize = esGsLdsSize + esGsExtraLdsDwords;
 
       assert(gsOnChipLdsSize <= maxLdsSize);
     }
@@ -821,8 +820,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // Start out with the assumption that our GS prims per subgroup won't change.
       unsigned onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
 
-      // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
-      unsigned onchipEsGsVsLdsSize = alignTo(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
+      // Total LDS use per subgroup to keep ESGS and GSVS data on chip.
+      unsigned onchipEsGsVsLdsSize = esGsLdsSize + gsVsLdsSize;
       unsigned onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
 
       if (onchipEsGsVsLdsSize > maxLdsSize) {
@@ -838,8 +837,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
               std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
           // Calculate the LDS sizes required to hit this threshold.
-          onchipEsGsLdsSizeOnchipGsVs =
-              alignTo(esGsRingItemSize * worstCaseEsVertsPerSubgroup, ldsSizeDwordGranularity);
+          onchipEsGsLdsSizeOnchipGsVs = esGsRingItemSize * worstCaseEsVertsPerSubgroup;
           gsVsLdsSize = gsVsItemSize * onchipGsPrimsPerSubgroup;
           onchipEsGsVsLdsSize = onchipEsGsLdsSizeOnchipGsVs + gsVsLdsSize;
 
@@ -896,10 +894,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10 && hasTs && !gsOnChip) {
-      unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
-      unsigned onChipGsLdsMagicSize = alignTo(
-          (esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
-          static_cast<unsigned>((1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)));
+      unsigned esVertsNum = EsVertsOffchipGsOrTess;
+      unsigned onChipGsLdsMagicSize = (esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords;
 
       // If the new size is greater than the size we previously set
       // then we need to either increase the size or decrease the verts
@@ -914,7 +910,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         }
       }
       // Support multiple GS instances
-      unsigned gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
+      unsigned gsPrimsNum = GsPrimsOffchipGsOrTess / gsInstanceCount;
 
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -1119,7 +1115,6 @@ bool PatchResourceCollect::isVertexReuseDisabled() {
 //
 // @param module : LLVM module
 void PatchResourceCollect::checkRayQueryLdsStackUsage(Module *module) {
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
   auto ldsStack = module->getNamedGlobal(RayQueryLdsStackName);
   if (ldsStack) {
     SmallVector<Constant *> worklist;
@@ -1210,6 +1205,12 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     }
   } else if (auto *loadBufferDescOp = dyn_cast<LoadBufferDescOp>(&callInst)) {
     unsigned flags = loadBufferDescOp->getFlags();
+    // Mark the shader as reading and writing (if applicable) a resource.
+    m_resUsage->resourceRead = true;
+    if (flags & Builder::BufferFlagWritten)
+      m_resUsage->resourceWrite = true;
+  } else if (auto *loadStridedBufferDescOp = dyn_cast<LoadStridedBufferDescOp>(&callInst)) {
+    unsigned flags = loadStridedBufferDescOp->getFlags();
     // Mark the shader as reading and writing (if applicable) a resource.
     m_resUsage->resourceRead = true;
     if (flags & Builder::BufferFlagWritten)
@@ -2317,36 +2318,62 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     unsigned availPerPrimitiveOutMapLoc = inOutUsage.perPrimitiveOutputMapLocCount;
 
     // Map per-vertex built-in outputs to generic ones
-    if (builtInUsage.mesh.position)
-      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
+    if (builtInUsage.mesh.position) {
+      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc;
+      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {4, BuiltInPosition}; // vec4
+      ++availOutMapLoc;
+    }
 
-    if (builtInUsage.mesh.pointSize)
-      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
+    if (builtInUsage.mesh.pointSize) {
+      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc;
+      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {1, BuiltInPointSize}; // float
+      ++availOutMapLoc;
+    }
 
     if (builtInUsage.mesh.clipDistance > 0) {
-      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
+      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc;
+      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {static_cast<unsigned>(builtInUsage.mesh.clipDistance),
+                                                                BuiltInClipDistance}; // float[]
+      ++availOutMapLoc;
+
       if (builtInUsage.mesh.clipDistance > 4)
         ++availOutMapLoc;
     }
 
     if (builtInUsage.mesh.cullDistance > 0) {
-      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
+      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc;
+      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {static_cast<unsigned>(builtInUsage.mesh.cullDistance),
+                                                                BuiltInCullDistance}; // float[]
+      ++availOutMapLoc;
+
       if (builtInUsage.mesh.cullDistance > 4)
         ++availOutMapLoc;
     }
 
     // Map per-primitive built-in outputs to generic ones
-    if (builtInUsage.mesh.primitiveId)
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveId] = availPerPrimitiveOutMapLoc++;
+    if (builtInUsage.mesh.primitiveId) {
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveId] = availPerPrimitiveOutMapLoc;
+      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInPrimitiveId}; // int
+      ++availPerPrimitiveOutMapLoc;
+    }
 
-    if (builtInUsage.mesh.viewportIndex)
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInViewportIndex] = availPerPrimitiveOutMapLoc++;
+    if (builtInUsage.mesh.viewportIndex) {
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInViewportIndex] = availPerPrimitiveOutMapLoc;
+      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInViewportIndex}; // int
+      ++availPerPrimitiveOutMapLoc;
+    }
 
-    if (builtInUsage.mesh.layer)
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInLayer] = availPerPrimitiveOutMapLoc++;
+    if (builtInUsage.mesh.layer) {
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInLayer] = availPerPrimitiveOutMapLoc;
+      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInLayer}; // int
+      ++availPerPrimitiveOutMapLoc;
+    }
 
-    if (builtInUsage.mesh.primitiveShadingRate)
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveShadingRate] = availPerPrimitiveOutMapLoc++;
+    if (builtInUsage.mesh.primitiveShadingRate) {
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveShadingRate] = availPerPrimitiveOutMapLoc;
+      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInPrimitiveShadingRate}; // int
+      ++availPerPrimitiveOutMapLoc;
+    }
 
     // Map per-vertex built-in outputs to exported locations
     if (nextStage == ShaderStage::Fragment) {
@@ -2357,13 +2384,13 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (nextBuiltInUsage.clipDistance > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
-        inOutUsage.mesh.builtInExportLocs[BuiltInClipDistance] = mapLoc;
+        inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInClipDistance] = mapLoc;
       }
 
       if (nextBuiltInUsage.cullDistance > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
-        inOutUsage.mesh.builtInExportLocs[BuiltInCullDistance] = mapLoc;
+        inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInCullDistance] = mapLoc;
       }
     } else if (nextStage == ShaderStage::Invalid) {
       // Mesh shader only
@@ -2377,12 +2404,12 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         }
 
         if (builtInUsage.mesh.clipDistance > 0)
-          inOutUsage.mesh.builtInExportLocs[BuiltInClipDistance] = exportLoc;
+          inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInClipDistance] = exportLoc;
 
         if (builtInUsage.mesh.cullDistance > 0) {
           if (builtInUsage.mesh.clipDistance >= 4)
             ++exportLoc;
-          inOutUsage.mesh.builtInExportLocs[BuiltInCullDistance] = exportLoc;
+          inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInCullDistance] = exportLoc;
         }
       }
     }
@@ -2397,38 +2424,35 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         assert(nextInOutUsage.perPrimitiveBuiltInInputLocMap.find(BuiltInPrimitiveId) !=
                nextInOutUsage.perPrimitiveBuiltInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInPrimitiveId];
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInPrimitiveId] = mapLoc;
+        inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInPrimitiveId] = mapLoc;
       }
 
       if (nextBuiltInUsage.layer) {
         assert(nextInOutUsage.perPrimitiveBuiltInInputLocMap.find(BuiltInLayer) !=
                nextInOutUsage.perPrimitiveBuiltInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInLayer];
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInLayer] = mapLoc;
+        inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInLayer] = mapLoc;
       }
 
       if (nextBuiltInUsage.viewportIndex) {
         assert(nextInOutUsage.perPrimitiveBuiltInInputLocMap.find(BuiltInViewportIndex) !=
                nextInOutUsage.perPrimitiveBuiltInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewportIndex];
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewportIndex] = mapLoc;
+        inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInViewportIndex] = mapLoc;
       }
     } else if (nextStage == ShaderStage::Invalid) {
       // Mesh shader only
       unsigned availPerPrimitiveExportLoc = inOutUsage.perPrimitiveOutputMapLocCount;
 
       if (builtInUsage.mesh.primitiveId)
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInPrimitiveId] = availPerPrimitiveExportLoc++;
+        inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInPrimitiveId] = availPerPrimitiveExportLoc++;
 
       if (builtInUsage.mesh.layer)
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInLayer] = availPerPrimitiveExportLoc++;
+        inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInLayer] = availPerPrimitiveExportLoc++;
 
       if (builtInUsage.mesh.viewportIndex)
-        inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewportIndex] = availPerPrimitiveExportLoc++;
+        inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInViewportIndex] = availPerPrimitiveExportLoc++;
     }
-
-    inOutUsage.mesh.genericOutputMapLocCount = inOutUsage.outputMapLocCount;
-    inOutUsage.mesh.perPrimitiveGenericOutputMapLocCount = inOutUsage.perPrimitiveOutputMapLocCount;
 
     inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, availOutMapLoc);
     inOutUsage.perPrimitiveOutputMapLocCount =
@@ -2987,6 +3011,25 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
       if (m_shaderStage == ShaderStage::Geometry)
         inOutUsage.gs.outLocCount[streamId] = std::max(inOutUsage.gs.outLocCount[streamId], newLocMappedTo + 1);
     }
+
+    // After location mapping is done, we update the location/components map of mesh shader vertex outputs with new
+    // locations.
+    if (m_shaderStage == ShaderStage::Mesh) {
+      // Make a copy and clear the old map
+      auto vertexOutputComponents = inOutUsage.mesh.vertexOutputComponents;
+      inOutUsage.mesh.vertexOutputComponents.clear();
+
+      // Setup a new map with new locations
+      for (auto &locInfoPair : outputLocInfoMap) {
+        const unsigned location = locInfoPair.first.getLocation();
+        const unsigned newLocation = locInfoPair.second.getLocation();
+
+        if (vertexOutputComponents.count(location) == 0)
+          continue; // Skip if not found
+
+        inOutUsage.mesh.vertexOutputComponents[newLocation] = vertexOutputComponents[location];
+      }
+    }
   }
 
   //
@@ -3078,6 +3121,25 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 
       assert(newLocMappedTo != InvalidValue);
       locPair.second = newLocMappedTo;
+    }
+
+    // After location mapping is done, we update the location/components map of mesh shader primitive outputs with
+    // new locations.
+    if (m_shaderStage == ShaderStage::Mesh) {
+      // Make a copy and clear the old map
+      auto primitiveOutputComponents = inOutUsage.mesh.primitiveOutputComponents;
+      inOutUsage.mesh.primitiveOutputComponents.clear();
+
+      // Setup a new map with new locations
+      for (auto &locPair : perPrimitiveOutputLocMap) {
+        const unsigned location = locPair.first;
+        const unsigned newLocation = locPair.second;
+
+        if (primitiveOutputComponents.count(location) == 0)
+          continue; // Skip if not found
+
+        inOutUsage.mesh.primitiveOutputComponents[newLocation] = primitiveOutputComponents[location];
+      }
     }
   }
 

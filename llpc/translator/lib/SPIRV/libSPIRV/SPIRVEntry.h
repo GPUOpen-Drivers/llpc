@@ -495,6 +495,12 @@ public:
     WordLiterals.push_back(Word2);
     updateModuleVersion();
   }
+  SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode, SPIRVWord Word0, SPIRVWord Word1)
+      : SPIRVAnnotation(TheTarget, 5), ExecMode(TheExecMode) {
+    WordLiterals.push_back(Word0);
+    WordLiterals.push_back(Word1);
+    updateModuleVersion();
+  }
   // Complete constructor for SubgroupSize, SubgroupsPerWorkgroup
   SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode, SPIRVWord Code)
       : SPIRVAnnotation(TheTarget, 4), ExecMode(TheExecMode) {

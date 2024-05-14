@@ -246,26 +246,14 @@ Value *BuilderImpl::CreateIntegerDotProduct(Value *vector1, Value *vector2, Valu
 }
 
 // =====================================================================================================================
-// Get whether the context we are building in supports DPP ROW_XMASK operations.
-bool BuilderImpl::supportDppRowXmask() const {
-  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;
-}
-
-// =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
 bool BuilderImpl::supportWaveWideBPermute() const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
   auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
   auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage.value());
-  supportBPermute = supportBPermute || (gfxIp >= 10 && waveSize == 32);
+  supportBPermute = supportBPermute || waveSize == 32;
   return supportBPermute;
-}
-
-// =====================================================================================================================
-// Get whether the context we are building in supports permute lane DPP operations.
-bool BuilderImpl::supportPermLaneDpp() const {
-  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;
 }
 
 // =====================================================================================================================

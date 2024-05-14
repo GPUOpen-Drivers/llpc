@@ -77,7 +77,7 @@ attribute[1].binding = 0
 attribute[1].format = VK_FORMAT_R32G32_SFLOAT
 attribute[1].offset = 16
 ; SHADERTEST-LABEL: define {{[^@]+}}@lgc.shader.VS.main
-; SHADERTEST-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[VERTEXBUFFERTABLE:%.*]], i32 inreg noundef [[BASEVERTEX:%.*]], i32 inreg noundef [[BASEINSTANCE:%.*]], i32 noundef [[VERTEXID:%.*]], i32 noundef [[RELVERTEXID:%.*]], i32 noundef [[PRIMITIVEID:%.*]], i32 noundef [[INSTANCEID:%.*]]) #[[ATTR0:[0-9]+]] !lgc.shaderstage !12 {
+; SHADERTEST-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[VERTEXBUFFERTABLE:%.*]], i32 inreg noundef [[BASEVERTEX:%.*]], i32 inreg noundef [[BASEINSTANCE:%.*]], i32 noundef [[VERTEXID:%.*]], i32 noundef [[RELVERTEXID:%.*]], i32 noundef [[PRIMITIVEID:%.*]], i32 noundef [[INSTANCEID:%.*]]) #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !12 !lgc.shaderstage !13 {
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = bitcast i64 [[TMP0]] to <2 x i32>
@@ -86,7 +86,7 @@ attribute[1].offset = 16
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(4)
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr <4 x i32>, ptr addrspace(4) [[TMP4]], i64 0
-; SHADERTEST-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP5]], align 16, !invariant.load !13
+; SHADERTEST-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP5]], align 16, !invariant.load !14
 ; SHADERTEST-NEXT:    [[TMP7:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[TMP6]], i32 [[VERTEXINDEX]], i32 16, i32 0, i32 22, i32 0)
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = insertelement <2 x i32> poison, i32 [[TMP7]], i64 0
 ; SHADERTEST-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[TMP6]], i32 [[VERTEXINDEX]], i32 20, i32 0, i32 22, i32 0)
@@ -97,7 +97,7 @@ attribute[1].offset = 16
 ; SHADERTEST-NEXT:    [[TMP14:%.*]] = insertelement <2 x i32> [[TMP12]], i32 [[TMP13]], i32 1
 ; SHADERTEST-NEXT:    [[VERTEX1_0:%.*]] = bitcast <2 x i32> [[TMP14]] to <2 x float>
 ; SHADERTEST-NEXT:    [[TMP15:%.*]] = getelementptr <4 x i32>, ptr addrspace(4) [[TMP4]], i64 0
-; SHADERTEST-NEXT:    [[TMP16:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP15]], align 16, !invariant.load !13
+; SHADERTEST-NEXT:    [[TMP16:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP15]], align 16, !invariant.load !14
 ; SHADERTEST-NEXT:    [[TMP17:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[TMP16]], i32 [[VERTEXINDEX]], i32 0, i32 0, i32 22, i32 0)
 ; SHADERTEST-NEXT:    [[TMP18:%.*]] = insertelement <4 x i32> poison, i32 [[TMP17]], i64 0
 ; SHADERTEST-NEXT:    [[TMP19:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[TMP16]], i32 [[VERTEXINDEX]], i32 4, i32 0, i32 22, i32 0)
@@ -137,7 +137,7 @@ attribute[1].offset = 16
 ;
 ;
 ; SHADERTEST-LABEL: define {{[^@]+}}@lgc.shader.FS.main
-; SHADERTEST-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[SAMPLEINFO:%.*]], i32 inreg noundef [[PRIMMASK:%.*]], <2 x float> noundef [[PERSPINTERPSAMPLE:%.*]], <2 x float> noundef [[PERSPINTERPCENTER:%.*]], <2 x float> noundef [[PERSPINTERPCENTROID:%.*]], <3 x float> noundef [[PERSPINTERPPULLMODE:%.*]], <2 x float> noundef [[LINEARINTERPSAMPLE:%.*]], <2 x float> noundef [[LINEARINTERPCENTER:%.*]], <2 x float> noundef [[LINEARINTERPCENTROID:%.*]], float noundef [[LINESTIPPLE:%.*]], float noundef [[FRAGCOORDX:%.*]], float noundef [[FRAGCOORDY:%.*]], float noundef [[FRAGCOORDZ:%.*]], float noundef [[FRAGCOORDW:%.*]], i32 noundef [[FRONTFACING:%.*]], i32 noundef [[ANCILLARY:%.*]], i32 noundef [[SAMPLECOVERAGE:%.*]], i32 noundef [[FIXEDXY:%.*]]) #[[ATTR1:[0-9]+]] !lgc.shaderstage !14 {
+; SHADERTEST-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[SAMPLEINFO:%.*]], i32 inreg noundef [[PRIMMASK:%.*]], <2 x float> noundef [[PERSPINTERPSAMPLE:%.*]], <2 x float> noundef [[PERSPINTERPCENTER:%.*]], <2 x float> noundef [[PERSPINTERPCENTROID:%.*]], <3 x float> noundef [[PERSPINTERPPULLMODE:%.*]], <2 x float> noundef [[LINEARINTERPSAMPLE:%.*]], <2 x float> noundef [[LINEARINTERPCENTER:%.*]], <2 x float> noundef [[LINEARINTERPCENTROID:%.*]], float noundef [[LINESTIPPLE:%.*]], float noundef [[FRAGCOORDX:%.*]], float noundef [[FRAGCOORDY:%.*]], float noundef [[FRAGCOORDZ:%.*]], float noundef [[FRAGCOORDW:%.*]], i32 noundef [[FRONTFACING:%.*]], i32 noundef [[ANCILLARY:%.*]], i32 noundef [[SAMPLECOVERAGE:%.*]], i32 noundef [[FIXEDXY:%.*]]) #[[ATTR1:[0-9]+]] !spirv.ExecutionModel !15 !lgc.shaderstage !16 {
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[INTERPPERSPSAMPLE:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspSample.v2f32.i32(i32 268435456) #[[ATTR3:[0-9]+]]
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.input.import.interpolated__f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPSAMPLE]])

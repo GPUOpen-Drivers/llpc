@@ -68,6 +68,7 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             target_compile_options("${PROJECT_NAME}" PRIVATE
                 # Output with color if in terminal: https://github.com/ninja-build/ninja/wiki/FAQ
                 -fcolor-diagnostics
+                -Werror=unused-private-field
                 -Wno-covered-switch-default
                 -Wno-extra-semi
                 -Wno-gnu-anonymous-struct

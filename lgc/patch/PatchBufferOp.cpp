@@ -1517,8 +1517,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     }
 
     if (isLoad) {
-      if (m_pipelineState.getTargetInfo().getGfxIpVersion().major >= 10 &&
-          m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
+      if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
         // TODO For stores?
         coherent.bits.dlc = isDlc;
       }

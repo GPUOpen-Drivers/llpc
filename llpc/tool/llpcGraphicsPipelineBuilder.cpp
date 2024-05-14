@@ -164,6 +164,26 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
   auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, {pipelineOut->pipelineBin}); });
 
+  if (compileInfo.isGraphicsLibrary) {
+    Result result = Result::Success;
+    if (compileInfo.stageMask == 0) {
+      result = getCompiler().BuildColorExportShader(pipelineInfo, compileInfo.fsOutputs.data(), pipelineOut,
+                                                    pipelineDumpHandle);
+
+    } else if (compileInfo.stageMask & Vkgc::ShaderStageBit::ShaderStageFragmentBit) {
+      result =
+          getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
+    } else {
+      result = getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageVertexProcess,
+                                                      pipelineDumpHandle);
+    }
+
+    if (result != Result::Success)
+      return createResultError(result, "Graphics pipeline compilation failed");
+
+    return pipelineOut->pipelineBin;
+  }
+
   if (pipelineInfo->enableColorExportShader) {
     Result result = getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageVertexProcess,
                                                            pipelineDumpHandle);
@@ -173,7 +193,7 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
       result =
           getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
     }
-    if (result == Result::Success) {
+    if (result == Result::Success && pipelineOut->fsOutputMetaData != nullptr) {
       void *fsOuts = compileInfo.pipelineBuf;
       compileInfo.pipelineBuf = nullptr;
       result = getCompiler().BuildColorExportShader(pipelineInfo, pipelineOut->fsOutputMetaData, pipelineOut,

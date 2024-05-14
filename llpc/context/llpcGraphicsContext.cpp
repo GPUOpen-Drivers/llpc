@@ -254,44 +254,41 @@ Options GraphicsContext::computePipelineOptions() const {
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
   options.vbAddressLowBitsKnown = pipelineInfo->getGlState().vbAddressLowBitsKnown;
-  if (getGfxIpVersion().major >= 10) {
-    // Only set NGG options for a GFX10+ graphics pipeline.
-    const auto &nggState = pipelineInfo->nggState;
-    if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
-      options.nggFlags |= NggFlagDisable;
-    else {
-      options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
-                         (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
-                         (nggState.compactVertex ? NggFlagCompactVertex : 0) |
-                         (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
-                         (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
-                         (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |
-                         (nggState.enableSphereCulling ? NggFlagEnableSphereCulling : 0) |
-                         (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
-                         (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
-      options.nggBackfaceExponent = nggState.backfaceExponent;
+  // Only set NGG options for a GFX10+ graphics pipeline.
+  const auto &nggState = pipelineInfo->nggState;
+  if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
+    options.nggFlags |= NggFlagDisable;
+  else {
+    options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
+                       (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
+                       (nggState.compactVertex ? NggFlagCompactVertex : 0) |
+                       (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
+                       (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
+                       (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |
+                       (nggState.enableSphereCulling ? NggFlagEnableSphereCulling : 0) |
+                       (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
+                       (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
+    options.nggBackfaceExponent = nggState.backfaceExponent;
 
-      // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
-      // that is valid.
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto, "Mismatch");
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) ==
-                        NggSubgroupSizing::MaximumSize,
-                    "Mismatch");
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) == NggSubgroupSizing::HalfSize,
-                    "Mismatch");
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
-                        NggSubgroupSizing::OptimizeForVerts,
-                    "Mismatch");
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
-                        NggSubgroupSizing::OptimizeForPrims,
-                    "Mismatch");
-      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) == NggSubgroupSizing::Explicit,
-                    "Mismatch");
-      options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
+    // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
+    // that is valid.
+    static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto, "Mismatch");
+    static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) == NggSubgroupSizing::MaximumSize,
+                  "Mismatch");
+    static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) == NggSubgroupSizing::HalfSize,
+                  "Mismatch");
+    static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
+                      NggSubgroupSizing::OptimizeForVerts,
+                  "Mismatch");
+    static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
+                      NggSubgroupSizing::OptimizeForPrims,
+                  "Mismatch");
+    static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) == NggSubgroupSizing::Explicit,
+                  "Mismatch");
+    options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
 
-      options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
-      options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
-    }
+    options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
+    options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
   }
   return options;
 }

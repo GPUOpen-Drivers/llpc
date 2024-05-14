@@ -38,12 +38,11 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; CLEANUP-LABEL: define void @simple_await(
 ; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.stacksize [[META4:![0-9]+]] !continuation.state [[META4]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
+; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANUP-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CLEANUP-NEXT:    unreachable
 ;
@@ -51,12 +50,12 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; CLEANUP-LABEL: define dso_local void @simple_await.resume.0(
 ; CLEANUP-SAME: ) !continuation.registercount [[META2]] !continuation [[META3]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 24)
-; CLEANUP-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
+; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANUP-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(32) [[RETURNADDR_RELOAD_ADDR]], align 4
+; CLEANUP-NEXT:    call void @lgc.cps.free(i32 24)
 ; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], <4 x i32> [[ARG_RELOAD]]), !continuation.registercount [[META2]]
 ; CLEANUP-NEXT:    unreachable
 ;
@@ -64,12 +63,11 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; CLEANUP-LABEL: define void @simple_await_entry(
 ; CLEANUP-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount [[META2]] !continuation.entry [[META5:![0-9]+]] !continuation [[META6:![0-9]+]] !continuation.stacksize [[META4]] !continuation.state [[META4]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
+; CLEANUP-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    store ptr addrspace(1) [[MEM]], ptr addrspace(32) [[MEM_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANUP-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CLEANUP-NEXT:    unreachable
 ;
@@ -77,13 +75,13 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; CLEANUP-LABEL: define dso_local void @simple_await_entry.resume.0(
 ; CLEANUP-SAME: ) !continuation.registercount [[META2]] !continuation [[META6]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 24)
-; CLEANUP-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
+; CLEANUP-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    [[MEM_RELOAD:%.*]] = load ptr addrspace(1), ptr addrspace(32) [[MEM_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANUP-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
 ; CLEANUP-NEXT:    store <4 x i32> [[ARG_RELOAD]], ptr addrspace(1) [[MEM_RELOAD]], align 4
+; CLEANUP-NEXT:    call void @lgc.cps.free(i32 24)
 ; CLEANUP-NEXT:    ret void
 ; CLEANUP:       entryresume.0.split:
 ; CLEANUP-NEXT:    unreachable
@@ -92,12 +90,11 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; REGISTERBUFFER-LABEL: define void @simple_await(
 ; REGISTERBUFFER-SAME: i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.stacksize [[META4:![0-9]+]] !continuation.state [[META4]] {
 ; REGISTERBUFFER-NEXT:  AllocaSpillBB:
-; REGISTERBUFFER-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; REGISTERBUFFER-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; REGISTERBUFFER-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
+; REGISTERBUFFER-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; REGISTERBUFFER-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; REGISTERBUFFER-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; REGISTERBUFFER-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; REGISTERBUFFER-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
-; REGISTERBUFFER-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; REGISTERBUFFER-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; REGISTERBUFFER-NEXT:    unreachable
 ;
@@ -105,12 +102,12 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; REGISTERBUFFER-LABEL: define dso_local void @simple_await.resume.0(
 ; REGISTERBUFFER-SAME: ) !continuation.registercount [[META2]] !continuation [[META3]] {
 ; REGISTERBUFFER-NEXT:  entryresume.0:
-; REGISTERBUFFER-NEXT:    call void @lgc.cps.free(i32 24)
-; REGISTERBUFFER-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; REGISTERBUFFER-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; REGISTERBUFFER-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
+; REGISTERBUFFER-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; REGISTERBUFFER-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
-; REGISTERBUFFER-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; REGISTERBUFFER-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; REGISTERBUFFER-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(32) [[RETURNADDR_RELOAD_ADDR]], align 4
+; REGISTERBUFFER-NEXT:    call void @lgc.cps.free(i32 24)
 ; REGISTERBUFFER-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], <4 x i32> [[ARG_RELOAD]]), !continuation.registercount [[META2]]
 ; REGISTERBUFFER-NEXT:    unreachable
 ;
@@ -118,12 +115,11 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; REGISTERBUFFER-LABEL: define void @simple_await_entry(
 ; REGISTERBUFFER-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount [[META2]] !continuation.entry [[META5:![0-9]+]] !continuation [[META6:![0-9]+]] !continuation.stacksize [[META4]] !continuation.state [[META4]] {
 ; REGISTERBUFFER-NEXT:  AllocaSpillBB:
-; REGISTERBUFFER-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; REGISTERBUFFER-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; REGISTERBUFFER-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
+; REGISTERBUFFER-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; REGISTERBUFFER-NEXT:    store ptr addrspace(1) [[MEM]], ptr addrspace(32) [[MEM_SPILL_ADDR]], align 4
-; REGISTERBUFFER-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; REGISTERBUFFER-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; REGISTERBUFFER-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; REGISTERBUFFER-NEXT:    [[CONT_STATE_STACK_ALLOC:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; REGISTERBUFFER-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; REGISTERBUFFER-NEXT:    unreachable
 ;
@@ -131,13 +127,13 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 ; REGISTERBUFFER-LABEL: define dso_local void @simple_await_entry.resume.0(
 ; REGISTERBUFFER-SAME: ) !continuation.registercount [[META2]] !continuation [[META6]] {
 ; REGISTERBUFFER-NEXT:  entryresume.0:
-; REGISTERBUFFER-NEXT:    call void @lgc.cps.free(i32 24)
-; REGISTERBUFFER-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; REGISTERBUFFER-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; REGISTERBUFFER-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 24)
+; REGISTERBUFFER-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; REGISTERBUFFER-NEXT:    [[MEM_RELOAD:%.*]] = load ptr addrspace(1), ptr addrspace(32) [[MEM_RELOAD_ADDR]], align 4
-; REGISTERBUFFER-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; REGISTERBUFFER-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; REGISTERBUFFER-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
 ; REGISTERBUFFER-NEXT:    store <4 x i32> [[ARG_RELOAD]], ptr addrspace(1) [[MEM_RELOAD]], align 4
+; REGISTERBUFFER-NEXT:    call void @lgc.cps.free(i32 24)
 ; REGISTERBUFFER-NEXT:    ret void
 ; REGISTERBUFFER:       entryresume.0.split:
 ; REGISTERBUFFER-NEXT:    unreachable

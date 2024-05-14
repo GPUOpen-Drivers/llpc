@@ -121,6 +121,9 @@ public:
 
   void writeToBuffer(ElfPackage *elf);
 
+  void fixupRelocation(unsigned relocIdx, unsigned relocValue, unsigned targetSymbolIdx = InvalidValue,
+                       unsigned modifyMask = 0);
+
 private:
   ElfWriter(const ElfWriter &) = delete;
   ElfWriter &operator=(const ElfWriter &) = delete;

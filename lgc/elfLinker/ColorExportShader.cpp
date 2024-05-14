@@ -48,16 +48,10 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
 
   if (!pipelineState->getOptions().enableColorExportShader) {
     PalMetadata *metadata = pipelineState->getPalMetadata();
-    if (pipelineState->useRegisterFieldFormat()) {
-      auto dbShaderControl = metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
-                                 .getMap(true);
-      m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
-    } else {
-      DB_SHADER_CONTROL shaderControl = {};
-      shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
-      m_killEnabled = shaderControl.bits.KILL_ENABLE;
-    }
+    auto dbShaderControl = metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                               .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                               .getMap(true);
+    m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
   }
   m_key = FragColorExport::computeKey(exports, pipelineState);
 }
@@ -139,7 +133,7 @@ Module *ColorExportShader::generate() {
     ++lastIndex;
   }
 
-  PalMetadata palMetadata{m_pipelineState, m_pipelineState->useRegisterFieldFormat()};
+  PalMetadata palMetadata{m_pipelineState};
 
   Value *dynamicIsDualSource = colorExportFunc->getArg(lastIndex);
   fragColorExport.generateExportInstructions(m_exports, values, m_killEnabled, &palMetadata, builder,
@@ -210,10 +204,8 @@ Function *ColorExportShader::createColorExportFunc() {
 
   AttrBuilder attribBuilder(func->getContext());
   attribBuilder.addAttribute("InitialPSInputAddr", std::to_string(0xFFFFFFFF));
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
-    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Fragment);
-    attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
-  }
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Fragment);
+  attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   func->addFnAttrs(attribBuilder);
 
   return func;

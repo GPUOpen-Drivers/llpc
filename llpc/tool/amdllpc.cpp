@@ -590,25 +590,23 @@ static void initCompileInfo(CompileInfo *compileInfo) {
       ForceNonUniformResourceIndexStageMask;
 
   // Set NGG control settings
-  if (ParsedGfxIp.major >= 10) {
-    auto &nggState = compileInfo->gfxPipelineInfo.nggState;
+  auto &nggState = compileInfo->gfxPipelineInfo.nggState;
 
-    nggState.enableNgg = EnableNgg;
-    nggState.enableGsUse = NggEnableGsUse;
-    nggState.forceCullingMode = NggForceCullingMode;
-    nggState.compactVertex = NggCompactVertex;
-    nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
-    nggState.enableFrustumCulling = NggEnableFrustumCulling;
-    nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;
-    nggState.enableSphereCulling = NggEnableSphereCulling;
-    nggState.enableSmallPrimFilter = NggEnableSmallPrimFilter;
-    nggState.enableCullDistanceCulling = NggEnableCullDistanceCulling;
+  nggState.enableNgg = EnableNgg;
+  nggState.enableGsUse = NggEnableGsUse;
+  nggState.forceCullingMode = NggForceCullingMode;
+  nggState.compactVertex = NggCompactVertex;
+  nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
+  nggState.enableFrustumCulling = NggEnableFrustumCulling;
+  nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;
+  nggState.enableSphereCulling = NggEnableSphereCulling;
+  nggState.enableSmallPrimFilter = NggEnableSmallPrimFilter;
+  nggState.enableCullDistanceCulling = NggEnableCullDistanceCulling;
 
-    nggState.backfaceExponent = NggBackfaceExponent;
-    nggState.subgroupSizing = static_cast<NggSubgroupSizingType>(NggSubgroupSizing.getValue());
-    nggState.primsPerSubgroup = NggPrimsPerSubgroup;
-    nggState.vertsPerSubgroup = NggVertsPerSubgroup;
-  }
+  nggState.backfaceExponent = NggBackfaceExponent;
+  nggState.subgroupSizing = static_cast<NggSubgroupSizingType>(NggSubgroupSizing.getValue());
+  nggState.primsPerSubgroup = NggPrimsPerSubgroup;
+  nggState.vertsPerSubgroup = NggVertsPerSubgroup;
 
   compileInfo->internalRtShaders = EnableInternalRtShaders;
 }
@@ -666,10 +664,12 @@ static Error fixupRtState(RtState &rtState, std::vector<char> &shaderLibraryStor
 //
 // @param compiler : LLPC compiler
 // @param inFiles : Input filename(s)
+// @param isGraphicsLibrary : Whether compiled pipeline is library
 // @returns : `ErrorSuccess` on success, `ResultError` on failure
-static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
+static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs, bool isGraphicsLibrary) {
   assert(!inputSpecs.empty());
   CompileInfo compileInfo = {};
+  compileInfo.isGraphicsLibrary = isGraphicsLibrary;
   compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
   std::vector<PipelineShaderInfo> standaloneRtShaders;
@@ -683,6 +683,20 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     compileInfo.autoLayoutDesc = false;
     if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
       return err;
+
+    if (compileInfo.pipelineType == VfxPipelineTypeGraphicsLibrary) {
+      // All input shaders form one group.
+      SmallVector<InputSpecGroup, 3> groups;
+      append_range(groups,
+                   map_range(compileInfo.inputSpecs, [](const InputSpec &spec) { return InputSpecGroup{spec}; }));
+
+      if (Error err = parallelFor(NumThreads, groups, [compiler](InputSpecGroup &inputGroup) {
+            return processInputs(compiler, inputGroup, true);
+          })) {
+        return err;
+      }
+      return Error::success();
+    }
 
     if (isRayTracingPipeline(compileInfo.stageMask)) {
       if (LlpcRaytracingModeSetting.getNumOccurrences())
@@ -889,8 +903,9 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  if (Error err = parallelFor(NumThreads, *inputGroupsOrErr,
-                              [compiler](InputSpecGroup &inputGroup) { return processInputs(compiler, inputGroup); })) {
+  if (Error err = parallelFor(NumThreads, *inputGroupsOrErr, [compiler](InputSpecGroup &inputGroup) {
+        return processInputs(compiler, inputGroup, false);
+      })) {
     result = reportError(std::move(err));
     return EXIT_FAILURE;
   }

@@ -468,7 +468,8 @@ union ShaderBlockMetadata {
     unsigned IsPointer : 1;               // Whether it is a pointer
     unsigned IsStruct : 1;                // Whether it is a structure
     unsigned IsAccelerationStructure : 1; // Whether it is an acceleration structure
-    unsigned Unused : 16;
+    unsigned Aliased : 1;                 // Whether "Aliased" decoration is present
+    unsigned Unused : 15;
   };
   uint64_t U64All;
 };
@@ -484,6 +485,7 @@ struct ShaderBlockDecorate {
   bool Volatile;         // Whether "volatile" qualifier is present
   bool NonWritable;      // Whether "readonly" qualifier is present
   bool NonReadable;      // Whether "writeonly" qualifier is present
+  bool Aliased;          // Whether "Aliased" qualifier is present
 };
 
 /// Flags used for floating-point control

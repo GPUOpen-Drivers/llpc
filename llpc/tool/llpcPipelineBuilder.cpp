@@ -100,6 +100,12 @@ std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, Comp
   if (isRayTracingPipeline(stageMask))
     return std::make_unique<RayTracingPipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
 
+  if (stageMask == 0) {
+    // This may be a color export shader.
+    if (compileInfo.gfxPipelineInfo.enableColorExportShader && !compileInfo.fsOutputs.empty())
+      return std::make_unique<GraphicsPipelineBuilder>(compiler, compileInfo, dumpOptions, printPipelineInfo);
+  }
+
   llvm_unreachable("Unknown pipeline kind");
   return nullptr;
 }

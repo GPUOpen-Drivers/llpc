@@ -876,6 +876,12 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
   auto GetExpression = [&](SPIRVId Id) -> DIExpression * {
     return transDebugInst<DIExpression>(BM->get<SPIRVExtInst>(Id));
   };
+  using LLPCDbgInstPtr =
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 492382
+      DbgInstPtr;
+#else
+      Instruction *;
+#endif
   SPIRVWordVec Ops = DebugInst->getArguments();
   switch (DebugInst->getExtOp()) {
   case SPIRVDebug::Scope:
@@ -899,6 +905,7 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
   case SPIRVDebug::Declare: {
     using namespace SPIRVDebug::Operand::DebugDeclare;
     auto LocalVar = GetLocalVar(Ops[DebugLocalVarIdx]);
+    LLPCDbgInstPtr DbgInst;
     if (getDbgInst<SPIRVDebug::DebugInfoNone>(Ops[VariableIdx])) {
       // If we don't have the variable(e.g. alloca might be promoted by mem2reg)
       // we should generate the following IR:
@@ -908,19 +915,41 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
       // parameter. To work around this limitation we create a dummy temp
       // alloca, use it to create llvm.dbg.declare, and then remove the alloca.
       auto *AI = new AllocaInst(Type::getInt8Ty(M->getContext()), 0, "tmp", BB);
-      auto *DbgDeclare =
-          Builder.insertDeclare(AI, LocalVar.first, GetExpression(Ops[ExpressionIdx]), LocalVar.second, BB);
+      DbgInst = Builder.insertDeclare(AI, LocalVar.first, GetExpression(Ops[ExpressionIdx]), LocalVar.second, BB);
       AI->eraseFromParent();
-      return DbgDeclare;
+    } else {
+      DbgInst = Builder.insertDeclare(GetValue(Ops[VariableIdx]), LocalVar.first, GetExpression(Ops[ExpressionIdx]),
+                                      LocalVar.second, BB);
     }
-    return Builder.insertDeclare(GetValue(Ops[VariableIdx]), LocalVar.first, GetExpression(Ops[ExpressionIdx]),
-                                 LocalVar.second, BB);
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 492382
+    // Debug Info Format is in transition phase right now.
+    // If new Debug Info Format is turned ON then 'insertDeclare' will return DbgRecord.
+    // If new Debug Info Format is turned OFF then 'insertDeclare' will return Instruction (Intrinsic) which we are
+    // storing in hashMap. This part will be removed after the transition, since new DbgInfoFormat will be turned ON
+    // always and we will return nullptr from that point. This comment applies also to 'insertDbgValueIntrinsic' below.
+    if (DbgInst.is<Instruction *>()) {
+      return DbgInst.get<Instruction *>();
+    } else {
+      return nullptr;
+    }
+#else
+    return DbgInst;
+#endif
   }
   case SPIRVDebug::Value: {
     using namespace SPIRVDebug::Operand::DebugValue;
     auto LocalVar = GetLocalVar(Ops[DebugLocalVarIdx]);
-    return Builder.insertDbgValueIntrinsic(GetValue(Ops[ValueIdx]), LocalVar.first, GetExpression(Ops[ExpressionIdx]),
-                                           LocalVar.second, BB);
+    LLPCDbgInstPtr DbgInst = Builder.insertDbgValueIntrinsic(GetValue(Ops[ValueIdx]), LocalVar.first,
+                                                             GetExpression(Ops[ExpressionIdx]), LocalVar.second, BB);
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 492382
+    if (DbgInst.is<Instruction *>()) {
+      return DbgInst.get<Instruction *>();
+    } else {
+      return nullptr;
+    }
+#else
+    return DbgInst;
+#endif
   }
   default:
     llvm_unreachable("Unknown debug intrinsic!");

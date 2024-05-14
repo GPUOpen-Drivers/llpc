@@ -66,6 +66,8 @@ public:
 
   static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
+  static void DumpFragmentOutputs(PipelineDumpFile *dumpFile, const uint8_t *data, uint32_t size);
+
   static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
                                                          UnlinkedShaderStage unlinkedShaderType = UnlinkedStageCount);
 
@@ -110,6 +112,8 @@ public:
 
   // Returns the hash for the glue shader that corresponds to the given glue shader string.
   static const MetroHash::Hash generateHashForGlueShader(BinaryData glueShaderString);
+
+  static bool isValidShaderInfo(const PipelineShaderInfo &info);
 
 private:
   static std::string getSpirvBinaryFileName(const MetroHash::Hash *hash);

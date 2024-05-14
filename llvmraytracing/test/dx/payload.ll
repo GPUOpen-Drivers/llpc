@@ -196,143 +196,196 @@ attributes #3 = { nounwind }
 ;
 ;
 ; CLEANUP-LABEL: define void @main(
-; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META20:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META21:![0-9]+]] !continuation.stacksize [[META22:![0-9]+]] !continuation.state [[META9]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8:![0-9]+]] !continuation.entry [[META19:![0-9]+]] !continuation.registercount [[META8]] !continuation [[META20:![0-9]+]] !continuation.stacksize [[META21:![0-9]+]] !continuation.state [[META8]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MAIN_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 108)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MAIN_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
-; CLEANUP-NEXT:    [[TMP5:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP4]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-NEXT:    [[TMP6:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP5]])
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
+; CLEANUP-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
+; CLEANUP-NEXT:    [[TMP4:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-NEXT:    [[TMP5:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP4]])
 ; CLEANUP-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
-; CLEANUP-NEXT:    [[TMP7:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
-; CLEANUP-NEXT:    store i32 [[TMP7]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    store i32 undef, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 108)
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @main.resume.0 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount !18
+; CLEANUP-NEXT:    [[TMP6:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
+; CLEANUP-NEXT:    store i32 [[TMP6]], ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP7]], align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 1
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP8]], align 4
+; CLEANUP-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 2
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP9]], align 4
+; CLEANUP-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 3
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP10]], align 4
+; CLEANUP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 4
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP11]], align 4
+; CLEANUP-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 5
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP12]], align 4
+; CLEANUP-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 6
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP13]], align 4
+; CLEANUP-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 7
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP14]], align 4
+; CLEANUP-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 8
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP15]], align 4
+; CLEANUP-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 9
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP16]], align 4
+; CLEANUP-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 10
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP17]], align 4
+; CLEANUP-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 11
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP18]], align 4
+; CLEANUP-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 12
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP19]], align 4
+; CLEANUP-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 13
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP20]], align 4
+; CLEANUP-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 14
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP21]], align 4
+; CLEANUP-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 15
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP22]], align 4
+; CLEANUP-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 16
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP23]], align 4
+; CLEANUP-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 17
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP24]], align 4
+; CLEANUP-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 18
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP25]], align 4
+; CLEANUP-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 19
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP26]], align 4
+; CLEANUP-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 20
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP27]], align 4
+; CLEANUP-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 21
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP28]], align 4
+; CLEANUP-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 22
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP29]], align 4
+; CLEANUP-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 23
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP30]], align 4
+; CLEANUP-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 24
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP31]], align 4
+; CLEANUP-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 25
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP32]], align 4
+; CLEANUP-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP7]], i32 26
+; CLEANUP-NEXT:    store i32 undef, ptr addrspace(32) [[TMP33]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @main.resume.0 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META17:![0-9]+]], !continuation.returnedRegistercount !17
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @main.resume.0(
-; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9]] !continuation.registercount [[META18]] !continuation [[META21]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8]] !continuation.registercount [[META17]] !continuation [[META20]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 108)
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MAIN_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    [[TMP26:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    [[TMP28:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    [[TMP30:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    [[TMP32:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    [[TMP34:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    [[TMP36:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    [[TMP38:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    [[TMP40:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    [[TMP42:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    [[TMP44:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    [[TMP46:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    [[TMP48:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    [[TMP50:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 108)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[MAIN_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(32) [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 1
+; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(32) [[TMP26]], align 4
+; CLEANUP-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 2
+; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(32) [[TMP28]], align 4
+; CLEANUP-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 3
+; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(32) [[TMP30]], align 4
+; CLEANUP-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 4
+; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(32) [[TMP32]], align 4
+; CLEANUP-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 5
+; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(32) [[TMP34]], align 4
+; CLEANUP-NEXT:    [[TMP36:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 6
+; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(32) [[TMP36]], align 4
+; CLEANUP-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 7
+; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(32) [[TMP38]], align 4
+; CLEANUP-NEXT:    [[TMP40:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 8
+; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(32) [[TMP40]], align 4
+; CLEANUP-NEXT:    [[TMP42:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 9
+; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(32) [[TMP42]], align 4
+; CLEANUP-NEXT:    [[TMP44:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 10
+; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(32) [[TMP44]], align 4
+; CLEANUP-NEXT:    [[TMP46:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 11
+; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(32) [[TMP46]], align 4
+; CLEANUP-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 12
+; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(32) [[TMP48]], align 4
+; CLEANUP-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 13
+; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(32) [[TMP50]], align 4
+; CLEANUP-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 14
+; CLEANUP-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(32) [[TMP52]], align 4
+; CLEANUP-NEXT:    [[TMP54:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 15
+; CLEANUP-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(32) [[TMP54]], align 4
+; CLEANUP-NEXT:    [[TMP56:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 16
+; CLEANUP-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(32) [[TMP56]], align 4
+; CLEANUP-NEXT:    [[TMP58:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 17
+; CLEANUP-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(32) [[TMP58]], align 4
+; CLEANUP-NEXT:    [[TMP60:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 18
+; CLEANUP-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(32) [[TMP60]], align 4
+; CLEANUP-NEXT:    [[TMP62:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 19
+; CLEANUP-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(32) [[TMP62]], align 4
+; CLEANUP-NEXT:    [[TMP64:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 20
+; CLEANUP-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(32) [[TMP64]], align 4
+; CLEANUP-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 21
+; CLEANUP-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(32) [[TMP66]], align 4
+; CLEANUP-NEXT:    [[TMP68:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 22
+; CLEANUP-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(32) [[TMP68]], align 4
+; CLEANUP-NEXT:    [[TMP70:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 23
+; CLEANUP-NEXT:    [[TMP71:%.*]] = load i32, ptr addrspace(32) [[TMP70]], align 4
+; CLEANUP-NEXT:    [[TMP72:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 24
+; CLEANUP-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(32) [[TMP72]], align 4
+; CLEANUP-NEXT:    [[TMP74:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 25
+; CLEANUP-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(32) [[TMP74]], align 4
+; CLEANUP-NEXT:    [[TMP76:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 26
+; CLEANUP-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(32) [[TMP76]], align 4
+; CLEANUP-NEXT:    [[TMP80:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
+; CLEANUP-NEXT:    call void @lgc.cps.free(i32 108)
 ; CLEANUP-NEXT:    ret void
 ; CLEANUP:       entryresume.0.split:
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define void @AnyHit(
-; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]]) #[[ATTR3:[0-9]+]] !lgc.rt.shaderstage [[META23:![0-9]+]] !continuation.registercount [[META18]] !continuation [[META24:![0-9]+]] !continuation.state [[META9]] {
+; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]]) #[[ATTR3:[0-9]+]] !lgc.rt.shaderstage [[META22:![0-9]+]] !continuation.registercount [[META17]] !continuation [[META23:![0-9]+]] !continuation.state [[META8]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
 ; CLEANUP-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
 ; CLEANUP-NEXT:    [[DOTFCA_0_0_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 0, 0, 0
@@ -366,132 +419,184 @@ attributes #3 = { nounwind }
 ; CLEANUP-NEXT:    [[DOTFCA_1_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; CLEANUP-NEXT:    store i32 [[DOTFCA_1_1_EXTRACT]], ptr [[DOTFCA_1_1_GEP]], align 4
 ; CLEANUP-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    [[TMP26:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    [[TMP28:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    [[TMP30:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    [[TMP32:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    [[TMP34:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    [[TMP36:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    [[TMP38:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    [[TMP40:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    [[TMP42:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    [[TMP44:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    [[TMP46:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    [[TMP48:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    [[TMP50:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    [[TMP52:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    [[TMP53:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; CLEANUP-NEXT:    [[ADDR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP53]], i32 0, i32 1
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(32) [[TMP3]], align 4
+; CLEANUP-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 1
+; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(32) [[TMP28]], align 4
+; CLEANUP-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 2
+; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(32) [[TMP30]], align 4
+; CLEANUP-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 3
+; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(32) [[TMP32]], align 4
+; CLEANUP-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 4
+; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(32) [[TMP34]], align 4
+; CLEANUP-NEXT:    [[TMP36:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 5
+; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(32) [[TMP36]], align 4
+; CLEANUP-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 6
+; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(32) [[TMP38]], align 4
+; CLEANUP-NEXT:    [[TMP40:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 7
+; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(32) [[TMP40]], align 4
+; CLEANUP-NEXT:    [[TMP42:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 8
+; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(32) [[TMP42]], align 4
+; CLEANUP-NEXT:    [[TMP44:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 9
+; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(32) [[TMP44]], align 4
+; CLEANUP-NEXT:    [[TMP46:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 10
+; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(32) [[TMP46]], align 4
+; CLEANUP-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 11
+; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(32) [[TMP48]], align 4
+; CLEANUP-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 12
+; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(32) [[TMP50]], align 4
+; CLEANUP-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 13
+; CLEANUP-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(32) [[TMP52]], align 4
+; CLEANUP-NEXT:    [[TMP54:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 14
+; CLEANUP-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(32) [[TMP54]], align 4
+; CLEANUP-NEXT:    [[TMP56:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 15
+; CLEANUP-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(32) [[TMP56]], align 4
+; CLEANUP-NEXT:    [[TMP58:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 16
+; CLEANUP-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(32) [[TMP58]], align 4
+; CLEANUP-NEXT:    [[TMP60:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 17
+; CLEANUP-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(32) [[TMP60]], align 4
+; CLEANUP-NEXT:    [[TMP62:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 18
+; CLEANUP-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(32) [[TMP62]], align 4
+; CLEANUP-NEXT:    [[TMP64:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 19
+; CLEANUP-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(32) [[TMP64]], align 4
+; CLEANUP-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 20
+; CLEANUP-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(32) [[TMP66]], align 4
+; CLEANUP-NEXT:    [[TMP68:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 21
+; CLEANUP-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(32) [[TMP68]], align 4
+; CLEANUP-NEXT:    [[TMP70:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 22
+; CLEANUP-NEXT:    [[TMP71:%.*]] = load i32, ptr addrspace(32) [[TMP70]], align 4
+; CLEANUP-NEXT:    [[TMP72:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 23
+; CLEANUP-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(32) [[TMP72]], align 4
+; CLEANUP-NEXT:    [[TMP74:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 24
+; CLEANUP-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(32) [[TMP74]], align 4
+; CLEANUP-NEXT:    [[TMP76:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 25
+; CLEANUP-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(32) [[TMP76]], align 4
+; CLEANUP-NEXT:    [[TMP78:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP3]], i32 26
+; CLEANUP-NEXT:    [[TMP79:%.*]] = load i32, ptr addrspace(32) [[TMP78]], align 4
+; CLEANUP-NEXT:    [[TMP82:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; CLEANUP-NEXT:    [[ADDR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP82]], i32 0, i32 1
 ; CLEANUP-NEXT:    [[VAL_I_FCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[ADDR_I]], i32 0, i32 0
 ; CLEANUP-NEXT:    [[VAL_I_FCA_0_LOAD:%.*]] = load <2 x float>, ptr [[VAL_I_FCA_0_GEP]], align 4
 ; CLEANUP-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[VAL_I_FCA_0_LOAD]], 0
 ; CLEANUP-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[DOTSROA_011_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; CLEANUP-NEXT:    [[TMP54:%.*]] = bitcast float [[DOTSROA_011_0_VEC_EXTRACT]] to i32
+; CLEANUP-NEXT:    [[TMP83:%.*]] = bitcast float [[DOTSROA_011_0_VEC_EXTRACT]] to i32
 ; CLEANUP-NEXT:    [[DOTSROA_011_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; CLEANUP-NEXT:    [[TMP55:%.*]] = bitcast float [[DOTSROA_011_4_VEC_EXTRACT]] to i32
+; CLEANUP-NEXT:    [[TMP84:%.*]] = bitcast float [[DOTSROA_011_4_VEC_EXTRACT]] to i32
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CLEANUP-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 [[TMP3]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    store i32 [[TMP4]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    store i32 [[TMP5]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    store i32 [[TMP6]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    store i32 [[TMP7]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    store i32 [[TMP8]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    store i32 [[TMP9]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    store i32 [[TMP10]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    store i32 [[TMP11]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    store i32 [[TMP12]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    store i32 [[TMP13]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    store i32 [[TMP14]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    store i32 [[TMP15]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    store i32 [[TMP16]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    store i32 [[TMP17]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    store i32 [[TMP18]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    store i32 [[TMP19]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    store i32 [[TMP20]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    store i32 [[TMP21]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    store i32 [[TMP22]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    store i32 [[TMP23]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    store i32 [[TMP24]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    store i32 [[TMP25]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    store i32 [[TMP26]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    store i32 [[TMP27]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    store i32 [[TMP28]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    store i32 [[TMP29]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    store i32 [[TMP30]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    store i32 [[TMP31]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    store i32 [[TMP32]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    store i32 [[TMP33]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    store i32 [[TMP34]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    store i32 [[TMP35]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    store i32 [[TMP36]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    store i32 [[TMP37]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    store i32 [[TMP38]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    store i32 [[TMP39]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    store i32 [[TMP40]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    store i32 [[TMP41]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    store i32 [[TMP42]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    store i32 [[TMP43]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    store i32 [[TMP44]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    store i32 [[TMP45]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    store i32 [[TMP46]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    store i32 [[TMP47]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    store i32 [[TMP48]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    store i32 [[TMP49]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    store i32 [[TMP50]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    store i32 [[TMP51]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    store i32 [[TMP52]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
+; CLEANUP-NEXT:    [[TMP85:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 [[TMP5]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    store i32 [[TMP27]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    store i32 [[TMP80]], ptr addrspace(32) [[TMP85]], align 4
+; CLEANUP-NEXT:    [[TMP110:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 1
+; CLEANUP-NEXT:    store i32 [[TMP29]], ptr addrspace(32) [[TMP110]], align 4
+; CLEANUP-NEXT:    [[TMP111:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 2
+; CLEANUP-NEXT:    store i32 [[TMP31]], ptr addrspace(32) [[TMP111]], align 4
+; CLEANUP-NEXT:    [[TMP86:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 3
+; CLEANUP-NEXT:    store i32 [[TMP33]], ptr addrspace(32) [[TMP86]], align 4
+; CLEANUP-NEXT:    [[TMP87:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 4
+; CLEANUP-NEXT:    store i32 [[TMP35]], ptr addrspace(32) [[TMP87]], align 4
+; CLEANUP-NEXT:    [[TMP88:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 5
+; CLEANUP-NEXT:    store i32 [[TMP37]], ptr addrspace(32) [[TMP88]], align 4
+; CLEANUP-NEXT:    [[TMP89:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 6
+; CLEANUP-NEXT:    store i32 [[TMP39]], ptr addrspace(32) [[TMP89]], align 4
+; CLEANUP-NEXT:    [[TMP90:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 7
+; CLEANUP-NEXT:    store i32 [[TMP41]], ptr addrspace(32) [[TMP90]], align 4
+; CLEANUP-NEXT:    [[TMP91:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 8
+; CLEANUP-NEXT:    store i32 [[TMP43]], ptr addrspace(32) [[TMP91]], align 4
+; CLEANUP-NEXT:    [[TMP92:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 9
+; CLEANUP-NEXT:    store i32 [[TMP45]], ptr addrspace(32) [[TMP92]], align 4
+; CLEANUP-NEXT:    [[TMP93:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 10
+; CLEANUP-NEXT:    store i32 [[TMP47]], ptr addrspace(32) [[TMP93]], align 4
+; CLEANUP-NEXT:    [[TMP94:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 11
+; CLEANUP-NEXT:    store i32 [[TMP49]], ptr addrspace(32) [[TMP94]], align 4
+; CLEANUP-NEXT:    [[TMP95:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 12
+; CLEANUP-NEXT:    store i32 [[TMP51]], ptr addrspace(32) [[TMP95]], align 4
+; CLEANUP-NEXT:    [[TMP96:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 13
+; CLEANUP-NEXT:    store i32 [[TMP53]], ptr addrspace(32) [[TMP96]], align 4
+; CLEANUP-NEXT:    [[TMP97:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 14
+; CLEANUP-NEXT:    store i32 [[TMP55]], ptr addrspace(32) [[TMP97]], align 4
+; CLEANUP-NEXT:    [[TMP98:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 15
+; CLEANUP-NEXT:    store i32 [[TMP57]], ptr addrspace(32) [[TMP98]], align 4
+; CLEANUP-NEXT:    [[TMP99:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 16
+; CLEANUP-NEXT:    store i32 [[TMP59]], ptr addrspace(32) [[TMP99]], align 4
+; CLEANUP-NEXT:    [[TMP100:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 17
+; CLEANUP-NEXT:    store i32 [[TMP61]], ptr addrspace(32) [[TMP100]], align 4
+; CLEANUP-NEXT:    [[TMP101:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 18
+; CLEANUP-NEXT:    store i32 [[TMP63]], ptr addrspace(32) [[TMP101]], align 4
+; CLEANUP-NEXT:    [[TMP102:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 19
+; CLEANUP-NEXT:    store i32 [[TMP65]], ptr addrspace(32) [[TMP102]], align 4
+; CLEANUP-NEXT:    [[TMP103:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 20
+; CLEANUP-NEXT:    store i32 [[TMP67]], ptr addrspace(32) [[TMP103]], align 4
+; CLEANUP-NEXT:    [[TMP104:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 21
+; CLEANUP-NEXT:    store i32 [[TMP69]], ptr addrspace(32) [[TMP104]], align 4
+; CLEANUP-NEXT:    [[TMP105:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 22
+; CLEANUP-NEXT:    store i32 [[TMP71]], ptr addrspace(32) [[TMP105]], align 4
+; CLEANUP-NEXT:    [[TMP106:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 23
+; CLEANUP-NEXT:    store i32 [[TMP73]], ptr addrspace(32) [[TMP106]], align 4
+; CLEANUP-NEXT:    [[TMP107:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 24
+; CLEANUP-NEXT:    store i32 [[TMP75]], ptr addrspace(32) [[TMP107]], align 4
+; CLEANUP-NEXT:    [[TMP108:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 25
+; CLEANUP-NEXT:    store i32 [[TMP77]], ptr addrspace(32) [[TMP108]], align 4
+; CLEANUP-NEXT:    [[TMP109:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP85]], i32 26
+; CLEANUP-NEXT:    store i32 [[TMP79]], ptr addrspace(32) [[TMP109]], align 4
 ; CLEANUP-NEXT:    [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 0
-; CLEANUP-NEXT:    [[TMP56:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
-; CLEANUP-NEXT:    [[TMP57:%.*]] = bitcast i32 [[TMP56]] to float
-; CLEANUP-NEXT:    [[DOTSROA_012_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP57]], i32 0
+; CLEANUP-NEXT:    [[TMP114:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
+; CLEANUP-NEXT:    [[TMP115:%.*]] = bitcast i32 [[TMP114]] to float
+; CLEANUP-NEXT:    [[DOTSROA_012_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP115]], i32 0
 ; CLEANUP-NEXT:    [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 1
-; CLEANUP-NEXT:    [[TMP58:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
-; CLEANUP-NEXT:    [[TMP59:%.*]] = bitcast i32 [[TMP58]] to float
-; CLEANUP-NEXT:    [[DOTSROA_012_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_012_0_VEC_INSERT]], float [[TMP59]], i32 1
+; CLEANUP-NEXT:    [[TMP116:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
+; CLEANUP-NEXT:    [[TMP117:%.*]] = bitcast i32 [[TMP116]] to float
+; CLEANUP-NEXT:    [[DOTSROA_012_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_012_0_VEC_INSERT]], float [[TMP117]], i32 1
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[DOTSROA_012_4_VEC_INSERT]], 0
-; CLEANUP-NEXT:    [[TMP60:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; CLEANUP-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP60]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
+; CLEANUP-NEXT:    [[TMP118:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; CLEANUP-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP118]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
 ; CLEANUP-NEXT:    [[DOTFCA_0_0_0_0_GEP1:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0, i32 0
 ; CLEANUP-NEXT:    [[DOTFCA_0_0_0_0_LOAD:%.*]] = load <3 x i32>, ptr [[DOTFCA_0_0_0_0_GEP1]], align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] poison, <3 x i32> [[DOTFCA_0_0_0_0_LOAD]], 0, 0, 0, 0
@@ -522,262 +627,367 @@ attributes #3 = { nounwind }
 ; CLEANUP-NEXT:    [[DOTFCA_1_1_GEP10:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; CLEANUP-NEXT:    [[DOTFCA_1_1_LOAD:%.*]] = load i32, ptr [[DOTFCA_1_1_GEP10]], align 4
 ; CLEANUP-NEXT:    [[DOTFCA_1_1_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_0_INSERT]], i32 [[DOTFCA_1_1_LOAD]], 1, 1
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META18]]
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META17]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define void @ClosestHit(
-; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META25:![0-9]+]] !continuation.registercount [[META18]] !continuation [[META26:![0-9]+]] !continuation.stacksize [[META27:![0-9]+]] !continuation.state [[META28:![0-9]+]] {
+; CLEANUP-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META24:![0-9]+]] !continuation.registercount [[META17]] !continuation [[META25:![0-9]+]] !continuation.stacksize [[META26:![0-9]+]] !continuation.state [[META27:![0-9]+]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 1
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 120)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; CLEANUP-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 1, 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    [[TMP26:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    [[TMP28:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    [[TMP30:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    [[TMP32:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    [[TMP34:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    [[TMP36:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    [[TMP38:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    [[TMP40:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    [[TMP42:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    [[TMP44:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    [[TMP46:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    [[TMP48:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    [[TMP50:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    [[TMP52:%.*]] = load i32, ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 2
-; CLEANUP-NEXT:    store i32 [[TMP52]], ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(32) [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 1
+; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(32) [[TMP26]], align 4
+; CLEANUP-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 2
+; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(32) [[TMP28]], align 4
+; CLEANUP-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 3
+; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(32) [[TMP30]], align 4
+; CLEANUP-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 4
+; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(32) [[TMP32]], align 4
+; CLEANUP-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 5
+; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(32) [[TMP34]], align 4
+; CLEANUP-NEXT:    [[TMP36:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 6
+; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(32) [[TMP36]], align 4
+; CLEANUP-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 7
+; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(32) [[TMP38]], align 4
+; CLEANUP-NEXT:    [[TMP40:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 8
+; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(32) [[TMP40]], align 4
+; CLEANUP-NEXT:    [[TMP42:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 9
+; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(32) [[TMP42]], align 4
+; CLEANUP-NEXT:    [[TMP44:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 10
+; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(32) [[TMP44]], align 4
+; CLEANUP-NEXT:    [[TMP46:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 11
+; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(32) [[TMP46]], align 4
+; CLEANUP-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 12
+; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(32) [[TMP48]], align 4
+; CLEANUP-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 13
+; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(32) [[TMP50]], align 4
+; CLEANUP-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 14
+; CLEANUP-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(32) [[TMP52]], align 4
+; CLEANUP-NEXT:    [[TMP54:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 15
+; CLEANUP-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(32) [[TMP54]], align 4
+; CLEANUP-NEXT:    [[TMP56:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 16
+; CLEANUP-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(32) [[TMP56]], align 4
+; CLEANUP-NEXT:    [[TMP58:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 17
+; CLEANUP-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(32) [[TMP58]], align 4
+; CLEANUP-NEXT:    [[TMP60:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 18
+; CLEANUP-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(32) [[TMP60]], align 4
+; CLEANUP-NEXT:    [[TMP62:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 19
+; CLEANUP-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(32) [[TMP62]], align 4
+; CLEANUP-NEXT:    [[TMP64:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 20
+; CLEANUP-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(32) [[TMP64]], align 4
+; CLEANUP-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 21
+; CLEANUP-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(32) [[TMP66]], align 4
+; CLEANUP-NEXT:    [[TMP68:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 22
+; CLEANUP-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(32) [[TMP68]], align 4
+; CLEANUP-NEXT:    [[TMP70:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 23
+; CLEANUP-NEXT:    [[TMP71:%.*]] = load i32, ptr addrspace(32) [[TMP70]], align 4
+; CLEANUP-NEXT:    [[TMP72:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 24
+; CLEANUP-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(32) [[TMP72]], align 4
+; CLEANUP-NEXT:    [[TMP74:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 25
+; CLEANUP-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(32) [[TMP74]], align 4
+; CLEANUP-NEXT:    [[TMP76:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 26
+; CLEANUP-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(32) [[TMP76]], align 4
+; CLEANUP-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 2
+; CLEANUP-NEXT:    store i32 [[TMP80]], ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
 ; CLEANUP-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] poison, <2 x float> [[DOTFCA_1_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[DOTSROA_053_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; CLEANUP-NEXT:    [[TMP53:%.*]] = bitcast float [[DOTSROA_053_0_VEC_EXTRACT]] to i32
+; CLEANUP-NEXT:    [[TMP81:%.*]] = bitcast float [[DOTSROA_053_0_VEC_EXTRACT]] to i32
 ; CLEANUP-NEXT:    [[DOTSROA_053_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; CLEANUP-NEXT:    [[TMP54:%.*]] = bitcast float [[DOTSROA_053_4_VEC_EXTRACT]] to i32
+; CLEANUP-NEXT:    [[TMP82:%.*]] = bitcast float [[DOTSROA_053_4_VEC_EXTRACT]] to i32
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; CLEANUP-NEXT:    [[TMP55:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; CLEANUP-NEXT:    [[TMP56:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; CLEANUP-NEXT:    [[TMP57:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP55]])
-; CLEANUP-NEXT:    [[TMP58:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP57]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; CLEANUP-NEXT:    [[TMP59:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP58]])
+; CLEANUP-NEXT:    [[TMP83:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
+; CLEANUP-NEXT:    [[TMP84:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
+; CLEANUP-NEXT:    [[TMP85:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP83]])
+; CLEANUP-NEXT:    [[TMP86:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP85]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-NEXT:    [[TMP87:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP86]])
 ; CLEANUP-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; CLEANUP-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
-; CLEANUP-NEXT:    [[TMP60:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
-; CLEANUP-NEXT:    store i32 [[TMP60]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 [[TMP2]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    store i32 [[TMP3]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    store i32 [[TMP4]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    store i32 [[TMP5]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    store i32 [[TMP6]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    store i32 [[TMP7]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    store i32 [[TMP8]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    store i32 [[TMP9]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    store i32 [[TMP10]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    store i32 [[TMP11]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    store i32 [[TMP12]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    store i32 [[TMP13]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    store i32 [[TMP14]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    store i32 [[TMP15]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    store i32 [[TMP16]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    store i32 [[TMP17]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    store i32 [[TMP18]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    store i32 [[TMP19]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    store i32 [[TMP20]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    store i32 [[TMP21]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    store i32 [[TMP22]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    store i32 [[TMP23]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    store i32 [[TMP24]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    store i32 [[TMP25]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    store i32 [[TMP26]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    store i32 [[TMP27]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    store i32 [[TMP28]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    store i32 [[TMP29]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    store i32 [[TMP30]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    store i32 [[TMP31]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    store i32 [[TMP32]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    store i32 [[TMP33]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    store i32 [[TMP34]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    store i32 [[TMP35]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    store i32 [[TMP36]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    store i32 [[TMP37]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    store i32 [[TMP38]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    store i32 [[TMP39]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    store i32 [[TMP40]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    store i32 [[TMP41]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    store i32 [[TMP42]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    store i32 [[TMP43]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    store i32 [[TMP44]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    store i32 [[TMP45]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    store i32 [[TMP46]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    store i32 [[TMP47]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    store i32 [[TMP48]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    store i32 [[TMP49]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    store i32 [[TMP50]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    store i32 [[TMP51]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
-; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 120)
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @ClosestHit.resume.0 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META18]], !continuation.returnedRegistercount !18
+; CLEANUP-NEXT:    [[TMP88:%.*]] = ptrtoint ptr addrspace(32) [[PAYLOAD_SPILL_ALLOCA]] to i32
+; CLEANUP-NEXT:    store i32 [[TMP88]], ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP89:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 [[TMP3]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    store i32 [[TMP4]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    store i32 [[TMP5]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    store i32 [[TMP78]], ptr addrspace(32) [[TMP89]], align 4
+; CLEANUP-NEXT:    [[TMP114:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 1
+; CLEANUP-NEXT:    store i32 [[TMP27]], ptr addrspace(32) [[TMP114]], align 4
+; CLEANUP-NEXT:    [[TMP115:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 2
+; CLEANUP-NEXT:    store i32 [[TMP29]], ptr addrspace(32) [[TMP115]], align 4
+; CLEANUP-NEXT:    [[TMP90:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 3
+; CLEANUP-NEXT:    store i32 [[TMP31]], ptr addrspace(32) [[TMP90]], align 4
+; CLEANUP-NEXT:    [[TMP91:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 4
+; CLEANUP-NEXT:    store i32 [[TMP33]], ptr addrspace(32) [[TMP91]], align 4
+; CLEANUP-NEXT:    [[TMP92:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 5
+; CLEANUP-NEXT:    store i32 [[TMP35]], ptr addrspace(32) [[TMP92]], align 4
+; CLEANUP-NEXT:    [[TMP93:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 6
+; CLEANUP-NEXT:    store i32 [[TMP37]], ptr addrspace(32) [[TMP93]], align 4
+; CLEANUP-NEXT:    [[TMP94:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 7
+; CLEANUP-NEXT:    store i32 [[TMP39]], ptr addrspace(32) [[TMP94]], align 4
+; CLEANUP-NEXT:    [[TMP95:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 8
+; CLEANUP-NEXT:    store i32 [[TMP41]], ptr addrspace(32) [[TMP95]], align 4
+; CLEANUP-NEXT:    [[TMP96:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 9
+; CLEANUP-NEXT:    store i32 [[TMP43]], ptr addrspace(32) [[TMP96]], align 4
+; CLEANUP-NEXT:    [[TMP97:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 10
+; CLEANUP-NEXT:    store i32 [[TMP45]], ptr addrspace(32) [[TMP97]], align 4
+; CLEANUP-NEXT:    [[TMP98:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 11
+; CLEANUP-NEXT:    store i32 [[TMP47]], ptr addrspace(32) [[TMP98]], align 4
+; CLEANUP-NEXT:    [[TMP99:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 12
+; CLEANUP-NEXT:    store i32 [[TMP49]], ptr addrspace(32) [[TMP99]], align 4
+; CLEANUP-NEXT:    [[TMP100:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 13
+; CLEANUP-NEXT:    store i32 [[TMP51]], ptr addrspace(32) [[TMP100]], align 4
+; CLEANUP-NEXT:    [[TMP101:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 14
+; CLEANUP-NEXT:    store i32 [[TMP53]], ptr addrspace(32) [[TMP101]], align 4
+; CLEANUP-NEXT:    [[TMP102:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 15
+; CLEANUP-NEXT:    store i32 [[TMP55]], ptr addrspace(32) [[TMP102]], align 4
+; CLEANUP-NEXT:    [[TMP103:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 16
+; CLEANUP-NEXT:    store i32 [[TMP57]], ptr addrspace(32) [[TMP103]], align 4
+; CLEANUP-NEXT:    [[TMP104:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 17
+; CLEANUP-NEXT:    store i32 [[TMP59]], ptr addrspace(32) [[TMP104]], align 4
+; CLEANUP-NEXT:    [[TMP105:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 18
+; CLEANUP-NEXT:    store i32 [[TMP61]], ptr addrspace(32) [[TMP105]], align 4
+; CLEANUP-NEXT:    [[TMP106:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 19
+; CLEANUP-NEXT:    store i32 [[TMP63]], ptr addrspace(32) [[TMP106]], align 4
+; CLEANUP-NEXT:    [[TMP107:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 20
+; CLEANUP-NEXT:    store i32 [[TMP65]], ptr addrspace(32) [[TMP107]], align 4
+; CLEANUP-NEXT:    [[TMP108:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 21
+; CLEANUP-NEXT:    store i32 [[TMP67]], ptr addrspace(32) [[TMP108]], align 4
+; CLEANUP-NEXT:    [[TMP109:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 22
+; CLEANUP-NEXT:    store i32 [[TMP69]], ptr addrspace(32) [[TMP109]], align 4
+; CLEANUP-NEXT:    [[TMP110:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 23
+; CLEANUP-NEXT:    store i32 [[TMP71]], ptr addrspace(32) [[TMP110]], align 4
+; CLEANUP-NEXT:    [[TMP111:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 24
+; CLEANUP-NEXT:    store i32 [[TMP73]], ptr addrspace(32) [[TMP111]], align 4
+; CLEANUP-NEXT:    [[TMP112:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 25
+; CLEANUP-NEXT:    store i32 [[TMP75]], ptr addrspace(32) [[TMP112]], align 4
+; CLEANUP-NEXT:    [[TMP113:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP89]], i32 26
+; CLEANUP-NEXT:    store i32 [[TMP77]], ptr addrspace(32) [[TMP113]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i64 ptrtoint (ptr @ClosestHit.resume.0 to i64), [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @ClosestHit.resume.0(
-; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META25]] !continuation.registercount [[META18]] !continuation [[META26]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META24]] !continuation.registercount [[META17]] !continuation [[META25]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    call void @lgc.cps.free(i32 120)
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 0)
-; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    [[TMP26:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    [[TMP28:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    [[TMP30:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    [[TMP32:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    [[TMP34:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    [[TMP36:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    [[TMP38:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    [[TMP40:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    [[TMP42:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    [[TMP44:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    [[TMP46:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    [[TMP48:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    [[TMP50:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
+; CLEANUP-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 120)
+; CLEANUP-NEXT:    [[PAYLOAD_SPILL_ALLOCA:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(32) [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 1
+; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(32) [[TMP26]], align 4
+; CLEANUP-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 2
+; CLEANUP-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(32) [[TMP28]], align 4
+; CLEANUP-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 3
+; CLEANUP-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(32) [[TMP30]], align 4
+; CLEANUP-NEXT:    [[TMP32:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 4
+; CLEANUP-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(32) [[TMP32]], align 4
+; CLEANUP-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 5
+; CLEANUP-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(32) [[TMP34]], align 4
+; CLEANUP-NEXT:    [[TMP36:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 6
+; CLEANUP-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(32) [[TMP36]], align 4
+; CLEANUP-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 7
+; CLEANUP-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(32) [[TMP38]], align 4
+; CLEANUP-NEXT:    [[TMP40:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 8
+; CLEANUP-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(32) [[TMP40]], align 4
+; CLEANUP-NEXT:    [[TMP42:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 9
+; CLEANUP-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(32) [[TMP42]], align 4
+; CLEANUP-NEXT:    [[TMP44:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 10
+; CLEANUP-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(32) [[TMP44]], align 4
+; CLEANUP-NEXT:    [[TMP46:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 11
+; CLEANUP-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(32) [[TMP46]], align 4
+; CLEANUP-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 12
+; CLEANUP-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(32) [[TMP48]], align 4
+; CLEANUP-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 13
+; CLEANUP-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(32) [[TMP50]], align 4
+; CLEANUP-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 14
+; CLEANUP-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(32) [[TMP52]], align 4
+; CLEANUP-NEXT:    [[TMP54:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 15
+; CLEANUP-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(32) [[TMP54]], align 4
+; CLEANUP-NEXT:    [[TMP56:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 16
+; CLEANUP-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(32) [[TMP56]], align 4
+; CLEANUP-NEXT:    [[TMP58:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 17
+; CLEANUP-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(32) [[TMP58]], align 4
+; CLEANUP-NEXT:    [[TMP60:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 18
+; CLEANUP-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(32) [[TMP60]], align 4
+; CLEANUP-NEXT:    [[TMP62:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 19
+; CLEANUP-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(32) [[TMP62]], align 4
+; CLEANUP-NEXT:    [[TMP64:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 20
+; CLEANUP-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(32) [[TMP64]], align 4
+; CLEANUP-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 21
+; CLEANUP-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(32) [[TMP66]], align 4
+; CLEANUP-NEXT:    [[TMP68:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 22
+; CLEANUP-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(32) [[TMP68]], align 4
+; CLEANUP-NEXT:    [[TMP70:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 23
+; CLEANUP-NEXT:    [[TMP71:%.*]] = load i32, ptr addrspace(32) [[TMP70]], align 4
+; CLEANUP-NEXT:    [[TMP72:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 24
+; CLEANUP-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(32) [[TMP72]], align 4
+; CLEANUP-NEXT:    [[TMP74:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 25
+; CLEANUP-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(32) [[TMP74]], align 4
+; CLEANUP-NEXT:    [[TMP76:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP1]], i32 26
+; CLEANUP-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(32) [[TMP76]], align 4
+; CLEANUP-NEXT:    [[TMP80:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; CLEANUP-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 2
+; CLEANUP-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 2
 ; CLEANUP-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(32) [[DOTRELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[TMP1]], i32 0, i32 1
+; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[CLOSESTHIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(32) [[RETURNADDR_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    store i32 [[DOTRELOAD]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 [[TMP2]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; CLEANUP-NEXT:    store i32 [[TMP3]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; CLEANUP-NEXT:    store i32 [[TMP4]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; CLEANUP-NEXT:    store i32 [[TMP5]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 10), align 4
-; CLEANUP-NEXT:    store i32 [[TMP6]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 11), align 4
-; CLEANUP-NEXT:    store i32 [[TMP7]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 12), align 4
-; CLEANUP-NEXT:    store i32 [[TMP8]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 13), align 4
-; CLEANUP-NEXT:    store i32 [[TMP9]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 14), align 4
-; CLEANUP-NEXT:    store i32 [[TMP10]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 15), align 4
-; CLEANUP-NEXT:    store i32 [[TMP11]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 16), align 4
-; CLEANUP-NEXT:    store i32 [[TMP12]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 17), align 4
-; CLEANUP-NEXT:    store i32 [[TMP13]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 18), align 4
-; CLEANUP-NEXT:    store i32 [[TMP14]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 19), align 4
-; CLEANUP-NEXT:    store i32 [[TMP15]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 20), align 4
-; CLEANUP-NEXT:    store i32 [[TMP16]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 21), align 4
-; CLEANUP-NEXT:    store i32 [[TMP17]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 22), align 4
-; CLEANUP-NEXT:    store i32 [[TMP18]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 23), align 4
-; CLEANUP-NEXT:    store i32 [[TMP19]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 24), align 4
-; CLEANUP-NEXT:    store i32 [[TMP20]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 25), align 4
-; CLEANUP-NEXT:    store i32 [[TMP21]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 26), align 4
-; CLEANUP-NEXT:    store i32 [[TMP22]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 27), align 4
-; CLEANUP-NEXT:    store i32 [[TMP23]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 28), align 4
-; CLEANUP-NEXT:    store i32 [[TMP24]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 29), align 4
-; CLEANUP-NEXT:    store i32 [[TMP25]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 30), align 4
-; CLEANUP-NEXT:    store i32 [[TMP26]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 31), align 4
-; CLEANUP-NEXT:    store i32 [[TMP27]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 32), align 4
-; CLEANUP-NEXT:    store i32 [[TMP28]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 33), align 4
-; CLEANUP-NEXT:    store i32 [[TMP29]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 34), align 4
-; CLEANUP-NEXT:    store i32 [[TMP30]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 35), align 4
-; CLEANUP-NEXT:    store i32 [[TMP31]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 36), align 4
-; CLEANUP-NEXT:    store i32 [[TMP32]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 37), align 4
-; CLEANUP-NEXT:    store i32 [[TMP33]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 38), align 4
-; CLEANUP-NEXT:    store i32 [[TMP34]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 39), align 4
-; CLEANUP-NEXT:    store i32 [[TMP35]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 40), align 4
-; CLEANUP-NEXT:    store i32 [[TMP36]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 41), align 4
-; CLEANUP-NEXT:    store i32 [[TMP37]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 42), align 4
-; CLEANUP-NEXT:    store i32 [[TMP38]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 43), align 4
-; CLEANUP-NEXT:    store i32 [[TMP39]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 44), align 4
-; CLEANUP-NEXT:    store i32 [[TMP40]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 45), align 4
-; CLEANUP-NEXT:    store i32 [[TMP41]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 46), align 4
-; CLEANUP-NEXT:    store i32 [[TMP42]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 47), align 4
-; CLEANUP-NEXT:    store i32 [[TMP43]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 48), align 4
-; CLEANUP-NEXT:    store i32 [[TMP44]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 49), align 4
-; CLEANUP-NEXT:    store i32 [[TMP45]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 50), align 4
-; CLEANUP-NEXT:    store i32 [[TMP46]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 51), align 4
-; CLEANUP-NEXT:    store i32 [[TMP47]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 52), align 4
-; CLEANUP-NEXT:    store i32 [[TMP48]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 53), align 4
-; CLEANUP-NEXT:    store i32 [[TMP49]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 54), align 4
-; CLEANUP-NEXT:    store i32 [[TMP50]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 55), align 4
-; CLEANUP-NEXT:    store i32 [[TMP51]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 56), align 4
+; CLEANUP-NEXT:    store i32 [[DOTRELOAD]], ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP81:%.*]] = load ptr addrspace(32), ptr addrspace(20) @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 [[TMP3]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CLEANUP-NEXT:    store i32 [[TMP4]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CLEANUP-NEXT:    store i32 [[TMP5]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CLEANUP-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CLEANUP-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
+; CLEANUP-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
+; CLEANUP-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CLEANUP-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 14), align 4
+; CLEANUP-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 15), align 4
+; CLEANUP-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 16), align 4
+; CLEANUP-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 17), align 4
+; CLEANUP-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 18), align 4
+; CLEANUP-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 19), align 4
+; CLEANUP-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 20), align 4
+; CLEANUP-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 21), align 4
+; CLEANUP-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 22), align 4
+; CLEANUP-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 23), align 4
+; CLEANUP-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 24), align 4
+; CLEANUP-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 25), align 4
+; CLEANUP-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 26), align 4
+; CLEANUP-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 27), align 4
+; CLEANUP-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 28), align 4
+; CLEANUP-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 29), align 4
+; CLEANUP-NEXT:    store i32 [[TMP78]], ptr addrspace(32) [[TMP81]], align 4
+; CLEANUP-NEXT:    [[TMP106:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 1
+; CLEANUP-NEXT:    store i32 [[TMP27]], ptr addrspace(32) [[TMP106]], align 4
+; CLEANUP-NEXT:    [[TMP107:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 2
+; CLEANUP-NEXT:    store i32 [[TMP29]], ptr addrspace(32) [[TMP107]], align 4
+; CLEANUP-NEXT:    [[TMP82:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 3
+; CLEANUP-NEXT:    store i32 [[TMP31]], ptr addrspace(32) [[TMP82]], align 4
+; CLEANUP-NEXT:    [[TMP83:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 4
+; CLEANUP-NEXT:    store i32 [[TMP33]], ptr addrspace(32) [[TMP83]], align 4
+; CLEANUP-NEXT:    [[TMP84:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 5
+; CLEANUP-NEXT:    store i32 [[TMP35]], ptr addrspace(32) [[TMP84]], align 4
+; CLEANUP-NEXT:    [[TMP85:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 6
+; CLEANUP-NEXT:    store i32 [[TMP37]], ptr addrspace(32) [[TMP85]], align 4
+; CLEANUP-NEXT:    [[TMP86:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 7
+; CLEANUP-NEXT:    store i32 [[TMP39]], ptr addrspace(32) [[TMP86]], align 4
+; CLEANUP-NEXT:    [[TMP87:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 8
+; CLEANUP-NEXT:    store i32 [[TMP41]], ptr addrspace(32) [[TMP87]], align 4
+; CLEANUP-NEXT:    [[TMP88:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 9
+; CLEANUP-NEXT:    store i32 [[TMP43]], ptr addrspace(32) [[TMP88]], align 4
+; CLEANUP-NEXT:    [[TMP89:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 10
+; CLEANUP-NEXT:    store i32 [[TMP45]], ptr addrspace(32) [[TMP89]], align 4
+; CLEANUP-NEXT:    [[TMP90:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 11
+; CLEANUP-NEXT:    store i32 [[TMP47]], ptr addrspace(32) [[TMP90]], align 4
+; CLEANUP-NEXT:    [[TMP91:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 12
+; CLEANUP-NEXT:    store i32 [[TMP49]], ptr addrspace(32) [[TMP91]], align 4
+; CLEANUP-NEXT:    [[TMP92:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 13
+; CLEANUP-NEXT:    store i32 [[TMP51]], ptr addrspace(32) [[TMP92]], align 4
+; CLEANUP-NEXT:    [[TMP93:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 14
+; CLEANUP-NEXT:    store i32 [[TMP53]], ptr addrspace(32) [[TMP93]], align 4
+; CLEANUP-NEXT:    [[TMP94:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 15
+; CLEANUP-NEXT:    store i32 [[TMP55]], ptr addrspace(32) [[TMP94]], align 4
+; CLEANUP-NEXT:    [[TMP95:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 16
+; CLEANUP-NEXT:    store i32 [[TMP57]], ptr addrspace(32) [[TMP95]], align 4
+; CLEANUP-NEXT:    [[TMP96:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 17
+; CLEANUP-NEXT:    store i32 [[TMP59]], ptr addrspace(32) [[TMP96]], align 4
+; CLEANUP-NEXT:    [[TMP97:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 18
+; CLEANUP-NEXT:    store i32 [[TMP61]], ptr addrspace(32) [[TMP97]], align 4
+; CLEANUP-NEXT:    [[TMP98:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 19
+; CLEANUP-NEXT:    store i32 [[TMP63]], ptr addrspace(32) [[TMP98]], align 4
+; CLEANUP-NEXT:    [[TMP99:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 20
+; CLEANUP-NEXT:    store i32 [[TMP65]], ptr addrspace(32) [[TMP99]], align 4
+; CLEANUP-NEXT:    [[TMP100:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 21
+; CLEANUP-NEXT:    store i32 [[TMP67]], ptr addrspace(32) [[TMP100]], align 4
+; CLEANUP-NEXT:    [[TMP101:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 22
+; CLEANUP-NEXT:    store i32 [[TMP69]], ptr addrspace(32) [[TMP101]], align 4
+; CLEANUP-NEXT:    [[TMP102:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 23
+; CLEANUP-NEXT:    store i32 [[TMP71]], ptr addrspace(32) [[TMP102]], align 4
+; CLEANUP-NEXT:    [[TMP103:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 24
+; CLEANUP-NEXT:    store i32 [[TMP73]], ptr addrspace(32) [[TMP103]], align 4
+; CLEANUP-NEXT:    [[TMP104:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 25
+; CLEANUP-NEXT:    store i32 [[TMP75]], ptr addrspace(32) [[TMP104]], align 4
+; CLEANUP-NEXT:    [[TMP105:%.*]] = getelementptr inbounds i32, ptr addrspace(32) [[TMP81]], i32 26
+; CLEANUP-NEXT:    store i32 [[TMP77]], ptr addrspace(32) [[TMP105]], align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META18]]
+; CLEANUP-NEXT:    call void @lgc.cps.free(i32 120)
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
@@ -799,211 +1009,155 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POST-PROCESS-NEXT:    [[TMP0:%.*]] = call i32 @_cont_GetContinuationStackAddr()
 ; POST-PROCESS-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @_cont_SetupRayGen()
+; POST-PROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[_CONT_SETUPRAYGEN:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]]()
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 0
+; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 108
+; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], 0
 ; POST-PROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; POST-PROCESS-NEXT:    [[TMP4:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP5]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP5]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; POST-PROCESS-NEXT:    [[TMP7:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP6]])
 ; POST-PROCESS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
 ; POST-PROCESS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
-; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP1]], ptr addrspace(20) @REGISTERS, align 4
 ; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = add i32 [[TMP8]], -120
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = add i32 [[TMP9]], 120
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = inttoptr i32 [[TMP10]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP11]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP12]], align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = add i32 [[TMP13]], -120
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], 124
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = inttoptr i32 [[TMP15]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP16]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP17]], align 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = add i32 [[TMP18]], -120
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = add i32 [[TMP19]], 128
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP9:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP9]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP10]], align 4
+; POST-PROCESS-NEXT:    [[TMP11:%.*]] = add i32 [[TMP8]], 4
+; POST-PROCESS-NEXT:    [[TMP12:%.*]] = inttoptr i32 [[TMP11]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP12]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP13]], align 4
+; POST-PROCESS-NEXT:    [[TMP14:%.*]] = add i32 [[TMP8]], 8
+; POST-PROCESS-NEXT:    [[TMP15:%.*]] = inttoptr i32 [[TMP14]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP15]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP16]], align 4
+; POST-PROCESS-NEXT:    [[TMP17:%.*]] = add i32 [[TMP8]], 12
+; POST-PROCESS-NEXT:    [[TMP18:%.*]] = inttoptr i32 [[TMP17]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP18]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP19]], align 4
+; POST-PROCESS-NEXT:    [[TMP20:%.*]] = add i32 [[TMP8]], 16
 ; POST-PROCESS-NEXT:    [[TMP21:%.*]] = inttoptr i32 [[TMP20]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP21]], i32 0
 ; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP22]], align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = add i32 [[TMP23]], -120
-; POST-PROCESS-NEXT:    [[TMP25:%.*]] = add i32 [[TMP24]], 132
-; POST-PROCESS-NEXT:    [[TMP26:%.*]] = inttoptr i32 [[TMP25]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP26]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP27]], align 4
-; POST-PROCESS-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP29:%.*]] = add i32 [[TMP28]], -120
-; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP29]], 136
-; POST-PROCESS-NEXT:    [[TMP31:%.*]] = inttoptr i32 [[TMP30]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP31]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP32]], align 4
-; POST-PROCESS-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP34:%.*]] = add i32 [[TMP33]], -120
-; POST-PROCESS-NEXT:    [[TMP35:%.*]] = add i32 [[TMP34]], 140
+; POST-PROCESS-NEXT:    [[TMP23:%.*]] = add i32 [[TMP8]], 20
+; POST-PROCESS-NEXT:    [[TMP24:%.*]] = inttoptr i32 [[TMP23]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP25:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP24]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP25]], align 4
+; POST-PROCESS-NEXT:    [[TMP26:%.*]] = add i32 [[TMP8]], 24
+; POST-PROCESS-NEXT:    [[TMP27:%.*]] = inttoptr i32 [[TMP26]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP27]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP28]], align 4
+; POST-PROCESS-NEXT:    [[TMP29:%.*]] = add i32 [[TMP8]], 28
+; POST-PROCESS-NEXT:    [[TMP30:%.*]] = inttoptr i32 [[TMP29]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP30]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP31]], align 4
+; POST-PROCESS-NEXT:    [[TMP32:%.*]] = add i32 [[TMP8]], 32
+; POST-PROCESS-NEXT:    [[TMP33:%.*]] = inttoptr i32 [[TMP32]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP33]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP34]], align 4
+; POST-PROCESS-NEXT:    [[TMP35:%.*]] = add i32 [[TMP8]], 36
 ; POST-PROCESS-NEXT:    [[TMP36:%.*]] = inttoptr i32 [[TMP35]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP37:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP36]], i32 0
 ; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP37]], align 4
-; POST-PROCESS-NEXT:    [[TMP38:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP39:%.*]] = add i32 [[TMP38]], -120
-; POST-PROCESS-NEXT:    [[TMP40:%.*]] = add i32 [[TMP39]], 144
-; POST-PROCESS-NEXT:    [[TMP41:%.*]] = inttoptr i32 [[TMP40]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP42:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP41]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP42]], align 4
-; POST-PROCESS-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP44:%.*]] = add i32 [[TMP43]], -120
-; POST-PROCESS-NEXT:    [[TMP45:%.*]] = add i32 [[TMP44]], 148
-; POST-PROCESS-NEXT:    [[TMP46:%.*]] = inttoptr i32 [[TMP45]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP46]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP47]], align 4
-; POST-PROCESS-NEXT:    [[TMP48:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP49:%.*]] = add i32 [[TMP48]], -120
-; POST-PROCESS-NEXT:    [[TMP50:%.*]] = add i32 [[TMP49]], 152
+; POST-PROCESS-NEXT:    [[TMP38:%.*]] = add i32 [[TMP8]], 40
+; POST-PROCESS-NEXT:    [[TMP39:%.*]] = inttoptr i32 [[TMP38]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP39]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP40]], align 4
+; POST-PROCESS-NEXT:    [[TMP41:%.*]] = add i32 [[TMP8]], 44
+; POST-PROCESS-NEXT:    [[TMP42:%.*]] = inttoptr i32 [[TMP41]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP42]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP43]], align 4
+; POST-PROCESS-NEXT:    [[TMP44:%.*]] = add i32 [[TMP8]], 48
+; POST-PROCESS-NEXT:    [[TMP45:%.*]] = inttoptr i32 [[TMP44]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP46:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP45]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP46]], align 4
+; POST-PROCESS-NEXT:    [[TMP47:%.*]] = add i32 [[TMP8]], 52
+; POST-PROCESS-NEXT:    [[TMP48:%.*]] = inttoptr i32 [[TMP47]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP49:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP48]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP49]], align 4
+; POST-PROCESS-NEXT:    [[TMP50:%.*]] = add i32 [[TMP8]], 56
 ; POST-PROCESS-NEXT:    [[TMP51:%.*]] = inttoptr i32 [[TMP50]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP51]], i32 0
 ; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP52]], align 4
-; POST-PROCESS-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP53]], -120
-; POST-PROCESS-NEXT:    [[TMP55:%.*]] = add i32 [[TMP54]], 156
-; POST-PROCESS-NEXT:    [[TMP56:%.*]] = inttoptr i32 [[TMP55]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP57:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP56]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP57]], align 4
-; POST-PROCESS-NEXT:    [[TMP58:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP59:%.*]] = add i32 [[TMP58]], -120
-; POST-PROCESS-NEXT:    [[TMP60:%.*]] = add i32 [[TMP59]], 160
-; POST-PROCESS-NEXT:    [[TMP61:%.*]] = inttoptr i32 [[TMP60]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP61]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP62]], align 4
-; POST-PROCESS-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP64:%.*]] = add i32 [[TMP63]], -120
-; POST-PROCESS-NEXT:    [[TMP65:%.*]] = add i32 [[TMP64]], 164
+; POST-PROCESS-NEXT:    [[TMP53:%.*]] = add i32 [[TMP8]], 60
+; POST-PROCESS-NEXT:    [[TMP54:%.*]] = inttoptr i32 [[TMP53]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP55:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP54]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP55]], align 4
+; POST-PROCESS-NEXT:    [[TMP56:%.*]] = add i32 [[TMP8]], 64
+; POST-PROCESS-NEXT:    [[TMP57:%.*]] = inttoptr i32 [[TMP56]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP58:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP57]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP58]], align 4
+; POST-PROCESS-NEXT:    [[TMP59:%.*]] = add i32 [[TMP8]], 68
+; POST-PROCESS-NEXT:    [[TMP60:%.*]] = inttoptr i32 [[TMP59]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP61:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP60]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP61]], align 4
+; POST-PROCESS-NEXT:    [[TMP62:%.*]] = add i32 [[TMP8]], 72
+; POST-PROCESS-NEXT:    [[TMP63:%.*]] = inttoptr i32 [[TMP62]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP63]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP64]], align 4
+; POST-PROCESS-NEXT:    [[TMP65:%.*]] = add i32 [[TMP8]], 76
 ; POST-PROCESS-NEXT:    [[TMP66:%.*]] = inttoptr i32 [[TMP65]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP67:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP66]], i32 0
 ; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP67]], align 4
-; POST-PROCESS-NEXT:    [[TMP68:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP69:%.*]] = add i32 [[TMP68]], -120
-; POST-PROCESS-NEXT:    [[TMP70:%.*]] = add i32 [[TMP69]], 168
-; POST-PROCESS-NEXT:    [[TMP71:%.*]] = inttoptr i32 [[TMP70]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP72:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP71]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP72]], align 4
-; POST-PROCESS-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP74:%.*]] = add i32 [[TMP73]], -120
-; POST-PROCESS-NEXT:    [[TMP75:%.*]] = add i32 [[TMP74]], 172
-; POST-PROCESS-NEXT:    [[TMP76:%.*]] = inttoptr i32 [[TMP75]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP77:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP76]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP77]], align 4
-; POST-PROCESS-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP79:%.*]] = add i32 [[TMP78]], -120
-; POST-PROCESS-NEXT:    [[TMP80:%.*]] = add i32 [[TMP79]], 176
+; POST-PROCESS-NEXT:    [[TMP68:%.*]] = add i32 [[TMP8]], 80
+; POST-PROCESS-NEXT:    [[TMP69:%.*]] = inttoptr i32 [[TMP68]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP70:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP69]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP70]], align 4
+; POST-PROCESS-NEXT:    [[TMP71:%.*]] = add i32 [[TMP8]], 84
+; POST-PROCESS-NEXT:    [[TMP72:%.*]] = inttoptr i32 [[TMP71]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP72]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP73]], align 4
+; POST-PROCESS-NEXT:    [[TMP74:%.*]] = add i32 [[TMP8]], 88
+; POST-PROCESS-NEXT:    [[TMP75:%.*]] = inttoptr i32 [[TMP74]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP75]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP76]], align 4
+; POST-PROCESS-NEXT:    [[TMP77:%.*]] = add i32 [[TMP8]], 92
+; POST-PROCESS-NEXT:    [[TMP78:%.*]] = inttoptr i32 [[TMP77]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP79:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP78]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP79]], align 4
+; POST-PROCESS-NEXT:    [[TMP80:%.*]] = add i32 [[TMP8]], 96
 ; POST-PROCESS-NEXT:    [[TMP81:%.*]] = inttoptr i32 [[TMP80]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP82:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP81]], i32 0
 ; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP82]], align 4
-; POST-PROCESS-NEXT:    [[TMP83:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP84:%.*]] = add i32 [[TMP83]], -120
-; POST-PROCESS-NEXT:    [[TMP85:%.*]] = add i32 [[TMP84]], 180
-; POST-PROCESS-NEXT:    [[TMP86:%.*]] = inttoptr i32 [[TMP85]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP87:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP86]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP87]], align 4
-; POST-PROCESS-NEXT:    [[TMP88:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP89:%.*]] = add i32 [[TMP88]], -120
-; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP89]], 184
-; POST-PROCESS-NEXT:    [[TMP91:%.*]] = inttoptr i32 [[TMP90]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP91]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP92]], align 4
-; POST-PROCESS-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP94:%.*]] = add i32 [[TMP93]], -120
-; POST-PROCESS-NEXT:    [[TMP95:%.*]] = add i32 [[TMP94]], 188
-; POST-PROCESS-NEXT:    [[TMP96:%.*]] = inttoptr i32 [[TMP95]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP97:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP96]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP97]], align 4
-; POST-PROCESS-NEXT:    [[TMP98:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP99:%.*]] = add i32 [[TMP98]], -120
-; POST-PROCESS-NEXT:    [[TMP100:%.*]] = add i32 [[TMP99]], 192
-; POST-PROCESS-NEXT:    [[TMP101:%.*]] = inttoptr i32 [[TMP100]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP102:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP101]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP102]], align 4
-; POST-PROCESS-NEXT:    [[TMP103:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP104:%.*]] = add i32 [[TMP103]], -120
-; POST-PROCESS-NEXT:    [[TMP105:%.*]] = add i32 [[TMP104]], 196
-; POST-PROCESS-NEXT:    [[TMP106:%.*]] = inttoptr i32 [[TMP105]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP107:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP106]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP107]], align 4
-; POST-PROCESS-NEXT:    [[TMP108:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP109:%.*]] = add i32 [[TMP108]], -120
-; POST-PROCESS-NEXT:    [[TMP110:%.*]] = add i32 [[TMP109]], 200
-; POST-PROCESS-NEXT:    [[TMP111:%.*]] = inttoptr i32 [[TMP110]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP112:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP111]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP112]], align 4
-; POST-PROCESS-NEXT:    [[TMP113:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP113]], -120
-; POST-PROCESS-NEXT:    [[TMP115:%.*]] = add i32 [[TMP114]], 204
-; POST-PROCESS-NEXT:    [[TMP116:%.*]] = inttoptr i32 [[TMP115]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP117:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP116]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP117]], align 4
-; POST-PROCESS-NEXT:    [[TMP118:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP119:%.*]] = add i32 [[TMP118]], -120
-; POST-PROCESS-NEXT:    [[TMP120:%.*]] = add i32 [[TMP119]], 208
-; POST-PROCESS-NEXT:    [[TMP121:%.*]] = inttoptr i32 [[TMP120]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP122:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP121]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP122]], align 4
-; POST-PROCESS-NEXT:    [[TMP123:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP124:%.*]] = add i32 [[TMP123]], -120
-; POST-PROCESS-NEXT:    [[TMP125:%.*]] = add i32 [[TMP124]], 212
-; POST-PROCESS-NEXT:    [[TMP126:%.*]] = inttoptr i32 [[TMP125]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP127:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP126]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP127]], align 4
-; POST-PROCESS-NEXT:    [[TMP128:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP129:%.*]] = add i32 [[TMP128]], -120
-; POST-PROCESS-NEXT:    [[TMP130:%.*]] = add i32 [[TMP129]], 216
-; POST-PROCESS-NEXT:    [[TMP131:%.*]] = inttoptr i32 [[TMP130]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP132:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP131]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP132]], align 4
-; POST-PROCESS-NEXT:    [[TMP133:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP134:%.*]] = add i32 [[TMP133]], -120
-; POST-PROCESS-NEXT:    [[TMP135:%.*]] = add i32 [[TMP134]], 220
-; POST-PROCESS-NEXT:    [[TMP136:%.*]] = inttoptr i32 [[TMP135]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP137:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP136]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP137]], align 4
-; POST-PROCESS-NEXT:    [[TMP138:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP139:%.*]] = add i32 [[TMP138]], -120
-; POST-PROCESS-NEXT:    [[TMP140:%.*]] = add i32 [[TMP139]], 224
-; POST-PROCESS-NEXT:    [[TMP141:%.*]] = inttoptr i32 [[TMP140]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP142:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP141]], i32 0
-; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP142]], align 4
-; POST-PROCESS-NEXT:    [[TMP143:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP144:%.*]] = add i32 [[TMP143]], 108
-; POST-PROCESS-NEXT:    store i32 [[TMP144]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP145:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP146:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @main.resume.0 to i64))
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP145]], i64 [[TMP146]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META17:![0-9]+]], !continuation.returnedRegistercount !17
+; POST-PROCESS-NEXT:    [[TMP83:%.*]] = add i32 [[TMP8]], 100
+; POST-PROCESS-NEXT:    [[TMP84:%.*]] = inttoptr i32 [[TMP83]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP85:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP84]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP85]], align 4
+; POST-PROCESS-NEXT:    [[TMP86:%.*]] = add i32 [[TMP8]], 104
+; POST-PROCESS-NEXT:    [[TMP87:%.*]] = inttoptr i32 [[TMP86]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP87]], i32 0
+; POST-PROCESS-NEXT:    store i32 undef, ptr addrspace(21) [[TMP88]], align 4
+; POST-PROCESS-NEXT:    [[TMP89:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP90:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @main.resume.0 to i64))
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP89]], i64 [[TMP90]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META17:![0-9]+]], !continuation.returnedRegistercount !17
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
@@ -1014,196 +1168,143 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -108
-; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP29:%.*]] = add i32 [[TMP28]], -120
-; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP29]], 120
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP27:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP27]], i32 0
+; POST-PROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(21) [[TMP28]], align 4
+; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP3]], 4
 ; POST-PROCESS-NEXT:    [[TMP31:%.*]] = inttoptr i32 [[TMP30]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP31]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(21) [[TMP32]], align 4
-; POST-PROCESS-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP35:%.*]] = add i32 [[TMP34]], -120
-; POST-PROCESS-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], 124
-; POST-PROCESS-NEXT:    [[TMP37:%.*]] = inttoptr i32 [[TMP36]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP37]], i32 0
-; POST-PROCESS-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(21) [[TMP38]], align 4
-; POST-PROCESS-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], -120
-; POST-PROCESS-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], 128
+; POST-PROCESS-NEXT:    [[TMP34:%.*]] = add i32 [[TMP3]], 8
+; POST-PROCESS-NEXT:    [[TMP35:%.*]] = inttoptr i32 [[TMP34]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP35]], i32 0
+; POST-PROCESS-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(21) [[TMP36]], align 4
+; POST-PROCESS-NEXT:    [[TMP38:%.*]] = add i32 [[TMP3]], 12
+; POST-PROCESS-NEXT:    [[TMP39:%.*]] = inttoptr i32 [[TMP38]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP39]], i32 0
+; POST-PROCESS-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(21) [[TMP40]], align 4
+; POST-PROCESS-NEXT:    [[TMP42:%.*]] = add i32 [[TMP3]], 16
 ; POST-PROCESS-NEXT:    [[TMP43:%.*]] = inttoptr i32 [[TMP42]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP43]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(21) [[TMP44]], align 4
-; POST-PROCESS-NEXT:    [[TMP46:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], -120
-; POST-PROCESS-NEXT:    [[TMP48:%.*]] = add i32 [[TMP47]], 132
-; POST-PROCESS-NEXT:    [[TMP49:%.*]] = inttoptr i32 [[TMP48]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP50:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP49]], i32 0
-; POST-PROCESS-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(21) [[TMP50]], align 4
-; POST-PROCESS-NEXT:    [[TMP52:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP53:%.*]] = add i32 [[TMP52]], -120
-; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP53]], 136
+; POST-PROCESS-NEXT:    [[TMP46:%.*]] = add i32 [[TMP3]], 20
+; POST-PROCESS-NEXT:    [[TMP47:%.*]] = inttoptr i32 [[TMP46]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP47]], i32 0
+; POST-PROCESS-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(21) [[TMP48]], align 4
+; POST-PROCESS-NEXT:    [[TMP50:%.*]] = add i32 [[TMP3]], 24
+; POST-PROCESS-NEXT:    [[TMP51:%.*]] = inttoptr i32 [[TMP50]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP51]], i32 0
+; POST-PROCESS-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(21) [[TMP52]], align 4
+; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP3]], 28
 ; POST-PROCESS-NEXT:    [[TMP55:%.*]] = inttoptr i32 [[TMP54]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP55]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(21) [[TMP56]], align 4
-; POST-PROCESS-NEXT:    [[TMP58:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP59:%.*]] = add i32 [[TMP58]], -120
-; POST-PROCESS-NEXT:    [[TMP60:%.*]] = add i32 [[TMP59]], 140
-; POST-PROCESS-NEXT:    [[TMP61:%.*]] = inttoptr i32 [[TMP60]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP61]], i32 0
-; POST-PROCESS-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(21) [[TMP62]], align 4
-; POST-PROCESS-NEXT:    [[TMP64:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP65:%.*]] = add i32 [[TMP64]], -120
-; POST-PROCESS-NEXT:    [[TMP66:%.*]] = add i32 [[TMP65]], 144
+; POST-PROCESS-NEXT:    [[TMP58:%.*]] = add i32 [[TMP3]], 32
+; POST-PROCESS-NEXT:    [[TMP59:%.*]] = inttoptr i32 [[TMP58]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP60:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP59]], i32 0
+; POST-PROCESS-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(21) [[TMP60]], align 4
+; POST-PROCESS-NEXT:    [[TMP62:%.*]] = add i32 [[TMP3]], 36
+; POST-PROCESS-NEXT:    [[TMP63:%.*]] = inttoptr i32 [[TMP62]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP63]], i32 0
+; POST-PROCESS-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(21) [[TMP64]], align 4
+; POST-PROCESS-NEXT:    [[TMP66:%.*]] = add i32 [[TMP3]], 40
 ; POST-PROCESS-NEXT:    [[TMP67:%.*]] = inttoptr i32 [[TMP66]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP67]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(21) [[TMP68]], align 4
-; POST-PROCESS-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP71:%.*]] = add i32 [[TMP70]], -120
-; POST-PROCESS-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], 148
-; POST-PROCESS-NEXT:    [[TMP73:%.*]] = inttoptr i32 [[TMP72]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP74:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP73]], i32 0
-; POST-PROCESS-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(21) [[TMP74]], align 4
-; POST-PROCESS-NEXT:    [[TMP76:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP77:%.*]] = add i32 [[TMP76]], -120
-; POST-PROCESS-NEXT:    [[TMP78:%.*]] = add i32 [[TMP77]], 152
+; POST-PROCESS-NEXT:    [[TMP70:%.*]] = add i32 [[TMP3]], 44
+; POST-PROCESS-NEXT:    [[TMP71:%.*]] = inttoptr i32 [[TMP70]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP72:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP71]], i32 0
+; POST-PROCESS-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(21) [[TMP72]], align 4
+; POST-PROCESS-NEXT:    [[TMP74:%.*]] = add i32 [[TMP3]], 48
+; POST-PROCESS-NEXT:    [[TMP75:%.*]] = inttoptr i32 [[TMP74]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP75]], i32 0
+; POST-PROCESS-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(21) [[TMP76]], align 4
+; POST-PROCESS-NEXT:    [[TMP78:%.*]] = add i32 [[TMP3]], 52
 ; POST-PROCESS-NEXT:    [[TMP79:%.*]] = inttoptr i32 [[TMP78]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP79]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(21) [[TMP80]], align 4
-; POST-PROCESS-NEXT:    [[TMP82:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP83:%.*]] = add i32 [[TMP82]], -120
-; POST-PROCESS-NEXT:    [[TMP84:%.*]] = add i32 [[TMP83]], 156
-; POST-PROCESS-NEXT:    [[TMP85:%.*]] = inttoptr i32 [[TMP84]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP86:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP85]], i32 0
-; POST-PROCESS-NEXT:    [[TMP87:%.*]] = load i32, ptr addrspace(21) [[TMP86]], align 4
-; POST-PROCESS-NEXT:    [[TMP88:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP89:%.*]] = add i32 [[TMP88]], -120
-; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP89]], 160
+; POST-PROCESS-NEXT:    [[TMP82:%.*]] = add i32 [[TMP3]], 56
+; POST-PROCESS-NEXT:    [[TMP83:%.*]] = inttoptr i32 [[TMP82]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP84:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP83]], i32 0
+; POST-PROCESS-NEXT:    [[TMP85:%.*]] = load i32, ptr addrspace(21) [[TMP84]], align 4
+; POST-PROCESS-NEXT:    [[TMP86:%.*]] = add i32 [[TMP3]], 60
+; POST-PROCESS-NEXT:    [[TMP87:%.*]] = inttoptr i32 [[TMP86]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP87]], i32 0
+; POST-PROCESS-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(21) [[TMP88]], align 4
+; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP3]], 64
 ; POST-PROCESS-NEXT:    [[TMP91:%.*]] = inttoptr i32 [[TMP90]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP91]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(21) [[TMP92]], align 4
-; POST-PROCESS-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP95:%.*]] = add i32 [[TMP94]], -120
-; POST-PROCESS-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], 164
-; POST-PROCESS-NEXT:    [[TMP97:%.*]] = inttoptr i32 [[TMP96]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP98:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP97]], i32 0
-; POST-PROCESS-NEXT:    [[TMP99:%.*]] = load i32, ptr addrspace(21) [[TMP98]], align 4
-; POST-PROCESS-NEXT:    [[TMP100:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP101:%.*]] = add i32 [[TMP100]], -120
-; POST-PROCESS-NEXT:    [[TMP102:%.*]] = add i32 [[TMP101]], 168
+; POST-PROCESS-NEXT:    [[TMP94:%.*]] = add i32 [[TMP3]], 68
+; POST-PROCESS-NEXT:    [[TMP95:%.*]] = inttoptr i32 [[TMP94]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP96:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP95]], i32 0
+; POST-PROCESS-NEXT:    [[TMP97:%.*]] = load i32, ptr addrspace(21) [[TMP96]], align 4
+; POST-PROCESS-NEXT:    [[TMP98:%.*]] = add i32 [[TMP3]], 72
+; POST-PROCESS-NEXT:    [[TMP99:%.*]] = inttoptr i32 [[TMP98]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP100:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP99]], i32 0
+; POST-PROCESS-NEXT:    [[TMP101:%.*]] = load i32, ptr addrspace(21) [[TMP100]], align 4
+; POST-PROCESS-NEXT:    [[TMP102:%.*]] = add i32 [[TMP3]], 76
 ; POST-PROCESS-NEXT:    [[TMP103:%.*]] = inttoptr i32 [[TMP102]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP103]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(21) [[TMP104]], align 4
-; POST-PROCESS-NEXT:    [[TMP106:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP107:%.*]] = add i32 [[TMP106]], -120
-; POST-PROCESS-NEXT:    [[TMP108:%.*]] = add i32 [[TMP107]], 172
-; POST-PROCESS-NEXT:    [[TMP109:%.*]] = inttoptr i32 [[TMP108]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP110:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP109]], i32 0
-; POST-PROCESS-NEXT:    [[TMP111:%.*]] = load i32, ptr addrspace(21) [[TMP110]], align 4
-; POST-PROCESS-NEXT:    [[TMP112:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP113:%.*]] = add i32 [[TMP112]], -120
-; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP113]], 176
+; POST-PROCESS-NEXT:    [[TMP106:%.*]] = add i32 [[TMP3]], 80
+; POST-PROCESS-NEXT:    [[TMP107:%.*]] = inttoptr i32 [[TMP106]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP108:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP107]], i32 0
+; POST-PROCESS-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(21) [[TMP108]], align 4
+; POST-PROCESS-NEXT:    [[TMP110:%.*]] = add i32 [[TMP3]], 84
+; POST-PROCESS-NEXT:    [[TMP111:%.*]] = inttoptr i32 [[TMP110]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP112:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP111]], i32 0
+; POST-PROCESS-NEXT:    [[TMP113:%.*]] = load i32, ptr addrspace(21) [[TMP112]], align 4
+; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP3]], 88
 ; POST-PROCESS-NEXT:    [[TMP115:%.*]] = inttoptr i32 [[TMP114]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP116:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP115]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP117:%.*]] = load i32, ptr addrspace(21) [[TMP116]], align 4
-; POST-PROCESS-NEXT:    [[TMP118:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP119:%.*]] = add i32 [[TMP118]], -120
-; POST-PROCESS-NEXT:    [[TMP120:%.*]] = add i32 [[TMP119]], 180
-; POST-PROCESS-NEXT:    [[TMP121:%.*]] = inttoptr i32 [[TMP120]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP122:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP121]], i32 0
-; POST-PROCESS-NEXT:    [[TMP123:%.*]] = load i32, ptr addrspace(21) [[TMP122]], align 4
-; POST-PROCESS-NEXT:    [[TMP124:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP125:%.*]] = add i32 [[TMP124]], -120
-; POST-PROCESS-NEXT:    [[TMP126:%.*]] = add i32 [[TMP125]], 184
+; POST-PROCESS-NEXT:    [[TMP118:%.*]] = add i32 [[TMP3]], 92
+; POST-PROCESS-NEXT:    [[TMP119:%.*]] = inttoptr i32 [[TMP118]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP120:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP119]], i32 0
+; POST-PROCESS-NEXT:    [[TMP121:%.*]] = load i32, ptr addrspace(21) [[TMP120]], align 4
+; POST-PROCESS-NEXT:    [[TMP122:%.*]] = add i32 [[TMP3]], 96
+; POST-PROCESS-NEXT:    [[TMP123:%.*]] = inttoptr i32 [[TMP122]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP124:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP123]], i32 0
+; POST-PROCESS-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(21) [[TMP124]], align 4
+; POST-PROCESS-NEXT:    [[TMP126:%.*]] = add i32 [[TMP3]], 100
 ; POST-PROCESS-NEXT:    [[TMP127:%.*]] = inttoptr i32 [[TMP126]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP127]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP129:%.*]] = load i32, ptr addrspace(21) [[TMP128]], align 4
-; POST-PROCESS-NEXT:    [[TMP130:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP131:%.*]] = add i32 [[TMP130]], -120
-; POST-PROCESS-NEXT:    [[TMP132:%.*]] = add i32 [[TMP131]], 188
-; POST-PROCESS-NEXT:    [[TMP133:%.*]] = inttoptr i32 [[TMP132]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP134:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP133]], i32 0
-; POST-PROCESS-NEXT:    [[TMP135:%.*]] = load i32, ptr addrspace(21) [[TMP134]], align 4
-; POST-PROCESS-NEXT:    [[TMP136:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP137:%.*]] = add i32 [[TMP136]], -120
-; POST-PROCESS-NEXT:    [[TMP138:%.*]] = add i32 [[TMP137]], 192
-; POST-PROCESS-NEXT:    [[TMP139:%.*]] = inttoptr i32 [[TMP138]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP140:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP139]], i32 0
-; POST-PROCESS-NEXT:    [[TMP141:%.*]] = load i32, ptr addrspace(21) [[TMP140]], align 4
-; POST-PROCESS-NEXT:    [[TMP142:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP143:%.*]] = add i32 [[TMP142]], -120
-; POST-PROCESS-NEXT:    [[TMP144:%.*]] = add i32 [[TMP143]], 196
-; POST-PROCESS-NEXT:    [[TMP145:%.*]] = inttoptr i32 [[TMP144]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP146:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP145]], i32 0
-; POST-PROCESS-NEXT:    [[TMP147:%.*]] = load i32, ptr addrspace(21) [[TMP146]], align 4
-; POST-PROCESS-NEXT:    [[TMP148:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP149:%.*]] = add i32 [[TMP148]], -120
-; POST-PROCESS-NEXT:    [[TMP150:%.*]] = add i32 [[TMP149]], 200
-; POST-PROCESS-NEXT:    [[TMP151:%.*]] = inttoptr i32 [[TMP150]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP152:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP151]], i32 0
-; POST-PROCESS-NEXT:    [[TMP153:%.*]] = load i32, ptr addrspace(21) [[TMP152]], align 4
-; POST-PROCESS-NEXT:    [[TMP154:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP155:%.*]] = add i32 [[TMP154]], -120
-; POST-PROCESS-NEXT:    [[TMP156:%.*]] = add i32 [[TMP155]], 204
-; POST-PROCESS-NEXT:    [[TMP157:%.*]] = inttoptr i32 [[TMP156]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP157]], i32 0
-; POST-PROCESS-NEXT:    [[TMP159:%.*]] = load i32, ptr addrspace(21) [[TMP158]], align 4
-; POST-PROCESS-NEXT:    [[TMP160:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP161:%.*]] = add i32 [[TMP160]], -120
-; POST-PROCESS-NEXT:    [[TMP162:%.*]] = add i32 [[TMP161]], 208
-; POST-PROCESS-NEXT:    [[TMP163:%.*]] = inttoptr i32 [[TMP162]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP164:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP163]], i32 0
-; POST-PROCESS-NEXT:    [[TMP165:%.*]] = load i32, ptr addrspace(21) [[TMP164]], align 4
-; POST-PROCESS-NEXT:    [[TMP166:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP167:%.*]] = add i32 [[TMP166]], -120
-; POST-PROCESS-NEXT:    [[TMP168:%.*]] = add i32 [[TMP167]], 212
-; POST-PROCESS-NEXT:    [[TMP169:%.*]] = inttoptr i32 [[TMP168]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP170:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP169]], i32 0
-; POST-PROCESS-NEXT:    [[TMP171:%.*]] = load i32, ptr addrspace(21) [[TMP170]], align 4
-; POST-PROCESS-NEXT:    [[TMP172:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP173:%.*]] = add i32 [[TMP172]], -120
-; POST-PROCESS-NEXT:    [[TMP174:%.*]] = add i32 [[TMP173]], 216
-; POST-PROCESS-NEXT:    [[TMP175:%.*]] = inttoptr i32 [[TMP174]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP176:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP175]], i32 0
-; POST-PROCESS-NEXT:    [[TMP177:%.*]] = load i32, ptr addrspace(21) [[TMP176]], align 4
-; POST-PROCESS-NEXT:    [[TMP178:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP179:%.*]] = add i32 [[TMP178]], -120
-; POST-PROCESS-NEXT:    [[TMP180:%.*]] = add i32 [[TMP179]], 220
-; POST-PROCESS-NEXT:    [[TMP181:%.*]] = inttoptr i32 [[TMP180]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP182:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP181]], i32 0
-; POST-PROCESS-NEXT:    [[TMP183:%.*]] = load i32, ptr addrspace(21) [[TMP182]], align 4
-; POST-PROCESS-NEXT:    [[TMP184:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP185:%.*]] = add i32 [[TMP184]], -120
-; POST-PROCESS-NEXT:    [[TMP186:%.*]] = add i32 [[TMP185]], 224
-; POST-PROCESS-NEXT:    [[TMP187:%.*]] = inttoptr i32 [[TMP186]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP188:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP187]], i32 0
-; POST-PROCESS-NEXT:    [[TMP189:%.*]] = load i32, ptr addrspace(21) [[TMP188]], align 4
+; POST-PROCESS-NEXT:    [[TMP130:%.*]] = add i32 [[TMP3]], 104
+; POST-PROCESS-NEXT:    [[TMP131:%.*]] = inttoptr i32 [[TMP130]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP132:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP131]], i32 0
+; POST-PROCESS-NEXT:    [[TMP133:%.*]] = load i32, ptr addrspace(21) [[TMP132]], align 4
+; POST-PROCESS-NEXT:    [[TMP134:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; POST-PROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
+; POST-PROCESS-NEXT:    [[TMP135:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP136:%.*]] = add i32 [[TMP135]], -108
+; POST-PROCESS-NEXT:    store i32 [[TMP136]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    ret void
 ; POST-PROCESS:       entryresume.0.split:
 ; POST-PROCESS-NEXT:    unreachable
@@ -1246,400 +1347,292 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-NEXT:    [[DOTFCA_1_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; POST-PROCESS-NEXT:    store i32 [[DOTFCA_1_1_EXTRACT]], ptr [[DOTFCA_1_1_GEP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP27:%.*]] = add i32 [[TMP26]], -120
-; POST-PROCESS-NEXT:    [[TMP28:%.*]] = add i32 [[TMP27]], 120
-; POST-PROCESS-NEXT:    [[TMP29:%.*]] = inttoptr i32 [[TMP28]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP30:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP29]], i32 0
-; POST-PROCESS-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(21) [[TMP30]], align 4
-; POST-PROCESS-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP33:%.*]] = add i32 [[TMP32]], -120
-; POST-PROCESS-NEXT:    [[TMP34:%.*]] = add i32 [[TMP33]], 124
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP27:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP27]], i32 0
+; POST-PROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(21) [[TMP28]], align 4
+; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP3]], 4
+; POST-PROCESS-NEXT:    [[TMP31:%.*]] = inttoptr i32 [[TMP30]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP31]], i32 0
+; POST-PROCESS-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(21) [[TMP32]], align 4
+; POST-PROCESS-NEXT:    [[TMP34:%.*]] = add i32 [[TMP3]], 8
 ; POST-PROCESS-NEXT:    [[TMP35:%.*]] = inttoptr i32 [[TMP34]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP35]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(21) [[TMP36]], align 4
-; POST-PROCESS-NEXT:    [[TMP38:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP39:%.*]] = add i32 [[TMP38]], -120
-; POST-PROCESS-NEXT:    [[TMP40:%.*]] = add i32 [[TMP39]], 128
-; POST-PROCESS-NEXT:    [[TMP41:%.*]] = inttoptr i32 [[TMP40]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP42:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP41]], i32 0
-; POST-PROCESS-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(21) [[TMP42]], align 4
-; POST-PROCESS-NEXT:    [[TMP44:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP45:%.*]] = add i32 [[TMP44]], -120
-; POST-PROCESS-NEXT:    [[TMP46:%.*]] = add i32 [[TMP45]], 132
+; POST-PROCESS-NEXT:    [[TMP38:%.*]] = add i32 [[TMP3]], 12
+; POST-PROCESS-NEXT:    [[TMP39:%.*]] = inttoptr i32 [[TMP38]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP39]], i32 0
+; POST-PROCESS-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(21) [[TMP40]], align 4
+; POST-PROCESS-NEXT:    [[TMP42:%.*]] = add i32 [[TMP3]], 16
+; POST-PROCESS-NEXT:    [[TMP43:%.*]] = inttoptr i32 [[TMP42]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP43]], i32 0
+; POST-PROCESS-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(21) [[TMP44]], align 4
+; POST-PROCESS-NEXT:    [[TMP46:%.*]] = add i32 [[TMP3]], 20
 ; POST-PROCESS-NEXT:    [[TMP47:%.*]] = inttoptr i32 [[TMP46]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP47]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(21) [[TMP48]], align 4
-; POST-PROCESS-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], -120
-; POST-PROCESS-NEXT:    [[TMP52:%.*]] = add i32 [[TMP51]], 136
-; POST-PROCESS-NEXT:    [[TMP53:%.*]] = inttoptr i32 [[TMP52]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP54:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP53]], i32 0
-; POST-PROCESS-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(21) [[TMP54]], align 4
-; POST-PROCESS-NEXT:    [[TMP56:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP57:%.*]] = add i32 [[TMP56]], -120
-; POST-PROCESS-NEXT:    [[TMP58:%.*]] = add i32 [[TMP57]], 140
+; POST-PROCESS-NEXT:    [[TMP50:%.*]] = add i32 [[TMP3]], 24
+; POST-PROCESS-NEXT:    [[TMP51:%.*]] = inttoptr i32 [[TMP50]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP51]], i32 0
+; POST-PROCESS-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(21) [[TMP52]], align 4
+; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP3]], 28
+; POST-PROCESS-NEXT:    [[TMP55:%.*]] = inttoptr i32 [[TMP54]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP55]], i32 0
+; POST-PROCESS-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(21) [[TMP56]], align 4
+; POST-PROCESS-NEXT:    [[TMP58:%.*]] = add i32 [[TMP3]], 32
 ; POST-PROCESS-NEXT:    [[TMP59:%.*]] = inttoptr i32 [[TMP58]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP60:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP59]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(21) [[TMP60]], align 4
-; POST-PROCESS-NEXT:    [[TMP62:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP63:%.*]] = add i32 [[TMP62]], -120
-; POST-PROCESS-NEXT:    [[TMP64:%.*]] = add i32 [[TMP63]], 144
-; POST-PROCESS-NEXT:    [[TMP65:%.*]] = inttoptr i32 [[TMP64]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP66:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP65]], i32 0
-; POST-PROCESS-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(21) [[TMP66]], align 4
-; POST-PROCESS-NEXT:    [[TMP68:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP69:%.*]] = add i32 [[TMP68]], -120
-; POST-PROCESS-NEXT:    [[TMP70:%.*]] = add i32 [[TMP69]], 148
+; POST-PROCESS-NEXT:    [[TMP62:%.*]] = add i32 [[TMP3]], 36
+; POST-PROCESS-NEXT:    [[TMP63:%.*]] = inttoptr i32 [[TMP62]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP63]], i32 0
+; POST-PROCESS-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(21) [[TMP64]], align 4
+; POST-PROCESS-NEXT:    [[TMP66:%.*]] = add i32 [[TMP3]], 40
+; POST-PROCESS-NEXT:    [[TMP67:%.*]] = inttoptr i32 [[TMP66]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP67]], i32 0
+; POST-PROCESS-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(21) [[TMP68]], align 4
+; POST-PROCESS-NEXT:    [[TMP70:%.*]] = add i32 [[TMP3]], 44
 ; POST-PROCESS-NEXT:    [[TMP71:%.*]] = inttoptr i32 [[TMP70]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP72:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP71]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(21) [[TMP72]], align 4
-; POST-PROCESS-NEXT:    [[TMP74:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP75:%.*]] = add i32 [[TMP74]], -120
-; POST-PROCESS-NEXT:    [[TMP76:%.*]] = add i32 [[TMP75]], 152
-; POST-PROCESS-NEXT:    [[TMP77:%.*]] = inttoptr i32 [[TMP76]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP78:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP77]], i32 0
-; POST-PROCESS-NEXT:    [[TMP79:%.*]] = load i32, ptr addrspace(21) [[TMP78]], align 4
-; POST-PROCESS-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP81:%.*]] = add i32 [[TMP80]], -120
-; POST-PROCESS-NEXT:    [[TMP82:%.*]] = add i32 [[TMP81]], 156
+; POST-PROCESS-NEXT:    [[TMP74:%.*]] = add i32 [[TMP3]], 48
+; POST-PROCESS-NEXT:    [[TMP75:%.*]] = inttoptr i32 [[TMP74]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP75]], i32 0
+; POST-PROCESS-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(21) [[TMP76]], align 4
+; POST-PROCESS-NEXT:    [[TMP78:%.*]] = add i32 [[TMP3]], 52
+; POST-PROCESS-NEXT:    [[TMP79:%.*]] = inttoptr i32 [[TMP78]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP79]], i32 0
+; POST-PROCESS-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(21) [[TMP80]], align 4
+; POST-PROCESS-NEXT:    [[TMP82:%.*]] = add i32 [[TMP3]], 56
 ; POST-PROCESS-NEXT:    [[TMP83:%.*]] = inttoptr i32 [[TMP82]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP84:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP83]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP85:%.*]] = load i32, ptr addrspace(21) [[TMP84]], align 4
-; POST-PROCESS-NEXT:    [[TMP86:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP87:%.*]] = add i32 [[TMP86]], -120
-; POST-PROCESS-NEXT:    [[TMP88:%.*]] = add i32 [[TMP87]], 160
-; POST-PROCESS-NEXT:    [[TMP89:%.*]] = inttoptr i32 [[TMP88]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP90:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP89]], i32 0
-; POST-PROCESS-NEXT:    [[TMP91:%.*]] = load i32, ptr addrspace(21) [[TMP90]], align 4
-; POST-PROCESS-NEXT:    [[TMP92:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP93:%.*]] = add i32 [[TMP92]], -120
-; POST-PROCESS-NEXT:    [[TMP94:%.*]] = add i32 [[TMP93]], 164
+; POST-PROCESS-NEXT:    [[TMP86:%.*]] = add i32 [[TMP3]], 60
+; POST-PROCESS-NEXT:    [[TMP87:%.*]] = inttoptr i32 [[TMP86]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP87]], i32 0
+; POST-PROCESS-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(21) [[TMP88]], align 4
+; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP3]], 64
+; POST-PROCESS-NEXT:    [[TMP91:%.*]] = inttoptr i32 [[TMP90]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP91]], i32 0
+; POST-PROCESS-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(21) [[TMP92]], align 4
+; POST-PROCESS-NEXT:    [[TMP94:%.*]] = add i32 [[TMP3]], 68
 ; POST-PROCESS-NEXT:    [[TMP95:%.*]] = inttoptr i32 [[TMP94]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP96:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP95]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP97:%.*]] = load i32, ptr addrspace(21) [[TMP96]], align 4
-; POST-PROCESS-NEXT:    [[TMP98:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP99:%.*]] = add i32 [[TMP98]], -120
-; POST-PROCESS-NEXT:    [[TMP100:%.*]] = add i32 [[TMP99]], 168
-; POST-PROCESS-NEXT:    [[TMP101:%.*]] = inttoptr i32 [[TMP100]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP102:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP101]], i32 0
-; POST-PROCESS-NEXT:    [[TMP103:%.*]] = load i32, ptr addrspace(21) [[TMP102]], align 4
-; POST-PROCESS-NEXT:    [[TMP104:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP105:%.*]] = add i32 [[TMP104]], -120
-; POST-PROCESS-NEXT:    [[TMP106:%.*]] = add i32 [[TMP105]], 172
+; POST-PROCESS-NEXT:    [[TMP98:%.*]] = add i32 [[TMP3]], 72
+; POST-PROCESS-NEXT:    [[TMP99:%.*]] = inttoptr i32 [[TMP98]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP100:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP99]], i32 0
+; POST-PROCESS-NEXT:    [[TMP101:%.*]] = load i32, ptr addrspace(21) [[TMP100]], align 4
+; POST-PROCESS-NEXT:    [[TMP102:%.*]] = add i32 [[TMP3]], 76
+; POST-PROCESS-NEXT:    [[TMP103:%.*]] = inttoptr i32 [[TMP102]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP103]], i32 0
+; POST-PROCESS-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(21) [[TMP104]], align 4
+; POST-PROCESS-NEXT:    [[TMP106:%.*]] = add i32 [[TMP3]], 80
 ; POST-PROCESS-NEXT:    [[TMP107:%.*]] = inttoptr i32 [[TMP106]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP108:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP107]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(21) [[TMP108]], align 4
-; POST-PROCESS-NEXT:    [[TMP110:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP111:%.*]] = add i32 [[TMP110]], -120
-; POST-PROCESS-NEXT:    [[TMP112:%.*]] = add i32 [[TMP111]], 176
-; POST-PROCESS-NEXT:    [[TMP113:%.*]] = inttoptr i32 [[TMP112]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP114:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP113]], i32 0
-; POST-PROCESS-NEXT:    [[TMP115:%.*]] = load i32, ptr addrspace(21) [[TMP114]], align 4
-; POST-PROCESS-NEXT:    [[TMP116:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP117:%.*]] = add i32 [[TMP116]], -120
-; POST-PROCESS-NEXT:    [[TMP118:%.*]] = add i32 [[TMP117]], 180
+; POST-PROCESS-NEXT:    [[TMP110:%.*]] = add i32 [[TMP3]], 84
+; POST-PROCESS-NEXT:    [[TMP111:%.*]] = inttoptr i32 [[TMP110]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP112:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP111]], i32 0
+; POST-PROCESS-NEXT:    [[TMP113:%.*]] = load i32, ptr addrspace(21) [[TMP112]], align 4
+; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP3]], 88
+; POST-PROCESS-NEXT:    [[TMP115:%.*]] = inttoptr i32 [[TMP114]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP116:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP115]], i32 0
+; POST-PROCESS-NEXT:    [[TMP117:%.*]] = load i32, ptr addrspace(21) [[TMP116]], align 4
+; POST-PROCESS-NEXT:    [[TMP118:%.*]] = add i32 [[TMP3]], 92
 ; POST-PROCESS-NEXT:    [[TMP119:%.*]] = inttoptr i32 [[TMP118]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP120:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP119]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP121:%.*]] = load i32, ptr addrspace(21) [[TMP120]], align 4
-; POST-PROCESS-NEXT:    [[TMP122:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP123:%.*]] = add i32 [[TMP122]], -120
-; POST-PROCESS-NEXT:    [[TMP124:%.*]] = add i32 [[TMP123]], 184
-; POST-PROCESS-NEXT:    [[TMP125:%.*]] = inttoptr i32 [[TMP124]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP126:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP125]], i32 0
-; POST-PROCESS-NEXT:    [[TMP127:%.*]] = load i32, ptr addrspace(21) [[TMP126]], align 4
-; POST-PROCESS-NEXT:    [[TMP128:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP129:%.*]] = add i32 [[TMP128]], -120
-; POST-PROCESS-NEXT:    [[TMP130:%.*]] = add i32 [[TMP129]], 188
+; POST-PROCESS-NEXT:    [[TMP122:%.*]] = add i32 [[TMP3]], 96
+; POST-PROCESS-NEXT:    [[TMP123:%.*]] = inttoptr i32 [[TMP122]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP124:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP123]], i32 0
+; POST-PROCESS-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(21) [[TMP124]], align 4
+; POST-PROCESS-NEXT:    [[TMP126:%.*]] = add i32 [[TMP3]], 100
+; POST-PROCESS-NEXT:    [[TMP127:%.*]] = inttoptr i32 [[TMP126]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP127]], i32 0
+; POST-PROCESS-NEXT:    [[TMP129:%.*]] = load i32, ptr addrspace(21) [[TMP128]], align 4
+; POST-PROCESS-NEXT:    [[TMP130:%.*]] = add i32 [[TMP3]], 104
 ; POST-PROCESS-NEXT:    [[TMP131:%.*]] = inttoptr i32 [[TMP130]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP132:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP131]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP133:%.*]] = load i32, ptr addrspace(21) [[TMP132]], align 4
-; POST-PROCESS-NEXT:    [[TMP134:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP135:%.*]] = add i32 [[TMP134]], -120
-; POST-PROCESS-NEXT:    [[TMP136:%.*]] = add i32 [[TMP135]], 192
-; POST-PROCESS-NEXT:    [[TMP137:%.*]] = inttoptr i32 [[TMP136]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP138:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP137]], i32 0
-; POST-PROCESS-NEXT:    [[TMP139:%.*]] = load i32, ptr addrspace(21) [[TMP138]], align 4
-; POST-PROCESS-NEXT:    [[TMP140:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP141:%.*]] = add i32 [[TMP140]], -120
-; POST-PROCESS-NEXT:    [[TMP142:%.*]] = add i32 [[TMP141]], 196
-; POST-PROCESS-NEXT:    [[TMP143:%.*]] = inttoptr i32 [[TMP142]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP144:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP143]], i32 0
-; POST-PROCESS-NEXT:    [[TMP145:%.*]] = load i32, ptr addrspace(21) [[TMP144]], align 4
-; POST-PROCESS-NEXT:    [[TMP146:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP147:%.*]] = add i32 [[TMP146]], -120
-; POST-PROCESS-NEXT:    [[TMP148:%.*]] = add i32 [[TMP147]], 200
-; POST-PROCESS-NEXT:    [[TMP149:%.*]] = inttoptr i32 [[TMP148]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP150:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP149]], i32 0
-; POST-PROCESS-NEXT:    [[TMP151:%.*]] = load i32, ptr addrspace(21) [[TMP150]], align 4
-; POST-PROCESS-NEXT:    [[TMP152:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP153:%.*]] = add i32 [[TMP152]], -120
-; POST-PROCESS-NEXT:    [[TMP154:%.*]] = add i32 [[TMP153]], 204
-; POST-PROCESS-NEXT:    [[TMP155:%.*]] = inttoptr i32 [[TMP154]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP156:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP155]], i32 0
-; POST-PROCESS-NEXT:    [[TMP157:%.*]] = load i32, ptr addrspace(21) [[TMP156]], align 4
-; POST-PROCESS-NEXT:    [[TMP158:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP159:%.*]] = add i32 [[TMP158]], -120
-; POST-PROCESS-NEXT:    [[TMP160:%.*]] = add i32 [[TMP159]], 208
-; POST-PROCESS-NEXT:    [[TMP161:%.*]] = inttoptr i32 [[TMP160]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP162:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP161]], i32 0
-; POST-PROCESS-NEXT:    [[TMP163:%.*]] = load i32, ptr addrspace(21) [[TMP162]], align 4
-; POST-PROCESS-NEXT:    [[TMP164:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP165:%.*]] = add i32 [[TMP164]], -120
-; POST-PROCESS-NEXT:    [[TMP166:%.*]] = add i32 [[TMP165]], 212
-; POST-PROCESS-NEXT:    [[TMP167:%.*]] = inttoptr i32 [[TMP166]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP168:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP167]], i32 0
-; POST-PROCESS-NEXT:    [[TMP169:%.*]] = load i32, ptr addrspace(21) [[TMP168]], align 4
-; POST-PROCESS-NEXT:    [[TMP170:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP171:%.*]] = add i32 [[TMP170]], -120
-; POST-PROCESS-NEXT:    [[TMP172:%.*]] = add i32 [[TMP171]], 216
-; POST-PROCESS-NEXT:    [[TMP173:%.*]] = inttoptr i32 [[TMP172]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP174:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP173]], i32 0
-; POST-PROCESS-NEXT:    [[TMP175:%.*]] = load i32, ptr addrspace(21) [[TMP174]], align 4
-; POST-PROCESS-NEXT:    [[TMP176:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP177:%.*]] = add i32 [[TMP176]], -120
-; POST-PROCESS-NEXT:    [[TMP178:%.*]] = add i32 [[TMP177]], 220
-; POST-PROCESS-NEXT:    [[TMP179:%.*]] = inttoptr i32 [[TMP178]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP180:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP179]], i32 0
-; POST-PROCESS-NEXT:    [[TMP181:%.*]] = load i32, ptr addrspace(21) [[TMP180]], align 4
-; POST-PROCESS-NEXT:    [[TMP182:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP183:%.*]] = add i32 [[TMP182]], -120
-; POST-PROCESS-NEXT:    [[TMP184:%.*]] = add i32 [[TMP183]], 224
-; POST-PROCESS-NEXT:    [[TMP185:%.*]] = inttoptr i32 [[TMP184]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP186:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP185]], i32 0
-; POST-PROCESS-NEXT:    [[TMP187:%.*]] = load i32, ptr addrspace(21) [[TMP186]], align 4
-; POST-PROCESS-NEXT:    [[TMP188:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; POST-PROCESS-NEXT:    [[ADDR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP188]], i32 0, i32 1
+; POST-PROCESS-NEXT:    [[TMP134:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; POST-PROCESS-NEXT:    [[ADDR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP134]], i32 0, i32 1
 ; POST-PROCESS-NEXT:    [[VAL_I_FCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[ADDR_I]], i32 0, i32 0
 ; POST-PROCESS-NEXT:    [[VAL_I_FCA_0_LOAD:%.*]] = load <2 x float>, ptr [[VAL_I_FCA_0_GEP]], align 4
 ; POST-PROCESS-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[VAL_I_FCA_0_LOAD]], 0
 ; POST-PROCESS-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-NEXT:    [[DOTSROA_011_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; POST-PROCESS-NEXT:    [[TMP189:%.*]] = bitcast float [[DOTSROA_011_0_VEC_EXTRACT]] to i32
+; POST-PROCESS-NEXT:    [[TMP135:%.*]] = bitcast float [[DOTSROA_011_0_VEC_EXTRACT]] to i32
 ; POST-PROCESS-NEXT:    [[DOTSROA_011_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; POST-PROCESS-NEXT:    [[TMP190:%.*]] = bitcast float [[DOTSROA_011_4_VEC_EXTRACT]] to i32
+; POST-PROCESS-NEXT:    [[TMP136:%.*]] = bitcast float [[DOTSROA_011_4_VEC_EXTRACT]] to i32
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], 0
 ; POST-PROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; POST-PROCESS-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
-; POST-PROCESS-NEXT:    store i32 [[TMP3]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP4]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP10]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP19]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP22]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP24]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP25]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP191:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP192:%.*]] = add i32 [[TMP191]], -120
-; POST-PROCESS-NEXT:    [[TMP193:%.*]] = add i32 [[TMP192]], 120
-; POST-PROCESS-NEXT:    [[TMP194:%.*]] = inttoptr i32 [[TMP193]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP195:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP194]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP31]], ptr addrspace(21) [[TMP195]], align 4
-; POST-PROCESS-NEXT:    [[TMP196:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP197:%.*]] = add i32 [[TMP196]], -120
-; POST-PROCESS-NEXT:    [[TMP198:%.*]] = add i32 [[TMP197]], 124
-; POST-PROCESS-NEXT:    [[TMP199:%.*]] = inttoptr i32 [[TMP198]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP200:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP199]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP37]], ptr addrspace(21) [[TMP200]], align 4
-; POST-PROCESS-NEXT:    [[TMP201:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP202:%.*]] = add i32 [[TMP201]], -120
-; POST-PROCESS-NEXT:    [[TMP203:%.*]] = add i32 [[TMP202]], 128
+; POST-PROCESS-NEXT:    [[TMP137:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP4]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP138:%.*]] = inttoptr i32 [[TMP137]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP139:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP138]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP29]], ptr addrspace(21) [[TMP139]], align 4
+; POST-PROCESS-NEXT:    [[TMP140:%.*]] = add i32 [[TMP137]], 4
+; POST-PROCESS-NEXT:    [[TMP141:%.*]] = inttoptr i32 [[TMP140]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP142:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP141]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP33]], ptr addrspace(21) [[TMP142]], align 4
+; POST-PROCESS-NEXT:    [[TMP143:%.*]] = add i32 [[TMP137]], 8
+; POST-PROCESS-NEXT:    [[TMP144:%.*]] = inttoptr i32 [[TMP143]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP145:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP144]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP37]], ptr addrspace(21) [[TMP145]], align 4
+; POST-PROCESS-NEXT:    [[TMP146:%.*]] = add i32 [[TMP137]], 12
+; POST-PROCESS-NEXT:    [[TMP147:%.*]] = inttoptr i32 [[TMP146]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP148:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP147]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP41]], ptr addrspace(21) [[TMP148]], align 4
+; POST-PROCESS-NEXT:    [[TMP149:%.*]] = add i32 [[TMP137]], 16
+; POST-PROCESS-NEXT:    [[TMP150:%.*]] = inttoptr i32 [[TMP149]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP151:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP150]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP45]], ptr addrspace(21) [[TMP151]], align 4
+; POST-PROCESS-NEXT:    [[TMP152:%.*]] = add i32 [[TMP137]], 20
+; POST-PROCESS-NEXT:    [[TMP153:%.*]] = inttoptr i32 [[TMP152]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP154:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP153]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP49]], ptr addrspace(21) [[TMP154]], align 4
+; POST-PROCESS-NEXT:    [[TMP155:%.*]] = add i32 [[TMP137]], 24
+; POST-PROCESS-NEXT:    [[TMP156:%.*]] = inttoptr i32 [[TMP155]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP157:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP156]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP53]], ptr addrspace(21) [[TMP157]], align 4
+; POST-PROCESS-NEXT:    [[TMP158:%.*]] = add i32 [[TMP137]], 28
+; POST-PROCESS-NEXT:    [[TMP159:%.*]] = inttoptr i32 [[TMP158]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP160:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP159]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP57]], ptr addrspace(21) [[TMP160]], align 4
+; POST-PROCESS-NEXT:    [[TMP161:%.*]] = add i32 [[TMP137]], 32
+; POST-PROCESS-NEXT:    [[TMP162:%.*]] = inttoptr i32 [[TMP161]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP163:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP162]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP61]], ptr addrspace(21) [[TMP163]], align 4
+; POST-PROCESS-NEXT:    [[TMP164:%.*]] = add i32 [[TMP137]], 36
+; POST-PROCESS-NEXT:    [[TMP165:%.*]] = inttoptr i32 [[TMP164]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP166:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP165]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP65]], ptr addrspace(21) [[TMP166]], align 4
+; POST-PROCESS-NEXT:    [[TMP167:%.*]] = add i32 [[TMP137]], 40
+; POST-PROCESS-NEXT:    [[TMP168:%.*]] = inttoptr i32 [[TMP167]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP169:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP168]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP69]], ptr addrspace(21) [[TMP169]], align 4
+; POST-PROCESS-NEXT:    [[TMP170:%.*]] = add i32 [[TMP137]], 44
+; POST-PROCESS-NEXT:    [[TMP171:%.*]] = inttoptr i32 [[TMP170]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP172:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP171]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP73]], ptr addrspace(21) [[TMP172]], align 4
+; POST-PROCESS-NEXT:    [[TMP173:%.*]] = add i32 [[TMP137]], 48
+; POST-PROCESS-NEXT:    [[TMP174:%.*]] = inttoptr i32 [[TMP173]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP175:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP174]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP77]], ptr addrspace(21) [[TMP175]], align 4
+; POST-PROCESS-NEXT:    [[TMP176:%.*]] = add i32 [[TMP137]], 52
+; POST-PROCESS-NEXT:    [[TMP177:%.*]] = inttoptr i32 [[TMP176]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP178:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP177]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP81]], ptr addrspace(21) [[TMP178]], align 4
+; POST-PROCESS-NEXT:    [[TMP179:%.*]] = add i32 [[TMP137]], 56
+; POST-PROCESS-NEXT:    [[TMP180:%.*]] = inttoptr i32 [[TMP179]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP181:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP180]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP85]], ptr addrspace(21) [[TMP181]], align 4
+; POST-PROCESS-NEXT:    [[TMP182:%.*]] = add i32 [[TMP137]], 60
+; POST-PROCESS-NEXT:    [[TMP183:%.*]] = inttoptr i32 [[TMP182]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP184:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP183]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP89]], ptr addrspace(21) [[TMP184]], align 4
+; POST-PROCESS-NEXT:    [[TMP185:%.*]] = add i32 [[TMP137]], 64
+; POST-PROCESS-NEXT:    [[TMP186:%.*]] = inttoptr i32 [[TMP185]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP187:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP186]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP93]], ptr addrspace(21) [[TMP187]], align 4
+; POST-PROCESS-NEXT:    [[TMP188:%.*]] = add i32 [[TMP137]], 68
+; POST-PROCESS-NEXT:    [[TMP189:%.*]] = inttoptr i32 [[TMP188]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP190:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP189]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP97]], ptr addrspace(21) [[TMP190]], align 4
+; POST-PROCESS-NEXT:    [[TMP191:%.*]] = add i32 [[TMP137]], 72
+; POST-PROCESS-NEXT:    [[TMP192:%.*]] = inttoptr i32 [[TMP191]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP193:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP192]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP101]], ptr addrspace(21) [[TMP193]], align 4
+; POST-PROCESS-NEXT:    [[TMP194:%.*]] = add i32 [[TMP137]], 76
+; POST-PROCESS-NEXT:    [[TMP195:%.*]] = inttoptr i32 [[TMP194]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP196:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP195]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP105]], ptr addrspace(21) [[TMP196]], align 4
+; POST-PROCESS-NEXT:    [[TMP197:%.*]] = add i32 [[TMP137]], 80
+; POST-PROCESS-NEXT:    [[TMP198:%.*]] = inttoptr i32 [[TMP197]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP199:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP198]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP109]], ptr addrspace(21) [[TMP199]], align 4
+; POST-PROCESS-NEXT:    [[TMP200:%.*]] = add i32 [[TMP137]], 84
+; POST-PROCESS-NEXT:    [[TMP201:%.*]] = inttoptr i32 [[TMP200]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP202:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP201]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP113]], ptr addrspace(21) [[TMP202]], align 4
+; POST-PROCESS-NEXT:    [[TMP203:%.*]] = add i32 [[TMP137]], 88
 ; POST-PROCESS-NEXT:    [[TMP204:%.*]] = inttoptr i32 [[TMP203]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP205:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP204]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP43]], ptr addrspace(21) [[TMP205]], align 4
-; POST-PROCESS-NEXT:    [[TMP206:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP207:%.*]] = add i32 [[TMP206]], -120
-; POST-PROCESS-NEXT:    [[TMP208:%.*]] = add i32 [[TMP207]], 132
-; POST-PROCESS-NEXT:    [[TMP209:%.*]] = inttoptr i32 [[TMP208]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP210:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP209]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP49]], ptr addrspace(21) [[TMP210]], align 4
-; POST-PROCESS-NEXT:    [[TMP211:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP212:%.*]] = add i32 [[TMP211]], -120
-; POST-PROCESS-NEXT:    [[TMP213:%.*]] = add i32 [[TMP212]], 136
-; POST-PROCESS-NEXT:    [[TMP214:%.*]] = inttoptr i32 [[TMP213]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP215:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP214]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP55]], ptr addrspace(21) [[TMP215]], align 4
-; POST-PROCESS-NEXT:    [[TMP216:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP217:%.*]] = add i32 [[TMP216]], -120
-; POST-PROCESS-NEXT:    [[TMP218:%.*]] = add i32 [[TMP217]], 140
-; POST-PROCESS-NEXT:    [[TMP219:%.*]] = inttoptr i32 [[TMP218]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP220:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP219]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP61]], ptr addrspace(21) [[TMP220]], align 4
-; POST-PROCESS-NEXT:    [[TMP221:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP222:%.*]] = add i32 [[TMP221]], -120
-; POST-PROCESS-NEXT:    [[TMP223:%.*]] = add i32 [[TMP222]], 144
-; POST-PROCESS-NEXT:    [[TMP224:%.*]] = inttoptr i32 [[TMP223]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP225:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP224]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP67]], ptr addrspace(21) [[TMP225]], align 4
-; POST-PROCESS-NEXT:    [[TMP226:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP227:%.*]] = add i32 [[TMP226]], -120
-; POST-PROCESS-NEXT:    [[TMP228:%.*]] = add i32 [[TMP227]], 148
-; POST-PROCESS-NEXT:    [[TMP229:%.*]] = inttoptr i32 [[TMP228]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP230:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP229]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP73]], ptr addrspace(21) [[TMP230]], align 4
-; POST-PROCESS-NEXT:    [[TMP231:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP232:%.*]] = add i32 [[TMP231]], -120
-; POST-PROCESS-NEXT:    [[TMP233:%.*]] = add i32 [[TMP232]], 152
-; POST-PROCESS-NEXT:    [[TMP234:%.*]] = inttoptr i32 [[TMP233]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP235:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP234]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP79]], ptr addrspace(21) [[TMP235]], align 4
-; POST-PROCESS-NEXT:    [[TMP236:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP237:%.*]] = add i32 [[TMP236]], -120
-; POST-PROCESS-NEXT:    [[TMP238:%.*]] = add i32 [[TMP237]], 156
-; POST-PROCESS-NEXT:    [[TMP239:%.*]] = inttoptr i32 [[TMP238]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP240:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP239]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP85]], ptr addrspace(21) [[TMP240]], align 4
-; POST-PROCESS-NEXT:    [[TMP241:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP242:%.*]] = add i32 [[TMP241]], -120
-; POST-PROCESS-NEXT:    [[TMP243:%.*]] = add i32 [[TMP242]], 160
-; POST-PROCESS-NEXT:    [[TMP244:%.*]] = inttoptr i32 [[TMP243]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP245:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP244]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP91]], ptr addrspace(21) [[TMP245]], align 4
-; POST-PROCESS-NEXT:    [[TMP246:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP247:%.*]] = add i32 [[TMP246]], -120
-; POST-PROCESS-NEXT:    [[TMP248:%.*]] = add i32 [[TMP247]], 164
-; POST-PROCESS-NEXT:    [[TMP249:%.*]] = inttoptr i32 [[TMP248]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP250:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP249]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP97]], ptr addrspace(21) [[TMP250]], align 4
-; POST-PROCESS-NEXT:    [[TMP251:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP252:%.*]] = add i32 [[TMP251]], -120
-; POST-PROCESS-NEXT:    [[TMP253:%.*]] = add i32 [[TMP252]], 168
-; POST-PROCESS-NEXT:    [[TMP254:%.*]] = inttoptr i32 [[TMP253]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP255:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP254]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP103]], ptr addrspace(21) [[TMP255]], align 4
-; POST-PROCESS-NEXT:    [[TMP256:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP257:%.*]] = add i32 [[TMP256]], -120
-; POST-PROCESS-NEXT:    [[TMP258:%.*]] = add i32 [[TMP257]], 172
-; POST-PROCESS-NEXT:    [[TMP259:%.*]] = inttoptr i32 [[TMP258]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP260:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP259]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP109]], ptr addrspace(21) [[TMP260]], align 4
-; POST-PROCESS-NEXT:    [[TMP261:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP262:%.*]] = add i32 [[TMP261]], -120
-; POST-PROCESS-NEXT:    [[TMP263:%.*]] = add i32 [[TMP262]], 176
-; POST-PROCESS-NEXT:    [[TMP264:%.*]] = inttoptr i32 [[TMP263]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP265:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP264]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP115]], ptr addrspace(21) [[TMP265]], align 4
-; POST-PROCESS-NEXT:    [[TMP266:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP267:%.*]] = add i32 [[TMP266]], -120
-; POST-PROCESS-NEXT:    [[TMP268:%.*]] = add i32 [[TMP267]], 180
-; POST-PROCESS-NEXT:    [[TMP269:%.*]] = inttoptr i32 [[TMP268]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP270:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP269]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP121]], ptr addrspace(21) [[TMP270]], align 4
-; POST-PROCESS-NEXT:    [[TMP271:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP272:%.*]] = add i32 [[TMP271]], -120
-; POST-PROCESS-NEXT:    [[TMP273:%.*]] = add i32 [[TMP272]], 184
-; POST-PROCESS-NEXT:    [[TMP274:%.*]] = inttoptr i32 [[TMP273]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP275:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP274]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP127]], ptr addrspace(21) [[TMP275]], align 4
-; POST-PROCESS-NEXT:    [[TMP276:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP277:%.*]] = add i32 [[TMP276]], -120
-; POST-PROCESS-NEXT:    [[TMP278:%.*]] = add i32 [[TMP277]], 188
-; POST-PROCESS-NEXT:    [[TMP279:%.*]] = inttoptr i32 [[TMP278]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP280:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP279]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP133]], ptr addrspace(21) [[TMP280]], align 4
-; POST-PROCESS-NEXT:    [[TMP281:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP282:%.*]] = add i32 [[TMP281]], -120
-; POST-PROCESS-NEXT:    [[TMP283:%.*]] = add i32 [[TMP282]], 192
-; POST-PROCESS-NEXT:    [[TMP284:%.*]] = inttoptr i32 [[TMP283]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP285:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP284]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP139]], ptr addrspace(21) [[TMP285]], align 4
-; POST-PROCESS-NEXT:    [[TMP286:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP287:%.*]] = add i32 [[TMP286]], -120
-; POST-PROCESS-NEXT:    [[TMP288:%.*]] = add i32 [[TMP287]], 196
-; POST-PROCESS-NEXT:    [[TMP289:%.*]] = inttoptr i32 [[TMP288]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP290:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP289]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP145]], ptr addrspace(21) [[TMP290]], align 4
-; POST-PROCESS-NEXT:    [[TMP291:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP292:%.*]] = add i32 [[TMP291]], -120
-; POST-PROCESS-NEXT:    [[TMP293:%.*]] = add i32 [[TMP292]], 200
-; POST-PROCESS-NEXT:    [[TMP294:%.*]] = inttoptr i32 [[TMP293]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP295:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP294]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP151]], ptr addrspace(21) [[TMP295]], align 4
-; POST-PROCESS-NEXT:    [[TMP296:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP297:%.*]] = add i32 [[TMP296]], -120
-; POST-PROCESS-NEXT:    [[TMP298:%.*]] = add i32 [[TMP297]], 204
-; POST-PROCESS-NEXT:    [[TMP299:%.*]] = inttoptr i32 [[TMP298]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP300:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP299]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP157]], ptr addrspace(21) [[TMP300]], align 4
-; POST-PROCESS-NEXT:    [[TMP301:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP302:%.*]] = add i32 [[TMP301]], -120
-; POST-PROCESS-NEXT:    [[TMP303:%.*]] = add i32 [[TMP302]], 208
-; POST-PROCESS-NEXT:    [[TMP304:%.*]] = inttoptr i32 [[TMP303]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP305:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP304]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP163]], ptr addrspace(21) [[TMP305]], align 4
-; POST-PROCESS-NEXT:    [[TMP306:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP307:%.*]] = add i32 [[TMP306]], -120
-; POST-PROCESS-NEXT:    [[TMP308:%.*]] = add i32 [[TMP307]], 212
-; POST-PROCESS-NEXT:    [[TMP309:%.*]] = inttoptr i32 [[TMP308]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP310:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP309]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP169]], ptr addrspace(21) [[TMP310]], align 4
-; POST-PROCESS-NEXT:    [[TMP311:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP312:%.*]] = add i32 [[TMP311]], -120
-; POST-PROCESS-NEXT:    [[TMP313:%.*]] = add i32 [[TMP312]], 216
-; POST-PROCESS-NEXT:    [[TMP314:%.*]] = inttoptr i32 [[TMP313]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP315:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP314]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP175]], ptr addrspace(21) [[TMP315]], align 4
-; POST-PROCESS-NEXT:    [[TMP316:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP317:%.*]] = add i32 [[TMP316]], -120
-; POST-PROCESS-NEXT:    [[TMP318:%.*]] = add i32 [[TMP317]], 220
-; POST-PROCESS-NEXT:    [[TMP319:%.*]] = inttoptr i32 [[TMP318]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP320:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP319]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP181]], ptr addrspace(21) [[TMP320]], align 4
-; POST-PROCESS-NEXT:    [[TMP321:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP322:%.*]] = add i32 [[TMP321]], -120
-; POST-PROCESS-NEXT:    [[TMP323:%.*]] = add i32 [[TMP322]], 224
-; POST-PROCESS-NEXT:    [[TMP324:%.*]] = inttoptr i32 [[TMP323]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP325:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP324]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP187]], ptr addrspace(21) [[TMP325]], align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP117]], ptr addrspace(21) [[TMP205]], align 4
+; POST-PROCESS-NEXT:    [[TMP206:%.*]] = add i32 [[TMP137]], 92
+; POST-PROCESS-NEXT:    [[TMP207:%.*]] = inttoptr i32 [[TMP206]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP208:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP207]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP121]], ptr addrspace(21) [[TMP208]], align 4
+; POST-PROCESS-NEXT:    [[TMP209:%.*]] = add i32 [[TMP137]], 96
+; POST-PROCESS-NEXT:    [[TMP210:%.*]] = inttoptr i32 [[TMP209]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP211:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP210]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP125]], ptr addrspace(21) [[TMP211]], align 4
+; POST-PROCESS-NEXT:    [[TMP212:%.*]] = add i32 [[TMP137]], 100
+; POST-PROCESS-NEXT:    [[TMP213:%.*]] = inttoptr i32 [[TMP212]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP214:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP213]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP129]], ptr addrspace(21) [[TMP214]], align 4
+; POST-PROCESS-NEXT:    [[TMP215:%.*]] = add i32 [[TMP137]], 104
+; POST-PROCESS-NEXT:    [[TMP216:%.*]] = inttoptr i32 [[TMP215]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP217:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP216]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP133]], ptr addrspace(21) [[TMP217]], align 4
 ; POST-PROCESS-NEXT:    [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 0
-; POST-PROCESS-NEXT:    [[TMP326:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
-; POST-PROCESS-NEXT:    [[TMP327:%.*]] = bitcast i32 [[TMP326]] to float
-; POST-PROCESS-NEXT:    [[DOTSROA_012_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP327]], i32 0
+; POST-PROCESS-NEXT:    [[TMP218:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
+; POST-PROCESS-NEXT:    [[TMP219:%.*]] = bitcast i32 [[TMP218]] to float
+; POST-PROCESS-NEXT:    [[DOTSROA_012_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP219]], i32 0
 ; POST-PROCESS-NEXT:    [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 1
-; POST-PROCESS-NEXT:    [[TMP328:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
-; POST-PROCESS-NEXT:    [[TMP329:%.*]] = bitcast i32 [[TMP328]] to float
-; POST-PROCESS-NEXT:    [[DOTSROA_012_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_012_0_VEC_INSERT]], float [[TMP329]], i32 1
+; POST-PROCESS-NEXT:    [[TMP220:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
+; POST-PROCESS-NEXT:    [[TMP221:%.*]] = bitcast i32 [[TMP220]] to float
+; POST-PROCESS-NEXT:    [[DOTSROA_012_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_012_0_VEC_INSERT]], float [[TMP221]], i32 1
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[DOTSROA_012_4_VEC_INSERT]], 0
-; POST-PROCESS-NEXT:    [[TMP330:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; POST-PROCESS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP330]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
+; POST-PROCESS-NEXT:    [[TMP222:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; POST-PROCESS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP222]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_0_0_0_GEP1:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0, i32 0
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_0_0_0_LOAD:%.*]] = load <3 x i32>, ptr [[DOTFCA_0_0_0_0_GEP1]], align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] poison, <3 x i32> [[DOTFCA_0_0_0_0_LOAD]], 0, 0, 0, 0
@@ -1670,8 +1663,8 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-NEXT:    [[DOTFCA_1_1_GEP10:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; POST-PROCESS-NEXT:    [[DOTFCA_1_1_LOAD:%.*]] = load i32, ptr [[DOTFCA_1_1_GEP10]], align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_1_1_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_0_INSERT]], i32 [[DOTFCA_1_1_LOAD]], 1, 1
-; POST-PROCESS-NEXT:    [[TMP331:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP331]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META17]]
+; POST-PROCESS-NEXT:    [[TMP223:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP223]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META17]]
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
@@ -1681,410 +1674,300 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POST-PROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 0
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], 108
+; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 120
+; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = add i32 [[TMP1]], 108
 ; POST-PROCESS-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP4]], i32 0
 ; POST-PROCESS-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[TMP5]], align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; POST-PROCESS-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 1, 0
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP29]], -120
-; POST-PROCESS-NEXT:    [[TMP31:%.*]] = add i32 [[TMP30]], 120
-; POST-PROCESS-NEXT:    [[TMP32:%.*]] = inttoptr i32 [[TMP31]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP32]], i32 0
-; POST-PROCESS-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(21) [[TMP33]], align 4
-; POST-PROCESS-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], -120
-; POST-PROCESS-NEXT:    [[TMP37:%.*]] = add i32 [[TMP36]], 124
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP30:%.*]] = inttoptr i32 [[TMP6]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP30]], i32 0
+; POST-PROCESS-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(21) [[TMP31]], align 4
+; POST-PROCESS-NEXT:    [[TMP33:%.*]] = add i32 [[TMP6]], 4
+; POST-PROCESS-NEXT:    [[TMP34:%.*]] = inttoptr i32 [[TMP33]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP34]], i32 0
+; POST-PROCESS-NEXT:    [[TMP36:%.*]] = load i32, ptr addrspace(21) [[TMP35]], align 4
+; POST-PROCESS-NEXT:    [[TMP37:%.*]] = add i32 [[TMP6]], 8
 ; POST-PROCESS-NEXT:    [[TMP38:%.*]] = inttoptr i32 [[TMP37]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP39:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP38]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(21) [[TMP39]], align 4
-; POST-PROCESS-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], -120
-; POST-PROCESS-NEXT:    [[TMP43:%.*]] = add i32 [[TMP42]], 128
-; POST-PROCESS-NEXT:    [[TMP44:%.*]] = inttoptr i32 [[TMP43]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP45:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP44]], i32 0
-; POST-PROCESS-NEXT:    [[TMP46:%.*]] = load i32, ptr addrspace(21) [[TMP45]], align 4
-; POST-PROCESS-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP48:%.*]] = add i32 [[TMP47]], -120
-; POST-PROCESS-NEXT:    [[TMP49:%.*]] = add i32 [[TMP48]], 132
+; POST-PROCESS-NEXT:    [[TMP41:%.*]] = add i32 [[TMP6]], 12
+; POST-PROCESS-NEXT:    [[TMP42:%.*]] = inttoptr i32 [[TMP41]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP42]], i32 0
+; POST-PROCESS-NEXT:    [[TMP44:%.*]] = load i32, ptr addrspace(21) [[TMP43]], align 4
+; POST-PROCESS-NEXT:    [[TMP45:%.*]] = add i32 [[TMP6]], 16
+; POST-PROCESS-NEXT:    [[TMP46:%.*]] = inttoptr i32 [[TMP45]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP46]], i32 0
+; POST-PROCESS-NEXT:    [[TMP48:%.*]] = load i32, ptr addrspace(21) [[TMP47]], align 4
+; POST-PROCESS-NEXT:    [[TMP49:%.*]] = add i32 [[TMP6]], 20
 ; POST-PROCESS-NEXT:    [[TMP50:%.*]] = inttoptr i32 [[TMP49]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP51:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP50]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP52:%.*]] = load i32, ptr addrspace(21) [[TMP51]], align 4
-; POST-PROCESS-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP53]], -120
-; POST-PROCESS-NEXT:    [[TMP55:%.*]] = add i32 [[TMP54]], 136
-; POST-PROCESS-NEXT:    [[TMP56:%.*]] = inttoptr i32 [[TMP55]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP57:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP56]], i32 0
-; POST-PROCESS-NEXT:    [[TMP58:%.*]] = load i32, ptr addrspace(21) [[TMP57]], align 4
-; POST-PROCESS-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP60:%.*]] = add i32 [[TMP59]], -120
-; POST-PROCESS-NEXT:    [[TMP61:%.*]] = add i32 [[TMP60]], 140
+; POST-PROCESS-NEXT:    [[TMP53:%.*]] = add i32 [[TMP6]], 24
+; POST-PROCESS-NEXT:    [[TMP54:%.*]] = inttoptr i32 [[TMP53]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP55:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP54]], i32 0
+; POST-PROCESS-NEXT:    [[TMP56:%.*]] = load i32, ptr addrspace(21) [[TMP55]], align 4
+; POST-PROCESS-NEXT:    [[TMP57:%.*]] = add i32 [[TMP6]], 28
+; POST-PROCESS-NEXT:    [[TMP58:%.*]] = inttoptr i32 [[TMP57]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP58]], i32 0
+; POST-PROCESS-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(21) [[TMP59]], align 4
+; POST-PROCESS-NEXT:    [[TMP61:%.*]] = add i32 [[TMP6]], 32
 ; POST-PROCESS-NEXT:    [[TMP62:%.*]] = inttoptr i32 [[TMP61]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP62]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP64:%.*]] = load i32, ptr addrspace(21) [[TMP63]], align 4
-; POST-PROCESS-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP66:%.*]] = add i32 [[TMP65]], -120
-; POST-PROCESS-NEXT:    [[TMP67:%.*]] = add i32 [[TMP66]], 144
-; POST-PROCESS-NEXT:    [[TMP68:%.*]] = inttoptr i32 [[TMP67]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP69:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP68]], i32 0
-; POST-PROCESS-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(21) [[TMP69]], align 4
-; POST-PROCESS-NEXT:    [[TMP71:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], -120
-; POST-PROCESS-NEXT:    [[TMP73:%.*]] = add i32 [[TMP72]], 148
+; POST-PROCESS-NEXT:    [[TMP65:%.*]] = add i32 [[TMP6]], 36
+; POST-PROCESS-NEXT:    [[TMP66:%.*]] = inttoptr i32 [[TMP65]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP67:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP66]], i32 0
+; POST-PROCESS-NEXT:    [[TMP68:%.*]] = load i32, ptr addrspace(21) [[TMP67]], align 4
+; POST-PROCESS-NEXT:    [[TMP69:%.*]] = add i32 [[TMP6]], 40
+; POST-PROCESS-NEXT:    [[TMP70:%.*]] = inttoptr i32 [[TMP69]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP71:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP70]], i32 0
+; POST-PROCESS-NEXT:    [[TMP72:%.*]] = load i32, ptr addrspace(21) [[TMP71]], align 4
+; POST-PROCESS-NEXT:    [[TMP73:%.*]] = add i32 [[TMP6]], 44
 ; POST-PROCESS-NEXT:    [[TMP74:%.*]] = inttoptr i32 [[TMP73]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP75:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP74]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP76:%.*]] = load i32, ptr addrspace(21) [[TMP75]], align 4
-; POST-PROCESS-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP78:%.*]] = add i32 [[TMP77]], -120
-; POST-PROCESS-NEXT:    [[TMP79:%.*]] = add i32 [[TMP78]], 152
-; POST-PROCESS-NEXT:    [[TMP80:%.*]] = inttoptr i32 [[TMP79]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP81:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP80]], i32 0
-; POST-PROCESS-NEXT:    [[TMP82:%.*]] = load i32, ptr addrspace(21) [[TMP81]], align 4
-; POST-PROCESS-NEXT:    [[TMP83:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP84:%.*]] = add i32 [[TMP83]], -120
-; POST-PROCESS-NEXT:    [[TMP85:%.*]] = add i32 [[TMP84]], 156
+; POST-PROCESS-NEXT:    [[TMP77:%.*]] = add i32 [[TMP6]], 48
+; POST-PROCESS-NEXT:    [[TMP78:%.*]] = inttoptr i32 [[TMP77]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP79:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP78]], i32 0
+; POST-PROCESS-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(21) [[TMP79]], align 4
+; POST-PROCESS-NEXT:    [[TMP81:%.*]] = add i32 [[TMP6]], 52
+; POST-PROCESS-NEXT:    [[TMP82:%.*]] = inttoptr i32 [[TMP81]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP83:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP82]], i32 0
+; POST-PROCESS-NEXT:    [[TMP84:%.*]] = load i32, ptr addrspace(21) [[TMP83]], align 4
+; POST-PROCESS-NEXT:    [[TMP85:%.*]] = add i32 [[TMP6]], 56
 ; POST-PROCESS-NEXT:    [[TMP86:%.*]] = inttoptr i32 [[TMP85]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP87:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP86]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP88:%.*]] = load i32, ptr addrspace(21) [[TMP87]], align 4
-; POST-PROCESS-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP89]], -120
-; POST-PROCESS-NEXT:    [[TMP91:%.*]] = add i32 [[TMP90]], 160
-; POST-PROCESS-NEXT:    [[TMP92:%.*]] = inttoptr i32 [[TMP91]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP93:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP92]], i32 0
-; POST-PROCESS-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(21) [[TMP93]], align 4
-; POST-PROCESS-NEXT:    [[TMP95:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], -120
-; POST-PROCESS-NEXT:    [[TMP97:%.*]] = add i32 [[TMP96]], 164
+; POST-PROCESS-NEXT:    [[TMP89:%.*]] = add i32 [[TMP6]], 60
+; POST-PROCESS-NEXT:    [[TMP90:%.*]] = inttoptr i32 [[TMP89]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP91:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP90]], i32 0
+; POST-PROCESS-NEXT:    [[TMP92:%.*]] = load i32, ptr addrspace(21) [[TMP91]], align 4
+; POST-PROCESS-NEXT:    [[TMP93:%.*]] = add i32 [[TMP6]], 64
+; POST-PROCESS-NEXT:    [[TMP94:%.*]] = inttoptr i32 [[TMP93]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP95:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP94]], i32 0
+; POST-PROCESS-NEXT:    [[TMP96:%.*]] = load i32, ptr addrspace(21) [[TMP95]], align 4
+; POST-PROCESS-NEXT:    [[TMP97:%.*]] = add i32 [[TMP6]], 68
 ; POST-PROCESS-NEXT:    [[TMP98:%.*]] = inttoptr i32 [[TMP97]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP99:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP98]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP100:%.*]] = load i32, ptr addrspace(21) [[TMP99]], align 4
-; POST-PROCESS-NEXT:    [[TMP101:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP102:%.*]] = add i32 [[TMP101]], -120
-; POST-PROCESS-NEXT:    [[TMP103:%.*]] = add i32 [[TMP102]], 168
-; POST-PROCESS-NEXT:    [[TMP104:%.*]] = inttoptr i32 [[TMP103]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP105:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP104]], i32 0
-; POST-PROCESS-NEXT:    [[TMP106:%.*]] = load i32, ptr addrspace(21) [[TMP105]], align 4
-; POST-PROCESS-NEXT:    [[TMP107:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP108:%.*]] = add i32 [[TMP107]], -120
-; POST-PROCESS-NEXT:    [[TMP109:%.*]] = add i32 [[TMP108]], 172
+; POST-PROCESS-NEXT:    [[TMP101:%.*]] = add i32 [[TMP6]], 72
+; POST-PROCESS-NEXT:    [[TMP102:%.*]] = inttoptr i32 [[TMP101]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP103:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP102]], i32 0
+; POST-PROCESS-NEXT:    [[TMP104:%.*]] = load i32, ptr addrspace(21) [[TMP103]], align 4
+; POST-PROCESS-NEXT:    [[TMP105:%.*]] = add i32 [[TMP6]], 76
+; POST-PROCESS-NEXT:    [[TMP106:%.*]] = inttoptr i32 [[TMP105]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP107:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP106]], i32 0
+; POST-PROCESS-NEXT:    [[TMP108:%.*]] = load i32, ptr addrspace(21) [[TMP107]], align 4
+; POST-PROCESS-NEXT:    [[TMP109:%.*]] = add i32 [[TMP6]], 80
 ; POST-PROCESS-NEXT:    [[TMP110:%.*]] = inttoptr i32 [[TMP109]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP111:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP110]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP112:%.*]] = load i32, ptr addrspace(21) [[TMP111]], align 4
-; POST-PROCESS-NEXT:    [[TMP113:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP113]], -120
-; POST-PROCESS-NEXT:    [[TMP115:%.*]] = add i32 [[TMP114]], 176
-; POST-PROCESS-NEXT:    [[TMP116:%.*]] = inttoptr i32 [[TMP115]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP117:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP116]], i32 0
-; POST-PROCESS-NEXT:    [[TMP118:%.*]] = load i32, ptr addrspace(21) [[TMP117]], align 4
-; POST-PROCESS-NEXT:    [[TMP119:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP120:%.*]] = add i32 [[TMP119]], -120
-; POST-PROCESS-NEXT:    [[TMP121:%.*]] = add i32 [[TMP120]], 180
+; POST-PROCESS-NEXT:    [[TMP113:%.*]] = add i32 [[TMP6]], 84
+; POST-PROCESS-NEXT:    [[TMP114:%.*]] = inttoptr i32 [[TMP113]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP115:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP114]], i32 0
+; POST-PROCESS-NEXT:    [[TMP116:%.*]] = load i32, ptr addrspace(21) [[TMP115]], align 4
+; POST-PROCESS-NEXT:    [[TMP117:%.*]] = add i32 [[TMP6]], 88
+; POST-PROCESS-NEXT:    [[TMP118:%.*]] = inttoptr i32 [[TMP117]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP119:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP118]], i32 0
+; POST-PROCESS-NEXT:    [[TMP120:%.*]] = load i32, ptr addrspace(21) [[TMP119]], align 4
+; POST-PROCESS-NEXT:    [[TMP121:%.*]] = add i32 [[TMP6]], 92
 ; POST-PROCESS-NEXT:    [[TMP122:%.*]] = inttoptr i32 [[TMP121]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP123:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP122]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP124:%.*]] = load i32, ptr addrspace(21) [[TMP123]], align 4
-; POST-PROCESS-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP126:%.*]] = add i32 [[TMP125]], -120
-; POST-PROCESS-NEXT:    [[TMP127:%.*]] = add i32 [[TMP126]], 184
-; POST-PROCESS-NEXT:    [[TMP128:%.*]] = inttoptr i32 [[TMP127]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP129:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP128]], i32 0
-; POST-PROCESS-NEXT:    [[TMP130:%.*]] = load i32, ptr addrspace(21) [[TMP129]], align 4
-; POST-PROCESS-NEXT:    [[TMP131:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP132:%.*]] = add i32 [[TMP131]], -120
-; POST-PROCESS-NEXT:    [[TMP133:%.*]] = add i32 [[TMP132]], 188
+; POST-PROCESS-NEXT:    [[TMP125:%.*]] = add i32 [[TMP6]], 96
+; POST-PROCESS-NEXT:    [[TMP126:%.*]] = inttoptr i32 [[TMP125]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP127:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP126]], i32 0
+; POST-PROCESS-NEXT:    [[TMP128:%.*]] = load i32, ptr addrspace(21) [[TMP127]], align 4
+; POST-PROCESS-NEXT:    [[TMP129:%.*]] = add i32 [[TMP6]], 100
+; POST-PROCESS-NEXT:    [[TMP130:%.*]] = inttoptr i32 [[TMP129]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP131:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP130]], i32 0
+; POST-PROCESS-NEXT:    [[TMP132:%.*]] = load i32, ptr addrspace(21) [[TMP131]], align 4
+; POST-PROCESS-NEXT:    [[TMP133:%.*]] = add i32 [[TMP6]], 104
 ; POST-PROCESS-NEXT:    [[TMP134:%.*]] = inttoptr i32 [[TMP133]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP135:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP134]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP136:%.*]] = load i32, ptr addrspace(21) [[TMP135]], align 4
 ; POST-PROCESS-NEXT:    [[TMP137:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP138:%.*]] = add i32 [[TMP137]], -120
-; POST-PROCESS-NEXT:    [[TMP139:%.*]] = add i32 [[TMP138]], 192
-; POST-PROCESS-NEXT:    [[TMP140:%.*]] = inttoptr i32 [[TMP139]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP141:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP140]], i32 0
-; POST-PROCESS-NEXT:    [[TMP142:%.*]] = load i32, ptr addrspace(21) [[TMP141]], align 4
-; POST-PROCESS-NEXT:    [[TMP143:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP144:%.*]] = add i32 [[TMP143]], -120
-; POST-PROCESS-NEXT:    [[TMP145:%.*]] = add i32 [[TMP144]], 196
-; POST-PROCESS-NEXT:    [[TMP146:%.*]] = inttoptr i32 [[TMP145]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP147:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP146]], i32 0
-; POST-PROCESS-NEXT:    [[TMP148:%.*]] = load i32, ptr addrspace(21) [[TMP147]], align 4
-; POST-PROCESS-NEXT:    [[TMP149:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP150:%.*]] = add i32 [[TMP149]], -120
-; POST-PROCESS-NEXT:    [[TMP151:%.*]] = add i32 [[TMP150]], 200
-; POST-PROCESS-NEXT:    [[TMP152:%.*]] = inttoptr i32 [[TMP151]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP152]], i32 0
-; POST-PROCESS-NEXT:    [[TMP154:%.*]] = load i32, ptr addrspace(21) [[TMP153]], align 4
-; POST-PROCESS-NEXT:    [[TMP155:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP156:%.*]] = add i32 [[TMP155]], -120
-; POST-PROCESS-NEXT:    [[TMP157:%.*]] = add i32 [[TMP156]], 204
-; POST-PROCESS-NEXT:    [[TMP158:%.*]] = inttoptr i32 [[TMP157]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP159:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP158]], i32 0
-; POST-PROCESS-NEXT:    [[TMP160:%.*]] = load i32, ptr addrspace(21) [[TMP159]], align 4
-; POST-PROCESS-NEXT:    [[TMP161:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP162:%.*]] = add i32 [[TMP161]], -120
-; POST-PROCESS-NEXT:    [[TMP163:%.*]] = add i32 [[TMP162]], 208
-; POST-PROCESS-NEXT:    [[TMP164:%.*]] = inttoptr i32 [[TMP163]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP165:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP164]], i32 0
-; POST-PROCESS-NEXT:    [[TMP166:%.*]] = load i32, ptr addrspace(21) [[TMP165]], align 4
-; POST-PROCESS-NEXT:    [[TMP167:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP168:%.*]] = add i32 [[TMP167]], -120
-; POST-PROCESS-NEXT:    [[TMP169:%.*]] = add i32 [[TMP168]], 212
-; POST-PROCESS-NEXT:    [[TMP170:%.*]] = inttoptr i32 [[TMP169]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP171:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP170]], i32 0
-; POST-PROCESS-NEXT:    [[TMP172:%.*]] = load i32, ptr addrspace(21) [[TMP171]], align 4
-; POST-PROCESS-NEXT:    [[TMP173:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP174:%.*]] = add i32 [[TMP173]], -120
-; POST-PROCESS-NEXT:    [[TMP175:%.*]] = add i32 [[TMP174]], 216
-; POST-PROCESS-NEXT:    [[TMP176:%.*]] = inttoptr i32 [[TMP175]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP177:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP176]], i32 0
-; POST-PROCESS-NEXT:    [[TMP178:%.*]] = load i32, ptr addrspace(21) [[TMP177]], align 4
-; POST-PROCESS-NEXT:    [[TMP179:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP180:%.*]] = add i32 [[TMP179]], -120
-; POST-PROCESS-NEXT:    [[TMP181:%.*]] = add i32 [[TMP180]], 220
-; POST-PROCESS-NEXT:    [[TMP182:%.*]] = inttoptr i32 [[TMP181]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP183:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP182]], i32 0
-; POST-PROCESS-NEXT:    [[TMP184:%.*]] = load i32, ptr addrspace(21) [[TMP183]], align 4
-; POST-PROCESS-NEXT:    [[TMP185:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP186:%.*]] = add i32 [[TMP185]], -120
-; POST-PROCESS-NEXT:    [[TMP187:%.*]] = add i32 [[TMP186]], 224
-; POST-PROCESS-NEXT:    [[TMP188:%.*]] = inttoptr i32 [[TMP187]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP189:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP188]], i32 0
-; POST-PROCESS-NEXT:    [[TMP190:%.*]] = load i32, ptr addrspace(21) [[TMP189]], align 4
-; POST-PROCESS-NEXT:    [[TMP191:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP192:%.*]] = add i32 [[TMP2]], 116
-; POST-PROCESS-NEXT:    [[TMP193:%.*]] = inttoptr i32 [[TMP192]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP194:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP193]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP191]], ptr addrspace(21) [[TMP194]], align 4
+; POST-PROCESS-NEXT:    [[TMP138:%.*]] = add i32 [[TMP1]], 116
+; POST-PROCESS-NEXT:    [[TMP139:%.*]] = inttoptr i32 [[TMP138]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP140:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP139]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP137]], ptr addrspace(21) [[TMP140]], align 4
 ; POST-PROCESS-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] poison, <2 x float> [[DOTFCA_1_0_EXTRACT]], 0
 ; POST-PROCESS-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-NEXT:    [[DOTSROA_053_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; POST-PROCESS-NEXT:    [[TMP195:%.*]] = bitcast float [[DOTSROA_053_0_VEC_EXTRACT]] to i32
+; POST-PROCESS-NEXT:    [[TMP141:%.*]] = bitcast float [[DOTSROA_053_0_VEC_EXTRACT]] to i32
 ; POST-PROCESS-NEXT:    [[DOTSROA_053_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; POST-PROCESS-NEXT:    [[TMP196:%.*]] = bitcast float [[DOTSROA_053_4_VEC_EXTRACT]] to i32
+; POST-PROCESS-NEXT:    [[TMP142:%.*]] = bitcast float [[DOTSROA_053_4_VEC_EXTRACT]] to i32
 ; POST-PROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; POST-PROCESS-NEXT:    [[TMP197:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; POST-PROCESS-NEXT:    [[TMP198:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; POST-PROCESS-NEXT:    [[TMP199:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP197]])
-; POST-PROCESS-NEXT:    [[TMP200:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP199]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; POST-PROCESS-NEXT:    [[TMP201:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP200]])
+; POST-PROCESS-NEXT:    [[TMP143:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
+; POST-PROCESS-NEXT:    [[TMP144:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
+; POST-PROCESS-NEXT:    [[TMP145:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP143]])
+; POST-PROCESS-NEXT:    [[TMP146:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP145]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; POST-PROCESS-NEXT:    [[TMP147:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP146]])
 ; POST-PROCESS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
 ; POST-PROCESS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
-; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP10]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP19]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP22]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP24]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP25]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP26]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP27]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP28]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP202:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP203:%.*]] = add i32 [[TMP202]], -120
-; POST-PROCESS-NEXT:    [[TMP204:%.*]] = add i32 [[TMP203]], 120
-; POST-PROCESS-NEXT:    [[TMP205:%.*]] = inttoptr i32 [[TMP204]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP206:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP205]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP34]], ptr addrspace(21) [[TMP206]], align 4
-; POST-PROCESS-NEXT:    [[TMP207:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP208:%.*]] = add i32 [[TMP207]], -120
-; POST-PROCESS-NEXT:    [[TMP209:%.*]] = add i32 [[TMP208]], 124
-; POST-PROCESS-NEXT:    [[TMP210:%.*]] = inttoptr i32 [[TMP209]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP211:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP210]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP40]], ptr addrspace(21) [[TMP211]], align 4
-; POST-PROCESS-NEXT:    [[TMP212:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP213:%.*]] = add i32 [[TMP212]], -120
-; POST-PROCESS-NEXT:    [[TMP214:%.*]] = add i32 [[TMP213]], 128
+; POST-PROCESS-NEXT:    store i32 [[TMP1]], ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    [[TMP148:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP27]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP28]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP29]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP149:%.*]] = inttoptr i32 [[TMP148]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP150:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP149]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP32]], ptr addrspace(21) [[TMP150]], align 4
+; POST-PROCESS-NEXT:    [[TMP151:%.*]] = add i32 [[TMP148]], 4
+; POST-PROCESS-NEXT:    [[TMP152:%.*]] = inttoptr i32 [[TMP151]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP152]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP36]], ptr addrspace(21) [[TMP153]], align 4
+; POST-PROCESS-NEXT:    [[TMP154:%.*]] = add i32 [[TMP148]], 8
+; POST-PROCESS-NEXT:    [[TMP155:%.*]] = inttoptr i32 [[TMP154]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP156:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP155]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP40]], ptr addrspace(21) [[TMP156]], align 4
+; POST-PROCESS-NEXT:    [[TMP157:%.*]] = add i32 [[TMP148]], 12
+; POST-PROCESS-NEXT:    [[TMP158:%.*]] = inttoptr i32 [[TMP157]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP159:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP158]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP44]], ptr addrspace(21) [[TMP159]], align 4
+; POST-PROCESS-NEXT:    [[TMP160:%.*]] = add i32 [[TMP148]], 16
+; POST-PROCESS-NEXT:    [[TMP161:%.*]] = inttoptr i32 [[TMP160]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP162:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP161]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP48]], ptr addrspace(21) [[TMP162]], align 4
+; POST-PROCESS-NEXT:    [[TMP163:%.*]] = add i32 [[TMP148]], 20
+; POST-PROCESS-NEXT:    [[TMP164:%.*]] = inttoptr i32 [[TMP163]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP165:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP164]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP52]], ptr addrspace(21) [[TMP165]], align 4
+; POST-PROCESS-NEXT:    [[TMP166:%.*]] = add i32 [[TMP148]], 24
+; POST-PROCESS-NEXT:    [[TMP167:%.*]] = inttoptr i32 [[TMP166]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP168:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP167]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP56]], ptr addrspace(21) [[TMP168]], align 4
+; POST-PROCESS-NEXT:    [[TMP169:%.*]] = add i32 [[TMP148]], 28
+; POST-PROCESS-NEXT:    [[TMP170:%.*]] = inttoptr i32 [[TMP169]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP171:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP170]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP60]], ptr addrspace(21) [[TMP171]], align 4
+; POST-PROCESS-NEXT:    [[TMP172:%.*]] = add i32 [[TMP148]], 32
+; POST-PROCESS-NEXT:    [[TMP173:%.*]] = inttoptr i32 [[TMP172]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP174:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP173]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP64]], ptr addrspace(21) [[TMP174]], align 4
+; POST-PROCESS-NEXT:    [[TMP175:%.*]] = add i32 [[TMP148]], 36
+; POST-PROCESS-NEXT:    [[TMP176:%.*]] = inttoptr i32 [[TMP175]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP177:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP176]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP68]], ptr addrspace(21) [[TMP177]], align 4
+; POST-PROCESS-NEXT:    [[TMP178:%.*]] = add i32 [[TMP148]], 40
+; POST-PROCESS-NEXT:    [[TMP179:%.*]] = inttoptr i32 [[TMP178]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP180:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP179]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP72]], ptr addrspace(21) [[TMP180]], align 4
+; POST-PROCESS-NEXT:    [[TMP181:%.*]] = add i32 [[TMP148]], 44
+; POST-PROCESS-NEXT:    [[TMP182:%.*]] = inttoptr i32 [[TMP181]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP183:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP182]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP76]], ptr addrspace(21) [[TMP183]], align 4
+; POST-PROCESS-NEXT:    [[TMP184:%.*]] = add i32 [[TMP148]], 48
+; POST-PROCESS-NEXT:    [[TMP185:%.*]] = inttoptr i32 [[TMP184]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP186:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP185]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP80]], ptr addrspace(21) [[TMP186]], align 4
+; POST-PROCESS-NEXT:    [[TMP187:%.*]] = add i32 [[TMP148]], 52
+; POST-PROCESS-NEXT:    [[TMP188:%.*]] = inttoptr i32 [[TMP187]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP189:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP188]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP84]], ptr addrspace(21) [[TMP189]], align 4
+; POST-PROCESS-NEXT:    [[TMP190:%.*]] = add i32 [[TMP148]], 56
+; POST-PROCESS-NEXT:    [[TMP191:%.*]] = inttoptr i32 [[TMP190]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP192:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP191]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP88]], ptr addrspace(21) [[TMP192]], align 4
+; POST-PROCESS-NEXT:    [[TMP193:%.*]] = add i32 [[TMP148]], 60
+; POST-PROCESS-NEXT:    [[TMP194:%.*]] = inttoptr i32 [[TMP193]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP195:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP194]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP92]], ptr addrspace(21) [[TMP195]], align 4
+; POST-PROCESS-NEXT:    [[TMP196:%.*]] = add i32 [[TMP148]], 64
+; POST-PROCESS-NEXT:    [[TMP197:%.*]] = inttoptr i32 [[TMP196]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP198:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP197]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP96]], ptr addrspace(21) [[TMP198]], align 4
+; POST-PROCESS-NEXT:    [[TMP199:%.*]] = add i32 [[TMP148]], 68
+; POST-PROCESS-NEXT:    [[TMP200:%.*]] = inttoptr i32 [[TMP199]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP201:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP200]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP100]], ptr addrspace(21) [[TMP201]], align 4
+; POST-PROCESS-NEXT:    [[TMP202:%.*]] = add i32 [[TMP148]], 72
+; POST-PROCESS-NEXT:    [[TMP203:%.*]] = inttoptr i32 [[TMP202]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP204:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP203]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP104]], ptr addrspace(21) [[TMP204]], align 4
+; POST-PROCESS-NEXT:    [[TMP205:%.*]] = add i32 [[TMP148]], 76
+; POST-PROCESS-NEXT:    [[TMP206:%.*]] = inttoptr i32 [[TMP205]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP207:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP206]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP108]], ptr addrspace(21) [[TMP207]], align 4
+; POST-PROCESS-NEXT:    [[TMP208:%.*]] = add i32 [[TMP148]], 80
+; POST-PROCESS-NEXT:    [[TMP209:%.*]] = inttoptr i32 [[TMP208]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP210:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP209]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP112]], ptr addrspace(21) [[TMP210]], align 4
+; POST-PROCESS-NEXT:    [[TMP211:%.*]] = add i32 [[TMP148]], 84
+; POST-PROCESS-NEXT:    [[TMP212:%.*]] = inttoptr i32 [[TMP211]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP213:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP212]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP116]], ptr addrspace(21) [[TMP213]], align 4
+; POST-PROCESS-NEXT:    [[TMP214:%.*]] = add i32 [[TMP148]], 88
 ; POST-PROCESS-NEXT:    [[TMP215:%.*]] = inttoptr i32 [[TMP214]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP216:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP215]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP46]], ptr addrspace(21) [[TMP216]], align 4
-; POST-PROCESS-NEXT:    [[TMP217:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP218:%.*]] = add i32 [[TMP217]], -120
-; POST-PROCESS-NEXT:    [[TMP219:%.*]] = add i32 [[TMP218]], 132
-; POST-PROCESS-NEXT:    [[TMP220:%.*]] = inttoptr i32 [[TMP219]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP221:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP220]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP52]], ptr addrspace(21) [[TMP221]], align 4
-; POST-PROCESS-NEXT:    [[TMP222:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP223:%.*]] = add i32 [[TMP222]], -120
-; POST-PROCESS-NEXT:    [[TMP224:%.*]] = add i32 [[TMP223]], 136
-; POST-PROCESS-NEXT:    [[TMP225:%.*]] = inttoptr i32 [[TMP224]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP226:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP225]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP58]], ptr addrspace(21) [[TMP226]], align 4
-; POST-PROCESS-NEXT:    [[TMP227:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP228:%.*]] = add i32 [[TMP227]], -120
-; POST-PROCESS-NEXT:    [[TMP229:%.*]] = add i32 [[TMP228]], 140
-; POST-PROCESS-NEXT:    [[TMP230:%.*]] = inttoptr i32 [[TMP229]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP231:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP230]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP64]], ptr addrspace(21) [[TMP231]], align 4
-; POST-PROCESS-NEXT:    [[TMP232:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP233:%.*]] = add i32 [[TMP232]], -120
-; POST-PROCESS-NEXT:    [[TMP234:%.*]] = add i32 [[TMP233]], 144
-; POST-PROCESS-NEXT:    [[TMP235:%.*]] = inttoptr i32 [[TMP234]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP236:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP235]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP70]], ptr addrspace(21) [[TMP236]], align 4
-; POST-PROCESS-NEXT:    [[TMP237:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP238:%.*]] = add i32 [[TMP237]], -120
-; POST-PROCESS-NEXT:    [[TMP239:%.*]] = add i32 [[TMP238]], 148
-; POST-PROCESS-NEXT:    [[TMP240:%.*]] = inttoptr i32 [[TMP239]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP241:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP240]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP76]], ptr addrspace(21) [[TMP241]], align 4
-; POST-PROCESS-NEXT:    [[TMP242:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP243:%.*]] = add i32 [[TMP242]], -120
-; POST-PROCESS-NEXT:    [[TMP244:%.*]] = add i32 [[TMP243]], 152
-; POST-PROCESS-NEXT:    [[TMP245:%.*]] = inttoptr i32 [[TMP244]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP246:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP245]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP82]], ptr addrspace(21) [[TMP246]], align 4
-; POST-PROCESS-NEXT:    [[TMP247:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP248:%.*]] = add i32 [[TMP247]], -120
-; POST-PROCESS-NEXT:    [[TMP249:%.*]] = add i32 [[TMP248]], 156
-; POST-PROCESS-NEXT:    [[TMP250:%.*]] = inttoptr i32 [[TMP249]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP251:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP250]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP88]], ptr addrspace(21) [[TMP251]], align 4
-; POST-PROCESS-NEXT:    [[TMP252:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP253:%.*]] = add i32 [[TMP252]], -120
-; POST-PROCESS-NEXT:    [[TMP254:%.*]] = add i32 [[TMP253]], 160
-; POST-PROCESS-NEXT:    [[TMP255:%.*]] = inttoptr i32 [[TMP254]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP256:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP255]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP94]], ptr addrspace(21) [[TMP256]], align 4
-; POST-PROCESS-NEXT:    [[TMP257:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP258:%.*]] = add i32 [[TMP257]], -120
-; POST-PROCESS-NEXT:    [[TMP259:%.*]] = add i32 [[TMP258]], 164
-; POST-PROCESS-NEXT:    [[TMP260:%.*]] = inttoptr i32 [[TMP259]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP261:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP260]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP100]], ptr addrspace(21) [[TMP261]], align 4
-; POST-PROCESS-NEXT:    [[TMP262:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP263:%.*]] = add i32 [[TMP262]], -120
-; POST-PROCESS-NEXT:    [[TMP264:%.*]] = add i32 [[TMP263]], 168
-; POST-PROCESS-NEXT:    [[TMP265:%.*]] = inttoptr i32 [[TMP264]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP266:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP265]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP106]], ptr addrspace(21) [[TMP266]], align 4
-; POST-PROCESS-NEXT:    [[TMP267:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP268:%.*]] = add i32 [[TMP267]], -120
-; POST-PROCESS-NEXT:    [[TMP269:%.*]] = add i32 [[TMP268]], 172
-; POST-PROCESS-NEXT:    [[TMP270:%.*]] = inttoptr i32 [[TMP269]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP271:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP270]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP112]], ptr addrspace(21) [[TMP271]], align 4
-; POST-PROCESS-NEXT:    [[TMP272:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP273:%.*]] = add i32 [[TMP272]], -120
-; POST-PROCESS-NEXT:    [[TMP274:%.*]] = add i32 [[TMP273]], 176
-; POST-PROCESS-NEXT:    [[TMP275:%.*]] = inttoptr i32 [[TMP274]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP276:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP275]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP118]], ptr addrspace(21) [[TMP276]], align 4
-; POST-PROCESS-NEXT:    [[TMP277:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP278:%.*]] = add i32 [[TMP277]], -120
-; POST-PROCESS-NEXT:    [[TMP279:%.*]] = add i32 [[TMP278]], 180
-; POST-PROCESS-NEXT:    [[TMP280:%.*]] = inttoptr i32 [[TMP279]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP281:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP280]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP124]], ptr addrspace(21) [[TMP281]], align 4
-; POST-PROCESS-NEXT:    [[TMP282:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP283:%.*]] = add i32 [[TMP282]], -120
-; POST-PROCESS-NEXT:    [[TMP284:%.*]] = add i32 [[TMP283]], 184
-; POST-PROCESS-NEXT:    [[TMP285:%.*]] = inttoptr i32 [[TMP284]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP286:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP285]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP130]], ptr addrspace(21) [[TMP286]], align 4
-; POST-PROCESS-NEXT:    [[TMP287:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP288:%.*]] = add i32 [[TMP287]], -120
-; POST-PROCESS-NEXT:    [[TMP289:%.*]] = add i32 [[TMP288]], 188
-; POST-PROCESS-NEXT:    [[TMP290:%.*]] = inttoptr i32 [[TMP289]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP291:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP290]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP136]], ptr addrspace(21) [[TMP291]], align 4
-; POST-PROCESS-NEXT:    [[TMP292:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP293:%.*]] = add i32 [[TMP292]], -120
-; POST-PROCESS-NEXT:    [[TMP294:%.*]] = add i32 [[TMP293]], 192
-; POST-PROCESS-NEXT:    [[TMP295:%.*]] = inttoptr i32 [[TMP294]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP296:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP295]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP142]], ptr addrspace(21) [[TMP296]], align 4
-; POST-PROCESS-NEXT:    [[TMP297:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP298:%.*]] = add i32 [[TMP297]], -120
-; POST-PROCESS-NEXT:    [[TMP299:%.*]] = add i32 [[TMP298]], 196
-; POST-PROCESS-NEXT:    [[TMP300:%.*]] = inttoptr i32 [[TMP299]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP301:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP300]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP148]], ptr addrspace(21) [[TMP301]], align 4
-; POST-PROCESS-NEXT:    [[TMP302:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP303:%.*]] = add i32 [[TMP302]], -120
-; POST-PROCESS-NEXT:    [[TMP304:%.*]] = add i32 [[TMP303]], 200
-; POST-PROCESS-NEXT:    [[TMP305:%.*]] = inttoptr i32 [[TMP304]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP306:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP305]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP154]], ptr addrspace(21) [[TMP306]], align 4
-; POST-PROCESS-NEXT:    [[TMP307:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP308:%.*]] = add i32 [[TMP307]], -120
-; POST-PROCESS-NEXT:    [[TMP309:%.*]] = add i32 [[TMP308]], 204
-; POST-PROCESS-NEXT:    [[TMP310:%.*]] = inttoptr i32 [[TMP309]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP311:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP310]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP160]], ptr addrspace(21) [[TMP311]], align 4
-; POST-PROCESS-NEXT:    [[TMP312:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP313:%.*]] = add i32 [[TMP312]], -120
-; POST-PROCESS-NEXT:    [[TMP314:%.*]] = add i32 [[TMP313]], 208
-; POST-PROCESS-NEXT:    [[TMP315:%.*]] = inttoptr i32 [[TMP314]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP316:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP315]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP166]], ptr addrspace(21) [[TMP316]], align 4
-; POST-PROCESS-NEXT:    [[TMP317:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP318:%.*]] = add i32 [[TMP317]], -120
-; POST-PROCESS-NEXT:    [[TMP319:%.*]] = add i32 [[TMP318]], 212
-; POST-PROCESS-NEXT:    [[TMP320:%.*]] = inttoptr i32 [[TMP319]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP321:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP320]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP172]], ptr addrspace(21) [[TMP321]], align 4
-; POST-PROCESS-NEXT:    [[TMP322:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP323:%.*]] = add i32 [[TMP322]], -120
-; POST-PROCESS-NEXT:    [[TMP324:%.*]] = add i32 [[TMP323]], 216
-; POST-PROCESS-NEXT:    [[TMP325:%.*]] = inttoptr i32 [[TMP324]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP326:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP325]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP178]], ptr addrspace(21) [[TMP326]], align 4
-; POST-PROCESS-NEXT:    [[TMP327:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP328:%.*]] = add i32 [[TMP327]], -120
-; POST-PROCESS-NEXT:    [[TMP329:%.*]] = add i32 [[TMP328]], 220
-; POST-PROCESS-NEXT:    [[TMP330:%.*]] = inttoptr i32 [[TMP329]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP331:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP330]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP184]], ptr addrspace(21) [[TMP331]], align 4
-; POST-PROCESS-NEXT:    [[TMP332:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP333:%.*]] = add i32 [[TMP332]], -120
-; POST-PROCESS-NEXT:    [[TMP334:%.*]] = add i32 [[TMP333]], 224
-; POST-PROCESS-NEXT:    [[TMP335:%.*]] = inttoptr i32 [[TMP334]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP336:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP335]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP190]], ptr addrspace(21) [[TMP336]], align 4
-; POST-PROCESS-NEXT:    [[TMP337:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP338:%.*]] = add i32 [[TMP337]], 120
-; POST-PROCESS-NEXT:    store i32 [[TMP338]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP339:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP340:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @ClosestHit.resume.0 to i64))
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP339]], i64 [[TMP340]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
+; POST-PROCESS-NEXT:    store i32 [[TMP120]], ptr addrspace(21) [[TMP216]], align 4
+; POST-PROCESS-NEXT:    [[TMP217:%.*]] = add i32 [[TMP148]], 92
+; POST-PROCESS-NEXT:    [[TMP218:%.*]] = inttoptr i32 [[TMP217]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP219:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP218]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP124]], ptr addrspace(21) [[TMP219]], align 4
+; POST-PROCESS-NEXT:    [[TMP220:%.*]] = add i32 [[TMP148]], 96
+; POST-PROCESS-NEXT:    [[TMP221:%.*]] = inttoptr i32 [[TMP220]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP222:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP221]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP128]], ptr addrspace(21) [[TMP222]], align 4
+; POST-PROCESS-NEXT:    [[TMP223:%.*]] = add i32 [[TMP148]], 100
+; POST-PROCESS-NEXT:    [[TMP224:%.*]] = inttoptr i32 [[TMP223]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP225:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP224]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP132]], ptr addrspace(21) [[TMP225]], align 4
+; POST-PROCESS-NEXT:    [[TMP226:%.*]] = add i32 [[TMP148]], 104
+; POST-PROCESS-NEXT:    [[TMP227:%.*]] = inttoptr i32 [[TMP226]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP228:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP227]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP136]], ptr addrspace(21) [[TMP228]], align 4
+; POST-PROCESS-NEXT:    [[TMP229:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP230:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @ClosestHit.resume.0 to i64))
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP229]], i64 [[TMP230]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
@@ -2095,393 +1978,286 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -120
-; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP29:%.*]] = add i32 [[TMP28]], -120
-; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP29]], 120
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP27:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP27]], i32 0
+; POST-PROCESS-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(21) [[TMP28]], align 4
+; POST-PROCESS-NEXT:    [[TMP30:%.*]] = add i32 [[TMP3]], 4
 ; POST-PROCESS-NEXT:    [[TMP31:%.*]] = inttoptr i32 [[TMP30]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP31]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(21) [[TMP32]], align 4
-; POST-PROCESS-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP35:%.*]] = add i32 [[TMP34]], -120
-; POST-PROCESS-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], 124
-; POST-PROCESS-NEXT:    [[TMP37:%.*]] = inttoptr i32 [[TMP36]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP37]], i32 0
-; POST-PROCESS-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(21) [[TMP38]], align 4
-; POST-PROCESS-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], -120
-; POST-PROCESS-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], 128
+; POST-PROCESS-NEXT:    [[TMP34:%.*]] = add i32 [[TMP3]], 8
+; POST-PROCESS-NEXT:    [[TMP35:%.*]] = inttoptr i32 [[TMP34]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP35]], i32 0
+; POST-PROCESS-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(21) [[TMP36]], align 4
+; POST-PROCESS-NEXT:    [[TMP38:%.*]] = add i32 [[TMP3]], 12
+; POST-PROCESS-NEXT:    [[TMP39:%.*]] = inttoptr i32 [[TMP38]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP39]], i32 0
+; POST-PROCESS-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(21) [[TMP40]], align 4
+; POST-PROCESS-NEXT:    [[TMP42:%.*]] = add i32 [[TMP3]], 16
 ; POST-PROCESS-NEXT:    [[TMP43:%.*]] = inttoptr i32 [[TMP42]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP43]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(21) [[TMP44]], align 4
-; POST-PROCESS-NEXT:    [[TMP46:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], -120
-; POST-PROCESS-NEXT:    [[TMP48:%.*]] = add i32 [[TMP47]], 132
-; POST-PROCESS-NEXT:    [[TMP49:%.*]] = inttoptr i32 [[TMP48]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP50:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP49]], i32 0
-; POST-PROCESS-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(21) [[TMP50]], align 4
-; POST-PROCESS-NEXT:    [[TMP52:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP53:%.*]] = add i32 [[TMP52]], -120
-; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP53]], 136
+; POST-PROCESS-NEXT:    [[TMP46:%.*]] = add i32 [[TMP3]], 20
+; POST-PROCESS-NEXT:    [[TMP47:%.*]] = inttoptr i32 [[TMP46]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP47]], i32 0
+; POST-PROCESS-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(21) [[TMP48]], align 4
+; POST-PROCESS-NEXT:    [[TMP50:%.*]] = add i32 [[TMP3]], 24
+; POST-PROCESS-NEXT:    [[TMP51:%.*]] = inttoptr i32 [[TMP50]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP51]], i32 0
+; POST-PROCESS-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(21) [[TMP52]], align 4
+; POST-PROCESS-NEXT:    [[TMP54:%.*]] = add i32 [[TMP3]], 28
 ; POST-PROCESS-NEXT:    [[TMP55:%.*]] = inttoptr i32 [[TMP54]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP55]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(21) [[TMP56]], align 4
-; POST-PROCESS-NEXT:    [[TMP58:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP59:%.*]] = add i32 [[TMP58]], -120
-; POST-PROCESS-NEXT:    [[TMP60:%.*]] = add i32 [[TMP59]], 140
-; POST-PROCESS-NEXT:    [[TMP61:%.*]] = inttoptr i32 [[TMP60]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP61]], i32 0
-; POST-PROCESS-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(21) [[TMP62]], align 4
-; POST-PROCESS-NEXT:    [[TMP64:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP65:%.*]] = add i32 [[TMP64]], -120
-; POST-PROCESS-NEXT:    [[TMP66:%.*]] = add i32 [[TMP65]], 144
+; POST-PROCESS-NEXT:    [[TMP58:%.*]] = add i32 [[TMP3]], 32
+; POST-PROCESS-NEXT:    [[TMP59:%.*]] = inttoptr i32 [[TMP58]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP60:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP59]], i32 0
+; POST-PROCESS-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(21) [[TMP60]], align 4
+; POST-PROCESS-NEXT:    [[TMP62:%.*]] = add i32 [[TMP3]], 36
+; POST-PROCESS-NEXT:    [[TMP63:%.*]] = inttoptr i32 [[TMP62]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP63]], i32 0
+; POST-PROCESS-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(21) [[TMP64]], align 4
+; POST-PROCESS-NEXT:    [[TMP66:%.*]] = add i32 [[TMP3]], 40
 ; POST-PROCESS-NEXT:    [[TMP67:%.*]] = inttoptr i32 [[TMP66]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP67]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(21) [[TMP68]], align 4
-; POST-PROCESS-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP71:%.*]] = add i32 [[TMP70]], -120
-; POST-PROCESS-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], 148
-; POST-PROCESS-NEXT:    [[TMP73:%.*]] = inttoptr i32 [[TMP72]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP74:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP73]], i32 0
-; POST-PROCESS-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(21) [[TMP74]], align 4
-; POST-PROCESS-NEXT:    [[TMP76:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP77:%.*]] = add i32 [[TMP76]], -120
-; POST-PROCESS-NEXT:    [[TMP78:%.*]] = add i32 [[TMP77]], 152
+; POST-PROCESS-NEXT:    [[TMP70:%.*]] = add i32 [[TMP3]], 44
+; POST-PROCESS-NEXT:    [[TMP71:%.*]] = inttoptr i32 [[TMP70]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP72:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP71]], i32 0
+; POST-PROCESS-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(21) [[TMP72]], align 4
+; POST-PROCESS-NEXT:    [[TMP74:%.*]] = add i32 [[TMP3]], 48
+; POST-PROCESS-NEXT:    [[TMP75:%.*]] = inttoptr i32 [[TMP74]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP75]], i32 0
+; POST-PROCESS-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(21) [[TMP76]], align 4
+; POST-PROCESS-NEXT:    [[TMP78:%.*]] = add i32 [[TMP3]], 52
 ; POST-PROCESS-NEXT:    [[TMP79:%.*]] = inttoptr i32 [[TMP78]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP79]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(21) [[TMP80]], align 4
-; POST-PROCESS-NEXT:    [[TMP82:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP83:%.*]] = add i32 [[TMP82]], -120
-; POST-PROCESS-NEXT:    [[TMP84:%.*]] = add i32 [[TMP83]], 156
-; POST-PROCESS-NEXT:    [[TMP85:%.*]] = inttoptr i32 [[TMP84]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP86:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP85]], i32 0
-; POST-PROCESS-NEXT:    [[TMP87:%.*]] = load i32, ptr addrspace(21) [[TMP86]], align 4
-; POST-PROCESS-NEXT:    [[TMP88:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP89:%.*]] = add i32 [[TMP88]], -120
-; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP89]], 160
+; POST-PROCESS-NEXT:    [[TMP82:%.*]] = add i32 [[TMP3]], 56
+; POST-PROCESS-NEXT:    [[TMP83:%.*]] = inttoptr i32 [[TMP82]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP84:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP83]], i32 0
+; POST-PROCESS-NEXT:    [[TMP85:%.*]] = load i32, ptr addrspace(21) [[TMP84]], align 4
+; POST-PROCESS-NEXT:    [[TMP86:%.*]] = add i32 [[TMP3]], 60
+; POST-PROCESS-NEXT:    [[TMP87:%.*]] = inttoptr i32 [[TMP86]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP87]], i32 0
+; POST-PROCESS-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(21) [[TMP88]], align 4
+; POST-PROCESS-NEXT:    [[TMP90:%.*]] = add i32 [[TMP3]], 64
 ; POST-PROCESS-NEXT:    [[TMP91:%.*]] = inttoptr i32 [[TMP90]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP91]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(21) [[TMP92]], align 4
-; POST-PROCESS-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP95:%.*]] = add i32 [[TMP94]], -120
-; POST-PROCESS-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], 164
-; POST-PROCESS-NEXT:    [[TMP97:%.*]] = inttoptr i32 [[TMP96]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP98:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP97]], i32 0
-; POST-PROCESS-NEXT:    [[TMP99:%.*]] = load i32, ptr addrspace(21) [[TMP98]], align 4
-; POST-PROCESS-NEXT:    [[TMP100:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP101:%.*]] = add i32 [[TMP100]], -120
-; POST-PROCESS-NEXT:    [[TMP102:%.*]] = add i32 [[TMP101]], 168
+; POST-PROCESS-NEXT:    [[TMP94:%.*]] = add i32 [[TMP3]], 68
+; POST-PROCESS-NEXT:    [[TMP95:%.*]] = inttoptr i32 [[TMP94]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP96:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP95]], i32 0
+; POST-PROCESS-NEXT:    [[TMP97:%.*]] = load i32, ptr addrspace(21) [[TMP96]], align 4
+; POST-PROCESS-NEXT:    [[TMP98:%.*]] = add i32 [[TMP3]], 72
+; POST-PROCESS-NEXT:    [[TMP99:%.*]] = inttoptr i32 [[TMP98]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP100:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP99]], i32 0
+; POST-PROCESS-NEXT:    [[TMP101:%.*]] = load i32, ptr addrspace(21) [[TMP100]], align 4
+; POST-PROCESS-NEXT:    [[TMP102:%.*]] = add i32 [[TMP3]], 76
 ; POST-PROCESS-NEXT:    [[TMP103:%.*]] = inttoptr i32 [[TMP102]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP103]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(21) [[TMP104]], align 4
-; POST-PROCESS-NEXT:    [[TMP106:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP107:%.*]] = add i32 [[TMP106]], -120
-; POST-PROCESS-NEXT:    [[TMP108:%.*]] = add i32 [[TMP107]], 172
-; POST-PROCESS-NEXT:    [[TMP109:%.*]] = inttoptr i32 [[TMP108]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP110:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP109]], i32 0
-; POST-PROCESS-NEXT:    [[TMP111:%.*]] = load i32, ptr addrspace(21) [[TMP110]], align 4
-; POST-PROCESS-NEXT:    [[TMP112:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP113:%.*]] = add i32 [[TMP112]], -120
-; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP113]], 176
+; POST-PROCESS-NEXT:    [[TMP106:%.*]] = add i32 [[TMP3]], 80
+; POST-PROCESS-NEXT:    [[TMP107:%.*]] = inttoptr i32 [[TMP106]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP108:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP107]], i32 0
+; POST-PROCESS-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(21) [[TMP108]], align 4
+; POST-PROCESS-NEXT:    [[TMP110:%.*]] = add i32 [[TMP3]], 84
+; POST-PROCESS-NEXT:    [[TMP111:%.*]] = inttoptr i32 [[TMP110]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP112:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP111]], i32 0
+; POST-PROCESS-NEXT:    [[TMP113:%.*]] = load i32, ptr addrspace(21) [[TMP112]], align 4
+; POST-PROCESS-NEXT:    [[TMP114:%.*]] = add i32 [[TMP3]], 88
 ; POST-PROCESS-NEXT:    [[TMP115:%.*]] = inttoptr i32 [[TMP114]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP116:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP115]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP117:%.*]] = load i32, ptr addrspace(21) [[TMP116]], align 4
-; POST-PROCESS-NEXT:    [[TMP118:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP119:%.*]] = add i32 [[TMP118]], -120
-; POST-PROCESS-NEXT:    [[TMP120:%.*]] = add i32 [[TMP119]], 180
-; POST-PROCESS-NEXT:    [[TMP121:%.*]] = inttoptr i32 [[TMP120]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP122:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP121]], i32 0
-; POST-PROCESS-NEXT:    [[TMP123:%.*]] = load i32, ptr addrspace(21) [[TMP122]], align 4
-; POST-PROCESS-NEXT:    [[TMP124:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP125:%.*]] = add i32 [[TMP124]], -120
-; POST-PROCESS-NEXT:    [[TMP126:%.*]] = add i32 [[TMP125]], 184
+; POST-PROCESS-NEXT:    [[TMP118:%.*]] = add i32 [[TMP3]], 92
+; POST-PROCESS-NEXT:    [[TMP119:%.*]] = inttoptr i32 [[TMP118]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP120:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP119]], i32 0
+; POST-PROCESS-NEXT:    [[TMP121:%.*]] = load i32, ptr addrspace(21) [[TMP120]], align 4
+; POST-PROCESS-NEXT:    [[TMP122:%.*]] = add i32 [[TMP3]], 96
+; POST-PROCESS-NEXT:    [[TMP123:%.*]] = inttoptr i32 [[TMP122]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP124:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP123]], i32 0
+; POST-PROCESS-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(21) [[TMP124]], align 4
+; POST-PROCESS-NEXT:    [[TMP126:%.*]] = add i32 [[TMP3]], 100
 ; POST-PROCESS-NEXT:    [[TMP127:%.*]] = inttoptr i32 [[TMP126]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP127]], i32 0
 ; POST-PROCESS-NEXT:    [[TMP129:%.*]] = load i32, ptr addrspace(21) [[TMP128]], align 4
-; POST-PROCESS-NEXT:    [[TMP130:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP131:%.*]] = add i32 [[TMP130]], -120
-; POST-PROCESS-NEXT:    [[TMP132:%.*]] = add i32 [[TMP131]], 188
-; POST-PROCESS-NEXT:    [[TMP133:%.*]] = inttoptr i32 [[TMP132]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP134:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP133]], i32 0
-; POST-PROCESS-NEXT:    [[TMP135:%.*]] = load i32, ptr addrspace(21) [[TMP134]], align 4
-; POST-PROCESS-NEXT:    [[TMP136:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP137:%.*]] = add i32 [[TMP136]], -120
-; POST-PROCESS-NEXT:    [[TMP138:%.*]] = add i32 [[TMP137]], 192
-; POST-PROCESS-NEXT:    [[TMP139:%.*]] = inttoptr i32 [[TMP138]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP140:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP139]], i32 0
-; POST-PROCESS-NEXT:    [[TMP141:%.*]] = load i32, ptr addrspace(21) [[TMP140]], align 4
-; POST-PROCESS-NEXT:    [[TMP142:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP143:%.*]] = add i32 [[TMP142]], -120
-; POST-PROCESS-NEXT:    [[TMP144:%.*]] = add i32 [[TMP143]], 196
-; POST-PROCESS-NEXT:    [[TMP145:%.*]] = inttoptr i32 [[TMP144]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP146:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP145]], i32 0
-; POST-PROCESS-NEXT:    [[TMP147:%.*]] = load i32, ptr addrspace(21) [[TMP146]], align 4
-; POST-PROCESS-NEXT:    [[TMP148:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP149:%.*]] = add i32 [[TMP148]], -120
-; POST-PROCESS-NEXT:    [[TMP150:%.*]] = add i32 [[TMP149]], 200
-; POST-PROCESS-NEXT:    [[TMP151:%.*]] = inttoptr i32 [[TMP150]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP152:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP151]], i32 0
-; POST-PROCESS-NEXT:    [[TMP153:%.*]] = load i32, ptr addrspace(21) [[TMP152]], align 4
-; POST-PROCESS-NEXT:    [[TMP154:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP155:%.*]] = add i32 [[TMP154]], -120
-; POST-PROCESS-NEXT:    [[TMP156:%.*]] = add i32 [[TMP155]], 204
-; POST-PROCESS-NEXT:    [[TMP157:%.*]] = inttoptr i32 [[TMP156]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP157]], i32 0
-; POST-PROCESS-NEXT:    [[TMP159:%.*]] = load i32, ptr addrspace(21) [[TMP158]], align 4
-; POST-PROCESS-NEXT:    [[TMP160:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP161:%.*]] = add i32 [[TMP160]], -120
-; POST-PROCESS-NEXT:    [[TMP162:%.*]] = add i32 [[TMP161]], 208
-; POST-PROCESS-NEXT:    [[TMP163:%.*]] = inttoptr i32 [[TMP162]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP164:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP163]], i32 0
-; POST-PROCESS-NEXT:    [[TMP165:%.*]] = load i32, ptr addrspace(21) [[TMP164]], align 4
-; POST-PROCESS-NEXT:    [[TMP166:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP167:%.*]] = add i32 [[TMP166]], -120
-; POST-PROCESS-NEXT:    [[TMP168:%.*]] = add i32 [[TMP167]], 212
-; POST-PROCESS-NEXT:    [[TMP169:%.*]] = inttoptr i32 [[TMP168]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP170:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP169]], i32 0
-; POST-PROCESS-NEXT:    [[TMP171:%.*]] = load i32, ptr addrspace(21) [[TMP170]], align 4
-; POST-PROCESS-NEXT:    [[TMP172:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP173:%.*]] = add i32 [[TMP172]], -120
-; POST-PROCESS-NEXT:    [[TMP174:%.*]] = add i32 [[TMP173]], 216
-; POST-PROCESS-NEXT:    [[TMP175:%.*]] = inttoptr i32 [[TMP174]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP176:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP175]], i32 0
-; POST-PROCESS-NEXT:    [[TMP177:%.*]] = load i32, ptr addrspace(21) [[TMP176]], align 4
-; POST-PROCESS-NEXT:    [[TMP178:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP179:%.*]] = add i32 [[TMP178]], -120
-; POST-PROCESS-NEXT:    [[TMP180:%.*]] = add i32 [[TMP179]], 220
-; POST-PROCESS-NEXT:    [[TMP181:%.*]] = inttoptr i32 [[TMP180]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP182:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP181]], i32 0
-; POST-PROCESS-NEXT:    [[TMP183:%.*]] = load i32, ptr addrspace(21) [[TMP182]], align 4
-; POST-PROCESS-NEXT:    [[TMP184:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP185:%.*]] = add i32 [[TMP184]], -120
-; POST-PROCESS-NEXT:    [[TMP186:%.*]] = add i32 [[TMP185]], 224
-; POST-PROCESS-NEXT:    [[TMP187:%.*]] = inttoptr i32 [[TMP186]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP188:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP187]], i32 0
-; POST-PROCESS-NEXT:    [[TMP189:%.*]] = load i32, ptr addrspace(21) [[TMP188]], align 4
+; POST-PROCESS-NEXT:    [[TMP130:%.*]] = add i32 [[TMP3]], 104
+; POST-PROCESS-NEXT:    [[TMP131:%.*]] = inttoptr i32 [[TMP130]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP132:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP131]], i32 0
+; POST-PROCESS-NEXT:    [[TMP133:%.*]] = load i32, ptr addrspace(21) [[TMP132]], align 4
+; POST-PROCESS-NEXT:    [[TMP134:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; POST-PROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; POST-PROCESS-NEXT:    [[TMP190:%.*]] = add i32 [[TMP4]], 116
-; POST-PROCESS-NEXT:    [[TMP191:%.*]] = inttoptr i32 [[TMP190]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP192:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP191]], i32 0
-; POST-PROCESS-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(21) [[TMP192]], align 4
-; POST-PROCESS-NEXT:    [[TMP193:%.*]] = add i32 [[TMP4]], 108
-; POST-PROCESS-NEXT:    [[TMP194:%.*]] = inttoptr i32 [[TMP193]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP195:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP194]], i32 0
-; POST-PROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[TMP195]], align 4
+; POST-PROCESS-NEXT:    [[TMP135:%.*]] = add i32 [[TMP2]], 116
+; POST-PROCESS-NEXT:    [[TMP136:%.*]] = inttoptr i32 [[TMP135]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP137:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP136]], i32 0
+; POST-PROCESS-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(21) [[TMP137]], align 4
+; POST-PROCESS-NEXT:    [[TMP138:%.*]] = add i32 [[TMP2]], 108
+; POST-PROCESS-NEXT:    [[TMP139:%.*]] = inttoptr i32 [[TMP138]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP140:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP139]], i32 0
+; POST-PROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[TMP140]], align 4
 ; POST-PROCESS-NEXT:    store i32 [[DOTRELOAD]], ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP10]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP19]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP22]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP24]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP25]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP26]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP27]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-NEXT:    [[TMP196:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP197:%.*]] = add i32 [[TMP196]], -120
-; POST-PROCESS-NEXT:    [[TMP198:%.*]] = add i32 [[TMP197]], 120
+; POST-PROCESS-NEXT:    [[TMP141:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP4]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-NEXT:    [[TMP142:%.*]] = inttoptr i32 [[TMP141]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP143:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP142]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP29]], ptr addrspace(21) [[TMP143]], align 4
+; POST-PROCESS-NEXT:    [[TMP144:%.*]] = add i32 [[TMP141]], 4
+; POST-PROCESS-NEXT:    [[TMP145:%.*]] = inttoptr i32 [[TMP144]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP146:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP145]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP33]], ptr addrspace(21) [[TMP146]], align 4
+; POST-PROCESS-NEXT:    [[TMP147:%.*]] = add i32 [[TMP141]], 8
+; POST-PROCESS-NEXT:    [[TMP148:%.*]] = inttoptr i32 [[TMP147]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP149:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP148]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP37]], ptr addrspace(21) [[TMP149]], align 4
+; POST-PROCESS-NEXT:    [[TMP150:%.*]] = add i32 [[TMP141]], 12
+; POST-PROCESS-NEXT:    [[TMP151:%.*]] = inttoptr i32 [[TMP150]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP152:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP151]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP41]], ptr addrspace(21) [[TMP152]], align 4
+; POST-PROCESS-NEXT:    [[TMP153:%.*]] = add i32 [[TMP141]], 16
+; POST-PROCESS-NEXT:    [[TMP154:%.*]] = inttoptr i32 [[TMP153]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP155:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP154]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP45]], ptr addrspace(21) [[TMP155]], align 4
+; POST-PROCESS-NEXT:    [[TMP156:%.*]] = add i32 [[TMP141]], 20
+; POST-PROCESS-NEXT:    [[TMP157:%.*]] = inttoptr i32 [[TMP156]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP157]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP49]], ptr addrspace(21) [[TMP158]], align 4
+; POST-PROCESS-NEXT:    [[TMP159:%.*]] = add i32 [[TMP141]], 24
+; POST-PROCESS-NEXT:    [[TMP160:%.*]] = inttoptr i32 [[TMP159]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP161:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP160]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP53]], ptr addrspace(21) [[TMP161]], align 4
+; POST-PROCESS-NEXT:    [[TMP162:%.*]] = add i32 [[TMP141]], 28
+; POST-PROCESS-NEXT:    [[TMP163:%.*]] = inttoptr i32 [[TMP162]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP164:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP163]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP57]], ptr addrspace(21) [[TMP164]], align 4
+; POST-PROCESS-NEXT:    [[TMP165:%.*]] = add i32 [[TMP141]], 32
+; POST-PROCESS-NEXT:    [[TMP166:%.*]] = inttoptr i32 [[TMP165]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP167:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP166]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP61]], ptr addrspace(21) [[TMP167]], align 4
+; POST-PROCESS-NEXT:    [[TMP168:%.*]] = add i32 [[TMP141]], 36
+; POST-PROCESS-NEXT:    [[TMP169:%.*]] = inttoptr i32 [[TMP168]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP170:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP169]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP65]], ptr addrspace(21) [[TMP170]], align 4
+; POST-PROCESS-NEXT:    [[TMP171:%.*]] = add i32 [[TMP141]], 40
+; POST-PROCESS-NEXT:    [[TMP172:%.*]] = inttoptr i32 [[TMP171]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP173:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP172]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP69]], ptr addrspace(21) [[TMP173]], align 4
+; POST-PROCESS-NEXT:    [[TMP174:%.*]] = add i32 [[TMP141]], 44
+; POST-PROCESS-NEXT:    [[TMP175:%.*]] = inttoptr i32 [[TMP174]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP176:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP175]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP73]], ptr addrspace(21) [[TMP176]], align 4
+; POST-PROCESS-NEXT:    [[TMP177:%.*]] = add i32 [[TMP141]], 48
+; POST-PROCESS-NEXT:    [[TMP178:%.*]] = inttoptr i32 [[TMP177]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP179:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP178]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP77]], ptr addrspace(21) [[TMP179]], align 4
+; POST-PROCESS-NEXT:    [[TMP180:%.*]] = add i32 [[TMP141]], 52
+; POST-PROCESS-NEXT:    [[TMP181:%.*]] = inttoptr i32 [[TMP180]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP182:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP181]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP81]], ptr addrspace(21) [[TMP182]], align 4
+; POST-PROCESS-NEXT:    [[TMP183:%.*]] = add i32 [[TMP141]], 56
+; POST-PROCESS-NEXT:    [[TMP184:%.*]] = inttoptr i32 [[TMP183]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP185:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP184]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP85]], ptr addrspace(21) [[TMP185]], align 4
+; POST-PROCESS-NEXT:    [[TMP186:%.*]] = add i32 [[TMP141]], 60
+; POST-PROCESS-NEXT:    [[TMP187:%.*]] = inttoptr i32 [[TMP186]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP188:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP187]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP89]], ptr addrspace(21) [[TMP188]], align 4
+; POST-PROCESS-NEXT:    [[TMP189:%.*]] = add i32 [[TMP141]], 64
+; POST-PROCESS-NEXT:    [[TMP190:%.*]] = inttoptr i32 [[TMP189]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP191:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP190]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP93]], ptr addrspace(21) [[TMP191]], align 4
+; POST-PROCESS-NEXT:    [[TMP192:%.*]] = add i32 [[TMP141]], 68
+; POST-PROCESS-NEXT:    [[TMP193:%.*]] = inttoptr i32 [[TMP192]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP194:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP193]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP97]], ptr addrspace(21) [[TMP194]], align 4
+; POST-PROCESS-NEXT:    [[TMP195:%.*]] = add i32 [[TMP141]], 72
+; POST-PROCESS-NEXT:    [[TMP196:%.*]] = inttoptr i32 [[TMP195]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP197:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP196]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP101]], ptr addrspace(21) [[TMP197]], align 4
+; POST-PROCESS-NEXT:    [[TMP198:%.*]] = add i32 [[TMP141]], 76
 ; POST-PROCESS-NEXT:    [[TMP199:%.*]] = inttoptr i32 [[TMP198]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP200:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP199]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP33]], ptr addrspace(21) [[TMP200]], align 4
-; POST-PROCESS-NEXT:    [[TMP201:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP202:%.*]] = add i32 [[TMP201]], -120
-; POST-PROCESS-NEXT:    [[TMP203:%.*]] = add i32 [[TMP202]], 124
-; POST-PROCESS-NEXT:    [[TMP204:%.*]] = inttoptr i32 [[TMP203]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP205:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP204]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP39]], ptr addrspace(21) [[TMP205]], align 4
-; POST-PROCESS-NEXT:    [[TMP206:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP207:%.*]] = add i32 [[TMP206]], -120
-; POST-PROCESS-NEXT:    [[TMP208:%.*]] = add i32 [[TMP207]], 128
-; POST-PROCESS-NEXT:    [[TMP209:%.*]] = inttoptr i32 [[TMP208]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP210:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP209]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP45]], ptr addrspace(21) [[TMP210]], align 4
-; POST-PROCESS-NEXT:    [[TMP211:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP212:%.*]] = add i32 [[TMP211]], -120
-; POST-PROCESS-NEXT:    [[TMP213:%.*]] = add i32 [[TMP212]], 132
+; POST-PROCESS-NEXT:    store i32 [[TMP105]], ptr addrspace(21) [[TMP200]], align 4
+; POST-PROCESS-NEXT:    [[TMP201:%.*]] = add i32 [[TMP141]], 80
+; POST-PROCESS-NEXT:    [[TMP202:%.*]] = inttoptr i32 [[TMP201]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP203:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP202]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP109]], ptr addrspace(21) [[TMP203]], align 4
+; POST-PROCESS-NEXT:    [[TMP204:%.*]] = add i32 [[TMP141]], 84
+; POST-PROCESS-NEXT:    [[TMP205:%.*]] = inttoptr i32 [[TMP204]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP206:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP205]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP113]], ptr addrspace(21) [[TMP206]], align 4
+; POST-PROCESS-NEXT:    [[TMP207:%.*]] = add i32 [[TMP141]], 88
+; POST-PROCESS-NEXT:    [[TMP208:%.*]] = inttoptr i32 [[TMP207]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP209:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP208]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP117]], ptr addrspace(21) [[TMP209]], align 4
+; POST-PROCESS-NEXT:    [[TMP210:%.*]] = add i32 [[TMP141]], 92
+; POST-PROCESS-NEXT:    [[TMP211:%.*]] = inttoptr i32 [[TMP210]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP212:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP211]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP121]], ptr addrspace(21) [[TMP212]], align 4
+; POST-PROCESS-NEXT:    [[TMP213:%.*]] = add i32 [[TMP141]], 96
 ; POST-PROCESS-NEXT:    [[TMP214:%.*]] = inttoptr i32 [[TMP213]] to ptr addrspace(21)
 ; POST-PROCESS-NEXT:    [[TMP215:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP214]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP51]], ptr addrspace(21) [[TMP215]], align 4
-; POST-PROCESS-NEXT:    [[TMP216:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP217:%.*]] = add i32 [[TMP216]], -120
-; POST-PROCESS-NEXT:    [[TMP218:%.*]] = add i32 [[TMP217]], 136
-; POST-PROCESS-NEXT:    [[TMP219:%.*]] = inttoptr i32 [[TMP218]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP220:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP219]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP57]], ptr addrspace(21) [[TMP220]], align 4
-; POST-PROCESS-NEXT:    [[TMP221:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP222:%.*]] = add i32 [[TMP221]], -120
-; POST-PROCESS-NEXT:    [[TMP223:%.*]] = add i32 [[TMP222]], 140
-; POST-PROCESS-NEXT:    [[TMP224:%.*]] = inttoptr i32 [[TMP223]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP225:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP224]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP63]], ptr addrspace(21) [[TMP225]], align 4
-; POST-PROCESS-NEXT:    [[TMP226:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP227:%.*]] = add i32 [[TMP226]], -120
-; POST-PROCESS-NEXT:    [[TMP228:%.*]] = add i32 [[TMP227]], 144
-; POST-PROCESS-NEXT:    [[TMP229:%.*]] = inttoptr i32 [[TMP228]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP230:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP229]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP69]], ptr addrspace(21) [[TMP230]], align 4
-; POST-PROCESS-NEXT:    [[TMP231:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP232:%.*]] = add i32 [[TMP231]], -120
-; POST-PROCESS-NEXT:    [[TMP233:%.*]] = add i32 [[TMP232]], 148
-; POST-PROCESS-NEXT:    [[TMP234:%.*]] = inttoptr i32 [[TMP233]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP235:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP234]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP75]], ptr addrspace(21) [[TMP235]], align 4
-; POST-PROCESS-NEXT:    [[TMP236:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP237:%.*]] = add i32 [[TMP236]], -120
-; POST-PROCESS-NEXT:    [[TMP238:%.*]] = add i32 [[TMP237]], 152
-; POST-PROCESS-NEXT:    [[TMP239:%.*]] = inttoptr i32 [[TMP238]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP240:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP239]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP81]], ptr addrspace(21) [[TMP240]], align 4
-; POST-PROCESS-NEXT:    [[TMP241:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP242:%.*]] = add i32 [[TMP241]], -120
-; POST-PROCESS-NEXT:    [[TMP243:%.*]] = add i32 [[TMP242]], 156
-; POST-PROCESS-NEXT:    [[TMP244:%.*]] = inttoptr i32 [[TMP243]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP245:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP244]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP87]], ptr addrspace(21) [[TMP245]], align 4
-; POST-PROCESS-NEXT:    [[TMP246:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP247:%.*]] = add i32 [[TMP246]], -120
-; POST-PROCESS-NEXT:    [[TMP248:%.*]] = add i32 [[TMP247]], 160
-; POST-PROCESS-NEXT:    [[TMP249:%.*]] = inttoptr i32 [[TMP248]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP250:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP249]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP93]], ptr addrspace(21) [[TMP250]], align 4
-; POST-PROCESS-NEXT:    [[TMP251:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP252:%.*]] = add i32 [[TMP251]], -120
-; POST-PROCESS-NEXT:    [[TMP253:%.*]] = add i32 [[TMP252]], 164
-; POST-PROCESS-NEXT:    [[TMP254:%.*]] = inttoptr i32 [[TMP253]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP255:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP254]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP99]], ptr addrspace(21) [[TMP255]], align 4
-; POST-PROCESS-NEXT:    [[TMP256:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP257:%.*]] = add i32 [[TMP256]], -120
-; POST-PROCESS-NEXT:    [[TMP258:%.*]] = add i32 [[TMP257]], 168
-; POST-PROCESS-NEXT:    [[TMP259:%.*]] = inttoptr i32 [[TMP258]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP260:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP259]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP105]], ptr addrspace(21) [[TMP260]], align 4
-; POST-PROCESS-NEXT:    [[TMP261:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP262:%.*]] = add i32 [[TMP261]], -120
-; POST-PROCESS-NEXT:    [[TMP263:%.*]] = add i32 [[TMP262]], 172
-; POST-PROCESS-NEXT:    [[TMP264:%.*]] = inttoptr i32 [[TMP263]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP265:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP264]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP111]], ptr addrspace(21) [[TMP265]], align 4
-; POST-PROCESS-NEXT:    [[TMP266:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP267:%.*]] = add i32 [[TMP266]], -120
-; POST-PROCESS-NEXT:    [[TMP268:%.*]] = add i32 [[TMP267]], 176
-; POST-PROCESS-NEXT:    [[TMP269:%.*]] = inttoptr i32 [[TMP268]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP270:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP269]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP117]], ptr addrspace(21) [[TMP270]], align 4
-; POST-PROCESS-NEXT:    [[TMP271:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP272:%.*]] = add i32 [[TMP271]], -120
-; POST-PROCESS-NEXT:    [[TMP273:%.*]] = add i32 [[TMP272]], 180
-; POST-PROCESS-NEXT:    [[TMP274:%.*]] = inttoptr i32 [[TMP273]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP275:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP274]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP123]], ptr addrspace(21) [[TMP275]], align 4
-; POST-PROCESS-NEXT:    [[TMP276:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP277:%.*]] = add i32 [[TMP276]], -120
-; POST-PROCESS-NEXT:    [[TMP278:%.*]] = add i32 [[TMP277]], 184
-; POST-PROCESS-NEXT:    [[TMP279:%.*]] = inttoptr i32 [[TMP278]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP280:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP279]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP129]], ptr addrspace(21) [[TMP280]], align 4
-; POST-PROCESS-NEXT:    [[TMP281:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP282:%.*]] = add i32 [[TMP281]], -120
-; POST-PROCESS-NEXT:    [[TMP283:%.*]] = add i32 [[TMP282]], 188
-; POST-PROCESS-NEXT:    [[TMP284:%.*]] = inttoptr i32 [[TMP283]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP285:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP284]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP135]], ptr addrspace(21) [[TMP285]], align 4
-; POST-PROCESS-NEXT:    [[TMP286:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP287:%.*]] = add i32 [[TMP286]], -120
-; POST-PROCESS-NEXT:    [[TMP288:%.*]] = add i32 [[TMP287]], 192
-; POST-PROCESS-NEXT:    [[TMP289:%.*]] = inttoptr i32 [[TMP288]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP290:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP289]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP141]], ptr addrspace(21) [[TMP290]], align 4
-; POST-PROCESS-NEXT:    [[TMP291:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP292:%.*]] = add i32 [[TMP291]], -120
-; POST-PROCESS-NEXT:    [[TMP293:%.*]] = add i32 [[TMP292]], 196
-; POST-PROCESS-NEXT:    [[TMP294:%.*]] = inttoptr i32 [[TMP293]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP295:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP294]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP147]], ptr addrspace(21) [[TMP295]], align 4
-; POST-PROCESS-NEXT:    [[TMP296:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP297:%.*]] = add i32 [[TMP296]], -120
-; POST-PROCESS-NEXT:    [[TMP298:%.*]] = add i32 [[TMP297]], 200
-; POST-PROCESS-NEXT:    [[TMP299:%.*]] = inttoptr i32 [[TMP298]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP300:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP299]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP153]], ptr addrspace(21) [[TMP300]], align 4
-; POST-PROCESS-NEXT:    [[TMP301:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP302:%.*]] = add i32 [[TMP301]], -120
-; POST-PROCESS-NEXT:    [[TMP303:%.*]] = add i32 [[TMP302]], 204
-; POST-PROCESS-NEXT:    [[TMP304:%.*]] = inttoptr i32 [[TMP303]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP305:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP304]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP159]], ptr addrspace(21) [[TMP305]], align 4
-; POST-PROCESS-NEXT:    [[TMP306:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP307:%.*]] = add i32 [[TMP306]], -120
-; POST-PROCESS-NEXT:    [[TMP308:%.*]] = add i32 [[TMP307]], 208
-; POST-PROCESS-NEXT:    [[TMP309:%.*]] = inttoptr i32 [[TMP308]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP310:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP309]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP165]], ptr addrspace(21) [[TMP310]], align 4
-; POST-PROCESS-NEXT:    [[TMP311:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP312:%.*]] = add i32 [[TMP311]], -120
-; POST-PROCESS-NEXT:    [[TMP313:%.*]] = add i32 [[TMP312]], 212
-; POST-PROCESS-NEXT:    [[TMP314:%.*]] = inttoptr i32 [[TMP313]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP315:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP314]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP171]], ptr addrspace(21) [[TMP315]], align 4
-; POST-PROCESS-NEXT:    [[TMP316:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP317:%.*]] = add i32 [[TMP316]], -120
-; POST-PROCESS-NEXT:    [[TMP318:%.*]] = add i32 [[TMP317]], 216
-; POST-PROCESS-NEXT:    [[TMP319:%.*]] = inttoptr i32 [[TMP318]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP320:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP319]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP177]], ptr addrspace(21) [[TMP320]], align 4
-; POST-PROCESS-NEXT:    [[TMP321:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP322:%.*]] = add i32 [[TMP321]], -120
-; POST-PROCESS-NEXT:    [[TMP323:%.*]] = add i32 [[TMP322]], 220
-; POST-PROCESS-NEXT:    [[TMP324:%.*]] = inttoptr i32 [[TMP323]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP325:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP324]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP183]], ptr addrspace(21) [[TMP325]], align 4
-; POST-PROCESS-NEXT:    [[TMP326:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-NEXT:    [[TMP327:%.*]] = add i32 [[TMP326]], -120
-; POST-PROCESS-NEXT:    [[TMP328:%.*]] = add i32 [[TMP327]], 224
-; POST-PROCESS-NEXT:    [[TMP329:%.*]] = inttoptr i32 [[TMP328]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP330:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP329]], i32 0
-; POST-PROCESS-NEXT:    store i32 [[TMP189]], ptr addrspace(21) [[TMP330]], align 4
+; POST-PROCESS-NEXT:    store i32 [[TMP125]], ptr addrspace(21) [[TMP215]], align 4
+; POST-PROCESS-NEXT:    [[TMP216:%.*]] = add i32 [[TMP141]], 100
+; POST-PROCESS-NEXT:    [[TMP217:%.*]] = inttoptr i32 [[TMP216]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP218:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP217]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP129]], ptr addrspace(21) [[TMP218]], align 4
+; POST-PROCESS-NEXT:    [[TMP219:%.*]] = add i32 [[TMP141]], 104
+; POST-PROCESS-NEXT:    [[TMP220:%.*]] = inttoptr i32 [[TMP219]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP221:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP220]], i32 0
+; POST-PROCESS-NEXT:    store i32 [[TMP133]], ptr addrspace(21) [[TMP221]], align 4
 ; POST-PROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
-; POST-PROCESS-NEXT:    [[TMP331:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP331]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
+; POST-PROCESS-NEXT:    [[TMP222:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP223:%.*]] = add i32 [[TMP222]], -120
+; POST-PROCESS-NEXT:    store i32 [[TMP223]], ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP224:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP224]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
@@ -2505,184 +2281,128 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP1:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP2:%.*]] = inttoptr i64 [[TMP1]] to ptr addrspace(22)
-; POST-PROCESS-GLOBAL-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @_cont_SetupRayGen()
+; POST-PROCESS-GLOBAL-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[_CONT_SETUPRAYGEN:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]]()
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 108
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP4]], ptr [[CSP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP5]])
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP5]])
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP8]])
 ; POST-PROCESS-GLOBAL-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP4]], ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP3]], ptr addrspace(20) @REGISTERS, align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = add i32 [[TMP11]], 120
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP10]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP11]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = add i32 [[TMP10]], 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP12]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP13]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = add i32 [[TMP14]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = add i32 [[TMP15]], 124
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = add i32 [[TMP10]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP14]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP15]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = add i32 [[TMP10]], 12
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP16]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP17]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = add i32 [[TMP18]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = add i32 [[TMP19]], 128
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = add i32 [[TMP10]], 16
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP18]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP19]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = add i32 [[TMP10]], 20
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP20]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP21]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = add i32 [[TMP22]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = add i32 [[TMP23]], 132
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = add i32 [[TMP10]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP22]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP23]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = add i32 [[TMP10]], 28
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP24]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP25]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = add i32 [[TMP26]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = add i32 [[TMP27]], 136
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = add i32 [[TMP10]], 32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP26]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP27]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = add i32 [[TMP10]], 36
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP28]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP29]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP30]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = add i32 [[TMP31]], 140
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = add i32 [[TMP10]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP30]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP31]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = add i32 [[TMP10]], 44
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP32]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP33]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = add i32 [[TMP34]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], 144
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = add i32 [[TMP10]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP34]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP35]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = add i32 [[TMP10]], 52
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP36]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP37]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = add i32 [[TMP38]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = add i32 [[TMP39]], 148
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = add i32 [[TMP10]], 56
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP38]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP39]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = add i32 [[TMP10]], 60
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP40]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP41]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = add i32 [[TMP42]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = add i32 [[TMP43]], 152
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = add i32 [[TMP10]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP42]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP43]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = add i32 [[TMP10]], 68
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP44]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP45]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = add i32 [[TMP47]], 156
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP10]], 72
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP46]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP47]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = add i32 [[TMP10]], 76
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP48]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP49]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP51]], 160
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = add i32 [[TMP10]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP50]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP51]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP10]], 84
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP52]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP53]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = add i32 [[TMP54]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = add i32 [[TMP55]], 164
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = add i32 [[TMP10]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP54]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP55]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = add i32 [[TMP10]], 92
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP56]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP57]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = add i32 [[TMP58]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = add i32 [[TMP59]], 168
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = add i32 [[TMP10]], 96
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP58]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP59]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = add i32 [[TMP10]], 100
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP60]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP61]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = add i32 [[TMP62]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = add i32 [[TMP63]], 172
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP64]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP65]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP66]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = add i32 [[TMP67]], 176
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP68]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP69]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = add i32 [[TMP70]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP72]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP73]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = add i32 [[TMP74]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP75]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP76]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP77]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = add i32 [[TMP78]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = add i32 [[TMP79]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP80]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP81]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = add i32 [[TMP82]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = add i32 [[TMP83]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP84]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP85]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = add i32 [[TMP86]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = add i32 [[TMP87]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP88]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP89]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP90]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = add i32 [[TMP91]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP92]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP93]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = add i32 [[TMP94]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP96]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP97]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = add i32 [[TMP98]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = add i32 [[TMP99]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP100]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP101]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = add i32 [[TMP102]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = add i32 [[TMP103]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP104]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP105]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = add i32 [[TMP106]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = add i32 [[TMP107]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP108]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP109]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = add i32 [[TMP110]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = add i32 [[TMP111]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP112]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP113]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = add i32 [[TMP114]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = add i32 [[TMP115]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP116]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP117]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = add i32 [[TMP118]], 108
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP119]], ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @main.resume.0 to i64))
-; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP120]], i64 [[TMP121]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount !18
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = add i32 [[TMP10]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP62]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 undef, ptr addrspace(22) [[TMP63]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @main.resume.0 to i64))
+; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP64]], i64 [[TMP65]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount !18
 ; POST-PROCESS-GLOBAL-NEXT:    unreachable
 ;
 ;
@@ -2695,169 +2415,116 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP2:%.*]] = inttoptr i64 [[TMP1]] to ptr addrspace(22)
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -108
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP4]], ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP30]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = add i32 [[TMP31]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP32]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(22) [[TMP33]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = add i32 [[TMP36]], 124
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP5]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(22) [[TMP29]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP5]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP31]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(22) [[TMP32]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = add i32 [[TMP5]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP34]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = load i32, ptr addrspace(22) [[TMP35]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = add i32 [[TMP5]], 12
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP37]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(22) [[TMP38]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], 128
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP42]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = load i32, ptr addrspace(22) [[TMP43]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP45]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP47]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(22) [[TMP48]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP51]], 136
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = add i32 [[TMP5]], 16
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP40]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = load i32, ptr addrspace(22) [[TMP41]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = add i32 [[TMP5]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP43]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(22) [[TMP44]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP5]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP46]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = load i32, ptr addrspace(22) [[TMP47]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = add i32 [[TMP5]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP49]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(22) [[TMP50]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP5]], 32
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP52]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = load i32, ptr addrspace(22) [[TMP53]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = add i32 [[TMP55]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = add i32 [[TMP56]], 140
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP57]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(22) [[TMP58]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = add i32 [[TMP60]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = add i32 [[TMP61]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP62]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = load i32, ptr addrspace(22) [[TMP63]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = add i32 [[TMP65]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP66]], 148
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = add i32 [[TMP5]], 36
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP55]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(22) [[TMP56]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = add i32 [[TMP5]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP58]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(22) [[TMP59]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = add i32 [[TMP5]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP61]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(22) [[TMP62]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = add i32 [[TMP5]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP64]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = load i32, ptr addrspace(22) [[TMP65]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP5]], 52
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP67]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(22) [[TMP68]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = add i32 [[TMP70]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], 152
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP72]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = load i32, ptr addrspace(22) [[TMP73]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP75]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = add i32 [[TMP76]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP77]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = load i32, ptr addrspace(22) [[TMP78]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = add i32 [[TMP80]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = add i32 [[TMP81]], 160
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = add i32 [[TMP5]], 56
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP70]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = load i32, ptr addrspace(22) [[TMP71]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = add i32 [[TMP5]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP73]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(22) [[TMP74]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP5]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP76]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(22) [[TMP77]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = add i32 [[TMP5]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP79]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(22) [[TMP80]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = add i32 [[TMP5]], 72
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP82]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = load i32, ptr addrspace(22) [[TMP83]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = add i32 [[TMP85]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = add i32 [[TMP86]], 164
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP87]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(22) [[TMP88]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP90]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = add i32 [[TMP91]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP92]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(22) [[TMP93]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = add i32 [[TMP96]], 172
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = add i32 [[TMP5]], 76
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP85]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = load i32, ptr addrspace(22) [[TMP86]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = add i32 [[TMP5]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP88]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(22) [[TMP89]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP5]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP91]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(22) [[TMP92]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = add i32 [[TMP5]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP94]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = load i32, ptr addrspace(22) [[TMP95]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = add i32 [[TMP5]], 92
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP97]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = load i32, ptr addrspace(22) [[TMP98]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = add i32 [[TMP100]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = add i32 [[TMP101]], 176
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP102]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = load i32, ptr addrspace(22) [[TMP103]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = add i32 [[TMP105]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = add i32 [[TMP106]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP107]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(22) [[TMP108]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = add i32 [[TMP110]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = add i32 [[TMP111]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP112]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = load i32, ptr addrspace(22) [[TMP113]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = add i32 [[TMP115]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = add i32 [[TMP116]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP117]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = load i32, ptr addrspace(22) [[TMP118]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = add i32 [[TMP120]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = add i32 [[TMP121]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP122]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = load i32, ptr addrspace(22) [[TMP123]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = add i32 [[TMP125]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = add i32 [[TMP126]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP127]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = load i32, ptr addrspace(22) [[TMP128]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = add i32 [[TMP130]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = add i32 [[TMP131]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP132]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = load i32, ptr addrspace(22) [[TMP133]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = add i32 [[TMP135]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = add i32 [[TMP136]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP137]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = load i32, ptr addrspace(22) [[TMP138]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = add i32 [[TMP140]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = add i32 [[TMP141]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP142]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = load i32, ptr addrspace(22) [[TMP143]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = add i32 [[TMP145]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = add i32 [[TMP146]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP147]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = load i32, ptr addrspace(22) [[TMP148]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = add i32 [[TMP150]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = add i32 [[TMP151]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP152]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = load i32, ptr addrspace(22) [[TMP153]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = add i32 [[TMP155]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = add i32 [[TMP156]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP157]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = load i32, ptr addrspace(22) [[TMP158]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = add i32 [[TMP160]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = add i32 [[TMP161]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP162]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = load i32, ptr addrspace(22) [[TMP163]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = add i32 [[TMP5]], 96
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP100]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = load i32, ptr addrspace(22) [[TMP101]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = add i32 [[TMP5]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP103]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(22) [[TMP104]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = add i32 [[TMP5]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP106]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = load i32, ptr addrspace(22) [[TMP107]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = add i32 [[TMP110]], -108
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP111]], ptr [[CSP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    ret void
 ; POST-PROCESS-GLOBAL:       entryresume.0.split:
 ; POST-PROCESS-GLOBAL-NEXT:    unreachable
@@ -2902,346 +2569,238 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_1_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 [[DOTFCA_1_1_EXTRACT]], ptr [[DOTFCA_1_1_GEP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = add i32 [[TMP28]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = add i32 [[TMP29]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP30]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(22) [[TMP31]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = add i32 [[TMP33]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = add i32 [[TMP34]], 124
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP35]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = load i32, ptr addrspace(22) [[TMP36]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = add i32 [[TMP38]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = add i32 [[TMP39]], 128
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP5]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(22) [[TMP29]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP5]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP31]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(22) [[TMP32]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = add i32 [[TMP5]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP34]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = load i32, ptr addrspace(22) [[TMP35]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = add i32 [[TMP5]], 12
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP37]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(22) [[TMP38]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = add i32 [[TMP5]], 16
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP40]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = load i32, ptr addrspace(22) [[TMP41]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = add i32 [[TMP43]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = add i32 [[TMP44]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP45]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(22) [[TMP46]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = add i32 [[TMP48]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = add i32 [[TMP49]], 136
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP50]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = load i32, ptr addrspace(22) [[TMP51]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = add i32 [[TMP53]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = add i32 [[TMP54]], 140
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = add i32 [[TMP5]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP43]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(22) [[TMP44]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP5]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP46]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = load i32, ptr addrspace(22) [[TMP47]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = add i32 [[TMP5]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP49]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(22) [[TMP50]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP5]], 32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP52]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = load i32, ptr addrspace(22) [[TMP53]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = add i32 [[TMP5]], 36
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP55]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(22) [[TMP56]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = add i32 [[TMP58]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = add i32 [[TMP59]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP60]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = load i32, ptr addrspace(22) [[TMP61]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = add i32 [[TMP63]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = add i32 [[TMP64]], 148
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP65]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(22) [[TMP66]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = add i32 [[TMP68]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = add i32 [[TMP69]], 152
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = add i32 [[TMP5]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP58]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(22) [[TMP59]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = add i32 [[TMP5]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP61]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(22) [[TMP62]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = add i32 [[TMP5]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP64]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = load i32, ptr addrspace(22) [[TMP65]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP5]], 52
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP67]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(22) [[TMP68]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = add i32 [[TMP5]], 56
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP70]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = load i32, ptr addrspace(22) [[TMP71]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = add i32 [[TMP73]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = add i32 [[TMP74]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP75]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(22) [[TMP76]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = add i32 [[TMP78]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = add i32 [[TMP79]], 160
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP80]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = load i32, ptr addrspace(22) [[TMP81]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = add i32 [[TMP83]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = add i32 [[TMP84]], 164
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = add i32 [[TMP5]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP73]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(22) [[TMP74]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP5]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP76]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(22) [[TMP77]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = add i32 [[TMP5]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP79]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(22) [[TMP80]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = add i32 [[TMP5]], 72
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP82]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = load i32, ptr addrspace(22) [[TMP83]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = add i32 [[TMP5]], 76
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP85]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = load i32, ptr addrspace(22) [[TMP86]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = add i32 [[TMP88]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = add i32 [[TMP89]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP90]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = load i32, ptr addrspace(22) [[TMP91]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = add i32 [[TMP93]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = add i32 [[TMP94]], 172
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP95]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = load i32, ptr addrspace(22) [[TMP96]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = add i32 [[TMP98]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = add i32 [[TMP99]], 176
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = add i32 [[TMP5]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP88]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(22) [[TMP89]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP5]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP91]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(22) [[TMP92]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = add i32 [[TMP5]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP94]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = load i32, ptr addrspace(22) [[TMP95]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = add i32 [[TMP5]], 92
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP97]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = load i32, ptr addrspace(22) [[TMP98]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = add i32 [[TMP5]], 96
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP100]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = load i32, ptr addrspace(22) [[TMP101]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = add i32 [[TMP103]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = add i32 [[TMP104]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP105]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = load i32, ptr addrspace(22) [[TMP106]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = add i32 [[TMP108]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = add i32 [[TMP109]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP110]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = load i32, ptr addrspace(22) [[TMP111]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = add i32 [[TMP113]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = add i32 [[TMP114]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP115]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = load i32, ptr addrspace(22) [[TMP116]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = add i32 [[TMP118]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = add i32 [[TMP119]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP120]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = load i32, ptr addrspace(22) [[TMP121]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = add i32 [[TMP123]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = add i32 [[TMP124]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP125]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = load i32, ptr addrspace(22) [[TMP126]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = add i32 [[TMP128]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = add i32 [[TMP129]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP130]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = load i32, ptr addrspace(22) [[TMP131]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = add i32 [[TMP133]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = add i32 [[TMP134]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP135]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = load i32, ptr addrspace(22) [[TMP136]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = add i32 [[TMP138]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = add i32 [[TMP139]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP140]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = load i32, ptr addrspace(22) [[TMP141]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = add i32 [[TMP143]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = add i32 [[TMP144]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP145]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = load i32, ptr addrspace(22) [[TMP146]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = add i32 [[TMP148]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = add i32 [[TMP149]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP150]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = load i32, ptr addrspace(22) [[TMP151]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = add i32 [[TMP153]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = add i32 [[TMP154]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP155]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = load i32, ptr addrspace(22) [[TMP156]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = add i32 [[TMP158]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = add i32 [[TMP159]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP160]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = load i32, ptr addrspace(22) [[TMP161]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; POST-PROCESS-GLOBAL-NEXT:    [[ADDR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP163]], i32 0, i32 1
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = add i32 [[TMP5]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP103]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(22) [[TMP104]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = add i32 [[TMP5]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP106]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = load i32, ptr addrspace(22) [[TMP107]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; POST-PROCESS-GLOBAL-NEXT:    [[ADDR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP109]], i32 0, i32 1
 ; POST-PROCESS-GLOBAL-NEXT:    [[VAL_I_FCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[ADDR_I]], i32 0, i32 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[VAL_I_FCA_0_LOAD:%.*]] = load <2 x float>, ptr [[VAL_I_FCA_0_GEP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[VAL_I_FCA_0_LOAD]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_011_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = bitcast float [[DOTSROA_011_0_VEC_EXTRACT]] to i32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = bitcast float [[DOTSROA_011_0_VEC_EXTRACT]] to i32
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_011_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP165:%.*]] = bitcast float [[DOTSROA_011_4_VEC_EXTRACT]] to i32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = bitcast float [[DOTSROA_011_4_VEC_EXTRACT]] to i32
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; POST-PROCESS-GLOBAL-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP5]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP6]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP8]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP9]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP10]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP11]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP13]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP14]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP15]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP16]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP17]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP18]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP19]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP20]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP21]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP22]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP23]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP24]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP25]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP26]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP27]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP166:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP167:%.*]] = add i32 [[TMP166]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP168:%.*]] = add i32 [[TMP167]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP169:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP168]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP32]], ptr addrspace(22) [[TMP169]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP170:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP171:%.*]] = add i32 [[TMP170]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP172:%.*]] = add i32 [[TMP171]], 124
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP173:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP172]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP37]], ptr addrspace(22) [[TMP173]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP174:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP175:%.*]] = add i32 [[TMP174]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP176:%.*]] = add i32 [[TMP175]], 128
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP177:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP176]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP42]], ptr addrspace(22) [[TMP177]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP178:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP179:%.*]] = add i32 [[TMP178]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP180:%.*]] = add i32 [[TMP179]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP181:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP180]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP47]], ptr addrspace(22) [[TMP181]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP182:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP183:%.*]] = add i32 [[TMP182]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP184:%.*]] = add i32 [[TMP183]], 136
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP185:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP184]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP52]], ptr addrspace(22) [[TMP185]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP186:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP187:%.*]] = add i32 [[TMP186]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP188:%.*]] = add i32 [[TMP187]], 140
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP189:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP188]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP57]], ptr addrspace(22) [[TMP189]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP190:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP191:%.*]] = add i32 [[TMP190]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP192:%.*]] = add i32 [[TMP191]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP193:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP192]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP62]], ptr addrspace(22) [[TMP193]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP194:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP195:%.*]] = add i32 [[TMP194]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP196:%.*]] = add i32 [[TMP195]], 148
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP197:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP196]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP67]], ptr addrspace(22) [[TMP197]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP198:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP199:%.*]] = add i32 [[TMP198]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP200:%.*]] = add i32 [[TMP199]], 152
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP201:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP200]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP72]], ptr addrspace(22) [[TMP201]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP202:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP203:%.*]] = add i32 [[TMP202]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP204:%.*]] = add i32 [[TMP203]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP205:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP204]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP77]], ptr addrspace(22) [[TMP205]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP206:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP207:%.*]] = add i32 [[TMP206]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP208:%.*]] = add i32 [[TMP207]], 160
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP209:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP208]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP82]], ptr addrspace(22) [[TMP209]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP210:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP211:%.*]] = add i32 [[TMP210]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP212:%.*]] = add i32 [[TMP211]], 164
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP213:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP212]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP87]], ptr addrspace(22) [[TMP213]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP214:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP215:%.*]] = add i32 [[TMP214]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP216:%.*]] = add i32 [[TMP215]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP217:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP216]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP92]], ptr addrspace(22) [[TMP217]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP218:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP219:%.*]] = add i32 [[TMP218]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP220:%.*]] = add i32 [[TMP219]], 172
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP221:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP220]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP97]], ptr addrspace(22) [[TMP221]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP222:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP223:%.*]] = add i32 [[TMP222]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP224:%.*]] = add i32 [[TMP223]], 176
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP225:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP224]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP102]], ptr addrspace(22) [[TMP225]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP226:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP227:%.*]] = add i32 [[TMP226]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP228:%.*]] = add i32 [[TMP227]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP229:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP228]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP107]], ptr addrspace(22) [[TMP229]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP230:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP231:%.*]] = add i32 [[TMP230]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP232:%.*]] = add i32 [[TMP231]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP233:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP232]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP112]], ptr addrspace(22) [[TMP233]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP234:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP235:%.*]] = add i32 [[TMP234]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP236:%.*]] = add i32 [[TMP235]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP237:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP236]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP117]], ptr addrspace(22) [[TMP237]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP238:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP239:%.*]] = add i32 [[TMP238]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP240:%.*]] = add i32 [[TMP239]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP241:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP240]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP122]], ptr addrspace(22) [[TMP241]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP242:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP243:%.*]] = add i32 [[TMP242]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP244:%.*]] = add i32 [[TMP243]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP245:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP244]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP127]], ptr addrspace(22) [[TMP245]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP246:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP247:%.*]] = add i32 [[TMP246]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP248:%.*]] = add i32 [[TMP247]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP249:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP248]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP132]], ptr addrspace(22) [[TMP249]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP250:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP251:%.*]] = add i32 [[TMP250]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP252:%.*]] = add i32 [[TMP251]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP253:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP252]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP137]], ptr addrspace(22) [[TMP253]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP254:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP255:%.*]] = add i32 [[TMP254]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP256:%.*]] = add i32 [[TMP255]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP257:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP256]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP142]], ptr addrspace(22) [[TMP257]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP258:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP259:%.*]] = add i32 [[TMP258]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP260:%.*]] = add i32 [[TMP259]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP261:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP260]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP147]], ptr addrspace(22) [[TMP261]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP262:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP263:%.*]] = add i32 [[TMP262]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP264:%.*]] = add i32 [[TMP263]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP265:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP264]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP152]], ptr addrspace(22) [[TMP265]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP266:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP267:%.*]] = add i32 [[TMP266]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP268:%.*]] = add i32 [[TMP267]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP269:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP268]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP157]], ptr addrspace(22) [[TMP269]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP270:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP271:%.*]] = add i32 [[TMP270]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP272:%.*]] = add i32 [[TMP271]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP273:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP272]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP162]], ptr addrspace(22) [[TMP273]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP27]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP28]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP112]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP30]], ptr addrspace(22) [[TMP113]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = add i32 [[TMP112]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP114]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP33]], ptr addrspace(22) [[TMP115]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = add i32 [[TMP112]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP116]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP36]], ptr addrspace(22) [[TMP117]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = add i32 [[TMP112]], 12
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP118]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP39]], ptr addrspace(22) [[TMP119]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = add i32 [[TMP112]], 16
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP120]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP42]], ptr addrspace(22) [[TMP121]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = add i32 [[TMP112]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP122]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP45]], ptr addrspace(22) [[TMP123]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = add i32 [[TMP112]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP124]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP48]], ptr addrspace(22) [[TMP125]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = add i32 [[TMP112]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP126]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP51]], ptr addrspace(22) [[TMP127]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = add i32 [[TMP112]], 32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP128]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP54]], ptr addrspace(22) [[TMP129]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = add i32 [[TMP112]], 36
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP130]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP57]], ptr addrspace(22) [[TMP131]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = add i32 [[TMP112]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP132]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP60]], ptr addrspace(22) [[TMP133]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = add i32 [[TMP112]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP134]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP63]], ptr addrspace(22) [[TMP135]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = add i32 [[TMP112]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP136]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP66]], ptr addrspace(22) [[TMP137]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = add i32 [[TMP112]], 52
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP138]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP69]], ptr addrspace(22) [[TMP139]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = add i32 [[TMP112]], 56
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP140]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP72]], ptr addrspace(22) [[TMP141]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = add i32 [[TMP112]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP142]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP75]], ptr addrspace(22) [[TMP143]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = add i32 [[TMP112]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP144]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP78]], ptr addrspace(22) [[TMP145]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = add i32 [[TMP112]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP146]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP81]], ptr addrspace(22) [[TMP147]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = add i32 [[TMP112]], 72
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP148]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP84]], ptr addrspace(22) [[TMP149]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = add i32 [[TMP112]], 76
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP150]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP87]], ptr addrspace(22) [[TMP151]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = add i32 [[TMP112]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP152]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP90]], ptr addrspace(22) [[TMP153]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = add i32 [[TMP112]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP154]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP93]], ptr addrspace(22) [[TMP155]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = add i32 [[TMP112]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP156]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP96]], ptr addrspace(22) [[TMP157]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = add i32 [[TMP112]], 92
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP158]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP99]], ptr addrspace(22) [[TMP159]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = add i32 [[TMP112]], 96
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP160]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP102]], ptr addrspace(22) [[TMP161]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = add i32 [[TMP112]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP162]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP105]], ptr addrspace(22) [[TMP163]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = add i32 [[TMP112]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP165:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP164]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP108]], ptr addrspace(22) [[TMP165]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP274:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP275:%.*]] = bitcast i32 [[TMP274]] to float
-; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_012_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP275]], i32 0
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP166:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP167:%.*]] = bitcast i32 [[TMP166]] to float
+; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_012_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP167]], i32 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 1
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP276:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP277:%.*]] = bitcast i32 [[TMP276]] to float
-; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_012_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_012_0_VEC_INSERT]], float [[TMP277]], i32 1
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP168:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP169:%.*]] = bitcast i32 [[TMP168]] to float
+; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_012_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_012_0_VEC_INSERT]], float [[TMP169]], i32 1
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[DOTSROA_012_4_VEC_INSERT]], 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP278:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; POST-PROCESS-GLOBAL-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP278]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP170:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; POST-PROCESS-GLOBAL-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP170]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_0_0_0_GEP1:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0, i32 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_0_0_0_LOAD:%.*]] = load <3 x i32>, ptr [[DOTFCA_0_0_0_0_GEP1]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] poison, <3 x i32> [[DOTFCA_0_0_0_0_LOAD]], 0, 0, 0, 0
@@ -3272,8 +2831,8 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_1_1_GEP10:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_1_1_LOAD:%.*]] = load i32, ptr [[DOTFCA_1_1_GEP10]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_1_1_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_0_INSERT]], i32 [[DOTFCA_1_1_LOAD]], 1, 1
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP279:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP279]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META18]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP171:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP171]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META18]]
 ; POST-PROCESS-GLOBAL-NEXT:    unreachable
 ;
 ;
@@ -3285,354 +2844,244 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP1:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP2:%.*]] = inttoptr i64 [[TMP1]] to ptr addrspace(22)
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = add i32 [[TMP4]], 108
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 120
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP4]], ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = add i32 [[TMP3]], 108
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP5]]
 ; POST-PROCESS-GLOBAL-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(22) [[TMP6]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 1, 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP30]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = add i32 [[TMP31]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP32]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(22) [[TMP33]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = add i32 [[TMP36]], 124
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP37]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(22) [[TMP38]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], 128
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP7]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(22) [[TMP31]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = add i32 [[TMP7]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP33]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(22) [[TMP34]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = add i32 [[TMP7]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP36]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = load i32, ptr addrspace(22) [[TMP37]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = add i32 [[TMP7]], 12
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP39]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = load i32, ptr addrspace(22) [[TMP40]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = add i32 [[TMP7]], 16
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP42]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = load i32, ptr addrspace(22) [[TMP43]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP45]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP47]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(22) [[TMP48]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP51]], 136
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP52]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = load i32, ptr addrspace(22) [[TMP53]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = add i32 [[TMP55]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = add i32 [[TMP56]], 140
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = add i32 [[TMP7]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP45]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(22) [[TMP46]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = add i32 [[TMP7]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP48]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(22) [[TMP49]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = add i32 [[TMP7]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP51]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(22) [[TMP52]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = add i32 [[TMP7]], 32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP54]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = load i32, ptr addrspace(22) [[TMP55]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = add i32 [[TMP7]], 36
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP57]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(22) [[TMP58]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = add i32 [[TMP60]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = add i32 [[TMP61]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP62]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = load i32, ptr addrspace(22) [[TMP63]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = add i32 [[TMP65]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP66]], 148
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP67]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(22) [[TMP68]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = add i32 [[TMP70]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], 152
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = add i32 [[TMP7]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP60]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = load i32, ptr addrspace(22) [[TMP61]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = add i32 [[TMP7]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP63]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(22) [[TMP64]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = add i32 [[TMP7]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP66]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = load i32, ptr addrspace(22) [[TMP67]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = add i32 [[TMP7]], 52
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP69]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = load i32, ptr addrspace(22) [[TMP70]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = add i32 [[TMP7]], 56
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP72]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = load i32, ptr addrspace(22) [[TMP73]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP75]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = add i32 [[TMP76]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP77]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = load i32, ptr addrspace(22) [[TMP78]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = add i32 [[TMP80]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = add i32 [[TMP81]], 160
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP82]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = load i32, ptr addrspace(22) [[TMP83]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = add i32 [[TMP85]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = add i32 [[TMP86]], 164
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = add i32 [[TMP7]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP75]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = load i32, ptr addrspace(22) [[TMP76]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = add i32 [[TMP7]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP78]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(22) [[TMP79]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = add i32 [[TMP7]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP81]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = load i32, ptr addrspace(22) [[TMP82]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = add i32 [[TMP7]], 72
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP84]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = load i32, ptr addrspace(22) [[TMP85]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = add i32 [[TMP7]], 76
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP87]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(22) [[TMP88]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP90]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = add i32 [[TMP91]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP92]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(22) [[TMP93]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = add i32 [[TMP96]], 172
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP97]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = load i32, ptr addrspace(22) [[TMP98]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = add i32 [[TMP100]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = add i32 [[TMP101]], 176
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = add i32 [[TMP7]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP90]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = load i32, ptr addrspace(22) [[TMP91]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = add i32 [[TMP7]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP93]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = load i32, ptr addrspace(22) [[TMP94]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = add i32 [[TMP7]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP96]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = load i32, ptr addrspace(22) [[TMP97]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = add i32 [[TMP7]], 92
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP99]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = load i32, ptr addrspace(22) [[TMP100]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = add i32 [[TMP7]], 96
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP102]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = load i32, ptr addrspace(22) [[TMP103]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = add i32 [[TMP105]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = add i32 [[TMP106]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP107]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(22) [[TMP108]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = add i32 [[TMP110]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = add i32 [[TMP111]], 184
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = add i32 [[TMP7]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP105]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = load i32, ptr addrspace(22) [[TMP106]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = add i32 [[TMP7]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP108]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = load i32, ptr addrspace(22) [[TMP109]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = add i32 [[TMP3]], 116
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP112]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = load i32, ptr addrspace(22) [[TMP113]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = add i32 [[TMP115]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = add i32 [[TMP116]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP117]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = load i32, ptr addrspace(22) [[TMP118]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = add i32 [[TMP120]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = add i32 [[TMP121]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP122]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = load i32, ptr addrspace(22) [[TMP123]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = add i32 [[TMP125]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = add i32 [[TMP126]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP127]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = load i32, ptr addrspace(22) [[TMP128]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = add i32 [[TMP130]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = add i32 [[TMP131]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP132]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = load i32, ptr addrspace(22) [[TMP133]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = add i32 [[TMP135]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = add i32 [[TMP136]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP137]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = load i32, ptr addrspace(22) [[TMP138]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = add i32 [[TMP140]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = add i32 [[TMP141]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP142]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = load i32, ptr addrspace(22) [[TMP143]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = add i32 [[TMP145]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = add i32 [[TMP146]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP147]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = load i32, ptr addrspace(22) [[TMP148]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = add i32 [[TMP150]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = add i32 [[TMP151]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP152]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = load i32, ptr addrspace(22) [[TMP153]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = add i32 [[TMP155]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = add i32 [[TMP156]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP157]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = load i32, ptr addrspace(22) [[TMP158]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = add i32 [[TMP160]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = add i32 [[TMP161]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP162]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = load i32, ptr addrspace(22) [[TMP163]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP165:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP166:%.*]] = add i32 [[TMP4]], 116
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP167:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP166]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP165]], ptr addrspace(22) [[TMP167]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP111]], ptr addrspace(22) [[TMP113]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] poison, <2 x float> [[DOTFCA_1_0_EXTRACT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_053_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP168:%.*]] = bitcast float [[DOTSROA_053_0_VEC_EXTRACT]] to i32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = bitcast float [[DOTSROA_053_0_VEC_EXTRACT]] to i32
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTSROA_053_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP169:%.*]] = bitcast float [[DOTSROA_053_4_VEC_EXTRACT]] to i32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = bitcast float [[DOTSROA_053_4_VEC_EXTRACT]] to i32
 ; POST-PROCESS-GLOBAL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP170:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP171:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP172:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP170]])
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP173:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP172]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP174:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP173]])
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP116]])
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP118]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP119]])
 ; POST-PROCESS-GLOBAL-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA_I]], 0
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP4]], ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP8]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP9]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP10]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP11]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP13]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP14]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP15]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP16]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP17]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP18]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP19]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP20]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP21]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP22]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP23]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP24]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP25]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP26]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP27]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP28]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP29]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP175:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP176:%.*]] = add i32 [[TMP175]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP177:%.*]] = add i32 [[TMP176]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP178:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP177]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP34]], ptr addrspace(22) [[TMP178]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP179:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP180:%.*]] = add i32 [[TMP179]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP181:%.*]] = add i32 [[TMP180]], 124
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP182:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP181]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP39]], ptr addrspace(22) [[TMP182]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP183:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP184:%.*]] = add i32 [[TMP183]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP185:%.*]] = add i32 [[TMP184]], 128
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP186:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP185]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP44]], ptr addrspace(22) [[TMP186]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP187:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP188:%.*]] = add i32 [[TMP187]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP189:%.*]] = add i32 [[TMP188]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP190:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP189]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP49]], ptr addrspace(22) [[TMP190]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP191:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP192:%.*]] = add i32 [[TMP191]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP193:%.*]] = add i32 [[TMP192]], 136
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP194:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP193]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP54]], ptr addrspace(22) [[TMP194]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP195:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP196:%.*]] = add i32 [[TMP195]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP197:%.*]] = add i32 [[TMP196]], 140
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP198:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP197]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP59]], ptr addrspace(22) [[TMP198]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP199:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP200:%.*]] = add i32 [[TMP199]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP201:%.*]] = add i32 [[TMP200]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP202:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP201]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP64]], ptr addrspace(22) [[TMP202]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP203:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP204:%.*]] = add i32 [[TMP203]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP205:%.*]] = add i32 [[TMP204]], 148
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP206:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP205]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP69]], ptr addrspace(22) [[TMP206]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP207:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP208:%.*]] = add i32 [[TMP207]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP209:%.*]] = add i32 [[TMP208]], 152
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP210:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP209]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP74]], ptr addrspace(22) [[TMP210]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP211:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP212:%.*]] = add i32 [[TMP211]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP213:%.*]] = add i32 [[TMP212]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP214:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP213]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP79]], ptr addrspace(22) [[TMP214]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP215:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP216:%.*]] = add i32 [[TMP215]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP217:%.*]] = add i32 [[TMP216]], 160
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP218:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP217]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP84]], ptr addrspace(22) [[TMP218]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP219:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP220:%.*]] = add i32 [[TMP219]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP221:%.*]] = add i32 [[TMP220]], 164
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP222:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP221]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP89]], ptr addrspace(22) [[TMP222]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP223:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP224:%.*]] = add i32 [[TMP223]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP225:%.*]] = add i32 [[TMP224]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP226:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP225]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP94]], ptr addrspace(22) [[TMP226]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP227:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP228:%.*]] = add i32 [[TMP227]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP229:%.*]] = add i32 [[TMP228]], 172
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP230:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP229]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP99]], ptr addrspace(22) [[TMP230]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP231:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP232:%.*]] = add i32 [[TMP231]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP233:%.*]] = add i32 [[TMP232]], 176
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP234:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP233]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP104]], ptr addrspace(22) [[TMP234]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP235:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP236:%.*]] = add i32 [[TMP235]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP237:%.*]] = add i32 [[TMP236]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP238:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP237]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP109]], ptr addrspace(22) [[TMP238]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP239:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP240:%.*]] = add i32 [[TMP239]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP241:%.*]] = add i32 [[TMP240]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP242:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP241]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP114]], ptr addrspace(22) [[TMP242]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP243:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP244:%.*]] = add i32 [[TMP243]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP245:%.*]] = add i32 [[TMP244]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP246:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP245]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP119]], ptr addrspace(22) [[TMP246]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP247:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP248:%.*]] = add i32 [[TMP247]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP249:%.*]] = add i32 [[TMP248]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP250:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP249]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP124]], ptr addrspace(22) [[TMP250]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP251:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP252:%.*]] = add i32 [[TMP251]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP253:%.*]] = add i32 [[TMP252]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP254:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP253]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP129]], ptr addrspace(22) [[TMP254]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP255:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP256:%.*]] = add i32 [[TMP255]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP257:%.*]] = add i32 [[TMP256]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP258:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP257]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP134]], ptr addrspace(22) [[TMP258]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP259:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP260:%.*]] = add i32 [[TMP259]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP261:%.*]] = add i32 [[TMP260]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP262:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP261]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP139]], ptr addrspace(22) [[TMP262]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP263:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP264:%.*]] = add i32 [[TMP263]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP265:%.*]] = add i32 [[TMP264]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP266:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP265]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP144]], ptr addrspace(22) [[TMP266]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP267:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP268:%.*]] = add i32 [[TMP267]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP269:%.*]] = add i32 [[TMP268]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP270:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP269]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP149]], ptr addrspace(22) [[TMP270]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP271:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP272:%.*]] = add i32 [[TMP271]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP273:%.*]] = add i32 [[TMP272]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP274:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP273]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP154]], ptr addrspace(22) [[TMP274]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP275:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP276:%.*]] = add i32 [[TMP275]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP277:%.*]] = add i32 [[TMP276]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP278:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP277]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP159]], ptr addrspace(22) [[TMP278]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP279:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP280:%.*]] = add i32 [[TMP279]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP281:%.*]] = add i32 [[TMP280]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP282:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP281]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP164]], ptr addrspace(22) [[TMP282]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP283:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP284:%.*]] = add i32 [[TMP283]], 120
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP284]], ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP285:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP286:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @ClosestHit.resume.0 to i64))
-; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP285]], i64 [[TMP286]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META18]], !continuation.returnedRegistercount !18
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP3]], ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP27]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP28]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP29]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP30]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP121]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP32]], ptr addrspace(22) [[TMP122]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = add i32 [[TMP121]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP123]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP35]], ptr addrspace(22) [[TMP124]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = add i32 [[TMP121]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP125]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP38]], ptr addrspace(22) [[TMP126]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = add i32 [[TMP121]], 12
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP127]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP41]], ptr addrspace(22) [[TMP128]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = add i32 [[TMP121]], 16
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP129]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP44]], ptr addrspace(22) [[TMP130]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = add i32 [[TMP121]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP131]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP47]], ptr addrspace(22) [[TMP132]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = add i32 [[TMP121]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP133]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP50]], ptr addrspace(22) [[TMP134]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = add i32 [[TMP121]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP135]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP53]], ptr addrspace(22) [[TMP136]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = add i32 [[TMP121]], 32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP137]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP56]], ptr addrspace(22) [[TMP138]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = add i32 [[TMP121]], 36
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP139]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP59]], ptr addrspace(22) [[TMP140]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = add i32 [[TMP121]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP141]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP62]], ptr addrspace(22) [[TMP142]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = add i32 [[TMP121]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP143]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP65]], ptr addrspace(22) [[TMP144]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = add i32 [[TMP121]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP145]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP68]], ptr addrspace(22) [[TMP146]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = add i32 [[TMP121]], 52
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP147]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP71]], ptr addrspace(22) [[TMP148]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = add i32 [[TMP121]], 56
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP149]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP74]], ptr addrspace(22) [[TMP150]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = add i32 [[TMP121]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP151]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP77]], ptr addrspace(22) [[TMP152]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = add i32 [[TMP121]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP153]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP80]], ptr addrspace(22) [[TMP154]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = add i32 [[TMP121]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP155]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP83]], ptr addrspace(22) [[TMP156]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = add i32 [[TMP121]], 72
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP157]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP86]], ptr addrspace(22) [[TMP158]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = add i32 [[TMP121]], 76
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP159]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP89]], ptr addrspace(22) [[TMP160]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = add i32 [[TMP121]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP161]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP92]], ptr addrspace(22) [[TMP162]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = add i32 [[TMP121]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP163]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP95]], ptr addrspace(22) [[TMP164]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP165:%.*]] = add i32 [[TMP121]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP166:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP165]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP98]], ptr addrspace(22) [[TMP166]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP167:%.*]] = add i32 [[TMP121]], 92
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP168:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP167]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP101]], ptr addrspace(22) [[TMP168]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP169:%.*]] = add i32 [[TMP121]], 96
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP170:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP169]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP104]], ptr addrspace(22) [[TMP170]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP171:%.*]] = add i32 [[TMP121]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP172:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP171]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP107]], ptr addrspace(22) [[TMP172]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP173:%.*]] = add i32 [[TMP121]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP174:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP173]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP110]], ptr addrspace(22) [[TMP174]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP175:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP176:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @ClosestHit.resume.0 to i64))
+; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP175]], i64 [[TMP176]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount [[META18]], !continuation.returnedRegistercount !18
 ; POST-PROCESS-GLOBAL-NEXT:    unreachable
 ;
 ;
@@ -3645,336 +3094,229 @@ attributes #3 = { nounwind }
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP2:%.*]] = inttoptr i64 [[TMP1]] to ptr addrspace(22)
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -120
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP4]], ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP30]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = add i32 [[TMP31]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP32]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(22) [[TMP33]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = add i32 [[TMP36]], 124
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP5]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(22) [[TMP29]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP31:%.*]] = add i32 [[TMP5]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP31]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP33:%.*]] = load i32, ptr addrspace(22) [[TMP32]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP34:%.*]] = add i32 [[TMP5]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP34]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP36:%.*]] = load i32, ptr addrspace(22) [[TMP35]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP37:%.*]] = add i32 [[TMP5]], 12
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP37]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP39:%.*]] = load i32, ptr addrspace(22) [[TMP38]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = add i32 [[TMP41]], 128
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP42]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = load i32, ptr addrspace(22) [[TMP43]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP45]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = add i32 [[TMP46]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP47]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = load i32, ptr addrspace(22) [[TMP48]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = add i32 [[TMP50]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP51]], 136
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP40:%.*]] = add i32 [[TMP5]], 16
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP41:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP40]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP42:%.*]] = load i32, ptr addrspace(22) [[TMP41]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP43:%.*]] = add i32 [[TMP5]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP43]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP45:%.*]] = load i32, ptr addrspace(22) [[TMP44]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP46:%.*]] = add i32 [[TMP5]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP46]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP48:%.*]] = load i32, ptr addrspace(22) [[TMP47]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP49:%.*]] = add i32 [[TMP5]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP50:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP49]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP51:%.*]] = load i32, ptr addrspace(22) [[TMP50]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP52:%.*]] = add i32 [[TMP5]], 32
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP53:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP52]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP54:%.*]] = load i32, ptr addrspace(22) [[TMP53]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = add i32 [[TMP55]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = add i32 [[TMP56]], 140
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP57]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = load i32, ptr addrspace(22) [[TMP58]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = add i32 [[TMP60]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = add i32 [[TMP61]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP62]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = load i32, ptr addrspace(22) [[TMP63]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = add i32 [[TMP65]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP66]], 148
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP55:%.*]] = add i32 [[TMP5]], 36
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP55]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP57:%.*]] = load i32, ptr addrspace(22) [[TMP56]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP58:%.*]] = add i32 [[TMP5]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP59:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP58]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(22) [[TMP59]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP61:%.*]] = add i32 [[TMP5]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP62:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP61]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP63:%.*]] = load i32, ptr addrspace(22) [[TMP62]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP64:%.*]] = add i32 [[TMP5]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP65:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP64]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP66:%.*]] = load i32, ptr addrspace(22) [[TMP65]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP67:%.*]] = add i32 [[TMP5]], 52
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP68:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP67]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP69:%.*]] = load i32, ptr addrspace(22) [[TMP68]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = add i32 [[TMP70]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = add i32 [[TMP71]], 152
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP72]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = load i32, ptr addrspace(22) [[TMP73]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP75]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = add i32 [[TMP76]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP77]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = load i32, ptr addrspace(22) [[TMP78]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = add i32 [[TMP80]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = add i32 [[TMP81]], 160
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP70:%.*]] = add i32 [[TMP5]], 56
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP71:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP70]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP72:%.*]] = load i32, ptr addrspace(22) [[TMP71]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP73:%.*]] = add i32 [[TMP5]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP74:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP73]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP75:%.*]] = load i32, ptr addrspace(22) [[TMP74]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP76:%.*]] = add i32 [[TMP5]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP77:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP76]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP78:%.*]] = load i32, ptr addrspace(22) [[TMP77]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP79:%.*]] = add i32 [[TMP5]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP80:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP79]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP81:%.*]] = load i32, ptr addrspace(22) [[TMP80]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP82:%.*]] = add i32 [[TMP5]], 72
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP83:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP82]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP84:%.*]] = load i32, ptr addrspace(22) [[TMP83]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = add i32 [[TMP85]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = add i32 [[TMP86]], 164
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP87]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = load i32, ptr addrspace(22) [[TMP88]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP90]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = add i32 [[TMP91]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP92]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = load i32, ptr addrspace(22) [[TMP93]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = add i32 [[TMP95]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = add i32 [[TMP96]], 172
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP85:%.*]] = add i32 [[TMP5]], 76
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP86:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP85]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP87:%.*]] = load i32, ptr addrspace(22) [[TMP86]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP88:%.*]] = add i32 [[TMP5]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP89:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP88]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP90:%.*]] = load i32, ptr addrspace(22) [[TMP89]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP91:%.*]] = add i32 [[TMP5]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP92:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP91]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP93:%.*]] = load i32, ptr addrspace(22) [[TMP92]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP94:%.*]] = add i32 [[TMP5]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP95:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP94]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP96:%.*]] = load i32, ptr addrspace(22) [[TMP95]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP97:%.*]] = add i32 [[TMP5]], 92
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP98:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP97]]
 ; POST-PROCESS-GLOBAL-NEXT:    [[TMP99:%.*]] = load i32, ptr addrspace(22) [[TMP98]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = add i32 [[TMP100]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = add i32 [[TMP101]], 176
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP102]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = load i32, ptr addrspace(22) [[TMP103]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = add i32 [[TMP105]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = add i32 [[TMP106]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP107]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(22) [[TMP108]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = add i32 [[TMP110]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = add i32 [[TMP111]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP112]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = load i32, ptr addrspace(22) [[TMP113]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = add i32 [[TMP115]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = add i32 [[TMP116]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP117]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = load i32, ptr addrspace(22) [[TMP118]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = add i32 [[TMP120]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = add i32 [[TMP121]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP122]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = load i32, ptr addrspace(22) [[TMP123]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = add i32 [[TMP125]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = add i32 [[TMP126]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP127]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = load i32, ptr addrspace(22) [[TMP128]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = add i32 [[TMP130]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = add i32 [[TMP131]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP132]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = load i32, ptr addrspace(22) [[TMP133]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = add i32 [[TMP135]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = add i32 [[TMP136]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP137]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = load i32, ptr addrspace(22) [[TMP138]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = add i32 [[TMP140]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = add i32 [[TMP141]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP142]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = load i32, ptr addrspace(22) [[TMP143]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = add i32 [[TMP145]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = add i32 [[TMP146]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP147]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = load i32, ptr addrspace(22) [[TMP148]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = add i32 [[TMP150]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = add i32 [[TMP151]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP152]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = load i32, ptr addrspace(22) [[TMP153]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = add i32 [[TMP155]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = add i32 [[TMP156]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP157]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = load i32, ptr addrspace(22) [[TMP158]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = add i32 [[TMP160]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = add i32 [[TMP161]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP162]]
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = load i32, ptr addrspace(22) [[TMP163]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP100:%.*]] = add i32 [[TMP5]], 96
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP101:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP100]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP102:%.*]] = load i32, ptr addrspace(22) [[TMP101]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP103:%.*]] = add i32 [[TMP5]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP104:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP103]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP105:%.*]] = load i32, ptr addrspace(22) [[TMP104]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP106:%.*]] = add i32 [[TMP5]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP107:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP106]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP108:%.*]] = load i32, ptr addrspace(22) [[TMP107]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP109:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; POST-PROCESS-GLOBAL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP165:%.*]] = add i32 [[TMP6]], 116
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP166:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP165]]
-; POST-PROCESS-GLOBAL-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(22) [[TMP166]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP167:%.*]] = add i32 [[TMP6]], 108
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP168:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP167]]
-; POST-PROCESS-GLOBAL-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(22) [[TMP168]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP110:%.*]] = add i32 [[TMP4]], 116
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP111:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP110]]
+; POST-PROCESS-GLOBAL-NEXT:    [[DOTRELOAD:%.*]] = load i32, ptr addrspace(22) [[TMP111]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP112:%.*]] = add i32 [[TMP4]], 108
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP113:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP112]]
+; POST-PROCESS-GLOBAL-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(22) [[TMP113]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    store i32 [[DOTRELOAD]], ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP8]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 8) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP9]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP10]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 10) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP11]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 11) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 12) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP13]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 13) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP14]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 14) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP15]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 15) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP16]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 16) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP17]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 17) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP18]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 18) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP19]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 19) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP20]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 20) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP21]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 21) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP22]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 22) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP23]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 23) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP24]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 24) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP25]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 25) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP26]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 26) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP27]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 27) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP28]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 28) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP29]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 29) to ptr addrspace(20)), align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP169:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP170:%.*]] = add i32 [[TMP169]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP171:%.*]] = add i32 [[TMP170]], 120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP172:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP171]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP34]], ptr addrspace(22) [[TMP172]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP173:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP174:%.*]] = add i32 [[TMP173]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP175:%.*]] = add i32 [[TMP174]], 124
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP176:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP175]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP39]], ptr addrspace(22) [[TMP176]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP177:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP178:%.*]] = add i32 [[TMP177]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP179:%.*]] = add i32 [[TMP178]], 128
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP180:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP179]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP44]], ptr addrspace(22) [[TMP180]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP181:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP182:%.*]] = add i32 [[TMP181]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP183:%.*]] = add i32 [[TMP182]], 132
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP184:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP183]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP49]], ptr addrspace(22) [[TMP184]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP185:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP186:%.*]] = add i32 [[TMP185]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP187:%.*]] = add i32 [[TMP186]], 136
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP188:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP187]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP54]], ptr addrspace(22) [[TMP188]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP189:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP190:%.*]] = add i32 [[TMP189]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP191:%.*]] = add i32 [[TMP190]], 140
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP192:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP191]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP59]], ptr addrspace(22) [[TMP192]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP193:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP194:%.*]] = add i32 [[TMP193]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP195:%.*]] = add i32 [[TMP194]], 144
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP196:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP195]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP64]], ptr addrspace(22) [[TMP196]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP197:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP198:%.*]] = add i32 [[TMP197]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP199:%.*]] = add i32 [[TMP198]], 148
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP200:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP199]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP69]], ptr addrspace(22) [[TMP200]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP201:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP202:%.*]] = add i32 [[TMP201]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP203:%.*]] = add i32 [[TMP202]], 152
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP204:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP203]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP74]], ptr addrspace(22) [[TMP204]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP205:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP206:%.*]] = add i32 [[TMP205]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP207:%.*]] = add i32 [[TMP206]], 156
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP208:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP207]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP79]], ptr addrspace(22) [[TMP208]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP209:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP210:%.*]] = add i32 [[TMP209]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP211:%.*]] = add i32 [[TMP210]], 160
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP212:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP211]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP84]], ptr addrspace(22) [[TMP212]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP213:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP214:%.*]] = add i32 [[TMP213]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP215:%.*]] = add i32 [[TMP214]], 164
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP216:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP215]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP89]], ptr addrspace(22) [[TMP216]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP217:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP218:%.*]] = add i32 [[TMP217]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP219:%.*]] = add i32 [[TMP218]], 168
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP220:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP219]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP94]], ptr addrspace(22) [[TMP220]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP221:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP222:%.*]] = add i32 [[TMP221]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP223:%.*]] = add i32 [[TMP222]], 172
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP224:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP223]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP99]], ptr addrspace(22) [[TMP224]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP225:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP226:%.*]] = add i32 [[TMP225]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP227:%.*]] = add i32 [[TMP226]], 176
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP228:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP227]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP104]], ptr addrspace(22) [[TMP228]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP229:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP230:%.*]] = add i32 [[TMP229]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP231:%.*]] = add i32 [[TMP230]], 180
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP232:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP231]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP109]], ptr addrspace(22) [[TMP232]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP233:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP234:%.*]] = add i32 [[TMP233]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP235:%.*]] = add i32 [[TMP234]], 184
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP236:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP235]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP114]], ptr addrspace(22) [[TMP236]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP237:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP238:%.*]] = add i32 [[TMP237]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP239:%.*]] = add i32 [[TMP238]], 188
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP240:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP239]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP119]], ptr addrspace(22) [[TMP240]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP241:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP242:%.*]] = add i32 [[TMP241]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP243:%.*]] = add i32 [[TMP242]], 192
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP244:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP243]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP124]], ptr addrspace(22) [[TMP244]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP245:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP246:%.*]] = add i32 [[TMP245]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP247:%.*]] = add i32 [[TMP246]], 196
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP248:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP247]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP129]], ptr addrspace(22) [[TMP248]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP249:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP250:%.*]] = add i32 [[TMP249]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP251:%.*]] = add i32 [[TMP250]], 200
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP252:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP251]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP134]], ptr addrspace(22) [[TMP252]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP253:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP254:%.*]] = add i32 [[TMP253]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP255:%.*]] = add i32 [[TMP254]], 204
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP256:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP255]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP139]], ptr addrspace(22) [[TMP256]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP257:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP258:%.*]] = add i32 [[TMP257]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP259:%.*]] = add i32 [[TMP258]], 208
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP260:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP259]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP144]], ptr addrspace(22) [[TMP260]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP261:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP262:%.*]] = add i32 [[TMP261]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP263:%.*]] = add i32 [[TMP262]], 212
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP264:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP263]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP149]], ptr addrspace(22) [[TMP264]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP265:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP266:%.*]] = add i32 [[TMP265]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP267:%.*]] = add i32 [[TMP266]], 216
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP268:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP267]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP154]], ptr addrspace(22) [[TMP268]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP269:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP270:%.*]] = add i32 [[TMP269]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP271:%.*]] = add i32 [[TMP270]], 220
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP272:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP271]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP159]], ptr addrspace(22) [[TMP272]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP273:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP274:%.*]] = add i32 [[TMP273]], -120
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP275:%.*]] = add i32 [[TMP274]], 224
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP276:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP275]]
-; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP164]], ptr addrspace(22) [[TMP276]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP114:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP6]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 7), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP7]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 8), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP8]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 9), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP9]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 10), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP10]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 11), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP11]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 12), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP12]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 13), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP13]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 14), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP14]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 15), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP15]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 16), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP16]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 17), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP17]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 18), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP18]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 19), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP19]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 20), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP20]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 21), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 22), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP22]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 23), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP23]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 24), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP24]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 25), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP25]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 26), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP26]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 27), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP27]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 28), align 4
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP28]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @REGISTERS, i32 29), align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP115:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP114]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP30]], ptr addrspace(22) [[TMP115]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP116:%.*]] = add i32 [[TMP114]], 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP117:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP116]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP33]], ptr addrspace(22) [[TMP117]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP118:%.*]] = add i32 [[TMP114]], 8
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP119:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP118]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP36]], ptr addrspace(22) [[TMP119]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP120:%.*]] = add i32 [[TMP114]], 12
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP121:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP120]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP39]], ptr addrspace(22) [[TMP121]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP122:%.*]] = add i32 [[TMP114]], 16
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP123:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP122]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP42]], ptr addrspace(22) [[TMP123]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP124:%.*]] = add i32 [[TMP114]], 20
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP125:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP124]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP45]], ptr addrspace(22) [[TMP125]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP126:%.*]] = add i32 [[TMP114]], 24
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP127:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP126]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP48]], ptr addrspace(22) [[TMP127]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP128:%.*]] = add i32 [[TMP114]], 28
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP129:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP128]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP51]], ptr addrspace(22) [[TMP129]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP130:%.*]] = add i32 [[TMP114]], 32
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP131:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP130]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP54]], ptr addrspace(22) [[TMP131]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP132:%.*]] = add i32 [[TMP114]], 36
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP133:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP132]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP57]], ptr addrspace(22) [[TMP133]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP134:%.*]] = add i32 [[TMP114]], 40
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP135:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP134]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP60]], ptr addrspace(22) [[TMP135]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP136:%.*]] = add i32 [[TMP114]], 44
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP137:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP136]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP63]], ptr addrspace(22) [[TMP137]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP138:%.*]] = add i32 [[TMP114]], 48
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP139:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP138]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP66]], ptr addrspace(22) [[TMP139]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP140:%.*]] = add i32 [[TMP114]], 52
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP141:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP140]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP69]], ptr addrspace(22) [[TMP141]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP142:%.*]] = add i32 [[TMP114]], 56
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP143:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP142]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP72]], ptr addrspace(22) [[TMP143]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP144:%.*]] = add i32 [[TMP114]], 60
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP145:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP144]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP75]], ptr addrspace(22) [[TMP145]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP146:%.*]] = add i32 [[TMP114]], 64
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP147:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP146]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP78]], ptr addrspace(22) [[TMP147]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP148:%.*]] = add i32 [[TMP114]], 68
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP149:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP148]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP81]], ptr addrspace(22) [[TMP149]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP150:%.*]] = add i32 [[TMP114]], 72
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP151:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP150]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP84]], ptr addrspace(22) [[TMP151]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP152:%.*]] = add i32 [[TMP114]], 76
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP153:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP152]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP87]], ptr addrspace(22) [[TMP153]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP154:%.*]] = add i32 [[TMP114]], 80
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP155:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP154]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP90]], ptr addrspace(22) [[TMP155]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP156:%.*]] = add i32 [[TMP114]], 84
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP157:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP156]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP93]], ptr addrspace(22) [[TMP157]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP158:%.*]] = add i32 [[TMP114]], 88
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP159:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP158]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP96]], ptr addrspace(22) [[TMP159]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP160:%.*]] = add i32 [[TMP114]], 92
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP161:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP160]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP99]], ptr addrspace(22) [[TMP161]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP162:%.*]] = add i32 [[TMP114]], 96
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP163:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP162]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP102]], ptr addrspace(22) [[TMP163]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP164:%.*]] = add i32 [[TMP114]], 100
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP165:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP164]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP105]], ptr addrspace(22) [[TMP165]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP166:%.*]] = add i32 [[TMP114]], 104
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP167:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP2]], i32 [[TMP166]]
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP108]], ptr addrspace(22) [[TMP167]], align 4
 ; POST-PROCESS-GLOBAL-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
-; POST-PROCESS-GLOBAL-NEXT:    [[TMP277:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP277]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META18]]
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP168:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP169:%.*]] = add i32 [[TMP168]], -120
+; POST-PROCESS-GLOBAL-NEXT:    store i32 [[TMP169]], ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    [[TMP170:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-GLOBAL-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP170]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META18]]
 ; POST-PROCESS-GLOBAL-NEXT:    unreachable
 ;

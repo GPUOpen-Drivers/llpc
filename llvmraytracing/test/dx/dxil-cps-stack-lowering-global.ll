@@ -45,8 +45,8 @@ AllocaSpillBB:
   store i32 99, ptr addrspace(32) %ptr
   %dis_data.i.fca.0.insert = insertvalue %struct.DispatchSystemData poison, i32 %.fca.0.extract, 0
   store i32 undef, ptr addrspace(20) @PAYLOAD, align 4
-  %3 = call i32 (...) @lgc.cps.as.continuation.reference(ptr @called.resume.0)
-  call void (...) @lgc.cps.jump(i32 2, i32 2, %struct.type %cont.state, i32 %3, %struct.DispatchSystemData %dis_data.i.fca.0.insert), !continuation.registercount !16
+  %3 = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @called.resume.0)
+  call void (...) @lgc.cps.jump(i32 2, i32 2, %struct.type %cont.state, i64 %3, %struct.DispatchSystemData %dis_data.i.fca.0.insert), !continuation.registercount !16
   unreachable
 }
 
@@ -107,13 +107,15 @@ declare void @continuation.return(...) #3
 declare ptr addrspace(32) @lgc.cps.alloc(i32) #5
 
 ; Function Attrs: nounwind willreturn
-declare i32 @lgc.cps.as.continuation.reference(...) #2
+declare i64 @lgc.cps.as.continuation.reference__i64(...) #2
 
 ; Function Attrs: nounwind willreturn memory(inaccessiblemem: read)
 declare ptr addrspace(32) @lgc.cps.peek(i32) #6
 
 ; Function Attrs: nounwind willreturn memory(inaccessiblemem: readwrite)
 declare void @lgc.cps.free(i32) #5
+
+declare void @continuation.continue(i64, ...)
 
 attributes #0 = { nofree nounwind willreturn }
 attributes #1 = { nofree norecurse nosync nounwind willreturn memory(argmem: write) }
@@ -175,8 +177,9 @@ attributes #6 = { nounwind willreturn memory(inaccessiblemem: read) }
 ; CPS-STACK-LOWERING-CPS-NEXT:    store i32 99, ptr addrspace(22) [[TMP8]], align 4
 ; CPS-STACK-LOWERING-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; CPS-STACK-LOWERING-CPS-NEXT:    store i32 undef, ptr addrspace(20) @REGISTERS, align 4
-; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP9:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @called.resume.0)
-; CPS-STACK-LOWERING-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 2, i32 2, [[STRUCT_TYPE]] [[CONT_STATE]], i32 [[TMP9]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]]), !continuation.registercount [[META16]]
+; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP9:%.*]] = load i32, ptr [[CSP]], align 4
+; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP10:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @called.resume.0 to i64))
+; CPS-STACK-LOWERING-CPS-NEXT:    call void (i64, ...) @continuation.continue(i64 2, i32 [[TMP9]], i64 [[TMP10]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]]), !continuation.registercount [[META16]]
 ; CPS-STACK-LOWERING-CPS-NEXT:    unreachable
 ;
 ;
@@ -200,6 +203,8 @@ attributes #6 = { nounwind willreturn memory(inaccessiblemem: read) }
 ; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP9:%.*]] = load i32, ptr [[CSP]], align 4
 ; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP10:%.*]] = add i32 [[TMP9]], -8
 ; CPS-STACK-LOWERING-CPS-NEXT:    store i32 [[TMP10]], ptr [[CSP]], align 4
-; CPS-STACK-LOWERING-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR_RELOAD]], i32 2, [[STRUCT_TYPE]] [[TMP0]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META16]]
+; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP11:%.*]] = zext i32 [[RETURN_ADDR_RELOAD]] to i64
+; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CSP]], align 4
+; CPS-STACK-LOWERING-CPS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[TMP11]], i32 [[TMP12]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META16]]
 ; CPS-STACK-LOWERING-CPS-NEXT:    unreachable
 ;

@@ -30,7 +30,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchInOutImportExport.h"
-#include "Gfx9Chip.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
 #include "lgc/LgcDialect.h"
@@ -51,8 +50,11 @@ using namespace lgc;
 
 namespace lgc {
 
+// Preferred number of HS threads per subgroup.
+constexpr unsigned MaxHsThreadsPerSubgroup = 256;
+
 // =====================================================================================================================
-PatchInOutImportExport::PatchInOutImportExport() : m_lds(nullptr) {
+PatchInOutImportExport::PatchInOutImportExport() {
   memset(&m_gfxIp, 0, sizeof(m_gfxIp));
   initPerShader();
 }
@@ -109,11 +111,6 @@ PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisMana
     else if (name.starts_with("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
       otherCallees.push_back(&func);
   }
-
-  // Create the global variable that is to model LDS
-  // NOTE: ES -> GS ring is always on-chip on GFX10+.
-  if (m_hasTs || m_hasGs)
-    m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
   static const std::array<unsigned char, 4> BufferFormatsGfx10 = {
@@ -376,7 +373,7 @@ void PatchInOutImportExport::processShader() {
         calcFactor.onChip.specialTfValueStart = calcFactor.onChip.hsPatchCountStart + 1;
 
         const unsigned maxNumHsWaves =
-            Gfx9::MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
+            MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
         calcFactor.specialTfValueSize = maxNumHsWaves * 2;
 
         calcFactor.tessOnChipLdsSize += 1 + calcFactor.specialTfValueSize;
@@ -1526,13 +1523,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_barrier, {});
     builder.CreateFence(AtomicOrdering::Acquire, syncScope);
   } else if (m_shaderStage == ShaderStage::Geometry) {
-    if (m_gfxIp.major >= 10) {
-      // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
-      // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
-      SyncScope::ID scope =
-          m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
-      builder.CreateFence(AtomicOrdering::Release, scope);
-    }
+    // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
+    // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
+    SyncScope::ID scope =
+        m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
+    builder.CreateFence(AtomicOrdering::Release, scope);
 
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
     auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
@@ -2067,21 +2062,10 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
 void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset,
                                                           Value *compIdx, Value *vertexOrPrimitiveIdx,
                                                           bool isPerPrimitive, BuilderBase &builder) {
-  // outputOffset = (location + locOffset) * 4 + compIdx * (bitWidth == 64 ? 2 : 1)
-  Value *outputOffset = builder.CreateAdd(builder.getInt32(location), locOffset);
-  outputOffset = builder.CreateShl(outputOffset, 2);
-
-  auto outputTy = output->getType();
-  if (outputTy->getScalarSizeInBits() == 64) {
+  if (output->getType()->getScalarSizeInBits() == 64)
     compIdx = builder.CreateShl(compIdx, 1);
-  }
 
-  outputOffset = builder.CreateAdd(outputOffset, compIdx);
-
-  if (isPerPrimitive)
-    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
-  else
-    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  builder.create<WriteMeshOutputOp>(isPerPrimitive, location, locOffset, compIdx, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -2447,7 +2431,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     // There is a special case when vkCreateGraphicsPipelines but not set sampleRate, but compiling shader
     // will ask to set runAtSampleRate, this case is valid but current code will cause hang.
     // So in this case, it will not use broadcast sample mask.
-    if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
+    if (!m_pipelineState->getOptions().disableSampleCoverageAdjust &&
+        (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate)) {
       unsigned baseMask = 1;
       if (!builtInUsage.sampleId) {
         if (m_pipelineState->getRasterizerState().pixelShaderSamples != 0) {
@@ -3403,15 +3388,10 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
 
   (void(builtInUsage)); // Unused
 
-  // outputOffset = location * 4 + elemIdx
-  Value *outputOffset = builder.getInt32(4 * loc);
-  if (elemIdx)
-    outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
+  if (!elemIdx)
+    elemIdx = builder.getInt32(0);
 
-  if (isPerPrimitive)
-    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
-  else
-    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  builder.create<WriteMeshOutputOp>(isPerPrimitive, loc, builder.getInt32(0), elemIdx, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -3859,10 +3839,9 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
     auto ringOffset = calcEsGsRingOffsetForOutput(location, compIdx, esGsOffset, builder);
 
     // ES -> GS ring is always on-chip on GFX10+
-    Value *idxs[] = {builder.getInt32(0), ringOffset};
-    auto ldsType = m_lds->getValueType();
-    Value *storePtr = builder.CreateGEP(ldsType, m_lds, idxs);
-    builder.CreateAlignedStore(storeValue, storePtr, m_lds->getAlign().value());
+    auto lds = Patch::getLdsVariable(m_pipelineState, m_entryPoint);
+    Value *storePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ringOffset);
+    builder.CreateAlignedStore(storeValue, storePtr, lds->getPointerAlignment(m_module->getDataLayout()));
   }
 }
 
@@ -3905,10 +3884,9 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
   } else {
     Value *ringOffset = calcEsGsRingOffsetForInput(location, compIdx, vertexIdx, builder);
     // ES -> GS ring is always on-chip on GFX10+
-    Value *idxs[] = {builder.getInt32(0), ringOffset};
-    auto ldsType = m_lds->getValueType();
-    auto *loadPtr = builder.CreateGEP(ldsType, m_lds, idxs);
-    loadValue = builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getAlign().value());
+    auto lds = Patch::getLdsVariable(m_pipelineState, m_entryPoint);
+    auto *loadPtr = builder.CreateGEP(builder.getInt32Ty(), lds, ringOffset);
+    loadValue = builder.CreateAlignedLoad(loadTy, loadPtr, lds->getPointerAlignment(m_module->getDataLayout()));
   }
 
   return loadValue;
@@ -3989,10 +3967,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     auto ringOffset = calcGsVsRingOffsetForOutput(location, compIdx, streamId, emitCounter, gsVsOffset, builder);
 
     if (m_pipelineState->isGsOnChip()) {
-      Value *idxs[] = {builder.getInt32(0), ringOffset};
-      auto ldsType = m_lds->getValueType();
-      Value *storePtr = builder.CreateGEP(ldsType, m_lds, idxs);
-      builder.CreateAlignedStore(storeValue, storePtr, m_lds->getAlign().value());
+      auto lds = Patch::getLdsVariable(m_pipelineState, m_entryPoint);
+      Value *storePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ringOffset);
+      builder.CreateAlignedStore(storeValue, storePtr, lds->getPointerAlignment(m_module->getDataLayout()));
     } else {
       // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit
       // control of soffset. This is required by swizzle enabled mode when address range checking should be
@@ -4135,7 +4112,6 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
 // @param ldsOffset : Start offset to do LDS read operations
 // @param builder : The IR builder to create and insert IR instruction
 Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Value *ldsOffset, BuilderBase &builder) {
-  assert(m_lds);
   assert(readTy->isSingleValueType());
 
   // Read dwords from LDS
@@ -4177,10 +4153,9 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
   } else {
     // Read from on-chip LDS
     for (unsigned i = 0; i < numChannels; ++i) {
-      Value *idxs[] = {builder.getInt32(0), ldsOffset};
-      auto ldsType = m_lds->getValueType();
-      auto *loadPtr = builder.CreateGEP(ldsType, m_lds, idxs);
-      auto loadTy = GetElementPtrInst::getIndexedType(ldsType, idxs);
+      auto loadTy = builder.getInt32Ty();
+      auto lds = Patch::getLdsVariable(m_pipelineState, m_entryPoint);
+      auto *loadPtr = builder.CreateGEP(loadTy, lds, ldsOffset);
       loadValues[i] = builder.CreateLoad(loadTy, loadPtr);
 
       ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(1));
@@ -4219,8 +4194,6 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
 // @param ldsOffset : Start offset to do LDS write operations
 // @param builder : The IR builder to create and insert IR instruction
 void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Value *ldsOffset, BuilderBase &builder) {
-  assert(m_lds);
-
   auto writeTy = writeValue->getType();
   assert(writeTy->isSingleValueType());
 
@@ -4270,9 +4243,8 @@ void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Va
   } else {
     // Write to on-chip LDS
     for (unsigned i = 0; i < numChannels; ++i) {
-      Value *idxs[] = {builder.getInt32(0), ldsOffset};
-      auto ldsType = m_lds->getValueType();
-      Value *storePtr = builder.CreateGEP(ldsType, m_lds, idxs);
+      auto lds = Patch::getLdsVariable(m_pipelineState, m_entryPoint);
+      Value *storePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
       builder.CreateStore(storeValues[i], storePtr);
 
       ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(1));
@@ -4525,7 +4497,7 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
                                                               unsigned outVertexCount, unsigned outVertexStride,
                                                               unsigned patchConstCount,
                                                               unsigned tessFactorStride) const {
-  unsigned maxThreadCountPerThreadGroup = Gfx9::MaxHsThreadsPerSubgroup;
+  unsigned maxThreadCountPerThreadGroup = MaxHsThreadsPerSubgroup;
 
   // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
   // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -4555,7 +4527,7 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
     // count actual HS patches.
     assert(m_gfxIp.major >= 11);
     const unsigned maxNumHsWaves =
-        Gfx9::MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
+        MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
     ldsSizePerThreadGroup -= 1 + maxNumHsWaves * 2;
   }
   ldsSizePerThreadGroup -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack

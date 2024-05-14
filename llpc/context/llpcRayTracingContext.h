@@ -117,6 +117,7 @@ public:
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
   Vkgc::LlpcRaytracingMode getRaytracingMode() { return m_pipelineInfo->mode; }
+  bool isContinuationsMode() { return getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations; }
   unsigned getCpsFlag() { return m_pipelineInfo->cpsFlags; }
 
 protected:

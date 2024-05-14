@@ -89,7 +89,7 @@ struct VertexCullInfo {
   //
   // Vertex transform feedback outputs
   //
-  unsigned xfbOutputs[4];
+  unsigned xfbOutputs[4]; // At most <4 x dword>
   //
   // Vertex cull data
   //
@@ -152,11 +152,14 @@ struct XfbOutputExport {
   unsigned xfbOffset;   // Transform feedback offset
   unsigned numElements; // Number of output elements, valid range is [1,4]
   bool is16bit;         // Whether the output is 16-bit
+  // For ES only
+  unsigned offsetInVertex; // Offset of an output within all transform feedback outputs of a vertex
+  // For GS only
   struct {
     unsigned streamId;  // Output stream ID
     unsigned location;  // Output location
     unsigned component; // Output component within a location
-  } locInfo;            // Output location info in GS-VS ring (just for GS)
+  } locInfo;            // Output location info in GS-VS ring
 };
 
 // Enumerates the LDS regions used by primitive shader
@@ -197,7 +200,7 @@ class NggPrimShader {
 public:
   NggPrimShader(PipelineState *pipelineState);
 
-  static unsigned calcEsGsRingItemSize(PipelineState *pipelineState);
+  static unsigned calcEsGsRingItemSize(PipelineState *pipelineState, llvm::Function *esMain);
   static PrimShaderLdsUsageInfo layoutPrimShaderLds(PipelineState *pipelineState,
                                                     PrimShaderLdsLayout *ldsLayout = nullptr);
 
@@ -208,8 +211,9 @@ private:
   NggPrimShader(const NggPrimShader &) = delete;
   NggPrimShader &operator=(const NggPrimShader &) = delete;
 
-  static unsigned calcVertexCullInfoSizeAndOffsets(PipelineState *pipelineState,
+  static unsigned calcVertexCullInfoSizeAndOffsets(PipelineState *pipelineState, llvm::Function *esMain,
                                                    VertexCullInfoOffsets &vertCullInfoOffsets);
+  static unsigned calcEsXfbOutputsSize(llvm::Function *target);
 
   llvm::FunctionType *getPrimShaderType(uint64_t &inRegMask);
 
@@ -300,8 +304,8 @@ private:
   llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
-  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexIndex, unsigned outputIndex);
-  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexIndex, unsigned outputIndex);
+  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexIndex, unsigned offsetInVertex);
+  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexIndex, unsigned offsetInVertex);
 
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {
@@ -411,8 +415,8 @@ private:
 
   llvm::IRBuilder<> m_builder; // LLVM IR builder
 
-  llvm::GlobalValue *m_lds = nullptr; // Global variable to model primitive shader LDS
-  PrimShaderLdsLayout m_ldsLayout;    // Primitive shader LDS layout
+  llvm::Constant *m_lds = nullptr; // Global variable to model primitive shader LDS
+  PrimShaderLdsLayout m_ldsLayout; // Primitive shader LDS layout
 };
 
 } // namespace lgc

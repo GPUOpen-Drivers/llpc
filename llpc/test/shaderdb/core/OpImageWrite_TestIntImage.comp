@@ -18,6 +18,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) %0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

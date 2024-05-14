@@ -40,16 +40,13 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
-#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/Support/MathExtras.h"
 #include <cassert>
 
@@ -110,7 +107,6 @@ private:
   Function *Continue = nullptr;
   Function *WaitContinue = nullptr;
   MapVector<Function *, ContinuationData> ToProcess;
-  uint32_t MaxContStateBytes = 0;
   CompilerUtils::CrossModuleInliner CrossInliner;
 };
 
@@ -452,7 +448,8 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
           getWithSamePointeeType(
               UsedContFrameTy,
               FuncData.NewContState->getType()->getPointerAddressSpace()));
-      replaceAllPointerUses(&B, ContFrame, CastNewContState, InstsToRemove);
+      CompilerUtils::replaceAllPointerUses(&B, ContFrame, CastNewContState,
+                                           InstsToRemove);
     } else {
       // If there is no continuation state, replace it with a poison
       // value instead of a zero-sized stack allocation.
@@ -505,8 +502,6 @@ void LegacyCleanupContinuationsPassImpl::handleFunctionEntry(
   uint64_t NeededStackSize = Data.getContStateStackBytes();
   bool IsStart = F == Data.NewStart;
 
-  int64_t StackOffsetForPayloadSpill = 0;
-
   if (IsStart) {
     // Add function metadata that stores how big the continuation state is in
     // bytes
@@ -519,15 +514,18 @@ void LegacyCleanupContinuationsPassImpl::handleFunctionEntry(
   }
 
   if (NeededStackSize) {
+    Value *ContStateOnStack = nullptr;
     if (IsStart) {
       ContHelper::setStackSize(F, NeededStackSize);
+
+      ContStateOnStack =
+          B.create<lgc::cps::AllocOp>(B.getInt32(NeededStackSize));
     } else {
-      // Deallocate
-      B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
+      ContStateOnStack =
+          B.create<lgc::cps::PeekOp>(B.getInt32(NeededStackSize));
     }
 
-    Value *ContStateOnStack =
-        B.create<lgc::cps::PeekOp>(B.getInt32(-StackOffsetForPayloadSpill));
+    ContStateOnStack->setName("cont.state.stack.segment");
 
     uint64_t ContStateNumI32s = divideCeil(Data.ContStateBytes, RegisterBytes);
     auto *ContStateTy = ArrayType::get(I32, ContStateNumI32s);
@@ -589,14 +587,6 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(
   // Pass resume address as argument
   B.SetInsertPoint(Call);
 
-  // Allocate continuation state
-  uint64_t NeededStackSize = Data.getContStateStackBytes();
-  if (NeededStackSize) {
-    auto *ContStateAlloc =
-        B.create<lgc::cps::AllocOp>(B.getInt32(NeededStackSize));
-    ContStateAlloc->setName("cont.state.stack.segment");
-  }
-
   auto *ReturnAddrInt = B.CreatePtrToInt(ResumeFun, I64);
 
   bool IsWait = ContHelper::isWaitAwaitCall(*Call);
@@ -641,9 +631,15 @@ void LegacyCleanupContinuationsPassImpl::handleReturn(ContinuationData &Data,
   LLVM_DEBUG(dbgs() << "Converting return to continue: " << *ContRet << "\n");
   bool IsEntry = isa<UndefValue>(ContRet->getArgOperand(0));
   B.SetInsertPoint(ContRet);
+
+  uint32_t NeededStackSize = Data.getContStateStackBytes();
+  if (NeededStackSize > 0)
+    B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
+
   if (IsEntry) {
     assert(ContRet->arg_size() == 1 &&
            "Entry functions ignore the return value");
+
     llvm::terminateShader(B, ContRet);
   } else {
     // Create the call to continuation.continue, but with the same argument list
@@ -694,8 +690,6 @@ llvm::PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
   // Check if the continuation state is used in any function part
   for (auto &FuncData : ToProcess) {
     finalizeContinuationData(*FuncData.first, FuncData.second);
-    MaxContStateBytes =
-        std::max(MaxContStateBytes, FuncData.second.ContStateBytes);
   }
 
   Changed |= !ToProcess.empty();

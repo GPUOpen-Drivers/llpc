@@ -61,7 +61,7 @@ public:
   // Register all the patching passes into the given pass builder
   static void registerPasses(llvm::PassBuilder &passBuilder);
 
-  static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
+  static llvm::Constant *getLdsVariable(PipelineState *pipelineState, llvm::Function *func, bool rtStack = false);
 
 protected:
   static void addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel);

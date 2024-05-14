@@ -157,8 +157,7 @@ PreservedAnalyses PatchCopyShader::run(Module &module, ModuleAnalysisManager &an
 
   // Set wavefront size
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::CopyShader);
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
-    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
+  entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
 
   // Create ending basic block, and terminate it with return.
   auto endBlock = BasicBlock::Create(*m_context, "", entryPoint, nullptr);
@@ -181,27 +180,18 @@ PreservedAnalyses PatchCopyShader::run(Module &module, ModuleAnalysisManager &an
   if (!m_pipelineState->getNggControl()->enableNgg) {
     // If no NGG, the copy shader will become a real HW VS. Set the user data entries in the
     // PAL metadata here.
-    if (m_pipelineState->useRegisterFieldFormat()) {
-      constexpr unsigned NumUserSgprs = 32;
-      SmallVector<unsigned, NumUserSgprs> userData;
-      userData.resize(NumUserSgprs, static_cast<unsigned>(UserDataMapping::Invalid));
-      userData[0] = static_cast<unsigned>(UserDataMapping::GlobalTable);
-      if (m_pipelineState->enableXfb())
-        userData[intfData->userDataUsage.gs.copyShaderStreamOutTable] =
-            static_cast<unsigned>(UserDataMapping::StreamOutTable);
-      m_pipelineState->setUserDataMap(ShaderStage::CopyShader, userData);
-    } else {
-      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStage::CopyShader, 0, UserDataMapping::GlobalTable);
-      if (m_pipelineState->enableXfb()) {
-        m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStage::CopyShader,
-                                                            intfData->userDataUsage.gs.copyShaderStreamOutTable,
-                                                            UserDataMapping::StreamOutTable);
-      }
-    }
+    constexpr unsigned NumUserSgprs = 32;
+    SmallVector<unsigned, NumUserSgprs> userData;
+    userData.resize(NumUserSgprs, static_cast<unsigned>(UserDataMapping::Invalid));
+    userData[0] = static_cast<unsigned>(UserDataMapping::GlobalTable);
+    if (m_pipelineState->enableXfb())
+      userData[intfData->userDataUsage.gs.copyShaderStreamOutTable] =
+          static_cast<unsigned>(UserDataMapping::StreamOutTable);
+    m_pipelineState->setUserDataMap(ShaderStage::CopyShader, userData);
   }
 
   if (m_pipelineState->isGsOnChip())
-    m_lds = Patch::getLdsVariable(m_pipelineState, &module);
+    m_lds = Patch::getLdsVariable(m_pipelineState, entryPoint);
 
   unsigned outputStreamCount = 0;
   for (int i = 0; i < MaxGsStreams; ++i) {
@@ -570,10 +560,10 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     assert(m_lds);
 
     Value *ringOffset = calcGsVsRingOffsetForInput(location, component, streamId, builder);
-    Value *loadPtr = builder.CreateGEP(m_lds->getValueType(), m_lds, {builder.getInt32(0), ringOffset});
+    Value *loadPtr = builder.CreateGEP(builder.getInt32Ty(), m_lds, ringOffset);
     loadPtr = builder.CreateBitCast(loadPtr, PointerType::get(loadTy, m_lds->getType()->getPointerAddressSpace()));
 
-    return builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getAlign());
+    return builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getPointerAlignment(m_module->getDataLayout()));
   }
 
   CoherentFlag coherent = {};
