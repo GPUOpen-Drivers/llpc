@@ -30,6 +30,10 @@ ARG FEATURES
 # Use bash instead of sh in this docker file.
 SHELL ["/bin/bash", "-c"]
 
+RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
+    && apt-get update \
+    && apt-get install -yqq --no-install-recommends python3-ruamel.yaml
+
 # Copy helper scripts into container.
 COPY docker/*.sh /vulkandriver/
 
