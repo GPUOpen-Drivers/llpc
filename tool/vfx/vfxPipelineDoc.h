@@ -43,7 +43,6 @@ class PipelineDocument : public Document {
 public:
   PipelineDocument() {
     initVkSections();
-    memset(&m_pipelineState, 0, sizeof(m_pipelineState));
 
     m_pipelineState.gfxPipelineInfo.options.optimizationLevel = 2;
     m_pipelineState.compPipelineInfo.options.optimizationLevel = 2;

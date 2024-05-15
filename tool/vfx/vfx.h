@@ -36,6 +36,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <string>
 #include <vector>
 
@@ -535,6 +536,17 @@ struct VfxPipelineState {
   Vfx::ShaderSource *stages;                         // Shader source sections
   std::string graphicsLibFileName[Vfx::GraphicsLibraryCount];
   std::vector<uint32_t> fsOutputs;
+
+public:
+  VfxPipelineState() : version(0), pipelineType(VfxPipelineTypeGraphics), numStages(0), stages(nullptr) {
+    memset(&gfxPipelineInfo, 0, sizeof(gfxPipelineInfo));
+    memset(&compPipelineInfo, 0, sizeof(compPipelineInfo));
+    memset(&rayPipelineInfo, 0, sizeof(rayPipelineInfo));
+    for (int i = 0; i < Vfx::GraphicsLibraryCount; ++i) {
+      graphicsLibFileName[i] = "";
+    }
+    fsOutputs.clear();
+  }
 };
 
 typedef struct VfxPipelineState *VfxPipelineStatePtr;
