@@ -61,17 +61,6 @@ enum class MeshLdsRegion : unsigned {
 // Map: LDS Region -> <Region Offset, Region Size>
 typedef std::unordered_map<MeshLdsRegion, std::pair<unsigned, unsigned>> MeshLdsLayout;
 
-// Mesh shader outputs layout
-struct MeshOutputsLayout {
-  unsigned vertexStride;                        // Vertex stride (in dwords)
-  unsigned vertexExportCount;                   // Vertex export count
-  unsigned primitiveStride;                     // Primitive stride (in dwords)
-  unsigned primitiveExportCount;                // Primitive export count
-  std::map<unsigned, unsigned> offsetsInVertex; // Map from output location to output offset within a vertex (in dwords)
-  std::map<unsigned, unsigned>
-      offsetsInPrimitive; // Map from output location to output offset within a primitive (in dwords)
-};
-
 // =====================================================================================================================
 // Represents the handler of mesh/task shader.
 class MeshTaskShader {
@@ -80,7 +69,7 @@ public:
   ~MeshTaskShader();
 
   static unsigned layoutMeshShaderLds(PipelineState *pipelineState, llvm::Function *entryPoint,
-                                      MeshLdsLayout *ldsLayout = nullptr, MeshOutputsLayout *outputsLayout = nullptr);
+                                      MeshLdsLayout *ldsLayout = nullptr);
 
   void process(llvm::Function *taskEntryPoint, llvm::Function *meshEntryPoint);
 
@@ -97,7 +86,8 @@ private:
   void lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp);
   void lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp);
   void lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuiltinInputOp);
-  void lowerWriteMeshOutput(WriteMeshOutputOp &writeMeshOutputOp);
+  void lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp);
+  void lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);
@@ -148,16 +138,6 @@ private:
     return m_ldsLayout[region].first;
   }
 
-  unsigned getOutputOffsetInPrimOrVertex(unsigned location, bool inPrimitive) {
-    if (inPrimitive) {
-      assert(m_outputsLayout.offsetsInPrimitive.count(location) > 0); // Must exist
-      return m_outputsLayout.offsetsInPrimitive[location];
-    }
-
-    assert(m_outputsLayout.offsetsInVertex.count(location) > 0); // Must exist
-    return m_outputsLayout.offsetsInVertex[location];
-  }
-
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset);
   void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *atomicValue, llvm::Value *ldsOffset);
@@ -205,8 +185,7 @@ private:
 
   GfxIpVersion m_gfxIp; // Graphics IP version info
 
-  MeshLdsLayout m_ldsLayout;         // Mesh shader LDS layout
-  MeshOutputsLayout m_outputsLayout; // Mesh shader outputs layout
+  MeshLdsLayout m_ldsLayout; // Mesh shader LDS layout
 };
 
 } // namespace lgc

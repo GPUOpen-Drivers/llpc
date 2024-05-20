@@ -513,31 +513,6 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
   }
-
-  if (isOutput && m_shaderStage == ShaderStage::Mesh) {
-    // Record number of components for mesh shader outputs
-    for (unsigned i = 0; i < locationCount; ++i) {
-      unsigned numComponents = 0;
-      if (inOutInfo.getNumComponents() > 4) {
-        assert(locationCount % 2 == 0);        // Must have even number of locations for 64-bit data type
-        assert(inOutInfo.getComponent() == 0); // Start component must be 0 in this case
-        // NOTE: For 64-bit vec3/vec4 data types, they will occupy two consecutive locations, we only record the number
-        // of components to the former one and skip the latter one.
-        if (i % 2 != 0)
-          continue;
-        numComponents = inOutInfo.getNumComponents();
-      } else {
-        numComponents = inOutInfo.getComponent() + inOutInfo.getNumComponents();
-      }
-
-      if (inOutInfo.isPerPrimitive())
-        resUsage->inOutUsage.mesh.primitiveOutputComponents[location + i] = {numComponents,
-                                                                             static_cast<BuiltInKind>(InvalidValue)};
-      else
-        resUsage->inOutUsage.mesh.vertexOutputComponents[location + i] = {numComponents,
-                                                                          static_cast<BuiltInKind>(InvalidValue)};
-    }
-  }
 }
 
 // =====================================================================================================================

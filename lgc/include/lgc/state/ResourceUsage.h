@@ -462,10 +462,9 @@ struct ResourceUsage {
       std::map<BuiltInKind, unsigned> vertexBuiltInExportSlots;
       std::map<BuiltInKind, unsigned> primitiveBuiltInExportSlots;
 
-      // Map from output locations to their number of components: <location, <numComponents, forBuiltIn>> (including
-      // those special outputs to which built-ins are mapped)
-      std::map<unsigned, std::pair<unsigned, BuiltInKind>> vertexOutputComponents;
-      std::map<unsigned, std::pair<unsigned, BuiltInKind>> primitiveOutputComponents;
+      // Export count for generic outputs (excluding those special outputs to which the built-ins are mapped)
+      unsigned vertexGenericOutputExportCount = 0;
+      unsigned primitiveGenericOutputExportCount = 0;
     } mesh;
 
     struct {

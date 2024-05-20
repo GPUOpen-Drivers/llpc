@@ -2318,62 +2318,36 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     unsigned availPerPrimitiveOutMapLoc = inOutUsage.perPrimitiveOutputMapLocCount;
 
     // Map per-vertex built-in outputs to generic ones
-    if (builtInUsage.mesh.position) {
-      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {4, BuiltInPosition}; // vec4
-      ++availOutMapLoc;
-    }
+    if (builtInUsage.mesh.position)
+      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
 
-    if (builtInUsage.mesh.pointSize) {
-      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {1, BuiltInPointSize}; // float
-      ++availOutMapLoc;
-    }
+    if (builtInUsage.mesh.pointSize)
+      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
 
     if (builtInUsage.mesh.clipDistance > 0) {
-      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {static_cast<unsigned>(builtInUsage.mesh.clipDistance),
-                                                                BuiltInClipDistance}; // float[]
-      ++availOutMapLoc;
-
+      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
       if (builtInUsage.mesh.clipDistance > 4)
         ++availOutMapLoc;
     }
 
     if (builtInUsage.mesh.cullDistance > 0) {
-      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {static_cast<unsigned>(builtInUsage.mesh.cullDistance),
-                                                                BuiltInCullDistance}; // float[]
-      ++availOutMapLoc;
-
+      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
       if (builtInUsage.mesh.cullDistance > 4)
         ++availOutMapLoc;
     }
 
     // Map per-primitive built-in outputs to generic ones
-    if (builtInUsage.mesh.primitiveId) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveId] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInPrimitiveId}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.primitiveId)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveId] = availPerPrimitiveOutMapLoc++;
 
-    if (builtInUsage.mesh.viewportIndex) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInViewportIndex] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInViewportIndex}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.viewportIndex)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInViewportIndex] = availPerPrimitiveOutMapLoc++;
 
-    if (builtInUsage.mesh.layer) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInLayer] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInLayer}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.layer)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInLayer] = availPerPrimitiveOutMapLoc++;
 
-    if (builtInUsage.mesh.primitiveShadingRate) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveShadingRate] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInPrimitiveShadingRate}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.primitiveShadingRate)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveShadingRate] = availPerPrimitiveOutMapLoc++;
 
     // Map per-vertex built-in outputs to exported locations
     if (nextStage == ShaderStage::Fragment) {
@@ -2453,6 +2427,9 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (builtInUsage.mesh.viewportIndex)
         inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInViewportIndex] = availPerPrimitiveExportLoc++;
     }
+
+    inOutUsage.mesh.vertexGenericOutputExportCount = inOutUsage.outputMapLocCount;
+    inOutUsage.mesh.primitiveGenericOutputExportCount = inOutUsage.perPrimitiveOutputMapLocCount;
 
     inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, availOutMapLoc);
     inOutUsage.perPrimitiveOutputMapLocCount =
@@ -3011,25 +2988,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
       if (m_shaderStage == ShaderStage::Geometry)
         inOutUsage.gs.outLocCount[streamId] = std::max(inOutUsage.gs.outLocCount[streamId], newLocMappedTo + 1);
     }
-
-    // After location mapping is done, we update the location/components map of mesh shader vertex outputs with new
-    // locations.
-    if (m_shaderStage == ShaderStage::Mesh) {
-      // Make a copy and clear the old map
-      auto vertexOutputComponents = inOutUsage.mesh.vertexOutputComponents;
-      inOutUsage.mesh.vertexOutputComponents.clear();
-
-      // Setup a new map with new locations
-      for (auto &locInfoPair : outputLocInfoMap) {
-        const unsigned location = locInfoPair.first.getLocation();
-        const unsigned newLocation = locInfoPair.second.getLocation();
-
-        if (vertexOutputComponents.count(location) == 0)
-          continue; // Skip if not found
-
-        inOutUsage.mesh.vertexOutputComponents[newLocation] = vertexOutputComponents[location];
-      }
-    }
   }
 
   //
@@ -3121,25 +3079,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 
       assert(newLocMappedTo != InvalidValue);
       locPair.second = newLocMappedTo;
-    }
-
-    // After location mapping is done, we update the location/components map of mesh shader primitive outputs with
-    // new locations.
-    if (m_shaderStage == ShaderStage::Mesh) {
-      // Make a copy and clear the old map
-      auto primitiveOutputComponents = inOutUsage.mesh.primitiveOutputComponents;
-      inOutUsage.mesh.primitiveOutputComponents.clear();
-
-      // Setup a new map with new locations
-      for (auto &locPair : perPrimitiveOutputLocMap) {
-        const unsigned location = locPair.first;
-        const unsigned newLocation = locPair.second;
-
-        if (primitiveOutputComponents.count(location) == 0)
-          continue; // Skip if not found
-
-        inOutUsage.mesh.primitiveOutputComponents[newLocation] = primitiveOutputComponents[location];
-      }
     }
   }
 

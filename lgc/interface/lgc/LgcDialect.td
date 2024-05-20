@@ -254,19 +254,30 @@ def GetMeshBuiltinInputOp : LgcOp<"get.mesh.builtin.input", [Memory<[]>, WillRet
   }];
 }
 
-def WriteMeshOutputOp : LgcOp<"write.mesh.output", [Memory<[]>]> {
-  let arguments = (ins AttrI1:$is_primitive, AttrI32:$location, I32:$location_offset, I32:$component_index, I32:$prim_or_vertex_index, value:$output_value);
+def WriteMeshVertexOutputOp : LgcOp<"write.mesh.vertex.output", [Memory<[]>]> {
+  let arguments = (ins I32:$output_offset, I32:$vertex_index, value:$output_value);
   let results = (outs);
 
-  let summary = "Write mesh shader primitive/vertex outputs";
+  let summary = "Write mesh shader vertex outputs";
   let description = [{
-    In the mesh shader, write mesh shader primitive/vertex outputs to LDS.
+    In the mesh shader, write mesh shader vertex outputs to LDS.
 
-    `is_primitive` indicates if this write is for a primitive output or for a vertex output.
-    `location` is the start location of this output.
-    `location_offset` is the relative location offset of this output, used by arrayed outputs.
-    `component_index` is the component index of this output when component addressing is involved.
-    `prim_or_vertex_index` is the primitive/vertex index specifying which primitive/vertex to write.
+    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed vertex.
+    `vertex_index` is the vertex index specifying which vertex to write.
+    `output_value` is the output value to write.
+  }];
+}
+
+def WriteMeshPrimitiveOutputOp : LgcOp<"write.mesh.primitive.output", [Memory<[]>]> {
+  let arguments = (ins I32:$output_offset, I32:$primitive_index, value:$output_value);
+  let results = (outs);
+
+  let summary = "Write mesh shader primitive outputs";
+  let description = [{
+    In the mesh shader, write mesh shader primitive outputs to LDS.
+
+    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed primitive.
+    `primitive_index` is the primitive index specifying which primitive to write.
     `output_value` is the output value to write.
   }];
 }

@@ -2062,10 +2062,21 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
 void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset,
                                                           Value *compIdx, Value *vertexOrPrimitiveIdx,
                                                           bool isPerPrimitive, BuilderBase &builder) {
-  if (output->getType()->getScalarSizeInBits() == 64)
-    compIdx = builder.CreateShl(compIdx, 1);
+  // outputOffset = (location + locOffset) * 4 + compIdx * (bitWidth == 64 ? 2 : 1)
+  Value *outputOffset = builder.CreateAdd(builder.getInt32(location), locOffset);
+  outputOffset = builder.CreateShl(outputOffset, 2);
 
-  builder.create<WriteMeshOutputOp>(isPerPrimitive, location, locOffset, compIdx, vertexOrPrimitiveIdx, output);
+  auto outputTy = output->getType();
+  if (outputTy->getScalarSizeInBits() == 64) {
+    compIdx = builder.CreateShl(compIdx, 1);
+  }
+
+  outputOffset = builder.CreateAdd(outputOffset, compIdx);
+
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -3388,10 +3399,15 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
 
   (void(builtInUsage)); // Unused
 
-  if (!elemIdx)
-    elemIdx = builder.getInt32(0);
+  // outputOffset = location * 4 + elemIdx
+  Value *outputOffset = builder.getInt32(4 * loc);
+  if (elemIdx)
+    outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
 
-  builder.create<WriteMeshOutputOp>(isPerPrimitive, loc, builder.getInt32(0), elemIdx, vertexOrPrimitiveIdx, output);
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
