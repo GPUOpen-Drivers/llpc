@@ -48,6 +48,20 @@ class CooperativeRowAccExpandOp;
 class CooperativeRowAccSumAccumulateOp;
 class CooperativeRowAccScalarOp;
 
+class CooperativeMatrixLoadOp;
+class CooperativeMatrixStoreOp;
+class CooperativeMatrixLengthOp;
+class CooperativeMatrixFillOp;
+class CooperativeMatrixExtractOp;
+class CooperativeMatrixInsertOp;
+class CooperativeMatrixConvertOp;
+class CooperativeMatrixTransposeOp;
+class CooperativeMatrixBinaryOp;
+class CooperativeMatrixTimesScalarOp;
+class CooperativeMatrixMulAddOp;
+class CooperativeMatrixPackOp;
+class CooperativeMatrixUnPackOp;
+
 // =====================================================================================================================
 // Pass to lower coopMatrix calls
 class LowerCooperativeMatrix : public Patch, public llvm::PassInfoMixin<LowerCooperativeMatrix> {
@@ -59,7 +73,7 @@ public:
   void visitCallInst(llvm::CallInst &callInst);
 
 private:
-  void processCoopMatrixFunction(llvm::ArrayRef<llvm::Function *> coopMatrixCallees);
+  void processCoopMatrixFunction(llvm::Module &module);
 
   struct TypeProperties {
     // Number of (true) elements per lane.
@@ -91,18 +105,26 @@ private:
     unsigned microCount;
   };
 
-  unsigned getLength(CooperativeMatrixLayout layout) const;
-
   TypeProperties getTypeProperties(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout) const;
 
   ComputeAddressInfo computeAddressing(CooperativeMatrixLayout layout, CooperativeMatrixElementType elemType,
                                        int waveSize, llvm::Value *stride, bool isColMajor,
                                        llvm::Instruction *insertPos);
 
-  llvm::Value *cooperativeMatrixLoadInternal(llvm::Value *dataPtr, llvm::Value *stride, bool colMajor,
-                                             CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                             unsigned memoryAccess, unsigned alignment, const llvm::Twine &instName,
-                                             llvm::Instruction *insertPos);
+  void visitCooperativeMatrixLengthOp(CooperativeMatrixLengthOp &matrixlength);
+  void visitCooperativeMatrixLoadOp(CooperativeMatrixLoadOp &load);
+  void visitCooperativeMatrixStoreOp(CooperativeMatrixStoreOp &store);
+  void visitCooperativeMatrixFillOp(CooperativeMatrixFillOp &fill);
+  void visitCooperativeMatrixExtractOp(CooperativeMatrixExtractOp &extract);
+  void visitCooperativeMatrixInsertOp(CooperativeMatrixInsertOp &insert);
+  void visitCooperativeMatrixConvertOp(CooperativeMatrixConvertOp &convert);
+  void visitCooperativeMatrixTransposeOp(CooperativeMatrixTransposeOp &transpose);
+  void visitCooperativeMatrixBinaryOp(CooperativeMatrixBinaryOp &binary);
+  void visitCooperativeMatrixTimesScalarOp(CooperativeMatrixTimesScalarOp &timesscalar);
+  void visitCooperativeMatrixMulAddOp(CooperativeMatrixMulAddOp &muladd);
+  void visitCooperativeMatrixPackOp(CooperativeMatrixPackOp &pack);
+  void visitCooperativeMatrixUnPackOp(CooperativeMatrixUnPackOp &unpack);
+
   // Convert vector data to cooperativeMatrix vec data
   // eg. v16*data_In_Buffer-->v8*coopMatrix_data as two 16bits elements packed.
   llvm::Value *convFlatVecToCoopMatrixVec(BuilderCommon &builder, llvm::Value *vecValue,
@@ -111,32 +133,6 @@ private:
   // Convert cooperativeMatrix vec data to vec data.
   llvm::Value *convCoopMatrixVecToFlatVec(BuilderCommon &builder, llvm::Value *matrixValue,
                                           CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
-
-  // Create cooperative matrix store operation
-  void cooperativeMatrixStoreInternal(llvm::Value *dataPtr, llvm::Value *stride, bool colMajor,
-                                      CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                      unsigned memoryAccess, unsigned alignment, llvm::Value *&vecVal,
-                                      const llvm::Twine &instName, llvm::Instruction *insertPos);
-
-  // Open-code cooperative matrix extract operation
-  llvm::Value *cooperativeMatrixExtract(BuilderCommon &builder, llvm::Value *matrix, llvm::Value *index,
-                                        CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
-
-  // Open-code cooperative matrix insert operation
-  llvm::Value *cooperativeMatrixInsert(BuilderCommon &builder, llvm::Value *matrix, llvm::Value *value,
-                                       llvm::Value *index, CooperativeMatrixElementType elemType,
-                                       CooperativeMatrixLayout layout);
-
-  // Open-code cooperative matrix fill operation
-  llvm::Value *cooperativeMatrixFill(BuilderCommon &builder, llvm::Value *value, CooperativeMatrixElementType elemType,
-                                     CooperativeMatrixLayout layout);
-
-  // Create cooperative matrix convert operation
-  llvm::Value *cooperativeMatrixConvert(llvm::CastInst::CastOps castOp, llvm::Value *source,
-                                        CooperativeMatrixElementType srcElemType,
-                                        CooperativeMatrixElementType dstElemType, CooperativeMatrixLayout srclayout,
-                                        CooperativeMatrixLayout dstlayout, const llvm::Twine &instName,
-                                        llvm::Instruction *insertPos);
 
   // Create cooperative matrix convert operation without reshape operation
   llvm::Value *cooperativeMatrixConvertInternal(llvm::CastInst::CastOps castOp, llvm::Value *source,
@@ -187,11 +183,6 @@ private:
                                                     CooperativeMatrixLayout srcLayout,
                                                     CooperativeMatrixLayout dstLayout, const llvm::Twine &instName,
                                                     llvm::Instruction *insertPos);
-
-  // Create cooperative matrix transpose operation
-  llvm::Value *cooperativeMatrixTranspose(llvm::Value *matrix, CooperativeMatrixElementType elemType,
-                                          CooperativeMatrixLayout srcLayout, const llvm::Twine &instName,
-                                          llvm::Instruction *insertPos);
 
   llvm::Value *transposeCooperativeMatrixRecursively(llvm::Value *matrix, unsigned vecStride, unsigned laneStride,
                                                      llvm::Value *threadId, BuilderBase &builder);

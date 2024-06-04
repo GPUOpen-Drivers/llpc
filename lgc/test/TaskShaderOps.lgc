@@ -36,7 +36,7 @@
 ; CHECK-NEXT: [[newBaseAddr:%[0-9]*]] = add nuw nsw i64 [[baseAddr]], [[wrappedEntryIndex64]]
 ; CHECK-NEXT: [[newDescWord0:%[0-9]*]] = trunc i64 [[newBaseAddr]] to i32
 ; CHECK-NEXT: [[newBaseAddrHi64:%[a-z.]*]] = lshr i64 [[newBaseAddr]], 32
-; CHECK-NEXT: [[newBaseAddrHi32:%[0-9]*]] = trunc i64 [[newBaseAddrHi64]] to i32
+; CHECK-NEXT: [[newBaseAddrHi32:%[0-9]*]] = trunc {{(nuw nsw )?}}i64 [[newBaseAddrHi64]] to i32
 ; CHECK-NEXT: [[newBaseAddrHi:%[0-9]*]] = and i32 [[newBaseAddrHi32]], 65535
 ; CHECK-NEXT: [[newDescWord1Tmp:%[0-9]*]] = and i32 [[descWord1]], -65536
 ; CHECK-NEXT: [[newDescWord1:%[0-9]*]] = or {{(disjoint )?}}i32 [[newDescWord1Tmp]], [[newBaseAddrHi]]

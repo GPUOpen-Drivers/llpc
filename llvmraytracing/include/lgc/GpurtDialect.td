@@ -38,6 +38,15 @@ def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def V2I32 : TgConstant<(FixedVectorType I32, 2)>, Type;
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 
+def PairStructType : BuiltinType {
+  let arguments = (args type:$self, type:$ele_type);
+  let evaluate = "::llvm::StructType::get($_context, {$ele_type, $ele_type})";
+  let check = "$self->isStructTy()";
+  let capture = [];
+}
+
+def StoreStackTy : TgConstant<(PairStructType I32)>, Type;
+
 def GpurtGetStackSizeOp : GpurtOp<"get.stack.size", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
@@ -82,17 +91,24 @@ def GpurtGetStackStrideOp : GpurtOp<"get.stack.stride", [Memory<[]>, WillReturn]
 }
 
 def GpurtLdsStackInitOp : GpurtOp<"lds.stack.init", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+  let arguments = (ins AttrI1:$use_extra_stack);
   let results = (outs I32:$result);
   let summary = "return the initial stack dword position for use with lds.stack.store";
+  let description = [{
+    Initialize the lds/(scratch buffer) stack at index position
+
+    Setting use_extra_stack to true means this initialize will perform on an extra piece of stack to avoid traversal stack conflict.
+  }];
 }
 
 def GpurtLdsStackStoreOp : GpurtOp<"lds.stack.store", [Memory<[(write)]>, WillReturn]> {
-  let arguments = (ins PrivatePointer:$new_pos, I32:$old_pos, V4I32:$data);
-  let results = (outs I32:$result);
+  let arguments = (ins I32:$old_pos, I32:$last_node, V4I32:$data);
+  let results = (outs StoreStackTy:$result);
   let summary = "perform a combined lds stack push and pop operation.";
   let description = [{
-    this pushes $data and pops a dword from the stack, and data and positions are interpreted according to the ds_bvh_stack_rtn instruction.
+    lds.stack.store pushes $data onto the stack and returns a struct of a popped nodePtr and
+    the new stackAddress (stack position),
+    The nodePtr and stackAddress are interpreted as by the ds_bvh_stack_rtn instruction.
   }];
 }
 
@@ -102,10 +118,28 @@ def GpurtFloatWithRoundModeOp : GpurtOp<"rt.floatop.roundmode", [Memory<[]>, Wil
   let summary = "return result of floatOp with roundmode";
 }
 
+def GpurtWaveScanOp : GpurtOp<"rt.scanop.wavescan", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$operation, I32:$flags, (ScalarOrFixedVector F32):$src0);
+  let results = (outs (eq $src0):$result);
+  let summary = "return result of wavescan with waveop";
+}
+
 def GpurtGetBoxSortHeuristicModeOp : GpurtOp<"get.box.sort.heuristic.mode", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
   let summary = "return the box sort heuristic mode";
+}
+
+def GpurtGetKnownSetRayFlagsOp : GpurtOp<"get.known.set.ray.flags", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the known-set bits of the traceRay specialization flags";
+}
+
+def GpurtGetKnownUnsetRayFlagsOp : GpurtOp<"get.known.unset.ray.flags", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the known-unset bits of the traceRay specialization flags";
 }
 
 def GpurtGetStaticFlagsOp : GpurtOp<"get.static.flags", [Memory<[]>, WillReturn]> {
@@ -264,6 +298,16 @@ def GpurtCallIntersectionShaderOp : GpurtOp<"call.intersection.shader", [Memory<
     - any_hit_shader_id: AnyHit shader identifier.
 
     - table_index: Hit group shader record index.
+  }];
+}
+
+def GpurtSetHitTokenDataOp : GpurtOp<"set.hit.token.data", [Memory<[(write InaccessibleMem)]>, WillReturn]> {
+  let arguments =  (ins I32:$arg0, I32:$arg1);
+  let results = (outs);
+
+  let summary = "Set hit token data";
+  let description = [{
+    Set hit token data.
   }];
 }
 

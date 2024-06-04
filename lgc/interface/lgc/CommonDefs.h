@@ -149,8 +149,11 @@ enum AddrSpace {
 // Max number of threads per subgroup in NGG mode.
 constexpr unsigned NggMaxThreadsPerSubgroup = 256;
 
-// Max number of waves per subgroup in NGG mode.
-constexpr unsigned NggMaxWavesPerSubgroup = NggMaxThreadsPerSubgroup / 32;
+// Max number of GS primitive amplifier defined by GE_NGG_SUBGRP_CNTL.PRIM_AMP_FACTOR.
+// NOTE: There are 9 bits that program the register field to launch 511 threads at most though it is not
+// documented in HW spec. HW spec says the maximum value is 256 and this value might be limited by rasterization.
+// In experiments, we find it is able to launch 511 threads.
+constexpr unsigned NggMaxPrimitiveAmplifier = 511;
 
 constexpr unsigned EsVertsOffchipGsOrTess = 250;
 constexpr unsigned GsPrimsOffchipGsOrTess = 126;

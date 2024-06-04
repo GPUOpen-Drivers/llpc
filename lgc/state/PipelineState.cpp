@@ -1542,8 +1542,11 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
     checkingStage = hasShaderStage(ShaderStage::TessEval) ? ShaderStage::TessEval : ShaderStage::Vertex;
   }
 
-  if (checkingStage == ShaderStage::Compute)
-    m_waveSize[checkingStage] = m_shaderModes.getComputeShaderMode().subgroupSize;
+  if (checkingStage == ShaderStage::Compute) {
+    const unsigned subgroupSize = m_shaderModes.getComputeShaderMode().subgroupSize;
+    m_waveSize[checkingStage] = subgroupSize;
+    m_subgroupSize[checkingStage] = subgroupSize;
+  }
 
   if (!m_waveSize[checkingStage]) {
     unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
@@ -1686,7 +1689,7 @@ bool PipelineState::enableSwXfb() {
   lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
 
   if (lastVertexStage == ShaderStage::Invalid) {
-    assert(isUnlinked()); // Unlinked pipeline only having fragment shader.
+    assert(isUnlinked()); // Unlinked fragment shader or part-pipeline
     return false;
   }
 

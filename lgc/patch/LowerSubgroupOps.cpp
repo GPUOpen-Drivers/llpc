@@ -63,6 +63,9 @@ PreservedAnalyses LowerSubgroupOps::run(Module &module, ModuleAnalysisManager &a
                                   .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                                   .add(&LowerSubgroupOps::visitElect)
                                   .add(&LowerSubgroupOps::visitAny)
+                                  .add(&LowerSubgroupOps::visitAll)
+                                  .add(&LowerSubgroupOps::visitAllEqual)
+                                  .add(&LowerSubgroupOps::visitRotate)
                                   .build();
   visitor.visit(*this, module);
   m_builder = nullptr;
@@ -84,6 +87,22 @@ void LowerSubgroupOps::visitElect(SubgroupElectOp &op) {
 void LowerSubgroupOps::visitAny(SubgroupAnyOp &op) {
   m_builder->SetInsertPoint(&op);
   replace(op, m_builder->CreateSubgroupAny(op.getValue()));
+}
+
+void LowerSubgroupOps::visitAll(SubgroupAllOp &op) {
+  m_builder->SetInsertPoint(&op);
+  replace(op, m_builder->CreateSubgroupAll(op.getValue()));
+}
+
+void LowerSubgroupOps::visitAllEqual(SubgroupAllEqualOp &op) {
+  m_builder->SetInsertPoint(&op);
+  replace(op, m_builder->CreateSubgroupAllEqual(op.getValue()));
+}
+
+void LowerSubgroupOps::visitRotate(SubgroupRotateOp &op) {
+  m_builder->SetInsertPoint(&op);
+  Value *cs = op.getClusterSize();
+  replace(op, m_builder->CreateSubgroupRotate(op.getValue(), op.getDelta(), isa<PoisonValue>(cs) ? nullptr : cs));
 }
 
 } // namespace lgc

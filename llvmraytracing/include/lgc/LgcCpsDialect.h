@@ -48,7 +48,7 @@ enum class RayTracingShaderStage;
 
 namespace lgc::cps {
 enum class CpsLevel : uint8_t {
-  RayGen = 0,
+  RayGen = 1,
   ClosestHit_Miss_Callable,
   Traversal,
   AnyHit_CombinedIntersection_AnyHit,

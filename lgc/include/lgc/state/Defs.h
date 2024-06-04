@@ -73,21 +73,6 @@ const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
 const static char TcsPassthroughEntryPoint[] = "lgc.shader.TCS.passthrough.main";
 
-const static char CooperativeMatrix[] = "lgc.cooperative.matrix";
-const static char CooperativeMatrixLength[] = "lgc.cooperative.matrix.length";
-const static char CooperativeMatrixExtract[] = "lgc.cooperative.matrix.extract";
-const static char CooperativeMatrixInsert[] = "lgc.cooperative.matrix.insert";
-const static char CooperativeMatrixFill[] = "lgc.cooperative.matrix.fill";
-const static char CooperativeMatrixLoad[] = "lgc.cooperative.matrix.load";
-const static char CooperativeMatrixStore[] = "lgc.cooperative.matrix.store";
-const static char CooperativeMatrixConvert[] = "lgc.cooperative.matrix.convert";
-const static char CooperativeMatrixBinOp[] = "lgc.cooperative.matrix.binop";
-const static char CooperativeMatrixTimesScalar[] = "lgc.cooperative.matrix.times.scalar";
-const static char CooperativeMatrixTranspose[] = "lgc.cooperative.matrix.transpose";
-const static char CooperativeMatrixMulAdd[] = "lgc.cooperative.matrix.muladd";
-const static char CooperativeMatrixPack[] = "lgc.cooperative.matrix.pack";
-const static char CooperativeMatrixUnpack[] = "lgc.cooperative.matrix.unpack";
-
 } // namespace lgcName
 
 // Value for high half of address that means "use PC".

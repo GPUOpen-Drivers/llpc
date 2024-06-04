@@ -54,17 +54,15 @@ void main() {
 // CHECK-NEXT:    v_mov_b32_e32 v2, 0xff800000
 // CHECK-NEXT:    s_not_b64 exec, exec
 // CHECK-NEXT:    s_or_saveexec_b64 s[2:3], -1
-// CHECK-NEXT:    v_mov_b32_e32 v3, 0xff800000
-// CHECK-NEXT:    v_mov_b32_e32 v4, 0xff800000
 // CHECK-NEXT:    v_mov_b32_dpp v1, v2 row_shr:1 row_mask:0xf bank_mask:0xf
-// CHECK-NEXT:    v_cmp_gt_u32_e64 s[0:1], 32, v0
-// CHECK-NEXT:    v_mov_b32_dpp v3, v2 row_shr:2 row_mask:0xf bank_mask:0xf
-// CHECK-NEXT:    v_mov_b32_dpp v4, v2 row_shr:3 row_mask:0xf bank_mask:0xf
-// CHECK-NEXT:    v_max_f32_e32 v1, v2, v1
-// CHECK-NEXT:    v_mov_b32_e32 v2, 0xff800000
-// CHECK-NEXT:    v_max3_f32 v1, v1, v3, v4
 // CHECK-NEXT:    v_mov_b32_e32 v3, 0xff800000
 // CHECK-NEXT:    v_lshlrev_b64 v[4:5], v0, 1
+// CHECK-NEXT:    v_cmp_gt_u32_e64 s[0:1], 32, v0
+// CHECK-NEXT:    v_max_f32_e32 v1, v2, v1
+// CHECK-NEXT:    v_mov_b32_e32 v2, 0xff800000
+// CHECK-NEXT:    v_mov_b32_dpp v3, v1 row_shr:2 row_mask:0xf bank_mask:0xf
+// CHECK-NEXT:    v_max_f32_e32 v1, v1, v3
+// CHECK-NEXT:    v_mov_b32_e32 v3, 0xff800000
 // CHECK-NEXT:    v_mov_b32_dpp v2, v1 row_shr:4 row_mask:0xf bank_mask:0xe
 // CHECK-NEXT:    v_max_f32_e32 v1, v1, v2
 // CHECK-NEXT:    v_and_b32_e32 v2, 0xffff0000, v4

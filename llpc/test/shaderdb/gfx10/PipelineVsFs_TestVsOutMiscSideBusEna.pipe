@@ -193,7 +193,7 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .entry_point:    _amdgpu_ps_main
 ; SHADERTEST-NEXT:         .float_mode:     0xc0
 ; SHADERTEST-NEXT:         .ieee_mode:      false
-; SHADERTEST-NEXT:         .mem_ordered:    true
+; SHADERTEST:         .mem_ordered:    true
 ; SHADERTEST-NEXT:         .scratch_en:     false
 ; SHADERTEST-NEXT:         .scratch_memory_size: 0
 ; SHADERTEST-NEXT:         .sgpr_count:     0x2
@@ -246,7 +246,7 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .entry_point:    _amdgpu_vs_main
 ; SHADERTEST-NEXT:         .float_mode:     0xc0
 ; SHADERTEST-NEXT:         .ieee_mode:      false
-; SHADERTEST-NEXT:         .mem_ordered:    true
+; SHADERTEST:         .mem_ordered:    true
 ; SHADERTEST-NEXT:         .scratch_en:     false
 ; SHADERTEST-NEXT:         .scratch_memory_size: 0
 ; SHADERTEST-NEXT:         .sgpr_count:     0x3

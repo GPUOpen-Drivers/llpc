@@ -35,6 +35,7 @@
 
 namespace llvm {
 class Function;
+class GlobalObject;
 class Module;
 class Type;
 } // namespace llvm
@@ -44,11 +45,24 @@ namespace lgc {
 // Set shader stage metadata on every defined function in a module
 void setShaderStage(llvm::Module *module, std::optional<ShaderStageEnum> stage);
 
-// Set shader stage metadata on a function
-void setShaderStage(llvm::Function *func, std::optional<ShaderStageEnum> stage);
+// Set shader stage metadata on a function.
+// This can instead be a GlobalVariable; that functionality is not used by LGC,
+// but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+// from the cache, and wants to mark it with a shader stage
+void setShaderStage(llvm::GlobalObject *func, std::optional<ShaderStageEnum> stage);
 
 // Gets the shader stage from the specified LLVM function.
-std::optional<ShaderStageEnum> getShaderStage(const llvm::Function *func);
+// This can instead be a GlobalVariable; that functionality is not used by LGC,
+// but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+// from the cache, and wants to mark it with a shader stage
+std::optional<ShaderStageEnum> getShaderStage(const llvm::GlobalObject *func);
+
+// Set a function's shader subtype. Only has an effect on a compute shader or non-shader export function,
+// where it causes the .shader_subtype PAL metadata item to be set to the arbitrary string given here.
+void setShaderSubtype(llvm::GlobalObject *func, llvm::StringRef subtype);
+
+// Get a function's shader subtype, or "" if none.
+llvm::StringRef getShaderSubtype(llvm::GlobalObject *func);
 
 // Determine whether the function is a shader entry-point.
 bool isShaderEntryPoint(const llvm::Function *func);

@@ -458,7 +458,9 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
   // Just according to the dualSourceBlendEnable flag.
   Value *dynamicIsDualSource = builder.getInt32(0);
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-    dynamicIsDualSource = ShaderInputs::getSpecialUserData(UserDataMapping::DynamicDualSrcBlendInfo, builder);
+    dynamicIsDualSource = ShaderInputs::getSpecialUserData(UserDataMapping::CompositeData, builder);
+    dynamicIsDualSource = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                                  {dynamicIsDualSource, builder.getInt32(7), builder.getInt32(1)});
   }
 
   bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();

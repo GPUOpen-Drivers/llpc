@@ -40,7 +40,7 @@
 
 namespace lgc {
 
-class LoadBufferAddrOp;
+class ExtendAddressOp;
 class LoadBufferDescOp;
 class LoadStridedBufferDescOp;
 
@@ -52,7 +52,7 @@ public:
   static llvm::StringRef name() { return "Lower buffer descriptor loads"; }
 
 private:
-  void visitLoadBufferAddr(LoadBufferAddrOp &op);
+  void visitExtendAddress(ExtendAddressOp &op);
   void visitLoadBufferDesc(LoadBufferDescOp &op);
   void visitLoadStridedBufferDesc(LoadStridedBufferDescOp &op);
   llvm::SmallVector<llvm::Instruction *> m_toErase;

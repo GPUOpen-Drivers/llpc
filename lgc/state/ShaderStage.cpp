@@ -43,6 +43,7 @@ using namespace llvm;
 // Named metadata node used on a function to show what shader stage it is part of
 namespace {
 const static char ShaderStageMetadata[] = "lgc.shaderstage";
+const static char ShaderSubtypeMetadata[] = "lgc.shadersubtype";
 } // anonymous namespace
 
 // =====================================================================================================================
@@ -70,9 +71,11 @@ void lgc::setShaderStage(Module *module, std::optional<ShaderStageEnum> stage) {
 // =====================================================================================================================
 // Set shader stage metadata on a function
 //
-// @param [in/out] func : Function to set shader stage on
+// @param [in/out] func : Function to mark. This can instead be a GlobalVariable; that functionality is not used
+//                        by LGC, but can be used by a front-end that uses a GlobalVariable to represent a
+//                        part-pipeline retrieved from the cache, and wants to mark it with a shader stage
 // @param stage : Shader stage to set or ShaderStage::Invalid
-void lgc::setShaderStage(Function *func, std::optional<ShaderStageEnum> stage) {
+void lgc::setShaderStage(GlobalObject *func, std::optional<ShaderStageEnum> stage) {
   unsigned mdKindId = func->getContext().getMDKindID(ShaderStageMetadata);
   if (stage) {
     auto stageMetaNode =
@@ -86,13 +89,37 @@ void lgc::setShaderStage(Function *func, std::optional<ShaderStageEnum> stage) {
 // =====================================================================================================================
 // Gets the shader stage from the specified LLVM function. Returns ShaderStage::Invalid if metadata not found.
 //
-// @param func : LLVM function
-std::optional<ShaderStageEnum> lgc::getShaderStage(const Function *func) {
+// @param func : LLVM function. This can instead be a GlobalVariable; that functionality is not used by LGC,
+//               but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+//               from the cache, and wants to mark it with a shader stage
+std::optional<ShaderStageEnum> lgc::getShaderStage(const GlobalObject *func) {
   // Check for the metadata that is added by PipelineState::link.
   MDNode *stageMetaNode = func->getMetadata(ShaderStageMetadata);
   if (stageMetaNode)
     return ShaderStageEnum(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
   return std::nullopt;
+}
+
+// =====================================================================================================================
+// Set a function's shader subtype. Only has an effect on a compute shader or non-shader export function,
+// where it causes the .shader_subtype PAL metadata item to be set to the arbitrary string given here.
+void lgc::setShaderSubtype(GlobalObject *func, StringRef subtype) {
+  unsigned mdKindId = func->getContext().getMDKindID(ShaderSubtypeMetadata);
+  if (!subtype.empty()) {
+    auto node = MDNode::get(func->getContext(), MDString::get(func->getContext(), subtype));
+    func->setMetadata(mdKindId, node);
+  } else
+    func->eraseMetadata(mdKindId);
+}
+
+// =====================================================================================================================
+// Get a function's shader subtype, or "" if none.
+llvm::StringRef lgc::getShaderSubtype(GlobalObject *func) {
+  MDNode *node = func->getMetadata(ShaderSubtypeMetadata);
+  if (!node)
+    return "";
+  MDString *stringNode = cast<MDString>(node->getOperand(0));
+  return stringNode->getString();
 }
 
 // =====================================================================================================================
@@ -166,7 +193,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
     block->insertInto(newFunc);
   }
 
-  // Copy attributes and shader stage from the old function. The new arguments have InReg set iff the corresponding
+  // Copy attributes from the old function. The new arguments have InReg set iff the corresponding
   // bit is set in inRegMask.
   AttributeList oldAttrList = oldFunc->getAttributes();
   SmallVector<AttributeSet, 8> argAttrs;
@@ -192,8 +219,9 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   newFunc->setAttributes(
       AttributeList::get(oldFunc->getContext(), oldAttrList.getFnAttrs(), oldAttrList.getRetAttrs(), argAttrs));
 
-  // Set the shader stage on the new function (implemented with IR metadata).
+  // Set the shader stage and shader subtype on the new function (implemented with IR metadata).
   setShaderStage(newFunc, getShaderStage(oldFunc));
+  setShaderSubtype(newFunc, getShaderSubtype(oldFunc));
 
   // Replace uses of the old args.
   // Set inreg attributes correctly. We have to use removeAttr because arg attributes are actually attached

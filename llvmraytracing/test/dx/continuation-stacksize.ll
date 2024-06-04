@@ -1,13 +1,11 @@
 ; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' \
-; RUN:     -S %s 2> %t0.stderr | FileCheck -check-prefix=POSTPROCESS-STACKSIZE %s
-; RUN: count 0 < %t0.stderr
+; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=POSTPROCESS-STACKSIZE %s
 ; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' \
-; RUN:     -S %s 2> %t1.stderr | FileCheck -check-prefix=POSTPROCESS-STATESIZE %s
-; RUN: count 0 < %t1.stderr
+; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=POSTPROCESS-STATESIZE %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
 
-target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
+target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
 %dx.types.Handle = type { i8* }
 %struct.DispatchSystemData = type { i32 }
@@ -42,6 +40,10 @@ declare !types !17 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTrian
 ; Function Attrs: nounwind memory(none)
 declare !types !19 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
 
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+  ret void
+}
+
 ; Function Attrs: alwaysinline
 define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #0 !types !21 {
   ret i32 5
@@ -69,9 +71,9 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !typ
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
 
-; POSTPROCESS-STACKSIZE-DAG: define void @main(){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
+; POSTPROCESS-STACKSIZE-DAG: define void @main({{.*}}){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; POSTPROCESS-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
-; POSTPROCESS-STATESIZE-DAG: define void @main(){{.*}} !continuation.state ![[main_state:[0-9]+]]
+; POSTPROCESS-STATESIZE-DAG: define void @main({{.*}}){{.*}} !continuation.state ![[main_state:[0-9]+]]
 ; POSTPROCESS-STATESIZE-DAG: ![[main_state]] = !{i32 0}
 
 define void @main() {
@@ -102,7 +104,7 @@ define void @mainTrace() {
   ret void
 }
 
-; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define %struct.DispatchSystemData @called(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]
+; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define %struct.DispatchSystemData @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 144}
 
 ; CLEANUP-STACKSIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]

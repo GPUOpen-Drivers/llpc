@@ -80,9 +80,18 @@ public:
   // Dump the module to stderr (for debugging).
   void dump() const;
 
-  bool IsNewDbgInfoFormat = false;
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 494698
+  // API used by PassManager.h.
+  void setIsNewDbgInfoFormat(bool UseNewFormat) {
+    IsNewDbgInfoFormat = UseNewFormat;
+    assert(isNormalized());
+    for (const std::unique_ptr<Module> &Entry : Modules)
+      Entry->setIsNewDbgInfoFormat(UseNewFormat);
+  }
 
-  void setIsNewDbgInfoFormat(bool UseNewFormat) { llvm_unreachable("Should never be called!"); }
+  // Public field used by PassManager.h.
+  bool IsNewDbgInfoFormat = false;
+#endif
 
 private:
   SmallVector<std::unique_ptr<Module>> Modules;

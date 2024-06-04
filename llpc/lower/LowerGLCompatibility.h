@@ -32,6 +32,7 @@
 
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
+#include "lgc/Builder.h"
 #include "llvm/IR/PassManager.h"
 
 namespace Llpc {
@@ -62,19 +63,37 @@ private:
   bool needLowerBackColor();
   bool needLowerFrontSecondaryColor();
   bool needLowerBackSecondaryColor();
+  bool needEmulateDrawPixels();
+  bool needEmulateTwoSideLighting();
+  bool needEmulateBitmap();
+  bool needLowerFragColor();
+  MDTuple *createInOutMd(const ShaderInOutMetadata &md);
+  MDTuple *createBuiltInInOutMd(lgc::BuiltInKind builtIn);
   void createClipDistance();
   void createClipPlane();
+  void createBackColor();
+  void createBackSecondaryColor();
+  void createFrontFacing();
+  void createPatchTexCoord();
+  void createFragDepth();
+  void createFragStencilRef();
   void emulateStoreClipVertex();
   void emulationOutputColor(llvm::User *color);
+  void emulateDrawPixels();
+  void emulateTwoSideLighting();
+  void emulateBitmap();
   void lowerClipVertex();
   void lowerColor(llvm::User *color);
   void lowerFrontColor();
   void lowerBackColor();
   void lowerFrontSecondaryColor();
   void lowerBackSecondaryColor();
+  void lowerFragColor();
 
   llvm::SmallVector<llvm::CallInst *> m_emitCalls; // "Call" instructions to emit vertex (geometry shader).
   llvm::ReturnInst *m_retInst;                     // "Return" of the entry point.
+  llvm::BasicBlock *m_entryPointEnd;               // The end block of the entry point, use for early return.
+  llvm::BasicBlock *m_originalEntryBlock;          // The original entry block of entry point.
 
   // The resource use to lower gl_ClipVertex
   llvm::User *m_out;                 // The global variable of gl_out[]
@@ -85,6 +104,14 @@ private:
   llvm::User *m_backColor;           // The global variable of gl_BackColor
   llvm::User *m_frontSecondaryColor; // The global variable of gl_FrontSecondaryColor
   llvm::User *m_backSecondaryColor;  // The global variable of gl_BackSecondaryColor
+  llvm::User *m_color;               // The global variable of gl_Color
+  llvm::User *m_secondaryColor;      // The fragment input, global variable of gl_SecondaryColor
+  llvm::User *m_frontFacing;         // The fragment input, global variable of gl_FrontFacing
+  llvm::User *m_patchTexCoord;       // The internal variable of patchTexCoord
+  llvm::User *m_fragColor;      // The fragment output, it can be gl_FragColor or user define fragment shader output
+  llvm::User *m_fragDepth;      // The fragment output, it can be gl_FragDepth or user define fragment shader output
+  llvm::User *m_fragStencilRef; // The fragment output, it can be gl_FragStencilRefAMD or gl_FragStencilRefARB or user
+                                // define fragment shader output
 };
 
 } // namespace Llpc

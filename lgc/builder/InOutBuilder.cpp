@@ -38,6 +38,7 @@
 #include "lgc/util/Internal.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-inout"
 
@@ -108,6 +109,49 @@ Value *BuilderImpl::CreateReadPerVertexInput(Type *resultTy, unsigned location, 
 
   unsigned vertexIndexInt = cast<ConstantInt>(vertexIndex)->getZExtValue();
   Value *result = nullptr;
+
+  if (m_pipelineState->isUnlinked() || m_pipelineState->getOptions().dynamicTopology) {
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
+    resUsage->builtInUsage.fs.useDynamicToplogy = true;
+    auto numVertices = ShaderInputs::getSpecialUserData(UserDataMapping::CompositeData, BuilderBase::get(*this));
+    numVertices = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {numVertices, getInt32(0), getInt32(2)});
+    auto isTriangle = CreateICmpEQ(numVertices, getInt32(3));
+    Instruction *InsertI = &*GetInsertPoint();
+    Instruction *thenInst = nullptr;
+    Instruction *elseInst = nullptr;
+    SplitBlockAndInsertIfThenElse(isTriangle, InsertI, &thenInst, &elseInst);
+
+    BasicBlock *thenBB = thenInst->getParent();
+    BasicBlock *elseBB = elseInst->getParent();
+    BasicBlock *tailBB = InsertI->getParent();
+
+    Value *triValue = nullptr;
+    {
+      SetInsertPoint(thenInst);
+      Value *isOne = nullptr;
+      Value *isTwo = nullptr;
+      getProvokingVertexInfo(&isOne, &isTwo);
+
+      auto V0 = readInput(getInt32((vertexIndexInt + 0) % 3));
+      auto V1 = readInput(getInt32((vertexIndexInt + 1) % 3));
+      auto V2 = readInput(getInt32((vertexIndexInt + 2) % 3));
+      triValue = CreateSelect(isOne, V1, CreateSelect(isTwo, V2, V0));
+    }
+
+    Value *pointOrLineValue = nullptr;
+    {
+      SetInsertPoint(elseInst);
+      pointOrLineValue = readInput(vertexIndex);
+    }
+
+    {
+      SetInsertPoint(&*tailBB->getFirstInsertionPt());
+      auto phiInst = CreatePHI(resultTy, 2);
+      phiInst->addIncoming(triValue, thenBB);
+      phiInst->addIncoming(pointOrLineValue, elseBB);
+      return phiInst;
+    }
+  }
 
   auto vertexCount = m_pipelineState->getVerticesPerPrimitive();
   switch (vertexCount) {
@@ -512,31 +556,6 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
   if (!isOutput && m_shaderStage == ShaderStage::Fragment) {
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
-  }
-
-  if (isOutput && m_shaderStage == ShaderStage::Mesh) {
-    // Record number of components for mesh shader outputs
-    for (unsigned i = 0; i < locationCount; ++i) {
-      unsigned numComponents = 0;
-      if (inOutInfo.getNumComponents() > 4) {
-        assert(locationCount % 2 == 0);        // Must have even number of locations for 64-bit data type
-        assert(inOutInfo.getComponent() == 0); // Start component must be 0 in this case
-        // NOTE: For 64-bit vec3/vec4 data types, they will occupy two consecutive locations, we only record the number
-        // of components to the former one and skip the latter one.
-        if (i % 2 != 0)
-          continue;
-        numComponents = inOutInfo.getNumComponents();
-      } else {
-        numComponents = inOutInfo.getComponent() + inOutInfo.getNumComponents();
-      }
-
-      if (inOutInfo.isPerPrimitive())
-        resUsage->inOutUsage.mesh.primitiveOutputComponents[location + i] = {numComponents,
-                                                                             static_cast<BuiltInKind>(InvalidValue)};
-      else
-        resUsage->inOutUsage.mesh.vertexOutputComponents[location + i] = {numComponents,
-                                                                          static_cast<BuiltInKind>(InvalidValue)};
-    }
   }
 }
 
@@ -1143,21 +1162,78 @@ Value *BuilderImpl::normalizeBaryCoord(InOutInfo inputInfo, Value *iJCoord) {
   hwCoord[1] = CreateExtractElement(iJCoord, 1);
   hwCoord[2] = CreateFSub(CreateFSub(one, hwCoord[0]), hwCoord[1]);
 
-  Value *normalized[3] = {zero, zero, zero};
+  if (m_pipelineState->isUnlinked() || m_pipelineState->getOptions().dynamicTopology) {
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
+    resUsage->builtInUsage.fs.useDynamicToplogy = true;
+    auto numVertices = ShaderInputs::getSpecialUserData(UserDataMapping::CompositeData, BuilderBase::get(*this));
+    numVertices = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {numVertices, getInt32(0), getInt32(2)});
+    auto currentBlock = GetInsertBlock();
+    auto endBlock = currentBlock->splitBasicBlock(numVertices->getNextNode());
+    currentBlock->getTerminator()->eraseFromParent();
+    SetInsertPoint(currentBlock);
+    auto switchInst = CreateSwitch(numVertices, endBlock, 3);
+    BasicBlock *case0 = BasicBlock::Create(getContext(), "case0", currentBlock->getParent(), endBlock);
+    BasicBlock *case1 = BasicBlock::Create(getContext(), "case1", currentBlock->getParent(), endBlock);
+    BasicBlock *case2 = BasicBlock::Create(getContext(), "case2", currentBlock->getParent(), endBlock);
+    switchInst->addCase(getInt32(1), case0);
+    switchInst->addCase(getInt32(2), case1);
+    switchInst->addCase(getInt32(3), case2);
+
+    Value *pointCoord = ConstantVector::get({one, zero, zero});
+    {
+      SetInsertPoint(case0);
+      CreateBr(endBlock);
+    }
+
+    Value *lineCoord = ConstantVector::get({zero, zero, zero});
+    {
+      SetInsertPoint(case1);
+      auto yCoord = CreateFAdd(hwCoord[0], hwCoord[1]);
+      lineCoord = CreateInsertElement(lineCoord, hwCoord[2], uint64_t(0));
+      lineCoord = CreateInsertElement(lineCoord, yCoord, 1);
+      CreateBr(endBlock);
+    }
+
+    Value *triCoord = PoisonValue::get(baryType);
+    {
+      SetInsertPoint(case2);
+      Value *isOne = nullptr;
+      Value *isTwo = nullptr;
+      getProvokingVertexInfo(&isOne, &isTwo);
+
+      Value *barycoord1 = CreateInsertElement(PoisonValue::get(baryType), hwCoord[0], uint64_t(0));
+      barycoord1 = CreateInsertElement(barycoord1, hwCoord[1], 1);
+      barycoord1 = CreateInsertElement(barycoord1, hwCoord[2], 2);
+
+      Value *barycoord0 = CreateShuffleVector(barycoord1, ArrayRef<int>({2, 0, 1}));
+      Value *barycoord2 = CreateShuffleVector(barycoord1, ArrayRef<int>({1, 2, 0}));
+      triCoord = CreateSelect(isOne, barycoord1, CreateSelect(isTwo, barycoord2, barycoord0));
+      CreateBr(endBlock);
+    }
+
+    {
+      SetInsertPoint(&*endBlock->getFirstInsertionPt());
+      auto phiInst = CreatePHI(baryType, 4);
+      phiInst->addIncoming(pointCoord, case0);
+      phiInst->addIncoming(lineCoord, case1);
+      phiInst->addIncoming(triCoord, case2);
+      phiInst->addIncoming(PoisonValue::get(baryType), currentBlock);
+      return phiInst;
+    }
+  }
 
   auto vertexCount = m_pipelineState->getVerticesPerPrimitive();
   switch (vertexCount) {
   case 1:
     // Points
-    normalized[0] = one;
-    break;
+    return ConstantVector::get({one, zero, zero});
   case 2: {
     // Lines
     // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
     auto yCoord = CreateFAdd(hwCoord[0], hwCoord[1]);
-    normalized[0] = hwCoord[2];
-    normalized[1] = yCoord;
-    break;
+    Value *barycoord = CreateInsertElement(ConstantVector::get({zero, zero, zero}), hwCoord[2], uint64_t(0));
+    barycoord = CreateInsertElement(barycoord, yCoord, 1);
+    return barycoord;
   }
   case 3: {
     Value *isOne = nullptr;
@@ -1182,11 +1258,7 @@ Value *BuilderImpl::normalizeBaryCoord(InOutInfo inputInfo, Value *iJCoord) {
     break;
   }
   }
-
-  Value *barycoord = PoisonValue::get(baryType);
-  for (unsigned i = 0; i < 3; ++i)
-    barycoord = CreateInsertElement(barycoord, normalized[i], i);
-  return barycoord;
+  return PoisonValue::get(baryType);
 }
 
 // =====================================================================================================================

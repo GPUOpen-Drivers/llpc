@@ -129,6 +129,7 @@ enum MemberType : unsigned {
   MemberTypeRayTracingShaderExportConfig, // VFX member type: SectionRayTracingShaderExportConfig
   MemberTypeIndirectCalleeSavedRegs,      // VFX member type: SectionIndirectCalleeSavedRegs
   MemberTypeGpurtFuncTable,               // VFX member type: SectionGpurtFuncTable
+  MemberTypeGpurtOption,                  // VFX member type: SectionGpurtOption
   MemberTypeExtendedRobustness,           // VFX member type: SectionExtendedRobustness
   MemberTypeAdvancedBlendInfo,            // VFX member type: SectionAdvancedBlendInfo
   MemberTypeGlAttribLocation,             // GL vertex attribute location
@@ -685,6 +686,33 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, closestHitShader, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, anyHitShader, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderGroup, intersectionShader, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+};
+
+// =====================================================================================================================
+// Represents the sub section shader group
+class SectionGpurtOption : public Section {
+public:
+  typedef Vkgc::GpurtOption SubState;
+
+  SectionGpurtOption() : Section(getAddrTable(), SectionTypeUnset, "gpurtOption") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGpurtOption, nameHash, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGpurtOption, value, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};

@@ -78,6 +78,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitFloatWithRoundMode)
                             .add(&LowerGpuRt::visitGpurtDispatchThreadIdFlatOp)
                             .add(&LowerGpuRt::visitContinuationStackIsGlobalOp)
+                            .add(&LowerGpuRt::visitWaveScanOp)
                             .build();
 
   visitor.visit(*this, module);
@@ -149,7 +150,10 @@ void LowerGpuRt::createGlobalStack(Module &module) {
                               payload.needGlobalStack = true;
                               payload.needExtraStack |= op.getUseExtraStack();
                             })
-                            .add<GpurtLdsStackInitOp>([](auto &payload, auto &op) { payload.needGlobalStack = true; })
+                            .add<GpurtLdsStackInitOp>([](auto &payload, auto &op) {
+                              payload.needGlobalStack = true;
+                              payload.needExtraStack |= op.getUseExtraStack();
+                            })
                             .build();
   visitor.visit(payload, module);
 
@@ -272,6 +276,11 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
     stackBasePerThread = m_builder->CreateAdd(localThreadId, groupOf32ThreadSize);
   }
 
+  if (inst.getUseExtraStack()) {
+    auto ldsStackSize = m_builder->getInt32(getWorkgroupSize() * MaxLdsStackEntries);
+    stackBasePerThread = m_builder->CreateAdd(stackBasePerThread, ldsStackSize);
+  }
+
   Value *stackBaseAsInt = m_builder->CreatePtrToInt(
       m_builder->CreateGEP(m_stackTy, m_stack, {m_builder->getInt32(0), stackBasePerThread}), m_builder->getInt32Ty());
 
@@ -338,14 +347,49 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
 }
 
 // =====================================================================================================================
+// Visit "GpurtWaveScanOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitWaveScanOp(lgc::GpurtWaveScanOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+
+  constexpr unsigned int Inclusive = 0x1;
+  constexpr unsigned int Exclusive = 0x2;
+
+  const BuilderDefs::GroupArithOp WaveScanOpTable[] = {
+      BuilderDefs::Nop,  BuilderDefs::FAdd, BuilderDefs::IAdd, BuilderDefs::IAdd, BuilderDefs::FMul, BuilderDefs::IMul,
+      BuilderDefs::IMul, BuilderDefs::FMin, BuilderDefs::SMin, BuilderDefs::UMin, BuilderDefs::FMax, BuilderDefs::SMax,
+      BuilderDefs::UMax, BuilderDefs::Nop,  BuilderDefs::Nop,  BuilderDefs::Nop,
+  };
+
+  auto waveOpCode = cast<ConstantInt>(inst.getOperation())->getZExtValue();
+  auto waveOpFlags = cast<ConstantInt>(inst.getFlags())->getZExtValue();
+  Value *src0 = inst.getSrc0();
+
+  BuilderDefs::GroupArithOp opCode = WaveScanOpTable[waveOpCode];
+
+  assert((waveOpFlags == Inclusive) || (waveOpFlags == Exclusive));
+  assert(opCode != BuilderDefs::Nop);
+
+  Value *result = nullptr;
+  if (waveOpFlags == Inclusive)
+    result = m_builder->CreateSubgroupClusteredInclusive(opCode, src0, m_builder->CreateGetWaveSize());
+  else if (waveOpFlags == Exclusive)
+    result = m_builder->CreateSubgroupClusteredExclusive(opCode, src0, m_builder->CreateGetWaveSize());
+
+  inst.replaceAllUsesWith(result);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
 // Visit "GpurtLdsStackStoreOp" instruction
 //
 // @param inst : The dialect instruction to process
 void LowerGpuRt::visitLdsStackStore(GpurtLdsStackStoreOp &inst) {
   m_builder->SetInsertPoint(&inst);
-  Value *stackAddr = inst.getNewPos();
-  Value *stackAddrVal = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
-  Value *lastVisited = inst.getOldPos();
+  Value *stackAddrVal = inst.getOldPos();
+  Value *lastVisited = inst.getLastNode();
   Value *data = inst.getData();
   // OFFSET = {OFFSET1, OFFSET0}
   // stack_size[1:0] = OFFSET1[5:4]
@@ -356,13 +400,11 @@ void LowerGpuRt::visitLdsStackStore(GpurtLdsStackStoreOp &inst) {
   // 64 -> {0x30, 0x00}
   assert(MaxLdsStackEntries == 16);
   Value *offset = m_builder->getInt32((Log2_32(MaxLdsStackEntries) - 3) << 12);
-
+  // return struct {newNode, newStackAddr}
   Value *result =
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_bvh_stack_rtn, {}, {stackAddrVal, lastVisited, data, offset});
 
-  m_builder->CreateStore(m_builder->CreateExtractValue(result, 1), stackAddr);
-  Value *ret = m_builder->CreateExtractValue(result, 0);
-  inst.replaceAllUsesWith(ret);
+  inst.replaceAllUsesWith(result);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

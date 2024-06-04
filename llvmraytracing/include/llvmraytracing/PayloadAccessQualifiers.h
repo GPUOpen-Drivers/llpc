@@ -370,6 +370,8 @@ public:
     return AccessMask == RHS.AccessMask;
   }
 
+  bool operator!=(const PAQAccessMask &RHS) const { return !(*this == RHS); }
+
   // Prints HLSL-like qualifier string as in "write(..) : read(..)"
   // If AccessKind is set, only prints the part corresponding to that kind.
   void print(llvm::raw_ostream &,
@@ -607,7 +609,7 @@ struct PAQNode {
 
   // Collect a set of PAQNodes representing the tree rooted at this node,
   // and append it to Result.
-  void collectLeafNodes(SmallVectorImpl<const PAQNode *> &Result) const;
+  void collectNodes(SmallVectorImpl<const PAQNode *> &Result) const;
 };
 
 inline raw_ostream &operator<<(raw_ostream &Stream, const PAQNode &NodeInfo) {
@@ -762,7 +764,7 @@ struct PAQSerializationInfoBase {
     if (PayloadMemPointerNode) {
       Result.push_back(PayloadMemPointerNode.get());
     }
-    PayloadRootNode->collectLeafNodes(Result);
+    PayloadRootNode->collectNodes(Result);
   }
 };
 

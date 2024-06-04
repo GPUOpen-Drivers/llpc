@@ -1,8 +1,8 @@
-; RUN: opt --report-cont-state-sizes       --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>&1 | FileCheck %s --check-prefix=REPORT-CONT-SIZES
-; RUN: opt --report-payload-register-sizes --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>&1 | FileCheck %s --check-prefix=REPORT-PAYLOAD-SIZES
-; RUN: opt --report-system-data-sizes      --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>&1 | FileCheck %s --check-prefix=REPORT-SYSTEM-DATA-SIZES
+; RUN: opt --report-cont-state-sizes       --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-CONT-SIZES
+; RUN: opt --report-payload-register-sizes --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-PAYLOAD-SIZES
+; RUN: opt --report-system-data-sizes      --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-SYSTEM-DATA-SIZES
 
-target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
+target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
 %struct.DispatchSystemData = type { i32 }
 %struct.CHSSystemData = type { [100 x i32] }
@@ -15,7 +15,7 @@ declare void @continuation.continue(i64, ...)
 
 ; REPORT-CONT-SIZES: Continuation state size of "RayGen" (raygeneration): 108 bytes
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "RayGen" (raygeneration): 28 and 24 bytes
-define void @RayGen(%struct.DispatchSystemData %0) !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
+define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
   %csp = alloca i32, align 4
   %cspInit = call i32 @continuation.initialContinuationStackPtr()
   store i32 %cspInit, i32* %csp
@@ -26,7 +26,7 @@ define void @RayGen(%struct.DispatchSystemData %0) !continuation.entry !0 !conti
 ; This is needed as fake continuation of RayGen, because we only report continuation state sizes
 ; if we find a continuation function using !continuation metadata.
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "RayGen.resume.0" (raygeneration) is "struct.DispatchSystemData", size: 4 bytes
-define void @RayGen.resume.0(%struct.DispatchSystemData %0) !continuation !3 !lgc.rt.shaderstage !12 {
+define void @RayGen.resume.0(i64 %0, %struct.DispatchSystemData  %1) !continuation !3 !lgc.rt.shaderstage !12 {
   ret void
 }
 

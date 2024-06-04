@@ -138,9 +138,8 @@ union Options {
 
     // Unused members, kept in place to keep LLVM IR metadata stable.
     unsigned unused0;
-    unsigned unused1;
-    unsigned unused2;
 
+    uint64_t resourceHash;               // Resource hash to set in ELF PAL metadata
     unsigned includeIr;                  // If set, the IR for all compiled shaders will be included in the
                                          //   pipeline ELF.
     unsigned nggFlags;                   // Flags to control NGG (NggFlag* values ored together)
@@ -196,6 +195,7 @@ union Options {
     bool disableSampleCoverageAdjust;              // Disable the adjustment of sample coverage
     bool forceFragColorDummyExport;                // Force dummy export is added to fragment shader color export.
     unsigned reserved22;
+    bool dynamicTopology; // Whether primitive topology is dynamic.
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -873,20 +873,32 @@ public:
   // with irLink(). This is a static method in Pipeline, as it does not need a Pipeline object, and can be used
   // in the front-end before a shader is associated with a pipeline.
   //
-  // @param func : Function to mark
+  // @param func : Function to mark. This can instead be a GlobalVariable; that functionality is not used by LGC,
+  //               but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+  //               from the cache, and wants to mark it with a shader stage
   // @param stage : Shader stage, or ShaderStage::Invalid if none
-  static void markShaderEntryPoint(llvm::Function *func, ShaderStageEnum stage);
+  static void markShaderEntryPoint(llvm::GlobalObject *func, ShaderStageEnum stage);
 
   // Get a function's shader stage.
   //
-  // @param func : Function to check
+  // @param func : Function to check. This can instead be a GlobalVariable; that functionality is not used by LGC,
+  //               but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+  //               from the cache, and wants to mark it with a shader stage
   // @returns stage : Shader stage, or nullopt if none
-  static std::optional<ShaderStageEnum> getShaderStage(llvm::Function *func);
+  static std::optional<ShaderStageEnum> getShaderStage(llvm::GlobalObject *func);
+
+  // Set a function's shader subtype. Only has an effect on a compute shader or non-shader export function,
+  // where it causes the .shader_subtype PAL metadata item to be set to the arbitrary string given here.
+  // The PAL metadata item has no semantic role, but is used by tools, which expect the value to be one of:
+  // "Traversal", "RayGeneration", "Intersection", "AnyHit", "ClosestHit", "Miss", "Callable", "LaunchKernel",
+  // "FixedExpansionNode", "DynamicExpansionNode", "AggregationNode", "ThreadLaunchNode", "DrawNode"
+  static void setShaderSubtype(llvm::GlobalObject *func, llvm::StringRef subtype);
 
   // Find the shader entry-point from shader module, and set pipeline stage.
   //
   // @param module : Shader module to attach
-  virtual void attachModule(llvm::Module *modules) = 0;
+  // @param (optional) pipelineLink : Enum saying whether this is a pipeline, unlinked or part-pipeline compile.
+  virtual void attachModule(llvm::Module *modules, PipelineLink pipelineLink = PipelineLink::WholePipeline) = 0;
 
   // Record pipeline state into IR metadata of specified module.
   //

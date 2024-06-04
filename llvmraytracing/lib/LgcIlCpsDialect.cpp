@@ -23,10 +23,10 @@
  *
  **********************************************************************************************************************/
 
-//===- ContinuationsDialect.cpp - Dialect implementation ------------------===//
+//===- LgcIlCpsDialect.cpp - Dialect implementation ------------------===//
 
-#include "llvmraytracing/ContinuationsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 
 #define GET_INCLUDES
 #define GET_DIALECT_DEFS
-#include "ContinuationsDialect.cpp.inc"
+#include "LgcIlCpsDialect.cpp.inc"

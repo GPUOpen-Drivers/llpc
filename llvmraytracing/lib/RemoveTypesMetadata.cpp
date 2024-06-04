@@ -32,7 +32,6 @@
 #include "llvmraytracing/Continuations.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Module.h"
-#include <cassert>
 
 using namespace llvm;
 

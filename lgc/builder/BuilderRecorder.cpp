@@ -260,12 +260,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "get.wave.size";
   case BuilderOpcode::GetSubgroupSize:
     return "get.subgroup.size";
-  case BuilderOpcode::SubgroupAll:
-    return "subgroup.all";
-  case BuilderOpcode::SubgroupAllEqual:
-    return "subgroup.all.equal";
-  case BuilderOpcode::SubgroupRotate:
-    return "subgroup.rotate";
   case BuilderOpcode::SubgroupBroadcast:
     return "subgroup.broadcast";
   case BuilderOpcode::SubgroupBroadcastWaterfall:
@@ -1623,24 +1617,6 @@ Value *Builder::CreateGetSubgroupSize(const Twine &instName) {
 }
 
 // =====================================================================================================================
-// Create a subgroup all.
-//
-// @param value : The value to compare
-// @param instName : Name to give instruction(s)
-Value *Builder::CreateSubgroupAll(Value *const value, const Twine &instName) {
-  return record(BuilderOpcode::SubgroupAll, getInt1Ty(), {value}, instName);
-}
-
-// =====================================================================================================================
-// Create a subgroup all equal.
-//
-// @param value : The value to compare
-// @param instName : Name to give instruction(s)
-Value *Builder::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
-  return record(BuilderOpcode::SubgroupAllEqual, getInt1Ty(), {value}, instName);
-}
-
-// =====================================================================================================================
 // Create a subgroup broadcast.
 //
 // @param value : The value to broadcast
@@ -1790,18 +1766,6 @@ Value *Builder::CreateSubgroupShuffleUp(Value *const value, Value *const offset,
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offset, const Twine &instName) {
   return record(BuilderOpcode::SubgroupShuffleDown, value->getType(), {value, offset}, instName);
-}
-
-// =====================================================================================================================
-// Create a subgroup rotate call.
-//
-// @param value : The value to read from the chosen rotated lane to all active lanes.
-// @param delta : The delta/offset added to lane id.
-// @param clusterSize : The cluster size if exists.
-// @param instName : Name to give final instruction.
-Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
-                                     const Twine &instName) {
-  return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);
 }
 
 // =====================================================================================================================
@@ -2108,9 +2072,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::WriteXfbOutput:
       // Functions that read and write memory.
       break;
-    case BuilderOpcode::SubgroupAll:
-    case BuilderOpcode::SubgroupAllEqual:
-    case BuilderOpcode::SubgroupRotate:
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
     case BuilderOpcode::SubgroupBroadcastWaterfall:

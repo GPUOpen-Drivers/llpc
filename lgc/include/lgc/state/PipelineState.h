@@ -156,7 +156,7 @@ public:
   void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) override final;
 
   // Find the shader entry-point from shader module, and set pipeline stage.
-  void attachModule(llvm::Module *modules) override final;
+  void attachModule(llvm::Module *modules, PipelineLink pipelineLink) override final;
 
   // Record pipeline state into IR metadata of specified module.
   void record(llvm::Module *module) override final;
@@ -431,6 +431,9 @@ public:
 
   // Get the activeness for a vertex stream
   bool isVertexStreamActive(unsigned streamId) {
+    if (!hasShaderStage(ShaderStage::Geometry))
+      return streamId == 0; // The active stream is always 0 when GS is not present
+
     if (getRasterizerState().rasterStream == streamId)
       return true; // Rasterization stream is always active
     return m_xfbStateMetadata.streamActive[streamId];

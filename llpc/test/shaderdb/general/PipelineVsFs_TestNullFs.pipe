@@ -169,7 +169,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .entry_point:    _amdgpu_ps_main
 ; CHECK-NEXT:         .float_mode:     0xc0
 ; CHECK-NEXT:         .ieee_mode:      false
-; CHECK-NEXT:         .mem_ordered:    true
+; CHECK:         .mem_ordered:    true
 ; CHECK-NEXT:         .scratch_en:     false
 ; CHECK-NEXT:         .scratch_memory_size: 0
 ; CHECK-NEXT:         .sgpr_count:     0x2
@@ -222,7 +222,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .entry_point:    _amdgpu_vs_main
 ; CHECK-NEXT:         .float_mode:     0xc0
 ; CHECK-NEXT:         .ieee_mode:      false
-; CHECK-NEXT:         .mem_ordered:    true
+; CHECK:         .mem_ordered:    true
 ; CHECK-NEXT:         .scratch_en:     false
 ; CHECK-NEXT:         .scratch_memory_size: 0
 ; CHECK-NEXT:         .sgpr_count:     0x3

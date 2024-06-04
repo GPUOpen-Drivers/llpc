@@ -160,9 +160,6 @@ enum BuilderOpcode : unsigned {
 
   // Subgroup
   GetSubgroupSize,
-  SubgroupAll,
-  SubgroupAllEqual,
-  SubgroupRotate,
   SubgroupBroadcast,
   SubgroupBroadcastWaterfall,
   SubgroupBroadcastFirst,

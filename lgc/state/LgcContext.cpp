@@ -156,7 +156,6 @@ void LgcContext::initialize() {
   // TODO: phi-of-ops optimization in NewGVN has some problems, we temporarily
   // disable this to avoid miscompilation, see (https://github.com/GPUOpen-Drivers/llpc/issues/1206).
   setOptionDefault("enable-phi-of-ops", "0");
-  setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464446
   // Old version of the code

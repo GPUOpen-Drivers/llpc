@@ -2,20 +2,25 @@
 ; size metadata.
 ;
 ; Default run checking serialization layouts and their usage:
-; RUN: grep -v INVALID %s | opt -debug-only=lower-raytracing-pipeline --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S 2>&1 | FileCheck %s
-; Check that hit attributes violating the max size are detected and crash:
-; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S %s 2>&1 | FileCheck %s --check-prefix INVALID
+; RUN: grep -v 'NOT-1' %s | opt -debug-only=lower-raytracing-pipeline --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S --lint-abort-on-error 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-MAX-1
+; RUN: grep -v 'NOT-2' %s | opt -debug-only=lower-raytracing-pipeline --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S --lint-abort-on-error 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-MAX-2
+; RUN: grep -v 'NOT-4' %s | opt -debug-only=lower-raytracing-pipeline --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S --lint-abort-on-error 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-MAX-4
+; RUN: grep -v 'NOT-8' %s | opt -debug-only=lower-raytracing-pipeline --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S --lint-abort-on-error 2>&1 | FileCheck %s --check-prefixes=CHECK,CHECK-MAX-8
+
+; Check that hit attributes violating the max size (here: 2 Dwords, set by removing lines containing NOT-2) are detected and crash:
+; RUN: grep -v 'NOT-INVALID' %s | not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix INVALID
 ; REQUIRES: assertions
 
 ; INVALID: Hit attributes are too large!
 
-target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
+target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
 %dx.types.Handle = type { i8* }
 %struct.MyPayload = type { float, i32, double }
 %struct.Attributes1DWords = type { [1 x i32] }
 %struct.Attributes2DWords = type { [2 x i32] }
 %struct.Attributes4DWords = type { [4 x i32] }
+%struct.Attributes8DWords = type { [8 x i32] }
 %dx.types.ResourceProperties = type { i32, i32 }
 %struct.DispatchSystemData = type { i32 }
 %struct.TraversalData = type { %struct.SystemData }
@@ -31,69 +36,30 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A" = external constant %dx.types.Handle, align 4
 @"\01?gOutput@@3V?$RWTexture2D@V?$vector@M$03@@@@A" = external constant %dx.types.Handle, align 4
 
-; CHECK-DAG: %struct.MyPayload.attr_max_2_i32s.layout_0_caller_out = type { [4 x i32] }
-; CHECK-DAG: %struct.MyPayload.attr_max_4_i32s.layout_0_caller_out = type { [6 x i32] }
-; CHECK-DAG: %struct.MyPayload.attr_max_8_i32s.layout_0_caller_out = type { [10 x i32] }
 ; If the app uses only 1 DWord for hit attributes, then the layout does not get smaller.
 ; Instead, one 1 DWord in system data is unused.
-; CHECK-DAG: %struct.MyPayload.attr_max_1_i32s.layout_0_caller_out = type { [4 x i32] }
+; CHECK-MAX-1-DAG: %struct.MyPayload.attr_max_1_i32s.layout_0_caller_out = type { [4 x i32] }
+; CHECK-MAX-2-DAG: %struct.MyPayload.attr_max_2_i32s.layout_0_caller_out = type { [4 x i32] }
+; CHECK-MAX-4-DAG: %struct.MyPayload.attr_max_4_i32s.layout_0_caller_out = type { [6 x i32] }
+; CHECK-MAX-8-DAG: %struct.MyPayload.attr_max_8_i32s.layout_0_caller_out = type { [10 x i32] }
 
-; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax1DWords(
-define void @AnyHit1DWordsMax1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !lgc.rt.attribute.size !49 !types !60 {
+; CHECK-LABEL: define {{.*}} @AnyHit1DWords(
+define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !types !60 {
   ret void
 }
 
-; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax2DWords(
-define void @AnyHit1DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !lgc.rt.attribute.size !22 !types !60 {
+; CHECK-LABEL: define {{.*}} @AnyHit2DWords(
+define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !types !23 {
   ret void
 }
 
-; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax8DWords(
-define void @AnyHit1DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !lgc.rt.attribute.size !27 !types !60 {
+; CHECK-LABEL: define {{.*}} @AnyHit4DWords(
+define void @AnyHit4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !types !28 {
   ret void
 }
 
-; The actual size matches the max size for this one, so the layout_2_anyhit_out_accept layout
-; is not specialized, thus no payload_attr_N_i32s suffix.
-; CHECK-LABEL: define {{.*}} @AnyHit2DWordsMax2DWords(
-define void @AnyHit2DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !lgc.rt.attribute.size !22 !types !23 {
-  ret void
-}
-
-; The actual size is 2 DWords smaller than the max size.
-; There are 2 unused DWords in the layout.
-; CHECK-LABEL: define {{.*}} @AnyHit2DWordsMax4DWords(
-define void @AnyHit2DWordsMax4DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !lgc.rt.attribute.size !26 !types !23 {
-  ret void
-}
-
-; CHECK-LABEL: define {{.*}} @AnyHit2DWordsMax8DWords(
-define void @AnyHit2DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !lgc.rt.attribute.size !27 !types !23 {
-  ret void
-}
-
-; CHECK-LABEL: define {{.*}} @AnyHit2DWordsNoLimit(
-define void @AnyHit2DWordsNoLimit(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !types !23 {
-  ret void
-}
-
-; CHECK-LABEL: define {{.*}} @AnyHit4DWordsMax4DWords(
-define void @AnyHit4DWordsMax4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !lgc.rt.attribute.size !26 !types !28 {
-  ret void
-}
-
-; CHECK-LABEL: define {{.*}} @AnyHit4DWordsMax8DWords(
-define void @AnyHit4DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !lgc.rt.attribute.size !27 !types !28 {
-  ret void
-}
-
-; CHECK-LABEL: define {{.*}} @AnyHit4DWordsNoLimit(
-define void @AnyHit4DWordsNoLimit(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !types !28 {
-  ret void
-}
-
-; The following one violates the limit and should crash:
-define void @AnyHit4DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !lgc.rt.attribute.size !22 !types !28 {
+; CHECK-LABEL: define {{.*}} @AnyHit8DWords(
+define void @AnyHit8DWords(%struct.MyPayload* %payload, %struct.Attributes8DWords* %attrs) !types !63 {
   ret void
 }
 
@@ -179,9 +145,24 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 !dx.valver = !{!1}
 !dx.shaderModel = !{!2}
 !dx.resources = !{!3}
-!dx.entryPoints = !{!10,
-  !12, ; INVALID
-  !15, !16, !17, !18, !19, !20, !21, !50, !51, !52}
+; DX entry points. We use grep filters on NOT-{maxSize} to only enable compatible shaders.
+!dx.entryPoints = !{
+  !10
+  , !14 ; AHS using 1 Dword attributes.
+  , !15 ; AHS using 2 Dword attributes.  NOT-1
+  , !16 ; AHS using 4 Dword attributes.  NOT-1 NOT-2
+  , !17 ; AHS using 8 Dword attributes.  NOT-1 NOT-2 NOT-4
+}
+
+; We filter out one of the following lines using a grep in the RUN line.
+; The NOT-{maxSize} patterns are used to run a test with the max hit attribute size to
+; maxSize, and only enabling compatible shaders.
+; The NOT-INVALID pattern is used to run all shaders with a max attribute size of 2 dwords,
+; which is expected to fail.
+!lgc.rt.max.attribute.size = !{!49} ; 1 DWord(s).       NOT-2 NOT-4 NOT-8 NOT-INVALID
+!lgc.rt.max.attribute.size = !{!22} ; 2 DWord(s). NOT-1       NOT-4 NOT-8
+!lgc.rt.max.attribute.size = !{!26} ; 4 DWord(s). NOT-1 NOT-2       NOT-8 NOT-INVALID
+!lgc.rt.max.attribute.size = !{!27} ; 8 DWord(s). NOT-1 NOT-2 NOT-4       NOT-INVALID
 
 !0 = !{!"dxcoob 2019.05.00"}
 !1 = !{i32 1, i32 7}
@@ -195,16 +176,12 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 !9 = !{i32 0, i32 9}
 !10 = !{null, !"", null, !3, !11}
 !11 = !{i32 0, i64 65540}
-!12 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit4DWordsMax2DWords, !"AnyHit4DWordsMax2DWords", null, null, !13}
-!13 = !{i32 8, i32 9, i32 5, !14}
-!14 = !{i32 0}
-!15 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit4DWordsMax4DWords, !"AnyHit4DWordsMax4DWords", null, null, !13}
-!16 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit4DWordsMax8DWords, !"AnyHit4DWordsMax8DWords", null, null, !13}
-!17 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit4DWordsNoLimit, !"AnyHit4DWordsNoLimit", null, null, !13}
-!18 = !{void (%struct.MyPayload*, %struct.Attributes2DWords*)* @AnyHit2DWordsMax2DWords, !"AnyHit2DWordsMax2DWords", null, null, !13}
-!19 = !{void (%struct.MyPayload*, %struct.Attributes2DWords*)* @AnyHit2DWordsMax4DWords, !"AnyHit2DWordsMax4DWords", null, null, !13}
-!20 = !{void (%struct.MyPayload*, %struct.Attributes2DWords*)* @AnyHit2DWordsMax8DWords, !"AnyHit2DWordsMax8DWords", null, null, !13}
-!21 = !{void (%struct.MyPayload*, %struct.Attributes2DWords*)* @AnyHit2DWordsNoLimit, !"AnyHit2DWordsNoLimit", null, null, !13}
+!12 = !{i32 8, i32 9, i32 5, !13}
+!13 = !{i32 0}
+!14 = !{void (%struct.MyPayload*, %struct.Attributes1DWords*)* @AnyHit1DWords, !"AnyHit1DWords", null, null, !12}
+!15 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit2DWords, !"AnyHit2DWords", null, null, !12}
+!16 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit4DWords, !"AnyHit4DWords", null, null, !12}
+!17 = !{void (%struct.MyPayload*, %struct.Attributes4DWords*)* @AnyHit8DWords, !"AnyHit8DWords", null, null, !12}
 !22 = !{i32 8}
 !23 = !{!"function", !"void", !24, !25}
 !24 = !{i32 0, %struct.MyPayload poison}
@@ -233,9 +210,8 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 !47 = !{!"function", !"void", i64 poison, !48}
 !48 = !{i32 0, i8 poison}
 !49 = !{i32 4}
-!50 = !{void (%struct.MyPayload* , %struct.Attributes1DWords*)* @AnyHit1DWordsMax1DWords, !"AnyHit1DWordsMax1DWords", null, null, !13}
-!51 = !{void (%struct.MyPayload* , %struct.Attributes1DWords*)* @AnyHit1DWordsMax2DWords, !"AnyHit1DWordsMax2DWords", null, null, !13}
-!52 = !{void (%struct.MyPayload* , %struct.Attributes1DWords*)* @AnyHit1DWordsMax8DWords, !"AnyHit1DWordsMax8DWords", null, null, !13}
 !60 = !{!"function", !"void", !61, !62}
 !61 = !{i32 0, %struct.MyPayload poison}
 !62 = !{i32 0, %struct.Attributes1DWords poison}
+!63 = !{!"function", !"void", !24, !64}
+!64 = !{i32 0, %struct.Attributes8DWords poison}

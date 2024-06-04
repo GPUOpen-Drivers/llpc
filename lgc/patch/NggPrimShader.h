@@ -301,6 +301,7 @@ private:
 
   void processSwXfb(llvm::ArrayRef<llvm::Argument *> args);
   void processSwXfbWithGs(llvm::ArrayRef<llvm::Argument *> args);
+  void prepareSwXfb(llvm::ArrayRef<llvm::Value *> primCountInSubgroup);
   llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
@@ -330,7 +331,7 @@ private:
 
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, bool useDs128 = false);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, bool useDs128 = false);
-  void atomicAdd(llvm::Value *valueToAdd, llvm::Value *ldsOffset);
+  void atomicOp(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *value, llvm::Value *ldsOffset);
   llvm::Value *readValueFromCb(llvm::Type *readyTy, llvm::Value *bufPtr, llvm::Value *offset, bool isVolatile = false);
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
@@ -400,9 +401,14 @@ private:
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs = false;  // Whether the pipeline has geometry shader
 
+  unsigned m_maxThreadsPerSubgroup = 0; // Maximum number of threads in a NGG subgroup
+  unsigned m_maxWavesPerSubgroup = 0;   // Maximum number of waves in a NGG subgroup
+
   llvm::Value *m_streamOutControlBufPtr = nullptr;                      // Stream-out control buffer pointer
   llvm::Value *m_streamOutBufDescs[MaxTransformFeedbackBuffers] = {};   // Stream-out buffer descriptors
   llvm::Value *m_streamOutBufOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out buffer offsets
+  llvm::Value *m_verticesPerPrimitive = nullptr; // If topology is dynamic, it is a SGPR value from user data
+                                                 // ComplexData; otherwise it is a constant.
 
   bool m_constPositionZ = false; // Whether the Z channel of vertex position data is constant
 

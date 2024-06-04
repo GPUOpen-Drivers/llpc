@@ -50,12 +50,14 @@ class DivergenceInfo;
 
 namespace lgc {
 
+class BufferAddrToPtrOp;
 class BufferDescToPtrOp;
 class StridedBufferDescToPtrOp;
 class StridedBufferAddrAndStrideToPtrOp;
 class StridedIndexAddOp;
 class BufferLengthOp;
 class BufferPtrDiffOp;
+class LoadTfeOp;
 class PipelineState;
 
 // =====================================================================================================================
@@ -97,6 +99,7 @@ private:
   void visitAtomicCmpXchgInst(llvm::AtomicCmpXchgInst &atomicCmpXchgInst);
   void visitAtomicRMWInst(llvm::AtomicRMWInst &atomicRmwInst);
   void visitBitCastInst(llvm::BitCastInst &bitCastInst);
+  void visitBufferAddrToPtr(BufferAddrToPtrOp &op);
   void visitBufferDescToPtr(BufferDescToPtrOp &descToPtr);
   void visitStridedBufferDescToPtr(StridedBufferDescToPtrOp &descToPtr);
   void visitStridedBufferAddrAndStrideToPtr(StridedBufferAddrAndStrideToPtrOp &addrAndStrideToPtr);
@@ -112,11 +115,13 @@ private:
   void visitStoreInst(llvm::StoreInst &storeInst);
   void visitICmpInst(llvm::ICmpInst &icmpInst);
   void visitInvariantStart(llvm::IntrinsicInst &intrinsic);
+  void visitLoadTfeOp(LoadTfeOp &loadTfe);
 
   void postVisitLoadInst(llvm::LoadInst &loadInst);
   void postVisitStoreInst(llvm::StoreInst &storeInst);
   void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
   void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
+  void postVisitLoadTfeOp(LoadTfeOp &loadTfe);
 
   DescriptorInfo getDescriptorInfo(llvm::Value *desc);
   bool isAnyBufferPointer(const llvm::Value *const pointerVal);

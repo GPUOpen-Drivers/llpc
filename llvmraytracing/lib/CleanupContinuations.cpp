@@ -49,7 +49,7 @@
 // the compiler backend.
 // 1. Replace returning handle with lgc.cps.jump() with the right continuation
 //    reference.
-// 2. Replace @continuation.return with simple `ret`, which means thread
+// 2. Replace @lgc.ilcps.return with simple `ret`, which means thread
 //    termination.
 // 3. Edit function signatures, like removing coroutine frame pointer argument,
 //    adding needed ones (state, rcr, returned_values) for resume function.
@@ -58,9 +58,9 @@
 
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "llvm/ADT/STLExtras.h"
@@ -250,9 +250,9 @@ static void buildCpsArgInfos(Function *F, bool IsStart,
     AllArgTypes.push_back(IntegerType::get(Context, 32));
     AllArgValues.push_back(nullptr);
 
-    // Find arguments from continuation.returnvalue calls
+    // Find arguments from lgc.ilcps.getreturnvalue calls
     for (auto &I : F->getEntryBlock()) {
-      if (auto *Intr = dyn_cast<continuations::GetReturnValueOp>(&I)) {
+      if (auto *Intr = dyn_cast<lgc::ilcps::GetReturnValueOp>(&I)) {
         AllArgTypes.push_back(Intr->getType());
         AllArgValues.push_back(Intr);
         InstsToRemove.push_back(Intr);
@@ -297,8 +297,9 @@ void CleanupContinuationsPass::removeContFreeCall(Function *F,
 }
 
 /// Insert cps.free() before the original function exits.
-/// Note: we skip the cps.free() insertion before calls to @continuation.return.
-/// Because this is not useful any more as it means the thread termination.
+/// Note: we skip the cps.free() insertion before calls to
+/// @lgc.ilcps.return. Because this is not useful any more as it means the
+/// thread termination.
 void CleanupContinuationsPass::freeCpsStack(Function *F,
                                             ContinuationData &CpsInfo) {
   struct VisitState {
@@ -390,11 +391,10 @@ void CleanupContinuationsPass::processContinuations() {
         if (isa<ReturnInst>(I)) {
           handleContinue(FuncData.second, I);
         } else if (I->getOpcode() == Instruction::Unreachable) {
-          // We should only possibly have 'continuation.return' or
+          // We should only possibly have 'lgc.ilcps.return' or
           // 'lgc.cps.jump' call before unreachable.
           auto *Call = cast<CallInst>(--I->getIterator());
-          auto *Called = Call->getCalledFunction();
-          if (Called->getName() == "continuation.return") {
+          if (auto *ContRet = dyn_cast<lgc::ilcps::ReturnOp>(Call)) {
             Builder->SetInsertPoint(Call);
             Builder->CreateRetVoid();
             Call->eraseFromParent();

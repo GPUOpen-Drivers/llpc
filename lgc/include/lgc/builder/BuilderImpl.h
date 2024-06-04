@@ -73,14 +73,11 @@ protected:
   // Get the PipelineState object.
   PipelineState *getPipelineState() const { return m_pipelineState; }
 
-  // Get whether the context we are building in support the bpermute operation.
+  // Get whether the context we are building in supports ds_bpermute or v_bpermute across all lanes in the wave.
   bool supportWaveWideBPermute() const;
 
   // Get whether the context we are building in supports permute lane 64 DPP operations.
   bool supportPermLane64Dpp() const;
-
-  // Create an "if..endif" or "if..else..endif" structure.
-  llvm::BranchInst *createIf(llvm::Value *condition, bool wantElse, const llvm::Twine &instName = "");
 
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
@@ -315,6 +312,9 @@ public:
   // Check whether vertex buffer descriptors are in a descriptor array binding instead of the VertexBufferTable.
   bool useVertexBufferDescArray();
 
+  // Build buffer compact descriptor
+  llvm::Value *buildBufferCompactDesc(llvm::Value *desc, unsigned stride);
+
 private:
   // Get a struct containing the pointer and byte stride for a descriptor
   llvm::Value *getDescPtrAndStride(ResourceNodeType resType, uint64_t descSet, unsigned binding,
@@ -328,9 +328,6 @@ private:
                           unsigned binding);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
-
-  // Build buffer compact descriptor
-  llvm::Value *buildBufferCompactDesc(llvm::Value *desc, unsigned stride);
 
   // Create a buffer descriptor.
   llvm::Value *createBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
@@ -651,15 +648,6 @@ public:
   // Create a get subgroup size query.
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName = "");
 
-  // Create a subgroup all.
-  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
-
-  // Create a subgroup all equal.
-  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
-
-  // Create a subgroup rotate.
-  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
-                                    const llvm::Twine &instName = "");
   // Create a subgroup broadcast.
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName = "");

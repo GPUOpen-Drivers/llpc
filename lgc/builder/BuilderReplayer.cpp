@@ -722,15 +722,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::GetSubgroupSize: {
     return m_builder->CreateGetSubgroupSize();
   }
-  case BuilderOpcode::SubgroupAll: {
-    return m_builder->CreateSubgroupAll(args[0]);
-  }
-  case BuilderOpcode::SubgroupAllEqual: {
-    return m_builder->CreateSubgroupAllEqual(args[0]);
-  }
-  case BuilderOpcode::SubgroupRotate: {
-    return m_builder->CreateSubgroupRotate(args[0], args[1], isa<PoisonValue>(args[2]) ? nullptr : &*args[2]);
-  }
   case BuilderOpcode::SubgroupBroadcast: {
     return m_builder->CreateSubgroupBroadcast(args[0], args[1]);
   }

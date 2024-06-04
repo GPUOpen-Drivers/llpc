@@ -37,6 +37,10 @@
 
 using namespace llvm;
 
+namespace llvm {
+class LLVMContext;
+} // namespace llvm
+
 namespace {
 
 // Shader stage metadata to identify the shader stage of a given function.
@@ -65,16 +69,69 @@ constexpr const char ArgSizeMetadata[] = "lgc.rt.arg.size";
 // bytes.
 constexpr const char AttributeSizeMetadata[] = "lgc.rt.attribute.size";
 
+// Pipeline-wide max attribute size module metadata, giving the maximum
+// attribute size in bytes.
+constexpr const char MaxAttributeSizeMetadata[] = "lgc.rt.max.attribute.size";
+
+// Pipeline-wide max payload size module metadata, giving the maximum
+// payload size in bytes.
+constexpr const char MaxPayloadSizeMetadata[] = "lgc.rt.max.payload.size";
+
 // ==============================================================================================
-// Wrapper around setMetadata for unsigned integer cases.
-void setMetadataNumericValue(Function *func, StringRef Kind, size_t size) {
-  func->setMetadata(
-      Kind, MDNode::get(func->getContext(),
-                        {ConstantAsMetadata::get(ConstantInt::get(
-                            Type::getInt32Ty(func->getContext()), size))}));
+// Helper to create an MDNode containing a constant.
+MDNode *getMdNodeForNumericConstant(LLVMContext &context, size_t value) {
+  return MDNode::get(context, {ConstantAsMetadata::get(ConstantInt::get(
+                                  Type::getInt32Ty(context), value))});
 }
 
-} // anonymous namespace
+// ==============================================================================================
+// Helper to create an MDNode containing a constant.
+std::optional<size_t> extractNumericConstantFromMdNode(MDNode *node) {
+  if (!node)
+    return std::nullopt;
+  assert(node->getNumOperands() == 1);
+  if (auto *value = mdconst::dyn_extract<ConstantInt>(node->getOperand(0)))
+    return value->getZExtValue();
+
+  return std::nullopt;
+}
+
+// ==============================================================================================
+// Wrapper around setMetadata for unsigned integer cases, global object/function
+// version.
+void setMetadataNumericValue(GlobalObject *func, StringRef Kind, size_t size) {
+  func->setMetadata(Kind,
+                    getMdNodeForNumericConstant(func->getContext(), size));
+}
+
+// ==============================================================================================
+// Helper to obtain a constant from global object/function metadata.
+std::optional<size_t> getMetadataNumericValue(const GlobalObject *obj,
+                                              StringRef Kind) {
+  MDNode *node = obj->getMetadata(Kind);
+  return extractNumericConstantFromMdNode(node);
+}
+
+// ==============================================================================================
+// Wrapper around setMetadata for unsigned integer cases, module version.
+void setMetadataNumericValue(Module *module, StringRef Kind, size_t size) {
+  auto *node = module->getOrInsertNamedMetadata(Kind);
+  node->clearOperands();
+  node->addOperand(getMdNodeForNumericConstant(module->getContext(), size));
+}
+
+// ==============================================================================================
+// Helper to obtain a constant from a named metadata value.
+std::optional<size_t> getMetadataNumericValue(const llvm::Module *module,
+                                              StringRef Kind) {
+  NamedMDNode *node = module->getNamedMetadata(Kind);
+  if (!node)
+    return std::nullopt;
+  assert(node->getNumOperands() == 1);
+  return extractNumericConstantFromMdNode(node->getOperand(0));
+}
+
+} // namespace
 
 // ==============================================================================================
 // Get the metadata IDs associated with the lgc.rt dialect, so the caller knows
@@ -90,7 +147,10 @@ void lgc::rt::getLgcRtMetadataIds(LLVMContext &context,
 // ==============================================================================================
 // Sets the given shader stage to a LLVM function. If std::nullopt is
 // passed, then the shader stage metadata is removed from the function.
-void lgc::rt::setLgcRtShaderStage(Function *func,
+// func can instead be a GlobalVariable, allowing a front-end to use a
+// GlobalVariable to represent a shader retrieved from the cache, and wants to
+// mark it with a shader stage.
+void lgc::rt::setLgcRtShaderStage(GlobalObject *func,
                                   std::optional<RayTracingShaderStage> stage) {
   if (stage.has_value())
     setMetadataNumericValue(func, ShaderStageMetadata,
@@ -102,15 +162,16 @@ void lgc::rt::setLgcRtShaderStage(Function *func,
 // ==============================================================================================
 // Get the lgc.rt shader stage from a given function. If there is no shader
 // stage metadata apparent, then std::nullopt is returned.
+// func can instead be a GlobalVariable, allowing a front-end to use a
+// GlobalVariable to represent a shader retrieved from the cache, and wants to
+// mark it with a shader stage.
 std::optional<lgc::rt::RayTracingShaderStage>
-lgc::rt::getLgcRtShaderStage(const Function *func) {
-  MDNode *stageMetaNode = func->getMetadata(ShaderStageMetadata);
-  if (stageMetaNode) {
-    if (auto *value =
-            mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0)))
-      return RayTracingShaderStage(value->getZExtValue());
+lgc::rt::getLgcRtShaderStage(const GlobalObject *func) {
+  std::optional<size_t> mdValue =
+      getMetadataNumericValue(func, ShaderStageMetadata);
+  if (mdValue.has_value()) {
+    return RayTracingShaderStage(*mdValue);
   }
-
   return std::nullopt;
 }
 
@@ -154,15 +215,13 @@ Constant *lgc::rt::getPaqFromSize(LLVMContext &context, size_t size) {
 // this code. We assume that the language reader correctly called
 // setShaderArgSize for any callable shader.
 size_t lgc::rt::getShaderArgSize(Function *func) {
-  MDNode *node = func->getMetadata(ArgSizeMetadata);
+  std::optional<size_t> result = getMetadataNumericValue(func, ArgSizeMetadata);
 
-  assert(node && "lgc::rt::getShaderArgSize: ArgSize metadata missing - forgot "
-                 "to call setShaderArgSize?");
+  assert(result.has_value() &&
+         "lgc::rt::getShaderArgSize: ArgSize metadata missing - forgot "
+         "to call setShaderArgSize?");
 
-  if (auto *value = mdconst::dyn_extract<ConstantInt>(node->getOperand(0)))
-    return value->getZExtValue();
-
-  return 0;
+  return result.value();
 }
 
 // ==============================================================================================
@@ -174,18 +233,41 @@ void lgc::rt::setShaderArgSize(Function *func, size_t size) {
 // ==============================================================================================
 // Get attribute size (in bytes) metadata for a ray-tracing shader function.
 std::optional<size_t> lgc::rt::getShaderHitAttributeSize(const Function *func) {
-  MDNode *node = func->getMetadata(AttributeSizeMetadata);
-  if (!node)
-    return std::nullopt;
-
-  if (auto *value = mdconst::dyn_extract<ConstantInt>(node->getOperand(0)))
-    return value->getZExtValue();
-
-  return std::nullopt;
+  return getMetadataNumericValue(func, AttributeSizeMetadata);
 }
 
 // ==============================================================================================
 // Set attribute size (in bytes) metadata for a ray-tracing shader function.
 void lgc::rt::setShaderHitAttributeSize(Function *func, size_t size) {
+  assert(getMaxHitAttributeSize(func->getParent()).value_or(size) >= size);
   setMetadataNumericValue(func, AttributeSizeMetadata, size);
+}
+
+// ==============================================================================================
+// Get max hit attribute size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function hit attribute sizes.
+std::optional<size_t>
+lgc::rt::getMaxHitAttributeSize(const llvm::Module *module) {
+  return getMetadataNumericValue(module, MaxAttributeSizeMetadata);
+}
+
+// ==============================================================================================
+// Set max hit attribute size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function hit attribute sizes.
+void lgc::rt::setMaxHitAttributeSize(llvm::Module *module, size_t size) {
+  setMetadataNumericValue(module, MaxAttributeSizeMetadata, size);
+}
+
+// ==============================================================================================
+// Get max payload size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function payload sizes.
+std::optional<size_t> lgc::rt::getMaxPayloadSize(const llvm::Module *module) {
+  return getMetadataNumericValue(module, MaxPayloadSizeMetadata);
+}
+
+// ==============================================================================================
+// Set max hit attribute size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function payload sizes.
+void lgc::rt::setMaxPayloadSize(llvm::Module *module, size_t size) {
+  setMetadataNumericValue(module, MaxPayloadSizeMetadata, size);
 }

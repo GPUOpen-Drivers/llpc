@@ -119,29 +119,29 @@
                OpReturn
                OpFunctionEnd
 
-; CHECK-LABEL:  @lgc.shader.CS.main(
-; CHECK-LABEL:  .entry:
-; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 2, i32 0, i32 2)
-; CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 2)
-; CHECK-NEXT:    [[TMP2:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
-; CHECK-NEXT:    [[TMP3:%.*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP2]], i32 32, i1 true, i32 1, i32 0, i32 0) #[[ATTR1:[0-9]+]]
-; CHECK-NEXT:    [[TMP4:%.*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP1]], i32 32, i1 true, i32 1, i32 0, i32 0) #[[ATTR1]]
-; CHECK-NEXT:    br label [[TMP5:%.*]]
+; CHECK-LABEL: @lgc.shader.CS.main(
+; CHECK-NEXT:  .entry:
+; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 2)
+; CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
+; CHECK-NEXT:    [[LOAD:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP1]], i32 32, i1 true, i32 1, i32 0, i32 0, i32 16)
+; CHECK-NEXT:    [[LOAD1:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP0]], i32 32, i1 true, i32 1, i32 0, i32 0, i32 16)
+; CHECK-NEXT:    br label [[TMP2:%.*]]
+; CHECK:       2:
+; CHECK-NEXT:    [[DOT012:%.*]] = phi i32 [ 0, [[DOTENTRY:%.*]] ], [ [[TMP10:%.*]], [[TMP5:%.*]] ]
+; CHECK-NEXT:    [[DOT0:%.*]] = phi <8 x float> [ undef, [[DOTENTRY]] ], [ [[TMP9:%.*]], [[TMP5]] ]
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @lgc.cooperative.matrix.length(i32 0)
+; CHECK-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[DOT012]], [[TMP3]]
+; CHECK-NEXT:    [[COND_FREEZE:%.*]] = freeze i1 [[TMP4]]
+; CHECK-NEXT:    br i1 [[COND_FREEZE]], label [[TMP5]], label [[TMP11:%.*]]
 ; CHECK:       5:
-; CHECK-NEXT:    [[DOT011:%.*]] = phi i32 [ 0, [[DOTENTRY:%.*]] ], [ [[TMP13:%.*]], [[TMP8:%.*]] ]
-; CHECK-NEXT:    [[DOT0:%.*]] = phi <8 x float> [ undef, [[DOTENTRY]] ], [ [[TMP12:%.*]], [[TMP8]] ]
-; CHECK-NEXT:    [[TMP6:%.*]] = call i32 @lgc.cooperative.matrix.length.i32.i32.i32(i32 1, i32 0) #[[ATTR2:[0-9]+]]
-; CHECK-NEXT:    [[TMP7:%.*]] = icmp slt i32 [[DOT011]], [[TMP6]]
-; CHECK-NEXT:    [[FR:%.*]] = freeze i1 [[TMP7]]
-; CHECK-NEXT:    br i1 [[FR]], label [[TMP8]], label [[TMP14:%.*]]
-; CHECK:       8:
-; CHECK-NEXT:    [[TMP9:%.*]] = call half @lgc.cooperative.matrix.extract.f16.v8f32.i32.i32.i32(<8 x float> [[TMP3]], i32 [[DOT011]], i32 1, i32 0) #[[ATTR2]]
-; CHECK-NEXT:    [[TMP10:%.*]] = call half @lgc.cooperative.matrix.extract.f16.v8f32.i32.i32.i32(<8 x float> [[TMP4]], i32 [[DOT011]], i32 1, i32 0) #[[ATTR2]]
-; CHECK-NEXT:    [[TMP11:%.*]] = fmul reassoc nnan nsz arcp contract afn half [[TMP9]], [[TMP10]]
-; CHECK-NEXT:    [[TMP12]] = call <8 x float> @lgc.cooperative.matrix.insert.v8f32.v8f32.f16.i32.i32.i32(<8 x float> [[DOT0]], half [[TMP11]], i32 [[DOT011]], i32 1, i32 0) #[[ATTR2]]
-; CHECK-NEXT:    [[TMP13]] = add i32 [[DOT011]], 1
-; CHECK-NEXT:    br label [[TMP5]], !llvm.loop [[LOOP8:![0-9]+]]
-; CHECK:       14:
-; CHECK-NEXT:    call void @lgc.cooperative.matrix.store.p7.i32.i1.i32.i32.i32.v8f32(ptr addrspace(7) [[TMP0]], i32 64, i1 true, i32 1, i32 0, i32 0, <8 x float> [[DOT0]]) #[[ATTR3:[0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call half (...) @lgc.cooperative.matrix.extract__f16(<8 x float> [[LOAD]], i32 [[DOT012]], i32 1, i32 0)
+; CHECK-NEXT:    [[TMP7:%.*]] = call half (...) @lgc.cooperative.matrix.extract__f16(<8 x float> [[LOAD1]], i32 [[DOT012]], i32 1, i32 0)
+; CHECK-NEXT:    [[TMP8:%.*]] = fmul reassoc nnan nsz arcp contract afn half [[TMP6]], [[TMP7]]
+; CHECK-NEXT:    [[TMP9]] = call <8 x float> (...) @lgc.cooperative.matrix.insert__v8f32(<8 x float> [[DOT0]], half [[TMP8]], i32 [[DOT012]], i32 1, i32 0)
+; CHECK-NEXT:    [[TMP10]] = add i32 [[DOT012]], 1
+; CHECK-NEXT:    br label [[TMP2]], !llvm.loop [[LOOP12:![0-9]+]]
+; CHECK:       11:
+; CHECK-NEXT:    [[TMP12:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 2, i32 0, i32 2)
+; CHECK-NEXT:    call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) [[TMP12]], i32 64, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> [[DOT0]])
 ; CHECK-NEXT:    ret void
 ;

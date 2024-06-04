@@ -880,6 +880,8 @@ public:
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cbState, alphaToCoverageEnable, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cbState, dualSourceBlendEnable, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cbState, dualSourceBlendDynamic, MemberTypeBool, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampVs, MemberTypeBool, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampFs, MemberTypeBool, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
                                      Vkgc::MaxColorTargets, true);
 
@@ -890,6 +892,7 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableColorExportShader, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicTopology, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, useSoftwareVertexBufferDescriptors, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
@@ -1104,6 +1107,8 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, attributeSizeMaxInLib, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, isReplay, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_clientMetadata, MemberTypeU8Array, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, cpsFlags, MemberTypeInt, false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_gpurtOptions, MemberTypeGpurtOption, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -1132,6 +1137,13 @@ public:
       m_state.clientMetadataSize = m_clientMetadataBufMem.size();
       m_state.pClientMetadata = m_clientMetadataBufMem.data();
     }
+
+    m_state.gpurtOptionCount = static_cast<unsigned>(m_gpurtOptions.size());
+    m_vkgcGpurtOptions.resize(m_state.gpurtOptionCount);
+    for (unsigned i = 0; i < m_state.gpurtOptionCount; ++i)
+      m_gpurtOptions[i].getSubState(m_vkgcGpurtOptions[i]);
+    m_state.pGpurtOptions = (m_state.gpurtOptionCount) > 0 ? m_vkgcGpurtOptions.data() : nullptr;
+
     state = m_state;
   };
   SubState &getSubStateRef() { return m_state; };
@@ -1148,6 +1160,8 @@ private:
   std::vector<uint8_t> m_traceRayBinary;
   std::vector<uint8_t> *m_clientMetadata;
   std::vector<uint8_t> m_clientMetadataBufMem;
+  std::vector<SectionGpurtOption> m_gpurtOptions;
+  std::vector<Vkgc::GpurtOption> m_vkgcGpurtOptions;
 };
 
 } // namespace Vfx

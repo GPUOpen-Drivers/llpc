@@ -3,19 +3,20 @@
 
 define i32 @test_length_f16() !spirv.ExecutionModel !8 !lgc.shaderstage !9 {
 ; CHECK-LABEL: @test_length_f16(
-; CHECK-NEXT:    ret i32 16
+; CHECK-NEXT:    [[A:%.*]] = call i32 (...) @lgc.cooperative.matrix.length__i32(i32 1, i32 0)
+; CHECK-NEXT:    ret i32 [[A]]
 ;
-  %a = call i32 @lgc.cooperative.matrix.length.i32.i32.i32(i32 1, i32 0)
+  %a = call i32 (...) @lgc.cooperative.matrix.length__i32(i32 1, i32 0)
   ret i32 %a
 }
 
 define half @test_extract_f16(<8 x float> %matrix) !spirv.ExecutionModel !8 !lgc.shaderstage !9 {
 ; CHECK-LABEL: @test_extract_f16(
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast <8 x float> [[MATRIX:%.*]] to <16 x half>
-; CHECK-NEXT:    [[R:%.*]] = extractelement <16 x half> [[TMP1]], i32 5
-; CHECK-NEXT:    ret half [[R]]
+; CHECK-NEXT:    [[TMP2:%.*]] = extractelement <16 x half> [[TMP1]], i32 5
+; CHECK-NEXT:    ret half [[TMP2]]
 ;
-  %r = call half @lgc.cooperative.matrix.extract.f16.v8f32.i32.i32.i32(<8 x float> %matrix, i32 5, i32 1, i32 0)
+  %r = call half (...) @lgc.cooperative.matrix.extract__f16(<8 x float> %matrix, i32 5, i32 1, i32 0)
   ret half %r
 }
 
@@ -23,16 +24,16 @@ define <8 x float> @test_insert_f16(<8 x float> %matrix, half %x) !spirv.Executi
 ; CHECK-LABEL: @test_insert_f16(
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast <8 x float> [[MATRIX:%.*]] to <16 x half>
 ; CHECK-NEXT:    [[TMP2:%.*]] = insertelement <16 x half> [[TMP1]], half [[X:%.*]], i32 5
-; CHECK-NEXT:    [[R:%.*]] = bitcast <16 x half> [[TMP2]] to <8 x float>
-; CHECK-NEXT:    ret <8 x float> [[R]]
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <16 x half> [[TMP2]] to <8 x float>
+; CHECK-NEXT:    ret <8 x float> [[TMP3]]
 ;
-  %r = call <8 x float> @lgc.cooperative.matrix.insert.v8f32.v8f32.f16.i32.i32.i32(<8 x float> %matrix, half %x, i32 5, i32 1, i32 0)
+  %r = call <8 x float> (...) @lgc.cooperative.matrix.insert__v8f32(<8 x float> %matrix, half %x, i32 5, i32 1, i32 0)
   ret <8 x float> %r
 }
 
-declare i32 @lgc.cooperative.matrix.length.i32.i32.i32(i32, i32)
-declare half @lgc.cooperative.matrix.extract.f16.v8f32.i32.i32.i32(<8 x float>, i32, i32, i32)
-declare <8 x float> @lgc.cooperative.matrix.insert.v8f32.v8f32.f16.i32.i32.i32(<8 x float>, half, i32, i32, i32)
+declare i32 @lgc.cooperative.matrix.length__i32(...)
+declare half @lgc.cooperative.matrix.extract__f16(...)
+declare <8 x float> @lgc.cooperative.matrix.insert__v8f32(...)
 
 !llpc.compute.mode = !{!0}
 !lgc.client = !{!1}

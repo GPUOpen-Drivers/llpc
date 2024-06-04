@@ -55,6 +55,27 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
 
+  // Create a subgroup all.
+  //
+  // @param value : The value to compare
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
+
+  // Create a subgroup all equal.
+  //
+  // @param value : The value to compare
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
+
+  // Create a subgroup rotate call.
+  //
+  // @param value : The value to read from the chosen rotated lane to all active lanes.
+  // @param delta : The delta/offset added to lane id.
+  // @param clusterSize : The cluster size if exists.
+  // @param instName : Name to give final instruction.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
+
 private:
   SubgroupBuilder() = delete;
   SubgroupBuilder(const SubgroupBuilder &) = delete;

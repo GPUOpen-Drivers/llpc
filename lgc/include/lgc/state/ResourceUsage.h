@@ -335,8 +335,9 @@ struct ResourceUsage {
         unsigned sampleMask : 1;     // Whether gl_SampleMask[] is used
         unsigned fragStencilRef : 1; // Whether gl_FragStencilRef is used
         // Statements
-        unsigned discard : 1;         // Whether "discard" statement is used
-        unsigned runAtSampleRate : 1; // Whether fragment shader run at sample rate
+        unsigned discard : 1;           // Whether "discard" statement is used
+        unsigned runAtSampleRate : 1;   // Whether fragment shader run at sample rate
+        unsigned useDynamicToplogy : 1; // Whether to use dynamic topology.
       } fs;
 
       // Compute shader
@@ -462,10 +463,9 @@ struct ResourceUsage {
       std::map<BuiltInKind, unsigned> vertexBuiltInExportSlots;
       std::map<BuiltInKind, unsigned> primitiveBuiltInExportSlots;
 
-      // Map from output locations to their number of components: <location, <numComponents, forBuiltIn>> (including
-      // those special outputs to which built-ins are mapped)
-      std::map<unsigned, std::pair<unsigned, BuiltInKind>> vertexOutputComponents;
-      std::map<unsigned, std::pair<unsigned, BuiltInKind>> primitiveOutputComponents;
+      // Export count for generic outputs (excluding those special outputs to which the built-ins are mapped)
+      unsigned vertexGenericOutputExportCount = 0;
+      unsigned primitiveGenericOutputExportCount = 0;
     } mesh;
 
     struct {
@@ -540,6 +540,7 @@ struct InterfaceData {
         unsigned viewId;             // View ID
         unsigned vbTablePtr;         // Pointer of vertex buffer table
         unsigned esGsOffset;         // ES-GS ring buffer offset
+        unsigned compositeData;      // CompositeData
         StreamOutData streamOutData; // Stream-out Data
       } vs;
 
@@ -572,6 +573,7 @@ struct InterfaceData {
         unsigned primitiveId;                     // Primitive ID
         unsigned invocationId;                    // Invocation ID
         unsigned viewId;                          // View ID
+        unsigned compositeData;                   // CompositeData
         StreamOutData streamOutData;              // Stream-out Data
       } gs;
 
@@ -588,10 +590,9 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewId;                  // View ID
-        unsigned primMask;                // Primitive mask
-        unsigned sampleInfo;              // Sample Info: numSample + samplePattern
-        unsigned dynamicDualSrcBlendInfo; // dualSrcBlendDynamicValue
+        unsigned viewId;        // View ID
+        unsigned primMask;      // Primitive mask
+        unsigned compositeData; // CompositeData
 
         // Perspective interpolation (I/J)
         struct {

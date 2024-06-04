@@ -794,9 +794,26 @@ void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef dat
         for (size = nl + 1; size != data.size() && data[size] == '\n'; ++size)
           ;
       }
+    } else {
+      // If not outputting ascii, only do 4 bytes, as m_streamer->emitBinaryData splits into 4 byte chunks anyway,
+      // and splitting it ourselves allows us to add a comment with offset and chars on each 4 byte chunk.
+      size = std::min(size, size_t(4));
     }
 
     if (outputting) {
+      std::string comment;
+      raw_string_ostream commentStream(comment);
+      commentStream << format("%06x", offset);
+      if (!isAscii) {
+        commentStream << ": ";
+        for (size_t idx = 0; idx != size; ++idx) {
+          int ch = data[idx];
+          if (ch < ' ' || ch > '~')
+            ch = '.';
+          commentStream << char(ch);
+        }
+      }
+      m_streamer->AddComment(comment);
       if (isAscii)
         m_streamer->emitBytes(data.take_front(size));
       else

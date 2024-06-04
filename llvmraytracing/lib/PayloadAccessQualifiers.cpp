@@ -537,11 +537,15 @@ createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
 
   std::unique_ptr<PAQNode> RootNode =
       std::make_unique<PAQNode>(PAQNode{&PayloadType});
-  RootNode->Children.reserve(NumElements);
 
-  for (uint32_t I = 0; I < NumElements; ++I) {
-    PAQNode ChildNode = {PayloadStructType->getElementType(I)};
-    if (TypeAnnotationMDTuple) {
+  // If the payload type is PAQ-annotated, create child nodes
+  // with their access masks. Otherwise, set a trivial access
+  // mask on the root node, and let later hierarchical propagation
+  // expand the children.
+  if (TypeAnnotationMDTuple) {
+    RootNode->Children.reserve(NumElements);
+    for (uint32_t I = 0; I < NumElements; ++I) {
+      PAQNode ChildNode = {PayloadStructType->getElementType(I)};
       // TypeAnnotationMDTuple should contain a nested tuple for every
       // element, consisting of a tag i32, and the bitmask i32.
       const MDOperand &FieldOperand = TypeAnnotationMDTuple->getOperand(I);
@@ -576,16 +580,16 @@ createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
         ChildNode.AccessMask =
             importPAQAccessMaskFromDXILBitMask(BitMask.value());
       }
-    } else {
-      // No metadata available, assume all read/all write
-      ChildNode.AccessMask.emplace();
-      for (PAQShaderStage Stage : PAQShaderStages) {
-        ChildNode.AccessMask->set(Stage, PAQAccessKind::Write);
-        ChildNode.AccessMask->set(Stage, PAQAccessKind::Read);
-      }
-    }
 
-    RootNode->Children.push_back(std::move(ChildNode));
+      RootNode->Children.push_back(std::move(ChildNode));
+    }
+  } else {
+    // No metadata available, assume all read/all write
+    RootNode->AccessMask.emplace();
+    for (PAQShaderStage Stage : PAQShaderStages) {
+      RootNode->AccessMask->set(Stage, PAQAccessKind::Write);
+      RootNode->AccessMask->set(Stage, PAQAccessKind::Read);
+    }
   }
 
   return RootNode;
@@ -593,14 +597,16 @@ createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
 
 // Recursive implementation for createNestedStructHierarchy.
 //
-// Creates child nodes, and sets the lifetime class. The access mask
-// of Node is set by the caller.
+// Creates child nodes, and sets the lifetime class.
+// The access mask of Node can be set by the caller,
+// in which case it is propagated to its children.
+// If no access mask is set, the access mask is propagated
+// from children if uniform.
 // For leaves, the lifetime class is set from the access mask (if set).
 // For inner nodes, the lifetime class is propagated from children if uniform.
 static void createNestedStructHierarchyRecursively(
-    Type *Ty, PAQNode &Node,
+    PAQNode &Node,
     const MapVector<Type *, std::unique_ptr<PAQNode>> *ModulePayloadRootNodes) {
-  assert(Node.Children.empty() && "PAQ hierarchy already created!");
 
   // If Node.AccessMask is unset, there are two possible cases:
   //  - Node is a nested payload field. In this case, the field was *not*
@@ -626,12 +632,10 @@ static void createNestedStructHierarchyRecursively(
   // However, in this case the whole struct is write(all) + read(all) anyways,
   // and nested payload structs can be ignored.
   const PAQNode *PayloadTypeRootNode = nullptr;
-  StructType *StructTy = dyn_cast<StructType>(Ty);
+  StructType *StructTy = dyn_cast<StructType>(Node.Ty);
   if (!Node.AccessMask) {
     bool IsNestedPayload = false;
-    if (StructTy) {
-      assert(ModulePayloadRootNodes != nullptr &&
-             "Missing module payload root nodes!");
+    if (StructTy && ModulePayloadRootNodes) {
       auto It = ModulePayloadRootNodes->find(StructTy);
       if (It != ModulePayloadRootNodes->end()) {
         IsNestedPayload = true;
@@ -658,31 +662,62 @@ static void createNestedStructHierarchyRecursively(
     return;
   }
 
-  Node.Children.reserve(StructTy->getNumElements());
-  bool LifetimeClassesAreUniform = true;
-  // Construct child nodes, and propagate their lifetime class if uniform
+  // Create child nodes, unless they already exist
+  // For PAQ-annotated payload root nodes, child nodes are already added earlier
+  // as part of PAQ qualifier import.
+  // If child nodes are already present, check that they are as expected
+  bool ChildrenArePrepopulated = !Node.Children.empty();
+  if (ChildrenArePrepopulated) {
+    assert(Node.Children.size() == StructTy->getNumElements());
+  } else {
+    Node.Children.reserve(StructTy->getNumElements());
+  }
   for (uint32_t I = 0; I < StructTy->getNumElements(); ++I) {
-    Type *ChildTy = StructTy->getElementType(I);
-    PAQNode ChildNode{ChildTy};
+    std::optional<PAQAccessMask> ChildAccessMask;
     if (Node.AccessMask) {
       // Use access mask from parent
-      ChildNode.AccessMask = Node.AccessMask;
+      ChildAccessMask = Node.AccessMask;
     } else if (PayloadTypeRootNode) {
       // Use access mask from payload type definition
       // May be unset if ChildTy is again a payload struct type
-      ChildNode.AccessMask = PayloadTypeRootNode->Children[I].AccessMask;
+      ChildAccessMask = PayloadTypeRootNode->Children[I].AccessMask;
     }
+    if (ChildrenArePrepopulated) {
+      assert(!ChildAccessMask.has_value() ||
+             Node.Children[I].AccessMask == ChildAccessMask);
+    } else {
+      Type *ChildTy = StructTy->getElementType(I);
+      Node.Children.emplace_back();
+      Node.Children.back().Ty = ChildTy;
+      Node.Children.back().AccessMask = ChildAccessMask;
+    }
+  }
 
-    createNestedStructHierarchyRecursively(ChildTy, ChildNode,
-                                           ModulePayloadRootNodes);
-    Node.Children.push_back(std::move(ChildNode));
+  // Propagate into/from child nodes
+  bool LifetimeClassesAreUniform = true;
+  bool AccessMasksAreUniform = true;
 
-    if (Node.Children.back().LifetimeClass !=
-        Node.Children.front().LifetimeClass)
+  for (uint32_t I = 0; I < StructTy->getNumElements(); ++I) {
+    PAQNode &ChildNode = Node.Children.at(I);
+
+    createNestedStructHierarchyRecursively(ChildNode, ModulePayloadRootNodes);
+
+    if (ChildNode.LifetimeClass != Node.Children.front().LifetimeClass)
       LifetimeClassesAreUniform = false;
+    if (ChildNode.AccessMask != Node.Children.front().AccessMask)
+      AccessMasksAreUniform = false;
   }
   if (LifetimeClassesAreUniform)
     Node.LifetimeClass = Node.Children[0].LifetimeClass;
+  // Propagate uniform access masks to the parent struct value
+  if (AccessMasksAreUniform && Node.Children[0].AccessMask.has_value()) {
+    PAQAccessMask CommonAccessMask = *Node.Children[0].AccessMask;
+    assert(Node.AccessMask.value_or(CommonAccessMask) == CommonAccessMask);
+    Node.AccessMask = CommonAccessMask;
+    assert(!Node.LifetimeClass.has_value() ||
+           *Node.LifetimeClass ==
+               lifetimeClassFromAccessMask(Node.AccessMask.value()));
+  }
 }
 
 [[maybe_unused]] static void dumpPAQTree(StructType *PayloadType,
@@ -701,8 +736,9 @@ static void createNestedStructHierarchyRecursively(
 // of payload type, in which case qualifiers of nested fields need to
 // be determined from the nested payload type.
 // Hence, a map of all root nodes of payload structs in the module is passed.
-// These are not yet hierarchically expanding (because that is what this
-// function does), which is fine because only the root nodes are accessed.
+// These are not yet hierarchically expanded (because that is what this
+// function does), which is fine because only the root nodes of other payload
+// types are accessed.
 // ModulePayloadRootNodes may be nullptr, in which case no unqualified fields
 // may exist in Node.
 // Note that setting an access mask for a node applies the same mask to its
@@ -710,14 +746,8 @@ static void createNestedStructHierarchyRecursively(
 static void createNestedStructHierarchy(
     Type *PayloadType, PAQNode &Node,
     const MapVector<Type *, std::unique_ptr<PAQNode>> *ModulePayloadRootNodes) {
-  StructType *StructTy = cast<StructType>(PayloadType);
-  for (uint32_t I = 0; I < StructTy->getNumElements(); ++I) {
-    PAQNode &ChildNode = Node.Children[I];
-    createNestedStructHierarchyRecursively(StructTy->getElementType(I),
-                                           ChildNode, ModulePayloadRootNodes);
-  }
-
-  LLVM_DEBUG(dumpPAQTree(StructTy, Node));
+  createNestedStructHierarchyRecursively(Node, ModulePayloadRootNodes);
+  LLVM_DEBUG(dumpPAQTree(cast<StructType>(PayloadType), Node));
 }
 
 static std::unique_ptr<PAQNode>
@@ -858,15 +888,25 @@ importModulePayloadPAQNodes(const Module &M) {
   return PayloadRootNodes;
 }
 
-void PAQNode::collectLeafNodes(SmallVectorImpl<const PAQNode *> &Result) const {
-  if (Ty->isStructTy()) {
-    // If Node.LifetimeClass is set, we could keep the struct together
-    // instead of dissolving it into its elements, but dissolving
-    // has the advantage to reduce potential padding.
-    // Node.Children may be empty for empty structs,
-    // leading to intentionally non-represented subtrees.
-    for (const PAQNode &ChildNode : Children)
-      ChildNode.collectLeafNodes(Result);
+void PAQNode::collectNodes(SmallVectorImpl<const PAQNode *> &Result) const {
+  StructType *StructTy = dyn_cast<StructType>(Ty);
+  if (StructTy) {
+    // For struct types where all fields have the same access mask
+    // (indicated by AccessMask being set), and are live at all
+    // (indicated by LifetimeClass being set), we have a choice of
+    // whether we represent the whole struct with a single node,
+    // or whether we recurse and represent each node individually.
+    // We choose to represent the whole struct by a single node,
+    // thereby avoiding padding between the storage intervals
+    // of smaller-than-dword (e.g. 16-bit) fields, as storage
+    // intervals are allocated on dword granularity.
+    if (LifetimeClass.has_value() && AccessMask.has_value()) {
+      if (!StructTy->isEmptyTy())
+        Result.push_back(this);
+    } else {
+      for (const PAQNode &ChildNode : Children)
+        ChildNode.collectNodes(Result);
+    }
   } else {
     // Fields with write() : read() have no lifetime class
     // and are not collected for serialization

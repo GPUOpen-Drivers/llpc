@@ -106,6 +106,7 @@ struct optional_bool : private std::optional<bool> {
   using std::optional<bool>::has_value;
   using std::optional<bool>::value;
   using std::optional<bool>::value_or;
+  using std::optional<bool>::operator*;
 };
 
 /// Enumerates result codes of LLPC operations.
@@ -576,7 +577,6 @@ struct ShaderModuleUsage {
   unsigned localSizeX;            ///< Compute shader work-group size in the X dimension
   unsigned localSizeY;            ///< Compute shader work-group size in the Y dimension
   unsigned localSizeZ;            ///< Compute shader work-group size in the Z dimension
-  bool useBarycentric;            ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
   bool disableDualSource;         ///< Whether disable dualSource blend
   uint32_t clipDistanceArraySize; ///< Count of output clip distance
 };
@@ -768,7 +768,7 @@ struct PipelineShaderOptions {
   unsigned ldsSpillLimitDwords;
 
   /// Attempt to scalarize waterfall descriptor loads.
-  bool scalarizeWaterfallLoads;
+  optional_bool scalarizeWaterfallLoads;
 
   /// Force rearranges threadId within group into blocks of 8*8 or 8*4
   bool overrideForceThreadIdSwizzling;
@@ -1141,6 +1141,12 @@ struct RtState {
   bool rtIpOverride;
 };
 
+/// GPURT option
+struct GpurtOption {
+  uint64_t nameHash; ///< A hash value that is used as name.
+  uint64_t value;    ///< Value of the setting
+};
+
 struct UniformConstantMapEntry {
   unsigned location; ///< Starting location of the uniform constant variable
   unsigned offset;   ///< Offset of the uniform constant variable in the final buffer
@@ -1264,6 +1270,7 @@ struct GraphicsPipelineBuildInfo {
                                            ///  return extra meta data.
   bool enableEarlyCompile;                 ///< Whether enable early compile
   bool useSoftwareVertexBufferDescriptors; ///< Use software vertex buffer descriptors to structure SRD.
+  bool dynamicTopology;                    ///< Whether primitive topology is dynamic.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif
@@ -1290,6 +1297,8 @@ struct GraphicsPipelineBuildInfo {
     uint8_t vbAddressLowBits[MaxVertexBindings];  ///< Lowest two bits of vertex buffer addresses
     float pixelTransferScale[4];                  ///< Scale apply to render color target
     float pixelTransferBias[4];                   ///< Bias apply to render color target
+    bool enableColorClampVs;                      ///< Enable clamp vertex output color
+    bool enableColorClampFs;                      ///< Enable clamp fragment output color
   } glState;
   const auto &getGlState() const { return glState; }
 #endif
@@ -1363,6 +1372,8 @@ struct RayTracingPipelineBuildInfo {
                                   ///  stored inside the ELF
   size_t clientMetadataSize;      ///< Size (in bytes) of the client-defined data
   unsigned cpsFlags;              ///< Cps feature flags
+  GpurtOption *pGpurtOptions;     ///< Array of GPURT options
+  unsigned gpurtOptionCount;      ///< Number of GPURT options
 };
 
 /// Ray tracing max shader name length

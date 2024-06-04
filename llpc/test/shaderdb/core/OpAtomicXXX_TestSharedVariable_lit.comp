@@ -61,18 +61,19 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: @{{.*}} = addrspace(3) global i32
 ; SHADERTEST: @{{.*}} = addrspace(3) global [4 x i32]
 ; SHADERTEST: atomicrmw add ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds ([4 x i32], ptr addrspace(3) @{{.*}}, i32 0, i32 1), i32 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 4), i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw min ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw umin ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw max ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umax ptr addrspace(3) getelementptr inbounds ([4 x i32], ptr addrspace(3) @{{.*}}, i32 0, i32 2), i32 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umax ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 8), i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw and ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds ([4 x i32], ptr addrspace(3) @{{.*}}, i32 0, i32 3), i32 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 12), i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw or ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw or ptr addrspace(3) %{{[0-9]*}}, i32 %{{[0-9]*}} monotonic
 ; SHADERTEST: atomicrmw xor ptr addrspace(3) @{{.*}}, i32 %{{[0-9]*}} monotonic

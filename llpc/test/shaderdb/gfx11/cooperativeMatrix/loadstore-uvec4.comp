@@ -20,11 +20,11 @@ void main() {
   coopMatStore(matrix, bufOut.x, 0, 4, 0);
 }
 
-// CHECK-LABEL:  @lgc.shader.CS.main(
-// CHECK-LABEL:  .entry:
-// CHECK-NEXT:    [[TMP0:%[0-9]*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 2)
-// CHECK-NEXT:    [[TMP1:%[0-9]*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
-// CHECK-NEXT:    [[TMP2:%[0-9]*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP1]], i32 64, i1 true, i32 1, i32 0, i32 0) #[[ATTR1:[0-9]+]]
-// CHECK-NEXT:    call void @lgc.cooperative.matrix.store.p7.i32.i1.i32.i32.i32.v8f32(ptr addrspace(7) [[TMP0]], i32 64, i1 true, i32 1, i32 0, i32 0, <8 x float> [[TMP2]]) #[[ATTR2:[0-9]+]]
+// CHECK-LABEL: @lgc.shader.CS.main(
+// CHECK-NEXT:  .entry:
+// CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 2)
+// CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
+// CHECK-NEXT:    [[LOAD:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP1]], i32 64, i1 true, i32 1, i32 0, i32 0, i32 16)
+// CHECK-NEXT:    call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) [[TMP0]], i32 64, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> [[LOAD]])
 // CHECK-NEXT:    ret void
 //

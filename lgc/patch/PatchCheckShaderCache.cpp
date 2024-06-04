@@ -110,11 +110,10 @@ PreservedAnalyses PatchCheckShaderCache::run(Module &module, ModuleAnalysisManag
       // locations of generic outputs). We have to add it to shader hash calculation.
       streamMapEntries(resUsage->inOutUsage.gs.builtInOutLocs, stream);
     } else if (stage == ShaderStage::Mesh) {
-      // NOTE: For mesh shader, those four special maps are used to export vertex/primitive attributes.
+      // NOTE: For mesh shader, those two special map info (from built-in IDs to export locations of vertex/primitive
+      // attributes) is used to export vertex/primitive attributes.
       streamMapEntries(resUsage->inOutUsage.mesh.vertexBuiltInExportSlots, stream);
       streamMapEntries(resUsage->inOutUsage.mesh.primitiveBuiltInExportSlots, stream);
-      streamMapEntries(resUsage->inOutUsage.mesh.vertexOutputComponents, stream);
-      streamMapEntries(resUsage->inOutUsage.mesh.primitiveOutputComponents, stream);
     }
 
     // Store the result of the hash for this shader stage.

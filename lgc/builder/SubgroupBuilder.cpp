@@ -90,16 +90,27 @@ Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
-Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName) {
-  Value *result = CreateICmpEQ(createGroupBallot(value), createGroupBallot(getTrue()));
+Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, const Twine &instName) {
+  bool ballotExcludeHelperLanes = false;
+  bool includeHelperLanes = false;
+  bool requireHelperLanes = false;
+
+  if (getShaderStage(GetInsertBlock()->getParent()).value() == ShaderStage::Fragment) {
+    const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+    ballotExcludeHelperLanes = fragmentMode.waveOpsExcludeHelperLanes;
+    includeHelperLanes = !fragmentMode.waveOpsExcludeHelperLanes;
+    requireHelperLanes = fragmentMode.waveOpsRequireHelperLanes;
+  }
+
+  Value *result = CreateICmpEQ(createGroupBallot(value, ballotExcludeHelperLanes),
+                               createGroupBallot(getTrue(), ballotExcludeHelperLanes));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
+  if (includeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
-    result = CreateIntrinsic(fragmentMode.waveOpsRequireHelperLanes ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm,
-                             {getInt32Ty()}, {result});
+    result = CreateIntrinsic(requireHelperLanes ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm, {getInt32Ty()},
+                             {result});
     result = CreateTrunc(result, getInt1Ty());
   }
   return result;
@@ -140,7 +151,7 @@ Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instN
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
-Value *BuilderImpl::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
+Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
   Type *const type = value->getType();
 
   Value *compare = CreateSubgroupBroadcastFirst(value, instName);
@@ -170,8 +181,8 @@ Value *BuilderImpl::CreateSubgroupAllEqual(Value *const value, const Twine &inst
 // @param delta : The delta/offset added to lane id.
 // @param clusterSize : The cluster size if exists.
 // @param instName : Name to give final instruction.
-Value *BuilderImpl::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
-                                         const Twine &instName) {
+Value *SubgroupBuilder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
+                                             const Twine &instName) {
   // LocalId = SubgroupLocalInvocationId
   // RotationGroupSize = hasClusterSIze? ClusterSize : SubgroupSize.
   // Invocation ID = ((LocalId + Delta) & (RotationGroupSize - 1)) + (LocalId & ~(RotationGroupSize - 1))
@@ -375,6 +386,7 @@ Value *BuilderImpl::CreateSubgroupBallotFindMsb(Value *const value, const Twine 
 // @param index : The index to shuffle from.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index, const Twine &instName) {
+
   if (supportWaveWideBPermute()) {
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                       ArrayRef<Value *> passthroughArgs) -> Value * {
@@ -391,21 +403,22 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
     // Start the WWM section by setting the inactive lanes.
     Value *const poisonValue = PoisonValue::get(value->getType());
     Value *const poisonIndex = PoisonValue::get(index->getType());
-    Value *const scaledIndex = CreateMul(index, getInt32(4));
     Value *wwmValue = BuilderBase::get(*this).CreateSetInactive(value, poisonValue);
-    Value *wwmIndex = BuilderBase::get(*this).CreateSetInactive(scaledIndex, poisonIndex);
+    Value *wwmIndex = nullptr;
+    BuilderBase::MapToSimpleTypeFunc bPermFunc = nullptr;
+    {
+      Value *const scaledIndex = CreateMul(index, getInt32(4));
+      wwmIndex = BuilderBase::get(*this).CreateSetInactive(scaledIndex, poisonIndex);
+      bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+        return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
+      };
+    }
 
     auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {mappedArgs[0]});
     };
-
     auto swapped = CreateMapToSimpleType(permuteFunc, wwmValue, {});
-
-    auto bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
-                        ArrayRef<Value *> passthroughArgs) -> Value * {
-      return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
-    };
 
     auto bPermSameHalf = CreateMapToSimpleType(bPermFunc, wwmValue, wwmIndex);
     auto bPermOtherHalf = CreateMapToSimpleType(bPermFunc, swapped, wwmIndex);
@@ -449,9 +462,8 @@ Value *BuilderImpl::CreateSubgroupShuffleXor(Value *const value, Value *const ma
   // issue dpp_mov for some simple quad/row shuffle cases;
   // then issue ds_permlane_x16 if supported or ds_swizzle, if maskValue < 32
   // default to call SubgroupShuffle, which may issue waterfallloops to handle complex cases.
-  if (isa<ConstantInt>(mask)) {
-    maskValue = cast<ConstantInt>(mask)->getZExtValue();
-
+  if (auto maskInt = dyn_cast<ConstantInt>(mask)) {
+    maskValue = maskInt->getZExtValue();
     if (maskValue < 32) {
       canOptimize = true;
       switch (maskValue) {
@@ -571,8 +583,11 @@ Value *BuilderImpl::CreateSubgroupShuffleDown(Value *const value, Value *const d
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
                                                      Value *const inClusterSize, const Twine &instName) {
-  auto waveSize = getInt32(getShaderWaveSize());
-  Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
+  assert(isa<ConstantInt>(inClusterSize));
+  unsigned clusterSize = cast<ConstantInt>(inClusterSize)->getZExtValue();
+  assert(isPowerOf2_32(clusterSize));
+  const unsigned waveSize = getShaderWaveSize();
+  clusterSize = std::min(clusterSize, waveSize);
 
   // Start the WWM section by setting the inactive lanes.
   Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
@@ -585,53 +600,47 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
     result = CreateSelect(isLive, result, identity);
   }
 
-  // Perform The group arithmetic operation between adjacent lanes in the subgroup, with all masks and rows enabled
-  // (0xF).
-  result = CreateSelect(
-      CreateICmpUGE(clusterSize, getInt32(2)),
-      createGroupArithmeticOperation(groupArithOp, result,
-                                     createDppUpdate(identity, result, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true)),
-      result);
+  if (clusterSize >= 2) {
+    // Perform The group arithmetic operation between adjacent lanes in the subgroup, with all masks and rows enabled
+    // (0xF).
+    result = createGroupArithmeticOperation(
+        groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true));
+  }
 
-  // Perform The group arithmetic operation between N <-> N+2 lanes in the subgroup, with all masks and rows enabled
-  // (0xF).
-  result = CreateSelect(
-      CreateICmpUGE(clusterSize, getInt32(4)),
-      createGroupArithmeticOperation(groupArithOp, result,
-                                     createDppUpdate(identity, result, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true)),
-      result);
+  if (clusterSize >= 4) {
+    // Perform The group arithmetic operation between N <-> N+2 lanes in the subgroup, with all masks and rows enabled
+    // (0xF).
+    result = createGroupArithmeticOperation(
+        groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true));
+  }
 
-  // Use a row half mirror to make all values in a cluster of 8 the same, with all masks and rows enabled (0xF).
-  result = CreateSelect(
-      CreateICmpUGE(clusterSize, getInt32(8)),
-      createGroupArithmeticOperation(groupArithOp, result,
-                                     createDppUpdate(identity, result, DppCtrl::DppRowHalfMirror, 0xF, 0xF, true)),
-      result);
+  if (clusterSize >= 8) {
+    // Use a row half mirror to make all values in a cluster of 8 the same, with all masks and rows enabled (0xF).
+    result = createGroupArithmeticOperation(
+        groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowHalfMirror, 0xF, 0xF, true));
+  }
 
-  // Use a row mirror to make all values in a cluster of 16 the same, with all masks and rows enabled (0xF).
-  result =
-      CreateSelect(CreateICmpUGE(clusterSize, getInt32(16)),
-                   createGroupArithmeticOperation(
-                       groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowMirror, 0xF, 0xF, true)),
-                   result);
+  if (clusterSize >= 16) {
+    // Use a row mirror to make all values in a cluster of 16 the same, with all masks and rows enabled (0xF).
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowMirror, 0xF, 0xF, true));
+  }
 
-  // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
-  result =
-      CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
-                   createGroupArithmeticOperation(
-                       groupArithOp, result, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false)),
-                   result);
+  if (clusterSize >= 32) {
+    // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false));
+  }
 
-  if (supportPermLane64Dpp()) {
-    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                          createGroupArithmeticOperation(groupArithOp, result, createPermLane64(result)), result);
-  } else {
-    Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
-    Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
-
-    // Combine broadcast from the 31st and 63rd for the final result.
-    result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                          createGroupArithmeticOperation(groupArithOp, broadcast31, broadcast63), result);
+  if (clusterSize == 64) {
+    assert(waveSize == 64);
+    if (supportPermLane64Dpp()) {
+      result = createGroupArithmeticOperation(groupArithOp, result, createPermLane64(result));
+    } else {
+      Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
+      Value *const broadcast63 = CreateSubgroupBroadcast(result, getInt32(63), instName);
+      result = createGroupArithmeticOperation(groupArithOp, broadcast31, broadcast63);
+    }
   }
 
   // Finish the WWM section by calling the intrinsic.
@@ -654,65 +663,62 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
                                                      Value *const inClusterSize, const Twine &instName) {
-  auto waveSize = getInt32(getShaderWaveSize());
-  Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
+  assert(isa<ConstantInt>(inClusterSize));
+  unsigned clusterSize = cast<ConstantInt>(inClusterSize)->getZExtValue();
+  assert(isPowerOf2_32(clusterSize));
+  const unsigned waveSize = getShaderWaveSize();
+  clusterSize = std::min(clusterSize, waveSize);
 
   Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
   // Start the WWM section by setting the inactive invocations.
-  Value *const setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
+  Value *result = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
-  // The DPP operation has all rows active and all banks in the rows active (0xF).
-  Value *result = CreateSelect(
-      CreateICmpUGE(clusterSize, getInt32(2)),
-      createGroupArithmeticOperation(groupArithOp, setInactive,
-                                     createDppUpdate(identity, setInactive, DppCtrl::DppRowSr1, 0xF, 0xF, 0)),
-      setInactive);
+  if (clusterSize >= 2) {
+    // The DPP operation has all rows active and all banks in the rows active (0xF).
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowSr1, 0xF, 0xF, 0));
+  }
 
-  // The DPP operation has all rows active and all banks in the rows active (0xF).
-  result =
-      CreateSelect(CreateICmpUGE(clusterSize, getInt32(4)),
-                   createGroupArithmeticOperation(
-                       groupArithOp, result, createDppUpdate(identity, setInactive, DppCtrl::DppRowSr2, 0xF, 0xF, 0)),
-                   result);
+  if (clusterSize >= 4) {
+    // The DPP operation has all rows active and all banks in the rows active (0xF).
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowSr2, 0xF, 0xF, 0));
+  }
 
-  // The DPP operation has all rows active and all banks in the rows active (0xF).
-  result =
-      CreateSelect(CreateICmpUGE(clusterSize, getInt32(4)),
-                   createGroupArithmeticOperation(
-                       groupArithOp, result, createDppUpdate(identity, setInactive, DppCtrl::DppRowSr3, 0xF, 0xF, 0)),
-                   result);
+  if (clusterSize >= 8) {
+    // The DPP operation has all rows active (0xF) and the top 3 banks active (0xe, 0b1110) to make sure that in
+    // each cluster of 16, only the top 12 lanes perform the operation.
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowSr4, 0xF, 0xE, 0));
+  }
 
-  // The DPP operation has all rows active (0xF) and the top 3 banks active (0xe, 0b1110) to make sure that in
-  // each cluster of 16, only the top 12 lanes perform the operation.
-  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(8)),
-                        createGroupArithmeticOperation(
-                            groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowSr4, 0xF, 0xE, 0)),
-                        result);
-
-  // The DPP operation has all rows active (0xF) and the top 2 banks active (0xc, 0b1100) to make sure that in
-  // each cluster of 16, only the top 8 lanes perform the operation.
-  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(16)),
-                        createGroupArithmeticOperation(
-                            groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0)),
-                        result);
+  if (clusterSize >= 16) {
+    // The DPP operation has all rows active (0xF) and the top 2 banks active (0xc, 0b1100) to make sure that in
+    // each cluster of 16, only the top 8 lanes perform the operation.
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0));
+  }
 
   Value *const threadMask = createThreadMask();
 
-  Value *const maskedPermLane = createThreadMaskedSelect(
-      threadMask, 0xFFFF0000FFFF0000, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+  if (clusterSize >= 32) {
+    Value *const maskedPermLane =
+        createThreadMaskedSelect(threadMask, 0xFFFF0000FFFF0000,
+                                 createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+    // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+    result = createGroupArithmeticOperation(groupArithOp, result, maskedPermLane);
+  }
 
-  // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
-  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
-                        createGroupArithmeticOperation(groupArithOp, result, maskedPermLane), result);
+  if (clusterSize == 64) {
 
-  Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
+    Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
 
-  Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
+    Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
 
-  // Combine broadcast of 31 with the top two rows only.
-  result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                        createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast), result);
+    // Combine broadcast of 31 with the top two rows only.
+    result = createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast);
+  }
 
   // Finish the WWM section by calling the intrinsic.
   result = createWwm(result);
@@ -734,19 +740,22 @@ Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, 
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
                                                      Value *const inClusterSize, const Twine &instName) {
-  auto waveSize = getInt32(getShaderWaveSize());
-  Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
+  assert(isa<ConstantInt>(inClusterSize));
+  unsigned clusterSize = cast<ConstantInt>(inClusterSize)->getZExtValue();
+  assert(isPowerOf2_32(clusterSize));
+  const unsigned waveSize = getShaderWaveSize();
+  clusterSize = std::min(clusterSize, waveSize);
 
   Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
   // Start the WWM section by setting the inactive invocations.
-  Value *setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
+  Value *result = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
   if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
-    setInactive = CreateSelect(isLive, setInactive, identity);
+    result = CreateSelect(isLive, result, identity);
   }
 
   Value *shiftRight = nullptr;
@@ -756,10 +765,10 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
   // Shift right within each row:
   // 0b0110,0101,0100,0011,0010,0001,0000,1111 = 0x6543210F
   // 0b1110,1101,1100,1011,1010,1001,1000,0111 = 0xEDCBA987
-  shiftRight = createPermLane16(setInactive, setInactive, 0x6543210F, 0xEDCBA987, true, false);
+  shiftRight = createPermLane16(result, result, 0x6543210F, 0xEDCBA987, true, false);
 
-  // Only needed for wave size 64.
-  if (getShaderWaveSize() == 64) {
+  // Only needed for cluster size 64.
+  if (clusterSize == 64) {
     // Need to write the value from the 16th invocation into the 48th.
     shiftRight = CreateSubgroupWriteInvocation(shiftRight, CreateSubgroupBroadcast(shiftRight, getInt32(16), ""),
                                                getInt32(48), "");
@@ -773,55 +782,53 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
       createThreadMaskedSelect(threadMask, 0x0001000100010001,
                                createPermLaneX16(shiftRight, shiftRight, 0, UINT32_MAX, true, false), shiftRight);
 
-  // The DPP operation has all rows active and all banks in the rows active (0xF).
-  Value *result = CreateSelect(
-      CreateICmpUGE(clusterSize, getInt32(2)),
-      createGroupArithmeticOperation(groupArithOp, shiftRight,
-                                     createDppUpdate(identity, shiftRight, DppCtrl::DppRowSr1, 0xF, 0xF, 0)),
-      shiftRight);
+  if (clusterSize >= 2) {
+    // The DPP operation has all rows active and all banks in the rows active (0xF).
+    result = createGroupArithmeticOperation(groupArithOp, shiftRight,
+                                            createDppUpdate(identity, shiftRight, DppCtrl::DppRowSr1, 0xF, 0xF, 0));
+  }
 
-  // The DPP operation has all rows active and all banks in the rows active (0xF).
-  result =
-      CreateSelect(CreateICmpUGE(clusterSize, getInt32(4)),
-                   createGroupArithmeticOperation(
-                       groupArithOp, result, createDppUpdate(identity, shiftRight, DppCtrl::DppRowSr2, 0xF, 0xF, 0)),
-                   result);
+  if (clusterSize >= 4) {
+    // The DPP operation has all rows active and all banks in the rows active (0xF).
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, shiftRight, DppCtrl::DppRowSr2, 0xF, 0xF, 0));
 
-  // The DPP operation has all rows active and all banks in the rows active (0xF).
-  result =
-      CreateSelect(CreateICmpUGE(clusterSize, getInt32(4)),
-                   createGroupArithmeticOperation(
-                       groupArithOp, result, createDppUpdate(identity, shiftRight, DppCtrl::DppRowSr3, 0xF, 0xF, 0)),
-                   result);
+    // The DPP operation has all rows active and all banks in the rows active (0xF).
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, shiftRight, DppCtrl::DppRowSr3, 0xF, 0xF, 0));
+  }
 
-  // The DPP operation has all rows active (0xF) and the top 3 banks active (0xe, 0b1110) to make sure that in
-  // each cluster of 16, only the top 12 lanes perform the operation.
-  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(8)),
-                        createGroupArithmeticOperation(
-                            groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowSr4, 0xF, 0xE, 0)),
-                        result);
+  if (clusterSize >= 8) {
+    // The DPP operation has all rows active (0xF) and the top 3 banks active (0xe, 0b1110) to make sure that in
+    // each cluster of 16, only the top 12 lanes perform the operation.
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowSr4, 0xF, 0xE, 0));
+  }
 
-  // The DPP operation has all rows active (0xF) and the top 2 banks active (0xc, 0b1100) to make sure that in
-  // each cluster of 16, only the top 8 lanes perform the operation.
-  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(16)),
-                        createGroupArithmeticOperation(
-                            groupArithOp, result, createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0)),
-                        result);
+  if (clusterSize >= 16) {
+    // The DPP operation has all rows active (0xF) and the top 2 banks active (0xc, 0b1100) to make sure that in
+    // each cluster of 16, only the top 8 lanes perform the operation.
+    result = createGroupArithmeticOperation(groupArithOp, result,
+                                            createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0));
+  }
 
-  Value *const maskedPermLane = createThreadMaskedSelect(
-      threadMask, 0xFFFF0000FFFF0000, createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+  if (clusterSize >= 32) {
+    Value *const maskedPermLane =
+        createThreadMaskedSelect(threadMask, 0xFFFF0000FFFF0000,
+                                 createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
 
-  // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
-  result = CreateSelect(CreateICmpUGE(clusterSize, getInt32(32)),
-                        createGroupArithmeticOperation(groupArithOp, result, maskedPermLane), result);
+    // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
+    result = createGroupArithmeticOperation(groupArithOp, result, maskedPermLane);
+  }
 
-  Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
+  if (clusterSize >= 64) {
+    Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
 
-  Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
+    Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
 
-  // Combine broadcast of 31 with the top two rows only.
-  result = CreateSelect(CreateICmpEQ(clusterSize, getInt32(64)),
-                        createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast), result);
+    // Combine broadcast of 31 with the top two rows only.
+    result = createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast);
+  }
 
   // Finish the WWM section by calling the intrinsic.
   result = createWwm(result);

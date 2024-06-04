@@ -66,23 +66,7 @@ PreservedAnalyses LowerCooperativeMatrix::run(Module &module, ModuleAnalysisMana
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   processCoopRowAccFunction(module);
-
-  SmallVector<Function *, 16> lowerCoopMatrixCallees;
-  for (auto &func : module) {
-    auto name = func.getName();
-    if (name.starts_with(lgcName::CooperativeMatrix))
-      lowerCoopMatrixCallees.push_back(&func);
-  }
-  if (lowerCoopMatrixCallees.empty())
-    return PreservedAnalyses::all();
-
-  processCoopMatrixFunction(lowerCoopMatrixCallees);
-
-  for (auto callInst : m_coopMatrixCalls) {
-    callInst->dropAllReferences();
-    callInst->eraseFromParent();
-  }
-  m_coopMatrixCalls.clear();
+  processCoopMatrixFunction(module);
 
   PreservedAnalyses PA;
   PA.preserveSet<CFGAnalyses>();
@@ -90,195 +74,34 @@ PreservedAnalyses LowerCooperativeMatrix::run(Module &module, ModuleAnalysisMana
 }
 
 // =====================================================================================================================
-// Run the on a module
+// Visit the cooperative matrix ops on module
 //
-// @param coopMatrixCallees : Function array for the cooperativeMatrix
-void LowerCooperativeMatrix::processCoopMatrixFunction(ArrayRef<Function *> coopMatrixCallees) {
-  for (auto callee : coopMatrixCallees) {
-    for (auto user : callee->users()) {
-      if (CallInst *callInst = dyn_cast<CallInst>(user)) {
-        visitCallInst(*callInst);
-      }
-    }
+// @param [in] module :  LLVM module to be run on
+void LowerCooperativeMatrix::processCoopMatrixFunction(Module &module) {
+  static auto visitor = llvm_dialects::VisitorBuilder<LowerCooperativeMatrix>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixLengthOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixExtractOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixInsertOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixFillOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixLoadOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixStoreOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixConvertOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixTransposeOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixBinaryOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixTimesScalarOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixPackOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeMatrixUnPackOp)
+                            .build();
+
+  visitor.visit(*this, module);
+
+  for (auto callInst : m_coopMatrixCalls) {
+    callInst->dropAllReferences();
+    callInst->eraseFromParent();
   }
-}
-
-// =====================================================================================================================
-// Visits "call" instruction.
-//
-// @param callInst : "Call" instruction
-void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
-  auto callee = callInst.getCalledFunction();
-  if (!callee)
-    return;
-
-  m_coopMatrixCalls.push_back(&callInst);
-
-  BuilderCommon builder(*m_context);
-  builder.SetInsertPoint(&callInst);
-
-  auto mangledName = callee->getName();
-  if (mangledName.starts_with(lgcName::CooperativeMatrixLength)) {
-    auto layout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
-    callInst.replaceAllUsesWith(builder.getInt32(getLength(layout)));
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixExtract)) {
-    Value *matrix = callInst.getOperand(0);
-    Value *index = callInst.getOperand(1);
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-    auto layout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-    Value *result = cooperativeMatrixExtract(builder, matrix, index, elemType, layout);
-    result->takeName(&callInst);
-    callInst.replaceAllUsesWith(result);
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixInsert)) {
-    Value *matrix = callInst.getOperand(0);
-    Value *value = callInst.getOperand(1);
-    Value *index = callInst.getOperand(2);
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-    auto layout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(4))->getZExtValue());
-    Value *result = cooperativeMatrixInsert(builder, matrix, value, index, elemType, layout);
-    result->takeName(&callInst);
-    callInst.replaceAllUsesWith(result);
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixFill)) {
-    Value *value = callInst.getOperand(0);
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
-    auto layout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-    Value *result = cooperativeMatrixFill(builder, value, elemType, layout);
-    result->takeName(&callInst);
-    callInst.replaceAllUsesWith(result);
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixLoad)) {
-    Value *dataPtr = callInst.getOperand(0);
-    Value *stride = callInst.getOperand(1);
-    bool colMajor = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-    auto layout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(4))->getZExtValue());
-    unsigned memoryAccess = cast<ConstantInt>(callInst.getOperand(5))->getZExtValue();
-    unsigned alignment = cast<ConstantInt>(callInst.getOperand(6))->getZExtValue();
-
-    Value *loadVal = cooperativeMatrixLoadInternal(dataPtr, stride, colMajor, elemType, layout, memoryAccess, alignment,
-                                                   callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(loadVal);
-
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixStore)) {
-    Value *dataPtr = callInst.getOperand(0);
-    Value *stride = callInst.getOperand(1);
-    bool colMajor = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-    auto layout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(4))->getZExtValue());
-    unsigned memoryAccess = cast<ConstantInt>(callInst.getOperand(5))->getZExtValue();
-    unsigned alignment = cast<ConstantInt>(callInst.getOperand(6))->getZExtValue();
-    Value *vecVal = callInst.getOperand(7);
-
-    cooperativeMatrixStoreInternal(dataPtr, stride, colMajor, elemType, layout, memoryAccess, alignment, vecVal,
-                                   callInst.getName(), &callInst);
-
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixConvert)) {
-    CastInst::CastOps castOp =
-        static_cast<CastInst::CastOps>(cast<ConstantInt>(callInst.getOperand(0))->getZExtValue());
-    Value *source = callInst.getOperand(1);
-    auto srcElemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-    auto dstElemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-    auto srcLayout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(4))->getZExtValue());
-    auto dstLayout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(5))->getZExtValue());
-    Value *resultVal = cooperativeMatrixConvert(castOp, source, srcElemType, dstElemType, srcLayout, dstLayout,
-                                                callInst.getName(), &callInst);
-    if ((cast<FixedVectorType>(resultVal->getType())->getNumElements() == 4) &&
-        (dstLayout == CooperativeMatrixLayout::AccumulatorMatrixLayout ||
-         dstLayout == CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout ||
-         dstLayout == CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout)) {
-      // for wave64 needs shuffleVector from V4 to V8 as frontend will always recognize V8 not care wave32 or wave64
-      resultVal = builder.CreateShuffleVector(resultVal, PoisonValue::get(resultVal->getType()),
-                                              ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
-    }
-    callInst.replaceAllUsesWith(resultVal);
-
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixTranspose)) {
-    Value *matrix = callInst.getOperand(0);
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
-    auto srcLayout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-
-    Value *resultVal = cooperativeMatrixTranspose(matrix, elemType, srcLayout, callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(resultVal);
-
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixBinOp)) {
-    CooperativeMatrixArithOp coopMatArithOp =
-        static_cast<CooperativeMatrixArithOp>(cast<ConstantInt>(callInst.getOperand(0))->getZExtValue());
-    Value *lhs = callInst.getOperand(1);
-    Value *rhs = callInst.getOperand(2);
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-    auto srcLayout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(4))->getZExtValue());
-
-    Value *resultVal =
-        cooperativeMatrixBinaryOp(coopMatArithOp, lhs, rhs, elemType, srcLayout, callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(resultVal);
-
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixTimesScalar)) {
-    Value *matrix = callInst.getOperand(0);
-    Value *scalar = callInst.getOperand(1);
-    auto elemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-    auto srcLayout = static_cast<CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(3))->getZExtValue());
-
-    Value *resultVal = coopMatrixTimesScalar(matrix, scalar, elemType, srcLayout, callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(resultVal);
-
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixMulAdd)) {
-    Value *matrixA = callInst.getOperand(0);
-    Value *matrixB = callInst.getOperand(1);
-    Value *matrixC = callInst.getOperand(2);
-    bool isSignedA = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-    bool isSignedB = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
-    bool isSatOrOpsel = cast<ConstantInt>(callInst.getOperand(5))->getZExtValue();
-    bool isTied = cast<ConstantInt>(callInst.getOperand(6))->getZExtValue();
-    auto accumElemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(7))->getZExtValue());
-    auto factorElemType =
-        static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(8))->getZExtValue());
-    Value *resultVal = cooperativeMatrixMulAdd(matrixA, matrixB, matrixC, isSignedA, isSignedB, isSatOrOpsel, isTied,
-                                               accumElemType, factorElemType, callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(resultVal);
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixPack)) {
-    Value *matrixA = callInst.getOperand(0);
-    Value *matrixB = callInst.getOperand(1);
-    Value *resultVal = cooperativeMatrixPack(matrixA, matrixB, callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(resultVal);
-  } else if (mangledName.starts_with(lgcName::CooperativeMatrixUnpack)) {
-    Value *packedMatrix = callInst.getOperand(0);
-    bool high = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-    Value *resultVal = cooperativeMatrixUnpack(packedMatrix, high, callInst.getName(), &callInst);
-    callInst.replaceAllUsesWith(resultVal);
-
-  } else {
-    llvm_unreachable("Should never be called!");
-  }
-}
-
-// =====================================================================================================================
-// Get the "length" of a matrix of the given layout, i.e. the number of matrix components stored per lane.
-//
-// @param layout : the matrix layout
-unsigned LowerCooperativeMatrix::getLength(CooperativeMatrixLayout layout) const {
-  auto waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
-  switch (layout) {
-  case CooperativeMatrixLayout::FactorMatrixLayout:
-    return 16;
-  case CooperativeMatrixLayout::AccumulatorMatrixLayout: {
-    return waveSize == 32 ? 8 : 4;
-  }
-  case CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout:
-  case CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout:
-    return 8;
-  default:
-    llvm_unreachable("unhandled matrix layout");
-  }
+  m_coopMatrixCalls.clear();
 }
 
 // =====================================================================================================================
@@ -443,30 +266,53 @@ LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, Cooper
 }
 
 // =====================================================================================================================
-// Load contiguous elements from the specified location of the memory.
-// @param dataPtr : The pointer to a data array.
-// @param stride : The stride in bytes in memory between the first elements of consecutive rows (orcolumns) in the
-// source data. Guaranteed to be a multiple of the matrix element size.
-// @param isColMajor : Identify the order for the data stored in memory, col-major/row-major
-// @param elemType : The element type for the matrix
-// @param layout : This is identify for factor(A/B) or accumulator(C) for 16 bit element matrix.
-// @param memoryAccess : The memory operands which provide:isVolatile/isTemporal/isCoherent
-// @param alignment:  Alignment for the memory access operations.
-// additional operands, maybe volatile/Aligned/Nontemporal/MakePointerAvailable
-// /MakePointerVisible/NonPrivatePointer usded by CooperativeMatrix Load/Store.
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixLoadInternal(Value *dataPtr, Value *stride, bool isColMajor,
-                                                             CooperativeMatrixElementType elemType,
-                                                             CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                                             unsigned alignment, const Twine &instName,
-                                                             Instruction *insertPos) {
+// Visit "CooperativeMatrixLengthOp" instruction
+//
+// @param matrixlength : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixLengthOp(CooperativeMatrixLengthOp &matrixlength) {
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&matrixlength);
+  auto waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
+  auto layout = matrixlength.getLayout();
+  unsigned length = 0;
+  switch (layout) {
+  case CooperativeMatrixLayout::FactorMatrixLayout:
+    length = 16;
+    break;
+  case CooperativeMatrixLayout::AccumulatorMatrixLayout: {
+    length = (waveSize == 32) ? 8 : 4;
+    break;
+  }
+  case CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout:
+  case CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout:
+    length = 8;
+    break;
+  default:
+    llvm_unreachable("unhandled matrix layout");
+  }
+  m_coopMatrixCalls.push_back(&matrixlength);
+  matrixlength.replaceAllUsesWith(builder.getInt32(length));
+}
+
+// =====================================================================================================================
+// Visit "CooperativeMatrixLoadOp" instruction
+//
+// @param load : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadOp &load) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&load);
 
   auto shaderStage = getShaderStage(builder.GetInsertBlock()->getParent());
   auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage.value());
   assert(waveSize == 32 || waveSize == 64);
+
+  auto elemType = load.getElemType();
+  Value *dataPtr = load.getPointer();
+  Value *stride = load.getStride();
+  auto memoryAccess = load.getMemoryAccess();
+  auto layout = load.getLayout();
+  auto isColMajor = load.getColMajor();
+  auto alignment = load.getAlignment();
 
   // Calc element offset in memory
   Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
@@ -483,7 +329,7 @@ Value *LowerCooperativeMatrix::cooperativeMatrixLoadInternal(Value *dataPtr, Val
 
   auto props = getTypeProperties(elemType, layout);
 
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, insertPos);
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &load);
   Value *vecVal = PoisonValue::get(FixedVectorType::get(elemTy, props.numFlatElements));
   for (unsigned idx = 0; idx < props.numFlatElements; ++idx) {
     Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(idx / addrInfo.microCount));
@@ -497,10 +343,10 @@ Value *LowerCooperativeMatrix::cooperativeMatrixLoadInternal(Value *dataPtr, Val
       // merging load/store instructions on backend later.
       unsigned constantOffsetInRowCol = cast<ConstantInt>(offsetInRowCol)->getZExtValue();
       Align compAlignment = commonAlignment(Align(alignment), constantOffsetInRowCol);
-      eleVal = builder.CreateAlignedLoad(elemTy, elePtr, compAlignment, isVolatile, instName);
+      eleVal = builder.CreateAlignedLoad(elemTy, elePtr, compAlignment, isVolatile);
     } else {
       // For rowMajor@B/C and colMajor@A, as the elements of one lane aren't continuous, no alignments needed.
-      eleVal = builder.CreateLoad(elemTy, elePtr, isVolatile, instName);
+      eleVal = builder.CreateLoad(elemTy, elePtr, isVolatile);
     }
     if (isCoherent && !(addrSpace == ADDR_SPACE_LOCAL && dataBitwidth < 32))
       cast<LoadInst>(eleVal)->setAtomic(AtomicOrdering::Unordered);
@@ -510,32 +356,26 @@ Value *LowerCooperativeMatrix::cooperativeMatrixLoadInternal(Value *dataPtr, Val
   }
 
   Value *coMatrix = convFlatVecToCoopMatrixVec(builder, vecVal, elemType, layout);
-  return coMatrix;
+  m_coopMatrixCalls.push_back(&load);
+  load.replaceAllUsesWith(coMatrix);
 }
 
 // =====================================================================================================================
-// Store a contiguous elements from the specified location of the memory.
+// Visit "CooperativeMatrixStoreOp" instruction
 //
-// @param dataPtr : The pointer to a data array.
-// @param stride : The stride in bytes between the first elements of consecutive rows (or columns) in the destination.
-// Guaranteed to be a multiple of the element size.
-// @param colMajor : Identify the order for the data stored in memory, col-major/row-major
-// @param elemType : The type for the element.
-// @param layout : This is identify for factor(A/B) or accumulator(C) for 16 bit element matrix.
-// @param memoryAccess :  The memory operands which provide
-// additional operands, maybe volatile/Aligned/Nontemporal/MakePointerAvailable
-// /MakePointerVisible/NonPrivatePointer used by CooperativeMatrix Load/Store.
-// @param vecVal : The contiguous elements made up of a vector to be loaded or stored.
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-void LowerCooperativeMatrix::cooperativeMatrixStoreInternal(Value *dataPtr, Value *stride, bool isColMajor,
-                                                            CooperativeMatrixElementType elemType,
-                                                            CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                                            unsigned alignment, Value *&vecVal, const Twine &instName,
-                                                            Instruction *insertPos) {
+// @param store : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStoreOp &store) {
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&store);
 
+  auto elemType = store.getElemType();
+  Value *dataPtr = store.getPointer();
+  Value *stride = store.getStride();
+  auto memoryAccess = store.getMemoryAccess();
+  auto layout = store.getLayout();
+  auto isColMajor = store.getColMajor();
+  auto alignment = store.getAlignment();
+  Value *vecVal = store.getStoreValue();
   auto shaderStage = getShaderStage(builder.GetInsertBlock()->getParent());
   auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage.value());
   assert(waveSize == 32 || waveSize == 64);
@@ -554,7 +394,7 @@ void LowerCooperativeMatrix::cooperativeMatrixStoreInternal(Value *dataPtr, Valu
   bool isTemporal = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
 
   auto props = getTypeProperties(elemType, layout);
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, insertPos);
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &store);
 
   vecVal = convCoopMatrixVecToFlatVec(builder, vecVal, elemType, layout);
 
@@ -579,19 +419,46 @@ void LowerCooperativeMatrix::cooperativeMatrixStoreInternal(Value *dataPtr, Valu
     if (isTemporal)
       st->setMetadata(LLVMContext::MD_nontemporal, MDNode::get(builder.getContext(), {}));
   }
+
+  m_coopMatrixCalls.push_back(&store);
 }
 
 // =====================================================================================================================
-// Open-code cooperative matrix extract operation
+// Visit "CooperativeMatrixFillOp" instruction
 //
-// @param builder : builder to use
-// @param matrix : the matrix from which to extract a component
-// @param index : the index to be extracted
-// @param elemType : the matrix element type
-// @param layout : the matrix layout type
-Value *LowerCooperativeMatrix::cooperativeMatrixExtract(BuilderCommon &builder, Value *matrix, Value *index,
-                                                        CooperativeMatrixElementType elemType,
-                                                        CooperativeMatrixLayout layout) {
+// @param fill : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixFillOp(CooperativeMatrixFillOp &fill) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&fill);
+
+  auto elemType = fill.getElemType();
+  auto layout = fill.getLayout();
+  Value *value = fill.getScalar();
+  auto props = getTypeProperties(elemType, layout);
+  Type *flatType = FixedVectorType::get(builder.transCooperativeMatrixElementType(elemType), props.numMatrixElements);
+
+  Value *vec = PoisonValue::get(flatType);
+  for (unsigned idx = 0; idx < props.numMatrixElements; idx++)
+    vec = builder.CreateInsertElement(vec, value, idx);
+
+  Value *fillValue = convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
+
+  m_coopMatrixCalls.push_back(&fill);
+  fill.replaceAllUsesWith(fillValue);
+}
+
+// =====================================================================================================================
+// Visit "CooperativeMatrixExtractOp" instruction
+//
+// @param extract : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixExtractOp(CooperativeMatrixExtractOp &extract) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&extract);
+
+  auto matrix = extract.getMatrix();
+  auto elemType = extract.getElemType();
+  auto layout = extract.getLayout();
+  auto index = extract.getIndex();
   Value *vec = convCoopMatrixVecToFlatVec(builder, matrix, elemType, layout);
 
   // This is a hacky workaround to the fact that for SPV_NV_cooperative_matrix, we have to support matrix length as
@@ -603,21 +470,24 @@ Value *LowerCooperativeMatrix::cooperativeMatrixExtract(BuilderCommon &builder, 
     index = builder.CreateAnd(index, builder.getInt32(length - 1));
   }
 
-  return builder.CreateExtractElement(vec, index);
+  Value *elementValue = builder.CreateExtractElement(vec, index);
+  m_coopMatrixCalls.push_back(&extract);
+  extract.replaceAllUsesWith(elementValue);
 }
 
 // =====================================================================================================================
-// Open-code cooperative matrix insert operation
+// Visit "CooperativeMatrixInsertOp" instruction
 //
-// @param builder : builder to use
-// @param matrix : the matrix into which to insert a component
-// @param value : the value to be inserted
-// @param index : the index to be inserted
-// @param elemType : the matrix element type
-// @param layout : the matrix layout type
-Value *LowerCooperativeMatrix::cooperativeMatrixInsert(BuilderCommon &builder, Value *matrix, Value *value,
-                                                       Value *index, CooperativeMatrixElementType elemType,
-                                                       CooperativeMatrixLayout layout) {
+// @param insert : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixInsertOp(CooperativeMatrixInsertOp &insert) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&insert);
+
+  auto matrix = insert.getMatrix();
+  auto elemType = insert.getElemType();
+  auto layout = insert.getLayout();
+  auto index = insert.getIndex();
+  auto value = insert.getInsertValue();
   Value *vec = convCoopMatrixVecToFlatVec(builder, matrix, elemType, layout);
 
   // This is a hacky workaround to the fact that for SPV_NV_cooperative_matrix, we have to support matrix length as
@@ -634,27 +504,9 @@ Value *LowerCooperativeMatrix::cooperativeMatrixInsert(BuilderCommon &builder, V
     vec = builder.CreateInsertElement(vec, value, index);
   }
 
-  return convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
-}
-
-// =====================================================================================================================
-// Open-code cooperative matrix fill operation
-//
-// @param builder : builder to use
-// @param value : the value to fill the cooperative matrix
-// @param elemType : the matrix element type
-// @param layout : the matrix layout type
-Value *LowerCooperativeMatrix::cooperativeMatrixFill(BuilderCommon &builder, Value *value,
-                                                     CooperativeMatrixElementType elemType,
-                                                     CooperativeMatrixLayout layout) {
-  auto props = getTypeProperties(elemType, layout);
-  Type *flatType = FixedVectorType::get(builder.transCooperativeMatrixElementType(elemType), props.numMatrixElements);
-
-  Value *vec = PoisonValue::get(flatType);
-  for (unsigned idx = 0; idx < props.numMatrixElements; idx++)
-    vec = builder.CreateInsertElement(vec, value, idx);
-
-  return convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
+  Value *out = convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
+  m_coopMatrixCalls.push_back(&insert);
+  insert.replaceAllUsesWith(out);
 }
 
 // =====================================================================================================================
@@ -694,27 +546,20 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
 }
 
 // =====================================================================================================================
-// Create cooperative matrix conversion.
-// Element-wise-conversion
-// @param castOp : The cast Opcode.
-// @param source : The source cooperative matrix.
-// @param srcElemType : Source matrix's element type.
-// @param dstElemType : Destination matrix's element type.
-// @param srcLayout : Layout for source matrix
-// @param dstLayout : Layout for destination matrix
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixConvert(CastInst::CastOps castOp, Value *source,
-                                                        CooperativeMatrixElementType srcElemType,
-                                                        CooperativeMatrixElementType dstElemType,
-                                                        CooperativeMatrixLayout srcLayout,
-                                                        CooperativeMatrixLayout dstLayout, const Twine &instName,
-                                                        Instruction *insertPos) {
-  assert(source->getType()->isVectorTy());
+// Visit "CooperativeMatrixConvertOp" instruction
+//
+// @param convert : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixConvertOp(CooperativeMatrixConvertOp &convert) {
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&convert);
   Value *resultValue = nullptr;
   Value *threadId = getLaneNumber(builder);
+  CastInst::CastOps castOp = static_cast<CastInst::CastOps>(convert.getCastOp());
+  auto srcLayout = convert.getSrcLayout();
+  auto dstLayout = convert.getDstLayout();
+  auto source = convert.getSource();
+  auto srcElemType = convert.getSrcElemType();
+  auto dstElemType = convert.getDstElemType();
 
   if (castOp == 0) { // Only reshape on 16bits, not do convert
     if ((srcLayout == CooperativeMatrixLayout::AccumulatorMatrixLayout) &&
@@ -724,7 +569,7 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvert(CastInst::CastOps castOp
       source = builder.CreateBitCast(source, FixedVectorType::get(builder.getInt32Ty(), vecNums));
     }
     resultValue = cooperativeMatrixReshape16BitElementGfx1011(source, srcElemType, srcLayout, dstLayout, threadId,
-                                                              instName, insertPos);
+                                                              convert.getName(), &convert);
   } else {
     unsigned numSrcBit = builder.transCooperativeMatrixElementType(srcElemType)->getScalarSizeInBits();
     unsigned numDstBit = builder.transCooperativeMatrixElementType(dstElemType)->getScalarSizeInBits();
@@ -733,47 +578,45 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvert(CastInst::CastOps castOp
     if ((numSrcBit < numDstBit) && (srcLayout != dstLayout)) {
       // Need Reshape from A/B layout to C/D layout
       // This interface will do cooperativeVecToflatVec internally except 8bit reshape.
-      source = cooperativeMatrixReshapeBeforeConvert(source, srcElemType, dstElemType, srcLayout, dstLayout, instName,
-                                                     insertPos);
+      source = cooperativeMatrixReshapeBeforeConvert(source, srcElemType, dstElemType, srcLayout, dstLayout,
+                                                     convert.getName(), &convert);
     } else {
       // For 16bit->32bit on Gfx11, no reshape needed as it will always in 	AccumulatorMatrixLayout
       source = convCoopMatrixVecToFlatVec(builder, source, srcElemType, srcLayout);
     }
 
     // Step 2: Just do flatElement conversion without any layout change.
-    resultValue = cooperativeMatrixConvertInternal(castOp, source, srcElemType, dstElemType, instName, insertPos);
+    resultValue =
+        cooperativeMatrixConvertInternal(castOp, source, srcElemType, dstElemType, convert.getName(), &convert);
 
     // Step 3: Some cases need change the layout due to different element types after conversion.
     if ((numSrcBit > numDstBit) && (srcLayout != dstLayout)) {
       // All these reshape interfaces will return N*packetTy.
       // Need Reshape from A/B layout to C/D layout
       resultValue = cooperativeMatrixReshapeAfterConvert(resultValue, srcElemType, dstElemType, srcLayout, dstLayout,
-                                                         instName, insertPos);
+                                                         convert.getName(), &convert);
     } else {
       resultValue = convFlatVecToCoopMatrixVec(builder, resultValue, dstElemType, dstLayout);
     }
   }
-  return resultValue;
+  m_coopMatrixCalls.push_back(&convert);
+  convert.replaceAllUsesWith(resultValue);
 }
 
 // =====================================================================================================================
-// Create cooperative matrix binary operation
+// Visit "CooperativeMatrixBinaryOp" instruction
 //
-// @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
-// @param lhs : The first operand and it can be a scalar or a cooperative matrix.
-// @param rhs : The second operand and it should be a cooperative matrix.
-// @param elemType : Element type for the matrix.
-// @param layout : Layout for the matrix.
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, Value *lhs,
-                                                         Value *rhs, CooperativeMatrixElementType elemType,
-                                                         CooperativeMatrixLayout layout, const Twine &instName,
-                                                         Instruction *insertPos) {
+// @param binary : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixBinaryOp(CooperativeMatrixBinaryOp &binary) {
+  Value *lhs = binary.getLhs();
+  Value *rhs = binary.getRhs();
   assert(lhs->getType()->isVectorTy() && lhs->getType() == rhs->getType() || rhs->getType()->isVectorTy());
+  CooperativeMatrixArithOp coopMatArithOp = binary.getArithOp();
+  auto elemType = binary.getElemType();
+  auto layout = binary.getLayout();
   Value *vcResult;
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&binary);
 
   lhs = convCoopMatrixVecToFlatVec(builder, lhs, elemType, layout);
   rhs = convCoopMatrixVecToFlatVec(builder, rhs, elemType, layout);
@@ -810,26 +653,23 @@ Value *LowerCooperativeMatrix::cooperativeMatrixBinaryOp(CooperativeMatrixArithO
   }
 
   Value *coopMatResult = convFlatVecToCoopMatrixVec(builder, vcResult, elemType, layout);
-  return coopMatResult;
+  m_coopMatrixCalls.push_back(&binary);
+  binary.replaceAllUsesWith(coopMatResult);
 }
 
 // =====================================================================================================================
-// Create cooperative matrix MatrixTimesScalar operation
+// Visit "CooperativeMatrixTimesScalarOp" instruction
 //
-// @param matrix : The first operand and it should be a cooperative matrix.
-// @param scalar : The second operand and it should be a scalar. If the matrix
-// is a packed accumulator matrix, the scalar has to be a <2 x half> vector.
-// @param elemType : The component type of the matrix.
-// @param layout : Identify whether it's A/B or C/D
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::coopMatrixTimesScalar(Value *matrix, Value *scalar,
-                                                     CooperativeMatrixElementType elemType,
-                                                     CooperativeMatrixLayout layout, const Twine &instName,
-                                                     Instruction *insertPos) {
+// @param timesScalar : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixTimesScalarOp(CooperativeMatrixTimesScalarOp &timesScalar) {
+  Value *matrix = timesScalar.getMatrix();
   assert(matrix->getType()->getScalarType()->isIntegerTy() || matrix->getType()->getScalarType()->isFloatTy());
+  auto elemType = timesScalar.getElemType();
+  auto layout = timesScalar.getLayout();
+  Value *scalar = timesScalar.getScalar();
+
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&timesScalar);
 
   Value *vcFlat = convCoopMatrixVecToFlatVec(builder, matrix, elemType, layout);
   const unsigned numElems = cast<FixedVectorType>(vcFlat->getType())->getNumElements();
@@ -846,7 +686,8 @@ Value *LowerCooperativeMatrix::coopMatrixTimesScalar(Value *matrix, Value *scala
     vcFlatResult = builder.CreateMul(vcFlat, splat);
   }
   Value *coopMatResult = convFlatVecToCoopMatrixVec(builder, vcFlatResult, elemType, layout);
-  return coopMatResult;
+  m_coopMatrixCalls.push_back(&timesScalar);
+  timesScalar.replaceAllUsesWith(coopMatResult);
 }
 
 // =====================================================================================================================
@@ -1350,18 +1191,15 @@ Value *LowerCooperativeMatrix::cooperativeMatrixReshapeAfterConvert(Value *sourc
 }
 
 // =====================================================================================================================
-// Create cooperative matrix transpose operation
+// Visit "CooperativeMatrixTransposeOp" instruction
 //
-// @param matrix : The first operand and it should be a cooperative matrix.
-// @param elemType : The component type of the matrix.
-// @param srcLayout: Identify whether it's A/B or C/D
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixTranspose(llvm::Value *matrix, CooperativeMatrixElementType elemType,
-                                                          CooperativeMatrixLayout srcLayout, const Twine &instName,
-                                                          llvm::Instruction *insertPos) {
+// @param transpose : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixTransposeOp(CooperativeMatrixTransposeOp &transpose) {
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&transpose);
+
+  Value *matrix = transpose.getMatrix();
+  auto elemType = transpose.getElemType();
 
   Value *threadId = getLaneNumber(builder);
   Value *isEvenThread = builder.CreateICmpEQ(builder.CreateAnd(threadId, builder.getInt32(1)), builder.getInt32(0));
@@ -1436,7 +1274,8 @@ Value *LowerCooperativeMatrix::cooperativeMatrixTranspose(llvm::Value *matrix, C
   // lane0/V0: {0_0,0_1}; V1: {2_0,2_1} lane2/V0:{0_2,0_3} V1:{2_2,2_3} ==>
   // lane0/V0: {0_0,0_1}; V1: {0_2,0_3} lane2/V0:{2_0,2_1} V1:{2_2,2_3}
   Value *resultValue = transposeCooperativeMatrixRecursively(matrix, vecStride, laneStride, threadId, builder);
-  return resultValue;
+  m_coopMatrixCalls.push_back(&transpose);
+  transpose.replaceAllUsesWith(resultValue);
 }
 
 // =====================================================================================================================
@@ -1513,26 +1352,22 @@ Value *LowerCooperativeMatrix::transposeCooperativeMatrixRecursively(llvm::Value
 }
 
 // =====================================================================================================================
-// Create cooperative matrix muladd operation
+// Visit "CooperativeMatrixMulAddOp" instruction
 //
-// @param matrixA : Factor cooperative matrix.
-// @param matrixB : Factor cooperative matrix.
-// @param matrixC : Accumulator cooperative matrix.
-// @param isSignedA : Identify the signess for matrix A's element type
-// @param isSignedB : Identify the signess for matrix B's element type
-// @param isSat : SaturatingAccumulation for calculation
-// @param accumElemType : The component type of the accumulator matrix.
-// @param factorElemType : The component type of the factor matrix.
-// @param matrixCLayout: The layout for matrix C/D.
-// @param instName : Name to give instruction(s).
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llvm::Value *matrixB, llvm::Value *matrixC,
-                                                       bool isSignedA, bool isSignedB, bool isSatOrOpsel, bool isTied,
-                                                       CooperativeMatrixElementType accumElemType,
-                                                       CooperativeMatrixElementType factorElemType,
-                                                       const Twine &instName, Instruction *insertPos) {
+// @param muladd : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMulAddOp &muladd) {
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&muladd);
+
+  Value *matrixA = muladd.getMatrixA();
+  Value *matrixB = muladd.getMatrixB();
+  Value *matrixC = muladd.getMatrixC();
+  auto factorElemType = muladd.getFactorElemType();
+  auto accumElemType = muladd.getAccuElemType();
+  bool isSignedA = muladd.getIsSignedA();
+  bool isSignedB = muladd.getIsSignedB();
+  bool isSatOrOpsel = muladd.getIsSatOrOpsel();
+  StringRef instName = muladd.getName();
 
   if (m_gfxIp.major >= 11) {
     // Gfx11:
@@ -1601,6 +1436,7 @@ Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llv
                accumElemType == CooperativeMatrixElementType::Float16) {
       // Matrix convert to match intrinsic arguments: Wave32: float32*v8->half*v16
       // Wave64: float32*v4->half*v8
+      bool isTied = muladd.getIsTied();
       auto intrinsic = Intrinsic::amdgcn_wmma_f16_16x16x16_f16;
       if (isTied)
 #if defined(LLVM_MAIN_REVISION) && LLVM_MAIN_REVISION < 479080
@@ -1631,98 +1467,95 @@ Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llv
                                                              ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7})
                                : matrixD;
     }
-    return matrixD;
-  } else { // Emulator on NAVI2X
-
-    Type *packedTy =
-        (factorElemType == CooperativeMatrixElementType::Float16) ? builder.getFloatTy() : builder.getInt32Ty();
-    Value *dotProductValue;
-
-    Value *threadId = getLaneNumber(builder);
-    Value *laneGroupIdx = builder.CreateUDiv(threadId, builder.getInt32(16));
-    Value *isEvenGroup =
-        builder.CreateICmpEQ(builder.CreateAnd(laneGroupIdx, builder.getInt32(1)), builder.getInt32(0));
-
-    unsigned flags = (isSignedB << 1) | isSignedA;
-    auto mapFuncReadLane = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
-                              ArrayRef<Value *> passthroughArgs) -> Value * {
-      Type *const int32Ty = builder.getInt32Ty();
-
-      return builder.CreateIntrinsic(int32Ty, Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
-    };
-
-    // matrixC is not reshaped for gfx10
-    if (accumElemType == CooperativeMatrixElementType::Float32 ||
-        accumElemType == CooperativeMatrixElementType::Int32) {
-      dotProductValue = PoisonValue::get(FixedVectorType::get(packedTy, 8));
-      for (unsigned idxc = 0; idxc < 8; ++idxc) {
-        Value *rowlowgroup = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc * 2));
-        Value *rowhighgroup = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc * 2 + 1));
-        Value *rowData = builder.CreateSelect(isEvenGroup, rowlowgroup, rowhighgroup);
-        Value *mulAB;
-        Value *initAccumulator = builder.CreateExtractElement(matrixC, idxc);
-        if (factorElemType == CooperativeMatrixElementType::Float16) {
-          mulAB = createDotProductFp16Fp32(rowData, matrixB, initAccumulator, isSatOrOpsel, instName, insertPos);
-        } else if (factorElemType == CooperativeMatrixElementType::Int16) {
-          mulAB =
-              createDotProductInt16Int32(rowData, matrixB, initAccumulator, flags, isSatOrOpsel, instName, insertPos);
-        } else if (factorElemType == CooperativeMatrixElementType::Int8) {
-          mulAB =
-              createDotProductInt8Int32(rowData, matrixB, initAccumulator, flags, isSatOrOpsel, instName, insertPos);
-        } else {
-          llvm_unreachable("Unsupported element type!");
-        }
-        dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB, idxc);
-      }
-    } else if (accumElemType == CooperativeMatrixElementType::Int16 ||
-               accumElemType == CooperativeMatrixElementType::Float16) {
-      dotProductValue =
-          PoisonValue::get(FixedVectorType::get(builder.transCooperativeMatrixElementType(accumElemType), 8));
-      // For gfx10, A*B:8*float32->16*half  C: no reshape for 16bit, still 16*half
-      Value *colData =
-          convCoopMatrixVecToFlatVec(builder, matrixB, factorElemType, CooperativeMatrixLayout::FactorMatrixLayout);
-      matrixC = convCoopMatrixVecToFlatVec(builder, matrixC, accumElemType,
-                                           CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout);
-
-      for (unsigned idxc = 0, accIdx = 0; idxc < 16; idxc += 4, accIdx += 2) {
-        Value *rowData1Low = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc));
-        Value *rowData2Low = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc + 1));
-        Value *rowData1High = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc + 2));
-        Value *rowData2High = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc + 3));
-
-        Value *rowData1 = builder.CreateSelect(isEvenGroup, rowData1Low, rowData1High);
-        Value *rowData2 = builder.CreateSelect(isEvenGroup, rowData2Low, rowData2High);
-
-        rowData1 =
-            convCoopMatrixVecToFlatVec(builder, rowData1, factorElemType, CooperativeMatrixLayout::FactorMatrixLayout);
-        rowData2 =
-            convCoopMatrixVecToFlatVec(builder, rowData2, factorElemType, CooperativeMatrixLayout::FactorMatrixLayout);
-
-        Value *mulAB1;
-        Value *mulAB2;
-        Value *accumulator1 = builder.CreateExtractElement(matrixC, accIdx);
-        Value *accumulator2 = builder.CreateExtractElement(matrixC, accIdx + 1);
-
-        if (accumElemType == CooperativeMatrixElementType::Float16) {
-          mulAB1 = createDotProductFp16Fp16(rowData1, colData, accumulator1, isSatOrOpsel, instName, insertPos);
-          mulAB2 = createDotProductFp16Fp16(rowData2, colData, accumulator2, isSatOrOpsel, instName, insertPos);
-        } else {
-          mulAB1 =
-              createDotProductInt16Int16(rowData1, colData, accumulator1, flags, isSatOrOpsel, instName, insertPos);
-          mulAB2 =
-              createDotProductInt16Int16(rowData2, colData, accumulator2, flags, isSatOrOpsel, instName, insertPos);
-        }
-        dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB1, accIdx);
-        dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB2, accIdx + 1);
-      }
-
-      dotProductValue = convFlatVecToCoopMatrixVec(builder, dotProductValue, accumElemType,
-                                                   CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout);
-    } else {
-      llvm_unreachable("The accumulator type is not supported.");
-    }
-    return dotProductValue;
+    m_coopMatrixCalls.push_back(&muladd);
+    muladd.replaceAllUsesWith(matrixD);
+    return;
   }
+
+  // Emulator on NAVI2X
+  Type *packedTy =
+      (factorElemType == CooperativeMatrixElementType::Float16) ? builder.getFloatTy() : builder.getInt32Ty();
+  Value *dotProductValue;
+
+  Value *threadId = getLaneNumber(builder);
+  Value *laneGroupIdx = builder.CreateUDiv(threadId, builder.getInt32(16));
+  Value *isEvenGroup = builder.CreateICmpEQ(builder.CreateAnd(laneGroupIdx, builder.getInt32(1)), builder.getInt32(0));
+
+  unsigned flags = (isSignedB << 1) | isSignedA;
+  auto mapFuncReadLane = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                            ArrayRef<Value *> passthroughArgs) -> Value * {
+    Type *const int32Ty = builder.getInt32Ty();
+
+    return builder.CreateIntrinsic(int32Ty, Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
+  };
+
+  // matrixC is not reshaped for gfx10
+  if (accumElemType == CooperativeMatrixElementType::Float32 || accumElemType == CooperativeMatrixElementType::Int32) {
+    dotProductValue = PoisonValue::get(FixedVectorType::get(packedTy, 8));
+    for (unsigned idxc = 0; idxc < 8; ++idxc) {
+      Value *rowlowgroup = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc * 2));
+      Value *rowhighgroup = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc * 2 + 1));
+      Value *rowData = builder.CreateSelect(isEvenGroup, rowlowgroup, rowhighgroup);
+      Value *mulAB;
+      Value *initAccumulator = builder.CreateExtractElement(matrixC, idxc);
+      if (factorElemType == CooperativeMatrixElementType::Float16) {
+        mulAB = createDotProductFp16Fp32(rowData, matrixB, initAccumulator, isSatOrOpsel, instName, &muladd);
+      } else if (factorElemType == CooperativeMatrixElementType::Int16) {
+        mulAB = createDotProductInt16Int32(rowData, matrixB, initAccumulator, flags, isSatOrOpsel, instName, &muladd);
+      } else if (factorElemType == CooperativeMatrixElementType::Int8) {
+        mulAB = createDotProductInt8Int32(rowData, matrixB, initAccumulator, flags, isSatOrOpsel, instName, &muladd);
+      } else {
+        llvm_unreachable("Unsupported element type!");
+      }
+      dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB, idxc);
+    }
+  } else if (accumElemType == CooperativeMatrixElementType::Int16 ||
+             accumElemType == CooperativeMatrixElementType::Float16) {
+    dotProductValue =
+        PoisonValue::get(FixedVectorType::get(builder.transCooperativeMatrixElementType(accumElemType), 8));
+    // For gfx10, A*B:8*float32->16*half  C: no reshape for 16bit, still 16*half
+    Value *colData =
+        convCoopMatrixVecToFlatVec(builder, matrixB, factorElemType, CooperativeMatrixLayout::FactorMatrixLayout);
+    matrixC = convCoopMatrixVecToFlatVec(builder, matrixC, accumElemType,
+                                         CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout);
+
+    for (unsigned idxc = 0, accIdx = 0; idxc < 16; idxc += 4, accIdx += 2) {
+      Value *rowData1Low = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc));
+      Value *rowData2Low = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc + 1));
+      Value *rowData1High = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc + 2));
+      Value *rowData2High = builder.CreateMapToSimpleType(mapFuncReadLane, matrixA, builder.getInt32(idxc + 3));
+
+      Value *rowData1 = builder.CreateSelect(isEvenGroup, rowData1Low, rowData1High);
+      Value *rowData2 = builder.CreateSelect(isEvenGroup, rowData2Low, rowData2High);
+
+      rowData1 =
+          convCoopMatrixVecToFlatVec(builder, rowData1, factorElemType, CooperativeMatrixLayout::FactorMatrixLayout);
+      rowData2 =
+          convCoopMatrixVecToFlatVec(builder, rowData2, factorElemType, CooperativeMatrixLayout::FactorMatrixLayout);
+
+      Value *mulAB1;
+      Value *mulAB2;
+      Value *accumulator1 = builder.CreateExtractElement(matrixC, accIdx);
+      Value *accumulator2 = builder.CreateExtractElement(matrixC, accIdx + 1);
+
+      if (accumElemType == CooperativeMatrixElementType::Float16) {
+        mulAB1 = createDotProductFp16Fp16(rowData1, colData, accumulator1, isSatOrOpsel, instName, &muladd);
+        mulAB2 = createDotProductFp16Fp16(rowData2, colData, accumulator2, isSatOrOpsel, instName, &muladd);
+      } else {
+        mulAB1 = createDotProductInt16Int16(rowData1, colData, accumulator1, flags, isSatOrOpsel, instName, &muladd);
+        mulAB2 = createDotProductInt16Int16(rowData2, colData, accumulator2, flags, isSatOrOpsel, instName, &muladd);
+      }
+      dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB1, accIdx);
+      dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB2, accIdx + 1);
+    }
+
+    dotProductValue = convFlatVecToCoopMatrixVec(builder, dotProductValue, accumElemType,
+                                                 CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout);
+  } else {
+    llvm_unreachable("The accumulator type is not supported.");
+  }
+  m_coopMatrixCalls.push_back(&muladd);
+  muladd.replaceAllUsesWith(dotProductValue);
 }
 
 // =====================================================================================================================
@@ -1933,16 +1766,15 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int16(Value *vector1, Value 
 }
 
 // =====================================================================================================================
-// Create code to pack two accumulator matrices into one set of registers
+// Visit "CooperativeMatrixPackOp" instruction
 //
-// @param matrixCLo : The lower accumulator
-// @param matrixCHi : The higher accumulator
-// @param instName : Name to give instruction(s)
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi,
-                                                     const Twine &instName, Instruction *insertPos) {
+// @param pack: The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixPackOp(CooperativeMatrixPackOp &pack) {
+  Value *matrixCLo = pack.getMatrixCLo();
+  Value *matrixCHi = pack.getMatrixCHi();
+
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&pack);
 
   static const int shuffleIndices[] = {0, 16, 2, 18, 4, 20, 6, 22, 8, 24, 10, 26, 12, 28, 14, 30};
 
@@ -1952,21 +1784,21 @@ Value *LowerCooperativeMatrix::cooperativeMatrixPack(llvm::Value *matrixCLo, llv
 
   auto result = builder.CreateShuffleVector(matrixCLo, matrixCHi, shuffleIndices);
 
-  return builder.CreateBitCast(result, FixedVectorType::get(builder.getFloatTy(), 8));
+  Value *packValue = builder.CreateBitCast(result, FixedVectorType::get(builder.getFloatTy(), 8));
+  m_coopMatrixCalls.push_back(&pack);
+  pack.replaceAllUsesWith(packValue);
 }
 
 // =====================================================================================================================
-// Create code to unpack one packed accumulator matrix into two separate set of
-// registers
+// Visit "CooperativeMatrixUnPackOp" instruction
 //
-// @param packedMatrix : The packed accumulator matrix
-// @param: high: Whether to get the matrix in the upper half of the registers
-// @param instName : Name to give instruction(s)
-// @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::cooperativeMatrixUnpack(llvm::Value *packedMatrix, bool high, const Twine &instName,
-                                                       Instruction *insertPos) {
+// @param unpack: The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeMatrixUnPackOp(CooperativeMatrixUnPackOp &unpack) {
+  Value *packedMatrix = unpack.getPackedMatrix();
+  bool high = unpack.getGetUpperHalf();
+
   BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPoint(&unpack);
 
   static const int shuffleIndicesLo[] = {0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14, -1};
   static const int shuffleIndicesHi[] = {1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15, -1};
@@ -1975,7 +1807,9 @@ Value *LowerCooperativeMatrix::cooperativeMatrixUnpack(llvm::Value *packedMatrix
   auto matrixPackedCast = builder.CreateBitCast(packedMatrix, halfVecTy);
   auto matrixUnpacked = builder.CreateShuffleVector(matrixPackedCast, high ? shuffleIndicesHi : shuffleIndicesLo);
 
-  return builder.CreateBitCast(matrixUnpacked, FixedVectorType::get(builder.getFloatTy(), 8));
+  Value *unpackValue = builder.CreateBitCast(matrixUnpacked, FixedVectorType::get(builder.getFloatTy(), 8));
+  m_coopMatrixCalls.push_back(&unpack);
+  unpack.replaceAllUsesWith(unpackValue);
 }
 
 // =====================================================================================================================

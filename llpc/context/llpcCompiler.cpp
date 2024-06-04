@@ -1560,18 +1560,9 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
     // If fragment use builtIn inputs, return RequireFullPipeline.
     const ShaderModuleData *moduleData =
         static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageFragment]->pModuleData);
-    if (moduleData->usage.useGenericBuiltIn || moduleData->usage.useBarycentric) {
+    if (moduleData->usage.useGenericBuiltIn) {
       // TODO: We have added semantic to support generic builtIn, however, there seems to be some errors. We need to
       // add more info to sync inputs and outputs.
-      return Result::RequireFullPipeline;
-    }
-  } else if (stage == UnlinkedStageVertexProcess) {
-    bool hasVs = shaderInfo[ShaderStageVertex]->pModuleData != nullptr;
-    bool hasTes = (shaderInfo[ShaderStageTessControl]->pModuleData != nullptr) ||
-                  (shaderInfo[ShaderStageTessControlBit]->pModuleData != nullptr);
-    bool hasGs = shaderInfo[ShaderStageGeometry]->pModuleData != nullptr;
-    if (m_gfxIp.major >= 11 && hasVs && !hasGs && !hasTes &&
-        static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageVertex]->pModuleData)->usage.enableXfb) {
       return Result::RequireFullPipeline;
     }
   }
@@ -2852,7 +2843,7 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
 
   if (rtContext->getIndirectStageMask() == 0) {
     options.rtIndirectMode = lgc::RayTracingIndirectMode::NotIndirect;
-  } else if (rtContext->isContinuationsMode()) {
+  } else if (rtContext->isContinuationsMode() && !LgcContext::getEmitLgc()) {
     // For continuations mode, we need to run LowerRaytracingPipelinePass here first separately because we need to
     // collect metadata added by the pass
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(context->getLgcContext()));

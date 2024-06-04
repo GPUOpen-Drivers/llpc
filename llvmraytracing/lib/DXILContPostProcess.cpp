@@ -38,11 +38,11 @@
 
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llpc/GpurtEnums.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/CpsStackLowering.h"
 #include "llvmraytracing/GpurtContext.h"
@@ -90,12 +90,9 @@ namespace {
 class DXILContPostProcessPassImpl final {
 public:
   DXILContPostProcessPassImpl(Module &M, Module &GpurtLibrary);
-  bool run(llvm::ModuleAnalysisManager &AnalysisManager);
+  PreservedAnalyses run(ModuleAnalysisManager &AnalysisManager);
 
-  static constexpr unsigned SystemDataArgumentIndexStartWithoutCsp = 1;
-  static constexpr unsigned SystemDataArgumentIndexContinuationWithoutCsp = 0;
-  static constexpr unsigned SystemDataArgumentIndexRayGen = 0;
-
+  static constexpr unsigned SystemDataArgumentIndex = 1;
   struct FunctionData {
     DXILShaderKind Kind = DXILShaderKind::Invalid;
     /// Calls to hlsl intrinsics
@@ -114,18 +111,12 @@ private:
   void handleValueGetI32(Function &F);
   void handleValueSetI32(Function &F);
 
-  void handleContPayloadRegisterI32Count(Function &F);
-  void handleContPayloadRegistersGetI32(Function &F);
-  void handleContPayloadRegistersSetI32(Function &F);
   void handleContStackIntrinsic(FunctionAnalysisManager &FAM, Function &F);
 
   void initializeProcessableFunctionData();
   bool handleRegisterBufferCalls();
   bool replaceIntrinsicCalls(Function &F, const FunctionData &Data);
-  [[nodiscard]] std::pair<bool, Function *>
-  insertSetupRayGen(Function &F, const FunctionData &Data);
   bool handleIntrinsicCalls(llvm::ModuleAnalysisManager &AnalysisManager);
-  bool replaceIntrinsicCallsAndSetupRayGen();
   bool lowerCpsOps();
   void lowerJumpOp(lgc::cps::JumpOp &JumpOp);
   bool unfoldGlobals();
@@ -135,7 +126,6 @@ private:
   Module *GpurtLibrary;
   GlobalVariable *Registers;
   MapVector<Function *, FunctionData> ToProcess;
-  Function *SetupRayGen;
   llvm_dialects::Builder Builder;
   std::optional<ContStackAddrspace> StackAddrspace;
   std::optional<CpsStackLowering> StackLowering;
@@ -165,7 +155,7 @@ static void reportContStateSizes(Module &M) {
   // Determine the set of entry functions which have a continuation function
   // We cannot rely on the state size for this, because functions without a
   // continuation (e.g. a non-recursive CHS) have a state size of 0 in metadata.
-  DenseSet<Function *> EntriesWithContinuationFunctions;
+  SetVector<Function *> EntriesWithContinuationFunctions;
   for (auto &F : M.functions()) {
     if (F.isDeclaration())
       continue;
@@ -177,21 +167,18 @@ static void reportContStateSizes(Module &M) {
     }
   }
 
-  for (auto &F : M) {
-    auto Stage = lgc::rt::getLgcRtShaderStage(&F);
-    if (!Stage || F.isDeclaration())
+  for (auto *F : EntriesWithContinuationFunctions) {
+    auto Stage = lgc::rt::getLgcRtShaderStage(F);
+    if (!Stage || F->isDeclaration())
       continue;
 
-    if (!EntriesWithContinuationFunctions.contains(&F))
-      continue;
-
-    auto OptStateSize = ContHelper::tryGetContinuationStateByteCount(F);
+    auto OptStateSize = ContHelper::tryGetContinuationStateByteCount(*F);
     if (!OptStateSize.has_value())
       continue;
 
     DXILShaderKind ShaderKind =
         ShaderStageHelper::rtShaderStageToDxilShaderKind(*Stage);
-    dbgs() << "Continuation state size of \"" << F.getName() << "\" ("
+    dbgs() << "Continuation state size of \"" << F->getName() << "\" ("
            << ShaderKind << "): " << OptStateSize.value() << " bytes\n";
   }
 }
@@ -265,115 +252,9 @@ static Function *getContinuationGetAddrAndMD(Module &M) {
     return F;
   auto &C = M.getContext();
   auto *I64 = Type::getInt64Ty(C);
-  // To avoid having multiple copies of the intrinsic for each referenced
-  // function type, keep existing inttoptr to convert the function pointer to
-  // i64, and pass that i64 to the intrinsic.
-  // TODO: With opaque pointers, instead just pass a ptr to the function.
-  auto *FuncTy = FunctionType::get(I64, {I64}, false);
+  auto *FuncTy = FunctionType::get(I64, {PointerType::get(C, 0)}, false);
+
   return cast<Function>(M.getOrInsertFunction(Name, FuncTy).getCallee());
-}
-
-// If this function returns false, we know that F cannot be used as pointer,
-// e.g. because it is an intrinsic.
-static bool canBeUsedAsPtr(const Function &F) {
-  return !F.getName().starts_with("dx.op");
-}
-
-// Collects all function pointers (uses of functions that are not calls),
-// and adds metadata to them using the `continuations.getAddrAndMD` intrinsic.
-// TODO: In the future, we might instead want to directly insert the intrinsic
-//       in places depending on function pointers (resume functions, and
-//       traversal). This function here is a stop-gap to enable implementing the
-//       intrinsic without having to deal with all corner cases that might arise
-//       above. Thus, we are just handling the cases known to occur.
-//       One might be tempted to speed this up by instead traversing usages of
-//       the continuation.continue intrinsics, getting the passed function
-//       pointers, and tracing these back. However, this way we would miss
-//       function pointers stored to memory, as we do for the return address
-//       stored in system data.
-static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
-  Function *GetAddrAndMD = getContinuationGetAddrAndMD(M);
-  IRBuilder<> B{M.getContext()};
-
-  bool Changed = false;
-  // We will first traverse all uses, and resolve everything up to constant
-  // expressions. However, there might be nested constant expressions, each
-  // having multiple users, so we resolve those using a worklist.
-  SmallVector<ConstantExpr *> CEWorkList;
-  SmallVector<User *> CurrentCEUsers;
-
-  for (auto &F : M.functions()) {
-    // Speed-up: Skip F if it cannot be used as pointer, e.g. dx intrinsics.
-    if (!canBeUsedAsPtr(F))
-      continue;
-
-    CEWorkList.clear();
-    for (auto *U : F.users()) {
-      // Ignore calls of the function.
-      auto *CI = dyn_cast<CallInst>(U);
-      if (CI && CI->getCalledFunction() == &F)
-        continue;
-
-      if (auto *GA = dyn_cast<GlobalAlias>(U)) {
-        // Ignore global aliases. Check that these have no users,
-        // as these would need to be changed.
-        assert(GA->user_empty());
-        continue;
-      }
-
-      // Must be ConstantExpr
-      ConstantExpr *CE = cast<ConstantExpr>(U);
-      CEWorkList.push_back(CE);
-    }
-
-    while (!CEWorkList.empty()) {
-      auto *CE = CEWorkList.pop_back_val();
-      assert(
-          (isa<BitCastOperator, PtrToIntOperator, ConstantExpr, BinaryOperator>(
-              CE)) &&
-          "Unexpected use of function!");
-
-      // Copy the users of CE into a local SmallVector before traversing it,
-      // because we are going to add new users of CE that we do *not* want to
-      // traverse.
-      CurrentCEUsers.assign(CE->user_begin(), CE->user_end());
-      for (User *CEU : CurrentCEUsers) {
-        if (auto *NestedCE = dyn_cast<ConstantExpr>(CEU)) {
-          CEWorkList.push_back(NestedCE);
-          continue;
-        }
-
-        if (auto *GA = dyn_cast<GlobalAlias>(CEU)) {
-          assert(GA->user_empty());
-          continue;
-        }
-
-        // Final case: A real instruction using the function. Wrap
-        // the value into the intrinsic and pass that one to the instruction
-        // Set insertion point, and replace CE with the intrinsic
-        auto *I = cast<Instruction>(CEU);
-        assert(CE->getType() == Type::getInt64Ty(M.getContext()) &&
-               "Function use should be as an i64!");
-        B.SetInsertPoint(I);
-
-        auto *AddrWithMD = B.CreateCall(GetAddrAndMD, {CE});
-
-        // Can't RAUW because the CE might be used by different instructions.
-        // Instead, manually replace the instruction's operand.
-        [[maybe_unused]] bool Found = false;
-        for (unsigned OpIdx = 0, E = I->getNumOperands(); OpIdx < E; ++OpIdx) {
-          if (I->getOperand(OpIdx) == CE) {
-            I->setOperand(OpIdx, AddrWithMD);
-            Found = true;
-            Changed = true;
-          }
-        }
-        assert(Found);
-      }
-    }
-  }
-
-  return Changed;
 }
 
 /// Checks some properties guaranteed for a module containing continuations
@@ -442,19 +323,6 @@ void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
 
   // Search calls to GetResumePointAddr, and lower it to the argument of the
   // next continue call. Then remove it from that continue call.
-  // TODO: The return address being implicitly added to the next continue call,
-  //       and then being implicitly removed by the use of this intrinsic feels
-  //       a bit fragile.
-  //       We are currently planning to move to a scheme where every await
-  //       call is preceded by a call to GetResumePointAddr (in order to set
-  //       a scheduling priority). If we decide to stick to that scheme, we
-  //       could instead move lowering of GetResumePointAddr() to the
-  //       continuation cleanup pass before forming continue calls, and then
-  //       never add the resume address to the continue call there. I'm leaving
-  //       this for later in case we change the scheme again to avoid
-  //       unnecessary code churn. For the time being, the resume function
-  //       being added to the continue statement is necessary for us to find
-  //       it here.
   for (auto &Use : make_early_inc_range(GetResumePointAddr->uses())) {
     auto *CInst = dyn_cast<CallInst>(Use.getUser());
     if (!CInst || !CInst->isCallee(&Use) ||
@@ -476,14 +344,12 @@ void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
     }
     auto *ContinueCall = *FoundContinueCall;
 
-    Value *ReturnAddr = nullptr;
-    bool IsCpsFunc = lgc::cps::isCpsFunction(*CInst->getFunction());
-
     // Only used for non-cps functions.
     unsigned ReturnAddrArgNum = 1;
+    Value *ReturnAddr = nullptr;
 
     if (auto *Jump = dyn_cast<lgc::cps::JumpOp>(ContinueCall); Jump) {
-      ReturnAddr = Builder.CreateZExt(Jump->getTarget(), Builder.getInt64Ty());
+      ReturnAddr = Jump->getTarget();
     } else {
       auto Name = ContinueCall->getCalledFunction()->getName();
 
@@ -521,11 +387,6 @@ void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
       (*I)->moveBefore(CInst);
 
     CInst->replaceAllUsesWith(ReturnAddr);
-
-    if (IsCpsFunc) {
-      CInst->eraseFromParent();
-      continue;
-    }
 
     // Re-create the continuation.continue call without the return address
     // argument.
@@ -577,10 +438,7 @@ void DXILContPostProcessPassImpl::handleValueI32Count(Function &F) {
   auto *Ty = getFuncArgPtrElementType(&F, 0);
   auto *Size = Builder.getInt32(
       Mod->getDataLayout().getTypeStoreSize(Ty).getFixedValue() / 4);
-  llvm::forEachCall(F, [&](CallInst &CInst) {
-    CInst.replaceAllUsesWith(Size);
-    CInst.eraseFromParent();
-  });
+  llvm::replaceCallsToFunction(F, *Size);
 }
 
 void DXILContPostProcessPassImpl::handleValueGetI32(Function &F) {
@@ -622,60 +480,6 @@ void DXILContPostProcessPassImpl::handleValueSetI32(Function &F) {
         Builder.CreateBitCast(CInst.getArgOperand(0), I32->getPointerTo());
     Addr = Builder.CreateGEP(I32, Addr, CInst.getArgOperand(1));
     Builder.CreateStore(CInst.getArgOperand(2), Addr);
-    CInst.eraseFromParent();
-  });
-}
-
-void DXILContPostProcessPassImpl::handleContPayloadRegisterI32Count(
-    Function &F) {
-  assert(F.arg_empty()
-         // register count
-         && F.getFunctionType()->getReturnType()->isIntegerTy(32));
-
-  uint32_t RegCount =
-      ContHelper::tryGetMaxUsedPayloadRegisterCount(*Mod).value_or(0);
-  auto *RegCountAsConstant =
-      ConstantInt::get(IntegerType::get(F.getContext(), 32), RegCount);
-
-  llvm::forEachCall(F, [&](CallInst &CInst) {
-    CInst.replaceAllUsesWith(RegCountAsConstant);
-    CInst.eraseFromParent();
-  });
-}
-
-void DXILContPostProcessPassImpl::handleContPayloadRegistersGetI32(
-    Function &F) {
-  assert(F.getReturnType()->isIntegerTy(32) &&
-         F.arg_size() == 1
-         // index
-         && F.getFunctionType()->getParamType(0)->isIntegerTy(32));
-
-  llvm::forEachCall(F, [&](CallInst &CInst) {
-    Builder.SetInsertPoint(&CInst);
-    auto *Addr =
-        Builder.CreateGEP(Registers->getValueType(), Registers,
-                          {Builder.getInt32(0), CInst.getArgOperand(0)});
-    auto *Load = Builder.CreateLoad(Builder.getInt32Ty(), Addr);
-    CInst.replaceAllUsesWith(Load);
-    CInst.eraseFromParent();
-  });
-}
-
-void DXILContPostProcessPassImpl::handleContPayloadRegistersSetI32(
-    Function &F) {
-  assert(F.getReturnType()->isVoidTy() &&
-         F.arg_size() == 2
-         // index
-         && F.getFunctionType()->getParamType(0)->isIntegerTy(32)
-         // value
-         && F.getFunctionType()->getParamType(1)->isIntegerTy(32));
-
-  llvm::forEachCall(F, [&](CallInst &CInst) {
-    Builder.SetInsertPoint(&CInst);
-    auto *Addr =
-        Builder.CreateGEP(Registers->getValueType(), Registers,
-                          {Builder.getInt32(0), CInst.getArgOperand(0)});
-    Builder.CreateStore(CInst.getOperand(1), Addr);
     CInst.eraseFromParent();
   });
 }
@@ -737,23 +541,23 @@ void DXILContPostProcessPassImpl::handleContStackIntrinsic(
     Type *DestTy = CInst.getType();
 
     bool IsMemoryAccess = false;
-    if (FuncName == "Alloc") {
+    if (FuncName.starts_with("Alloc")) {
       Value *SizeArg =
           ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
       Replacement = Builder.create<lgc::cps::AllocOp>(SizeArg);
 
       if (auto *Size = dyn_cast<ConstantInt>(SizeArg))
         ContHelper::addStackSize(CInst.getFunction(), Size->getSExtValue());
-    } else if (FuncName == "Free") {
+    } else if (FuncName.starts_with("Free")) {
       Value *SizeArg =
           ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
       Replacement = Builder.create<lgc::cps::FreeOp>(SizeArg);
-    } else if (FuncName == "SetPtr") {
+    } else if (FuncName.starts_with("SetPtr")) {
       Value *Vsp = CInst.getArgOperand(0);
       Replacement = Builder.create<lgc::cps::SetVspOp>(Builder.CreateIntToPtr(
           Vsp,
           PointerType::get(Builder.getInt8Ty(), lgc::cps::stackAddrSpace)));
-    } else if (FuncName == "GetPtr") {
+    } else if (FuncName.starts_with("GetPtr")) {
       Replacement = Builder.create<lgc::cps::GetVspOp>();
     } else if (FuncName.starts_with("Load")) {
       Value *Addr =
@@ -840,7 +644,7 @@ void DXILContPostProcessPassImpl::initializeProcessableFunctionData() {
       Data.Kind = Kind;
 
       Data.SystemDataArgumentIndex =
-          !IsCpsFunction ? SystemDataArgumentIndexRayGen : CpsArgIdxSystemData;
+          !IsCpsFunction ? SystemDataArgumentIndex : CpsArgIdxSystemData;
 
       Data.SystemDataTy =
           F.getFunctionType()->getParamType(Data.SystemDataArgumentIndex);
@@ -859,8 +663,7 @@ void DXILContPostProcessPassImpl::initializeProcessableFunctionData() {
       Data.Kind = Kind;
 
       Data.SystemDataArgumentIndex =
-          !IsCpsFunction ? SystemDataArgumentIndexStartWithoutCsp
-                         : CpsArgIdxSystemData;
+          !IsCpsFunction ? SystemDataArgumentIndex : CpsArgIdxSystemData;
       Data.SystemDataTy =
           F.getFunctionType()->getParamType(Data.SystemDataArgumentIndex);
       [[maybe_unused]] bool DidInsert =
@@ -885,10 +688,9 @@ void DXILContPostProcessPassImpl::initializeProcessableFunctionData() {
         FunctionData Data = ToProcess[EntryF];
         Data.IsStart = false;
 
-        Data.SystemDataArgumentIndex =
-            !lgc::cps::isCpsFunction(F)
-                ? SystemDataArgumentIndexContinuationWithoutCsp
-                : CpsArgIdxSystemData;
+        Data.SystemDataArgumentIndex = !lgc::cps::isCpsFunction(F)
+                                           ? SystemDataArgumentIndex
+                                           : CpsArgIdxSystemData;
 
         Data.SystemDataTy = F.getArg(Data.SystemDataArgumentIndex)->getType();
         [[maybe_unused]] bool DidInsert =
@@ -981,73 +783,6 @@ bool DXILContPostProcessPassImpl::replaceIntrinsicCalls(
   return true;
 }
 
-std::pair<bool, Function *>
-DXILContPostProcessPassImpl::insertSetupRayGen(Function &F,
-                                               const FunctionData &Data) {
-  // The start part of the RayGen shader is the only occurrence where we need to
-  // call SetupRayGen
-  if (Data.Kind != DXILShaderKind::RayGeneration || !Data.IsStart)
-    return {false, &F};
-
-  auto *FuncTy = F.getFunctionType();
-
-  assert(FuncTy->getNumParams() > Data.SystemDataArgumentIndex &&
-         "Missing system data argument");
-
-  Argument *const SystemDataArgument = F.getArg(Data.SystemDataArgumentIndex);
-
-  // Replace usages of the system data argument with the result of SetupRayGen
-  Builder.SetInsertPointPastAllocas(&F);
-
-  auto *SystemDataInit = Builder.CreateCall(SetupRayGen);
-  assert(SystemDataInit->getType() == Data.SystemDataTy &&
-         "SetupRayGen return type does not match system data type");
-  SystemDataInit->setName("system.data");
-  SystemDataArgument->replaceAllUsesWith(SystemDataInit);
-  CrossInliner.inlineCall(*SystemDataInit);
-
-  // Change function signature to remove the system data argument
-  SmallVector<Type *> ArgTypes;
-  ArgTypes.append(FuncTy->param_begin(),
-                  FuncTy->param_begin() + Data.SystemDataArgumentIndex);
-  ArgTypes.append(FuncTy->param_begin() + (Data.SystemDataArgumentIndex + 1),
-                  FuncTy->param_end());
-  auto *NewFuncTy = FunctionType::get(FuncTy->getReturnType(), ArgTypes, false);
-
-  Function *NewFunc = CompilerUtils::cloneFunctionHeader(
-      F, NewFuncTy, ArrayRef<AttributeSet>{});
-  NewFunc->takeName(&F);
-
-  llvm::moveFunctionBody(F, *NewFunc);
-
-  F.replaceAllUsesWith(ConstantExpr::getBitCast(NewFunc, F.getType()));
-  F.eraseFromParent();
-
-  return {true, NewFunc};
-}
-
-bool DXILContPostProcessPassImpl::replaceIntrinsicCallsAndSetupRayGen() {
-  bool Changed = false;
-
-  // We will change some function signatures and populate a new MapVector as we
-  // go, to then replace ToProcess
-  MapVector<Function *, FunctionData> ToProcessNew;
-  ToProcessNew.reserve(ToProcess.size());
-
-  for (auto &[Func, Data] : ToProcess) {
-    Changed |= replaceIntrinsicCalls(*Func, Data);
-
-    auto const [DidInsert, NewFunc] = insertSetupRayGen(*Func, Data);
-    Changed |= DidInsert;
-
-    // Func could have been changed, but Data is the same
-    ToProcessNew.insert({NewFunc, std::move(Data)});
-  }
-
-  ToProcess = std::move(ToProcessNew);
-  return Changed;
-}
-
 //
 // Entry point for all lgc.cps lowering.
 //
@@ -1058,6 +793,7 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
     DXILContPostProcessPassImpl &Self;
     bool &Changed;
     llvm_dialects::Builder &Builder;
+    Function *GetAddrAndMD;
   };
 
   // Note: It is a bit unlucky that we are using both a visitor for
@@ -1071,10 +807,10 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
           .add<lgc::cps::AsContinuationReferenceOp>(
               [](CpsVisitorState &State,
                  lgc::cps::AsContinuationReferenceOp &AsCrOp) {
-                Value *LoweredReference =
-                    lgc::cps::lowerAsContinuationReference(State.Builder,
-                                                           AsCrOp);
-                AsCrOp.replaceAllUsesWith(LoweredReference);
+                State.Builder.SetInsertPoint(&AsCrOp);
+                auto *AddrWithMD = State.Builder.CreateCall(State.GetAddrAndMD,
+                                                            {AsCrOp.getFn()});
+                AsCrOp.replaceAllUsesWith(AddrWithMD);
                 AsCrOp.eraseFromParent();
                 State.Changed = true;
               })
@@ -1085,7 +821,8 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
               })
           .build();
 
-  CpsVisitorState State{*this, Changed, Builder};
+  CpsVisitorState State{*this, Changed, Builder,
+                        getContinuationGetAddrAndMD(*Mod)};
 
   struct CspCandidateInfo {
     bool RequiresCspArgument = false;
@@ -1098,21 +835,19 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
     if (Func.isDeclaration())
       continue;
 
-    if (Func.hasMetadata(ContHelper::MDContinuationName)) {
-      CandidateInfo.push_back(
-          {!ContHelper::isLegacyEntryFunction(&Func), &Func});
-      continue;
-    }
-
     if (lgc::rt::getLgcRtShaderStage(&Func) ==
         lgc::rt::RayTracingShaderStage::KernelEntry) {
       CandidateInfo.push_back({false, &Func});
       continue;
     }
 
+    if (Func.hasMetadata(ContHelper::MDContinuationName)) {
+      CandidateInfo.push_back({true, &Func});
+      continue;
+    }
+
     if (lgc::cps::isCpsFunction(Func)) {
-      CandidateInfo.push_back(
-          {!ContHelper::isLegacyEntryFunction(&Func), &Func});
+      CandidateInfo.push_back({true, &Func});
       continue;
     }
   }
@@ -1204,15 +939,6 @@ bool DXILContPostProcessPassImpl::handleAmdInternals() {
     } else if (Name.starts_with("_AmdValueSetI32")) {
       Changed = true;
       handleValueSetI32(F);
-    } else if (Name.starts_with("_AmdContPayloadRegistersI32Count")) {
-      Changed = true;
-      handleContPayloadRegisterI32Count(F);
-    } else if (Name.starts_with("_AmdContPayloadRegistersGetI32")) {
-      Changed = true;
-      handleContPayloadRegistersGetI32(F);
-    } else if (Name.starts_with("_AmdContPayloadRegistersSetI32")) {
-      Changed = true;
-      handleContPayloadRegistersSetI32(F);
     }
   }
 
@@ -1221,12 +947,11 @@ bool DXILContPostProcessPassImpl::handleAmdInternals() {
 
 DXILContPostProcessPassImpl::DXILContPostProcessPassImpl(Module &M,
                                                          Module &GpurtLibrary)
-    : Mod{&M}, GpurtLibrary{&GpurtLibrary},
-      SetupRayGen{GpurtLibrary.getFunction(ContDriverFunc::SetupRayGenName)},
-      Builder{Mod->getContext()}, StackAddrspace{
-                                      ContHelper::tryGetStackAddrspace(*Mod)} {}
+    : Mod{&M}, GpurtLibrary{&GpurtLibrary}, Builder{Mod->getContext()},
+      StackAddrspace{ContHelper::tryGetStackAddrspace(*Mod)} {}
 
-bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
+PreservedAnalyses
+DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
   bool Changed = false;
 
   StackLowering.emplace(Mod->getContext(),
@@ -1241,7 +966,9 @@ bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
   Changed |= unfoldGlobals();
   Changed |= handleAmdInternals();
   Changed |= handleIntrinsicCalls(AnalysisManager);
-  Changed |= replaceIntrinsicCallsAndSetupRayGen();
+
+  for (auto &[Func, Data] : ToProcess)
+    Changed |= replaceIntrinsicCalls(*Func, Data);
 
   for (auto &F : make_early_inc_range(*Mod)) {
     auto FuncName = F.getName();
@@ -1260,9 +987,6 @@ bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
 
   Changed |= fixupDxilMetadata(*Mod);
 
-  // Change function pointer accesses to include metadata
-  Changed |= addGetAddrAndMDIntrinsicCalls(*Mod);
-
 #ifndef NDEBUG
   checkContinuationsModule(*Mod, ContinueCalls);
 #endif
@@ -1278,7 +1002,7 @@ bool DXILContPostProcessPassImpl::run(ModuleAnalysisManager &AnalysisManager) {
 
   Changed |= llvm::removeUnusedFunctionDecls(Mod, false);
 
-  return Changed;
+  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 } // anonymous namespace
 
@@ -1291,7 +1015,5 @@ DXILContPostProcessPass::run(llvm::Module &Module,
   auto &GpurtContext = lgc::GpurtContext::get(Module.getContext());
   DXILContPostProcessPassImpl Impl{
       Module, GpurtContext.theModule ? *GpurtContext.theModule : Module};
-  bool Changed = Impl.run(AnalysisManager);
-
-  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+  return Impl.run(AnalysisManager);
 }

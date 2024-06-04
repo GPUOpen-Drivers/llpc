@@ -1254,6 +1254,14 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
     }
 
+    // NOTE: In such case, last shader in the pre-rasterization doesn't export layer while fragment shader expects to
+    // read it. Should export 0 to fragment shader, which is required by the spec.
+    if (!useLayer && nextStage == ShaderStage::Fragment && nextBuiltInUsage.layer) {
+      assert(m_layer == nullptr);
+      m_layer = builder.getInt32(0);
+      useLayer = true;
+    }
+
     // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
     if (clipDistanceCount > 0 || cullDistanceCount > 0) {
       assert(clipDistanceCount + cullDistanceCount <= MaxClipCullDistanceCount);
@@ -1669,13 +1677,21 @@ Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, 
     Value *param =
         builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask}, attribs);
 
-    // tmp = llvm.amdgcn.interp.inreg.p10.f16(p10, coordI, p0, highHalf)
-    result = builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p10.f16", builder.getFloatTy(),
-                                     {param, coordI, param, highHalf}, attribs);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 494282
+    // Old version of code
+    auto interpP10Intrinsic = Intrinsic::amdgcn_interp_inreg_p10_f16;
+    auto interpP2Intrinsic = Intrinsic::amdgcn_interp_inreg_p2_f16;
+#else
+    // New version of the code (also handles unknown version, which we treat as
+    // latest)
+    auto interpP10Intrinsic = Intrinsic::amdgcn_interp_p10_rtz_f16;
+    auto interpP2Intrinsic = Intrinsic::amdgcn_interp_p2_rtz_f16;
+#endif
+    // tmp = interp.p10(p10, coordI, p0, highHalf)
+    result = builder.CreateIntrinsic(builder.getFloatTy(), interpP10Intrinsic, {param, coordI, param, highHalf});
 
-    // llvm.amdgcn.interp.inreg.p2.f16(p20, coordJ, tmp, highHalf)
-    result = builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p2.f16", builder.getHalfTy(),
-                                     {param, coordJ, result, highHalf}, attribs);
+    // interp.p2(p20, coordJ, tmp, highHalf)
+    result = builder.CreateIntrinsic(builder.getHalfTy(), interpP2Intrinsic, {param, coordJ, result, highHalf});
   } else {
     // llvm.amdgcn.interp.p1.f16(coordI, attr_channel, attr, highhalf, m0)
     result = builder.CreateNamedCall("llvm.amdgcn.interp.p1.f16", builder.getFloatTy(),
@@ -2062,10 +2078,21 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
 void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset,
                                                           Value *compIdx, Value *vertexOrPrimitiveIdx,
                                                           bool isPerPrimitive, BuilderBase &builder) {
-  if (output->getType()->getScalarSizeInBits() == 64)
-    compIdx = builder.CreateShl(compIdx, 1);
+  // outputOffset = (location + locOffset) * 4 + compIdx * (bitWidth == 64 ? 2 : 1)
+  Value *outputOffset = builder.CreateAdd(builder.getInt32(location), locOffset);
+  outputOffset = builder.CreateShl(outputOffset, 2);
 
-  builder.create<WriteMeshOutputOp>(isPerPrimitive, location, locOffset, compIdx, vertexOrPrimitiveIdx, output);
+  auto outputTy = output->getType();
+  if (outputTy->getScalarSizeInBits() == 64) {
+    compIdx = builder.CreateShl(compIdx, 1);
+  }
+
+  outputOffset = builder.CreateAdd(outputOffset, compIdx);
+
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -2637,10 +2664,10 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   // Handle internal-use built-ins for sample position emulation
   case BuiltInNumSamples: {
     if (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo) {
-      assert(entryArgIdxs.sampleInfo != 0);
-      auto sampleInfo = getFunctionArgument(m_entryPoint, entryArgIdxs.sampleInfo);
+      assert(entryArgIdxs.compositeData != 0);
+      auto sampleInfo = getFunctionArgument(m_entryPoint, entryArgIdxs.compositeData);
       input = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
-                                      {sampleInfo, builder.getInt32(0), builder.getInt32(16)});
+                                      {sampleInfo, builder.getInt32(2), builder.getInt32(5)});
     } else {
       input = builder.getInt32(m_pipelineState->getRasterizerState().numSamples);
     }
@@ -2648,10 +2675,13 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInSamplePatternIdx: {
     if (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo) {
-      assert(entryArgIdxs.sampleInfo != 0);
-      auto sampleInfo = getFunctionArgument(m_entryPoint, entryArgIdxs.sampleInfo);
-      input = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
-                                      {sampleInfo, builder.getInt32(16), builder.getInt32(16)});
+      assert(entryArgIdxs.compositeData != 0);
+      auto sampleInfo = getFunctionArgument(m_entryPoint, entryArgIdxs.compositeData);
+      Value *numSamples = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                                  {sampleInfo, builder.getInt32(2), builder.getInt32(5)});
+      numSamples = builder.CreateBinaryIntrinsic(Intrinsic::cttz, numSamples, builder.getTrue());
+      input = builder.CreateMul(
+          numSamples, builder.getInt32(m_pipelineState->getTargetInfo().getGpuProperty().maxMsaaRasterizerSamples));
     } else {
       input = builder.getInt32(m_pipelineState->getRasterizerState().samplePatternIdx);
     }
@@ -3388,10 +3418,15 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
 
   (void(builtInUsage)); // Unused
 
-  if (!elemIdx)
-    elemIdx = builder.getInt32(0);
+  // outputOffset = location * 4 + elemIdx
+  Value *outputOffset = builder.getInt32(4 * loc);
+  if (elemIdx)
+    outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
 
-  builder.create<WriteMeshOutputOp>(isPerPrimitive, loc, builder.getInt32(0), elemIdx, vertexOrPrimitiveIdx, output);
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================

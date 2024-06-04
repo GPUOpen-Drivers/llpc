@@ -83,7 +83,8 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
 
     ContHelper::setMaxPayloadRegisterCount(module, cps::CpsPayloadMaxNumVgprs);
 
-    setShaderHitAttributeSize(m_entryPoint, rtContext->getAttributeDataSizeInBytes());
+    setMaxHitAttributeSize(&module, rtContext->getAttributeDataSizeInBytes());
+    setMaxPayloadSize(&module, rtContext->getPayloadSizeInBytes());
   }
 
   return PreservedAnalyses::none();

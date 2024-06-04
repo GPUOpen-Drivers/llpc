@@ -37,18 +37,18 @@ find_package(Python3
 )
 
 # Locate dxc binary.
-if (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
+#if _WIN32
+if(WIN32)
+    if (NOT EXISTS "${DXC_PATH}")
+        message(FATAL_ERROR "Unable to find DirectXShaderCompiler directory: ${DXC_PATH}")
+    endif()
+endif()
+#endif
+if (NOT DXC_PATH)
     find_program(DXC_PATH dxc)
     if ("${DXC_PATH}" STREQUAL "DXC_PATH-NOTFOUND")
         message(FATAL_ERROR "Could not find shader compiler tool dxc.")
     endif()
-#if _WIN32
-elseif(WIN32)
-    set(DXC_PATH "$ENV{DK_ROOT}/DirectXShaderCompiler/8c9d92b/bin")
-    if (NOT EXISTS "${DXC_PATH}")
-        message(FATAL_ERROR "Unable to find DirectXShaderCompiler directory: ${DXC_PATH}")
-    endif()
-#endif
 endif()
 
 set(CMAKE_CURRENT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/gfxruntime)

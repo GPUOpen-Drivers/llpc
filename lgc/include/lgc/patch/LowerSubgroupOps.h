@@ -59,6 +59,9 @@ private:
 
   void visitElect(SubgroupElectOp &op);
   void visitAny(SubgroupAnyOp &op);
+  void visitAll(SubgroupAllOp &op);
+  void visitAllEqual(SubgroupAllEqualOp &op);
+  void visitRotate(SubgroupRotateOp &op);
 
   PipelineState *m_pipelineState = nullptr;
   SubgroupBuilder *m_builder = nullptr;

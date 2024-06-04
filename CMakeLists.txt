@@ -127,9 +127,8 @@ endif(LLPC_BUILD_TOOLS)
 if(ICD_BUILD_LLPC)
     # Generate Strings for LLPC standalone tool and vkgc_gpurtshim
     add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
+    add_subdirectory(gfxruntime ${PROJECT_BINARY_DIR}/gfxruntime)
 endif()
-
-add_subdirectory(gfxruntime ${PROJECT_BINARY_DIR}/gfxruntime)
 
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)

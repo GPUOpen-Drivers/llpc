@@ -150,6 +150,10 @@ private:
   bool lowerCpsOps(llvm::Function *func, ShaderInputs *shaderInputs);
   llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> fixedShaderArgTys,
                                    llvm::ArrayRef<std::string> argNames);
+
+  llvm::Value *takeLevel(llvm::Value *level, llvm::IRBuilder<> &builder, llvm::Type *waveMaskTy,
+                         llvm::ArrayRef<lgc::cps::CpsLevel> priority);
+
   unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
                         llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
   void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);

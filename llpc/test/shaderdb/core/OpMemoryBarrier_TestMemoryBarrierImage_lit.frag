@@ -13,7 +13,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: fence acq_rel
+; SHADERTEST: fence syncscope("agent") acq_rel
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

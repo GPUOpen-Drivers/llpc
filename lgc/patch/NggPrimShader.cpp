@@ -102,6 +102,22 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
       m_hasGs(pipelineState->hasShaderStage(ShaderStage::Geometry)), m_builder(pipelineState->getContext()) {
   assert(m_nggControl->enableNgg);
 
+  m_maxThreadsPerSubgroup = NggMaxThreadsPerSubgroup;
+  if (m_hasGs) {
+    // NOTE: Normally, the maximum value of GS output vertices is restricted to 256 by HW rasterization. However, we
+    // encounter a special DX case where it emits >256 vertices and just do stream-out operations without
+    // rasterization. Stream-out on GFX11+ is pure SW emulation and we can support such case. In experiments, we
+    // find our HW can support GE_NGG_SUBGRP_CNTL.PRIM_AMP_FACTOR > 256 though it is not documented. There are 9 bits
+    // that program the register field to launch 511 threads at most. With sufficient threads, this case could be
+    // handled by our current design.
+    const auto &geometryMode = pipelineState->getShaderModes()->getGeometryShaderMode();
+    m_maxThreadsPerSubgroup = std::max(NggMaxThreadsPerSubgroup, geometryMode.outputVertices);
+    assert(m_maxThreadsPerSubgroup <= NggMaxPrimitiveAmplifier);
+  }
+  const unsigned waveSize = pipelineState->getShaderWaveSize(
+      m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex));
+  m_maxWavesPerSubgroup = alignTo(m_maxThreadsPerSubgroup, waveSize) / waveSize;
+
   // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
   FastMathFlags fastMathFlags;
   fastMathFlags.setApproxFunc();
@@ -204,6 +220,20 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     PrimShaderLdsUsageInfo ldsUsageInfo = {};
     ldsUsageInfo.needsLds = true;
 
+    // NOTE: Normally, the maximum value of GS output vertices is restricted to 256 by HW rasterization. However, we
+    // encounter a special DX case where it emits >256 vertices and just do stream-out operations without
+    // rasterization. Stream-out on GFX11+ is pure SW emulation and we can support such case. In experiments, we
+    // find our HW can support GE_NGG_SUBGRP_CNTL.PRIM_AMP_FACTOR > 256 though it is not documented. There are 9 bits
+    // that program the register field to launch 511 threads at most. With sufficient threads, this case could be
+    // handled by our current design.
+    const auto &geometryMode = pipelineState->getShaderModes()->getGeometryShaderMode();
+    unsigned maxThreadsPerSubgroup = std::max(NggMaxThreadsPerSubgroup, geometryMode.outputVertices);
+    assert(maxThreadsPerSubgroup <= NggMaxPrimitiveAmplifier);
+
+    const unsigned waveSize = pipelineState->getShaderWaveSize(ShaderStage::Geometry);
+    assert(waveSize == 32 || waveSize == 64);
+    unsigned maxWavesPerSubgroup = alignTo(maxThreadsPerSubgroup, waveSize) / waveSize;
+
     //
     // The LDS layout is something like this:
     //
@@ -226,7 +256,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     }
 
     // Primitive data
-    ldsRegionSize = NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
+    ldsRegionSize = maxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
     if (ldsLayout) {
       printLdsRegionInfo("Primitive Connectivity Data", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::PrimitiveData] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -237,7 +267,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // Primitive counts
     if (pipelineState->enableSwXfb() || pipelineState->enablePrimStats()) {
       ldsRegionSize =
-          (NggMaxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
+          (maxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Primitive Counts", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::PrimitiveCounts] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -248,7 +278,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // Primitive index map (compacted -> uncompacted)
     if (pipelineState->enableSwXfb()) {
-      ldsRegionSize = NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
+      ldsRegionSize = maxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Primitive Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::PrimitiveIndexMap] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -268,7 +298,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
       }
     } else {
       ldsRegionSize =
-          (NggMaxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
+          (maxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Vertex Counts", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::VertexCounts] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -288,7 +318,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
                              (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap].second);
         }
       } else {
-        ldsRegionSize = NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per vertex thread, 4 GS streams
+        ldsRegionSize = maxThreadsPerSubgroup * MaxGsStreams; // 1 dword per vertex thread, 4 GS streams
         if (ldsLayout) {
           printLdsRegionInfo("Vertex Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
           (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -325,8 +355,11 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
       printLdsRegionInfo("Total LDS", 0, ldsOffset);
       LLPC_OUTS("\n");
       LLPC_OUTS("Needs LDS = " << (ldsUsageInfo.needsLds ? "true" : "false") << "\n");
-      LLPC_OUTS("ES Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
-      LLPC_OUTS("GS Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+      LLPC_OUTS("ES Extra LDS Size (in dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
+      LLPC_OUTS("GS Extra LDS Size (in dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Max Launched Threads = " << maxThreadsPerSubgroup << "\n");
+      LLPC_OUTS("Max Launched Waves (Wave" << std::to_string(waveSize) << ") = " << maxWavesPerSubgroup << "\n");
       LLPC_OUTS("\n");
     }
 
@@ -336,6 +369,11 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   const bool hasTes = pipelineState->hasShaderStage(ShaderStage::TessEval);
   const bool distributePrimitiveId =
       !hasTes && pipelineState->getShaderResourceUsage(ShaderStage::Vertex)->builtInUsage.vs.primitiveId;
+
+  const unsigned waveSize = pipelineState->getShaderWaveSize(hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
+  assert(waveSize == 32 || waveSize == 64);
+  unsigned maxThreadsPerSubgroup = NggMaxThreadsPerSubgroup;
+  unsigned maxWavesPerSubgroup = NggMaxThreadsPerSubgroup / waveSize;
 
   //
   // Passthrough mode is enabled (API GS is not present)
@@ -395,8 +433,11 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
       printLdsRegionInfo("Total LDS", 0, ldsOffset);
       LLPC_OUTS("\n");
       LLPC_OUTS("Needs LDS = " << (ldsUsageInfo.needsLds ? "true" : "false") << "\n");
-      LLPC_OUTS("ES Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
-      LLPC_OUTS("GS Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+      LLPC_OUTS("ES Extra LDS Size (in dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
+      LLPC_OUTS("GS Extra LDS Size (in dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Max Launched Threads = " << maxThreadsPerSubgroup << "\n");
+      LLPC_OUTS("Max Launched Waves (Wave" << std::to_string(waveSize) << ") = " << maxWavesPerSubgroup << "\n");
       LLPC_OUTS("\n");
     }
 
@@ -433,7 +474,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   ldsOffset = 0; // DistributedPrimitiveId is always the first region and is overlapped with VertexPosition
 
   // Vertex position
-  ldsRegionSize = 4 * NggMaxThreadsPerSubgroup; // 4 dwords per vertex thread
+  ldsRegionSize = 4 * maxThreadsPerSubgroup; // 4 dwords per vertex thread
   if (ldsLayout) {
     printLdsRegionInfo("Vertex Position", ldsOffset, ldsRegionSize);
     (*ldsLayout)[PrimShaderLdsRegion::VertexPosition] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -464,7 +505,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   }
 
   // Vertex counts
-  ldsRegionSize = NggMaxWavesPerSubgroup + 1; // 1 dword per wave and 1 dword per subgroup
+  ldsRegionSize = maxWavesPerSubgroup + 1; // 1 dword per wave and 1 dword per subgroup
   if (ldsLayout) {
     printLdsRegionInfo("Vertex Counts", ldsOffset, ldsRegionSize);
     (*ldsLayout)[PrimShaderLdsRegion::VertexCounts] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -474,7 +515,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
   // Vertex index map
   if (pipelineState->getNggControl()->compactVertex) {
-    ldsRegionSize = NggMaxThreadsPerSubgroup; // 1 dword per wave and 1 dword per subgroup
+    ldsRegionSize = maxThreadsPerSubgroup; // 1 dword per wave and 1 dword per subgroup
     if (ldsLayout) {
       printLdsRegionInfo("Vertex Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -487,8 +528,11 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     printLdsRegionInfo("Total LDS", 0, ldsOffset);
     LLPC_OUTS("\n");
     LLPC_OUTS("Needs LDS = " << (ldsUsageInfo.needsLds ? "true" : "false") << "\n");
-    LLPC_OUTS("ES Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
-    LLPC_OUTS("GS Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+    LLPC_OUTS("ES Extra LDS Size (in dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
+    LLPC_OUTS("GS Extra LDS Size (in dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+    LLPC_OUTS("\n");
+    LLPC_OUTS("Max Launched Threads = " << maxThreadsPerSubgroup << "\n");
+    LLPC_OUTS("Max Launched Waves (Wave" << std::to_string(waveSize) << ") = " << maxWavesPerSubgroup << "\n");
     LLPC_OUTS("\n");
   }
 
@@ -1101,8 +1145,6 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
 
-  const unsigned waveCountInSubgroup = NggMaxThreadsPerSubgroup / waveSize;
-
   SmallVector<Argument *, 32> args;
   for (auto &arg : primShader->args())
     args.push_back(&arg);
@@ -1186,7 +1228,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //   if (Not runtime passthrough) {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Initialize vertex draw flag
-  //     if (threadIdInSubgroup < waveCount + 1)
+  //     if (threadIdInSubgroup < maxWaves + 1)
   //       Initialize per-wave and per-subgroup count of output vertices
   //
   //     if (threadIdInWave < vertCountInWave)
@@ -1203,7 +1245,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Check draw flags of vertices and compute draw mask
   //
-  //     if (threadIdInWave < waveCount - waveId)
+  //     if (threadIdInWave < maxWaves - waveId)
   //       Accumulate per-wave and per-subgroup count of output vertices
   //     Barrier
   //
@@ -1399,7 +1441,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     m_builder.SetInsertPoint(endInitVertexDrawFlagBlock);
 
     auto validWave =
-        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
+        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(m_maxWavesPerSubgroup + 1));
     m_builder.CreateCondBr(validWave, initVertexCountsBlock, endInitVertexCountsBlock);
   }
 
@@ -1521,7 +1563,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     vertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     vertCountInWave = m_builder.CreateTrunc(vertCountInWave, m_builder.getInt32Ty());
 
-    auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(waveCountInSubgroup), m_nggInputs.waveIdInSubgroup);
+    auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(m_maxWavesPerSubgroup), m_nggInputs.waveIdInSubgroup);
     auto validThread = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, threadIdUpbound);
     m_builder.CreateCondBr(validThread, accumVertexCountsBlock, endAccumVertexCountsBlock);
   }
@@ -1536,7 +1578,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCounts);
 
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart));
-    atomicAdd(vertCountInWave, ldsOffset);
+    atomicOp(AtomicRMWInst::Add, vertCountInWave, ldsOffset);
 
     m_builder.CreateBr(endAccumVertexCountsBlock);
   }
@@ -1556,7 +1598,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // The last dword following dwords for all waves (each wave has one dword) stores vertex count of the
     // entire subgroup
     vertCountInSubgroup = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
-                                                    {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
+                                                    {vertCountInWaves, m_builder.getInt32(m_maxWavesPerSubgroup)});
 
     if (m_nggControl->compactVertex) {
       // Get vertex count for all waves prior to this wave
@@ -1863,7 +1905,6 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   if (!m_nggControl->compactVertex)
     assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
-  const unsigned waveCountInSubgroup = NggMaxThreadsPerSubgroup / waveSize;
   const bool cullingMode = !m_nggControl->passthroughMode;
 
   const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
@@ -1917,7 +1958,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   //   else if (Enable primitive statistics counting)
   //     Collect primitive statistics
   //
-  //  if (threadIdInSubgroup < waveCount + 1)
+  //  if (threadIdInSubgroup < maxWaves + 1)
   //     Initialize per-wave and per-subgroup count of output vertices
   //   Barrier
   //
@@ -1931,7 +1972,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   //   if (threadIdInSubgroup < vertCountInSubgroup)
   //     Check draw flags of output vertices and compute draw mask
   //
-  //   if (threadIdInWave < waveCount - waveId)
+  //   if (threadIdInWave < maxWaves - waveId)
   //     Accumulate per-wave and per-subgroup count of output vertices
   //   Barrier
   //   Update vertCountInSubgroup
@@ -2041,7 +2082,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (m_pipelineState->isVertexStreamActive(i)) { // Initialize primitive connectivity data if the stream is active
         writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                                PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * i);
+                                PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * i);
       }
     }
 
@@ -2078,7 +2119,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       collectPrimitiveStats();
 
     auto validWave =
-        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
+        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(m_maxWavesPerSubgroup + 1));
     m_builder.CreateCondBr(validWave, initVertexCountsBlock, endInitVertexCountsBlock);
   }
 
@@ -2087,7 +2128,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     m_builder.SetInsertPoint(initVertexCountsBlock);
 
     writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup, PrimShaderLdsRegion::VertexCounts,
-                            (NggMaxWavesPerSubgroup + 1) * rasterStream);
+                            (m_maxWavesPerSubgroup + 1) * rasterStream);
 
     m_builder.CreateBr(endInitVertexCountsBlock);
   }
@@ -2101,7 +2142,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 
     if (cullingMode) {
       primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                          PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * rasterStream);
+                                          PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
       auto tryCullPrimitive = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
       auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
       tryCullPrimitive = m_builder.CreateAnd(tryCullPrimitive, validPrimitive);
@@ -2153,7 +2194,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       m_builder.SetInsertPoint(nullifyPrimitiveDataBlock);
 
       writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                              PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * rasterStream);
+                              PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
 
       m_builder.CreateBr(endCullPrimitiveBlock);
     }
@@ -2192,7 +2233,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     // drawFlag = primData[N] != NullPrim
     auto primData0 =
         readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                 PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * rasterStream);
+                                 PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
     auto drawFlag0 = m_builder.CreateICmpNE(primData0, m_builder.getInt32(NullPrim));
     drawFlag = drawFlag0;
 
@@ -2200,7 +2241,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       // drawFlag |= N >= 1 ? (primData[N-1] != NullPrim) : false
       auto primData1 = readPerThreadDataFromLds(
           m_builder.getInt32Ty(), m_builder.CreateSub(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(1)),
-          PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * rasterStream);
+          PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
       auto drawFlag1 =
           m_builder.CreateSelect(m_builder.CreateICmpUGE(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(1)),
                                  m_builder.CreateICmpNE(primData1, m_builder.getInt32(NullPrim)), m_builder.getFalse());
@@ -2211,7 +2252,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       // drawFlag |= N >= 2 ? (primData[N-2] != NullPrim) : false
       auto primData2 = readPerThreadDataFromLds(
           m_builder.getInt32Ty(), m_builder.CreateSub(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(2)),
-          PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * rasterStream);
+          PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
       auto drawFlag2 =
           m_builder.CreateSelect(m_builder.CreateICmpUGE(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(2)),
                                  m_builder.CreateICmpNE(primData2, m_builder.getInt32(NullPrim)), m_builder.getFalse());
@@ -2235,7 +2276,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     vertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     vertCountInWave = m_builder.CreateTrunc(vertCountInWave, m_builder.getInt32Ty());
 
-    auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(waveCountInSubgroup), m_nggInputs.waveIdInSubgroup);
+    auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(m_maxWavesPerSubgroup), m_nggInputs.waveIdInSubgroup);
     auto validThread = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, threadIdUpbound);
 
     m_builder.CreateCondBr(validThread, accumVertexCountsBlock, endAccumVertexCountsBlock);
@@ -2251,8 +2292,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCounts);
 
     ldsOffset =
-        m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (NggMaxWavesPerSubgroup + 1) * rasterStream));
-    atomicAdd(vertCountInWave, ldsOffset);
+        m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (m_maxWavesPerSubgroup + 1) * rasterStream));
+    atomicOp(AtomicRMWInst::Add, vertCountInWave, ldsOffset);
 
     m_builder.CreateBr(endAccumVertexCountsBlock);
   }
@@ -2267,12 +2308,13 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     if (m_nggControl->compactVertex) {
       auto vertCountInWaves =
           readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave,
-                                   PrimShaderLdsRegion::VertexCounts, (NggMaxWavesPerSubgroup + 1) * rasterStream);
+                                   PrimShaderLdsRegion::VertexCounts, (m_maxWavesPerSubgroup + 1) * rasterStream);
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
       // entire subgroup
-      auto vertCountInSubgroup = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
-                                                           {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
+      auto vertCountInSubgroup =
+          m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                    {vertCountInWaves, m_builder.getInt32(m_maxWavesPerSubgroup)});
 
       // Get output vertex count for all waves prior to this wave
       vertCountInPrevWaves = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
@@ -2541,6 +2583,16 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
     streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval)->entryArgIdxs.tes.streamOutData;
   else
     streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex)->entryArgIdxs.vs.streamOutData;
+
+  unsigned compositeData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex)->entryArgIdxs.vs.compositeData;
+  if (compositeData != 0) {
+    // Use dynamic topology
+    m_verticesPerPrimitive =
+        createUBfe(m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, compositeData)), 0, 2);
+  } else {
+    // Use static topology
+    m_verticesPerPrimitive = m_builder.getInt32(m_pipelineState->getVerticesPerPrimitive());
+  }
 
   assert(userData->getType()->isVectorTy());
   const auto constBufferPtrTy = PointerType::get(m_builder.getContext(), ADDR_SPACE_CONST);
@@ -2891,7 +2943,7 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
   Value *primData =
       readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                               PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * rasterStream);
+                               PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
   auto validPrimitive = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
 
   // Primitive connectivity data have such layout:
@@ -4221,10 +4273,10 @@ Function *NggPrimShader::createGsEmitHandler() {
 
     // Write primitive data (just winding)
     const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::PrimitiveData);
-    // ldsOffset = regionStart + vertexIndex + NggMaxThreadsPerSubgroup * streamId
+    // ldsOffset = regionStart + vertexIndex + maxThreadsPerSubgroup * streamId
     auto ldsOffset = m_builder.CreateAdd(m_builder.getInt32(regionStart), vertexIndex);
     ldsOffset =
-        m_builder.CreateAdd(ldsOffset, m_builder.CreateMul(m_builder.getInt32(NggMaxThreadsPerSubgroup), streamId));
+        m_builder.CreateAdd(ldsOffset, m_builder.CreateMul(m_builder.getInt32(m_maxThreadsPerSubgroup), streamId));
     writeValueToLds(winding, ldsOffset);
 
     m_builder.CreateBr(endEmitPrimBlock);
@@ -6222,18 +6274,8 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
 
   bool bufferActive[MaxTransformFeedbackBuffers] = {};
-  unsigned firstActiveXfbBuffer = InvalidValue;
-  unsigned lastActiveXfbBuffer = InvalidValue;
-
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
     bufferActive[i] = xfbStrides[i] > 0;
-    if (!bufferActive[i])
-      continue; // Transform feedback buffer is inactive
-
-    if (firstActiveXfbBuffer == InvalidValue)
-      firstActiveXfbBuffer = i;
-    lastActiveXfbBuffer = i;
-  }
 
   //
   // The processing is something like this:
@@ -6244,18 +6286,10 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   //     Write XFB outputs to LDS region
   //   }
   //
-  //   if (threadIdInSubgroup == 0) {
-  //     Acquire the control of GDS_STRMOUT_DWORDS_WRITTEN_X
-  //     Calculate primsToWrite and dwordsToWrite
-  //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
-  //     Store XFB statistics info to LDS
-  //     Increment GDS_STRMOUT_PRIMS_NEEDED_0 and GDS_STRMOUT_PRIMS_WRITTEN_0
-  //   }
+  //   Prepare XFB to update its relevant counters
   //   Barrier
   //
-  //   if (threadIdInWave < MaxXfbBuffers + 1)
-  //     Read XFB statistics info from LDS
-  //
+  //   Read XFB statistics info from LDS
   //   Read primsToWrite and dwordsWritten from XFB statistics info
   //
   //   if (threadIdInSubgroup < primsToWrite)
@@ -6269,20 +6303,20 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   BasicBlock *endFetchXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endFetchXfbOutput");
   endFetchXfbOutputBlock->moveAfter(fetchXfbOutputBlock);
 
-  BasicBlock *prepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".prepareXfbExport");
-  prepareXfbExportBlock->moveAfter(endFetchXfbOutputBlock);
-  BasicBlock *endPrepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".endPrepareXfbExport");
-  endPrepareXfbExportBlock->moveAfter(prepareXfbExportBlock);
+  unsigned possibleVertsPerPrim = 3;
+  if (isa<ConstantInt>(m_verticesPerPrimitive))
+    possibleVertsPerPrim = cast<ConstantInt>(m_verticesPerPrimitive)->getZExtValue();
 
-  BasicBlock *readXfbStatInfoBlock = createBlock(xfbEntryBlock->getParent(), ".readXfbStatInfo");
-  readXfbStatInfoBlock->moveAfter(endPrepareXfbExportBlock);
-  BasicBlock *endReadXfbStatInfoBlock = createBlock(xfbEntryBlock->getParent(), ".endReadXfbStatInfo");
-  endReadXfbStatInfoBlock->moveAfter(readXfbStatInfoBlock);
+  BasicBlock *exportXfbOutputBlock[3] = {};
+  auto insertPos = endFetchXfbOutputBlock;
+  for (unsigned i = 0; i < possibleVertsPerPrim; ++i) {
+    exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInVertex" + std::to_string(i));
+    exportXfbOutputBlock[i]->moveAfter(insertPos);
+    insertPos = exportXfbOutputBlock[i];
+  }
 
-  BasicBlock *exportXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutput");
-  exportXfbOutputBlock->moveAfter(endReadXfbStatInfoBlock);
   BasicBlock *endExportXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endExportXfbOutput");
-  endExportXfbOutputBlock->moveAfter(exportXfbOutputBlock);
+  endExportXfbOutputBlock->moveAfter(insertPos);
 
   // Insert branching in current block to process transform feedback export
   {
@@ -6321,164 +6355,18 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   }
 
   // Construct ".endFetchXfbOutput" block
+  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
   {
     m_builder.SetInsertPoint(endFetchXfbOutputBlock);
 
-    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
-    m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
-  }
-
-  // Construct ".prepareXfbExport" block
-  {
-    m_builder.SetInsertPoint(prepareXfbExportBlock);
-
-    const unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
-    Value *numPrimsToWrite = m_nggInputs.primCountInSubgroup;
-
-    Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
-    Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
-
-    // Calculate numPrimsToWrite
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (!bufferActive[i])
-        continue;
-
-      if (m_gfxIp.major <= 11) {
-        if (i == firstActiveXfbBuffer) {
-          // ds_ordered_count
-          dwordsWritten[i] = m_builder.CreateIntrinsic(
-              Intrinsic::amdgcn_ds_ordered_add, {},
-              {
-                  m_builder.CreateIntToPtr(m_nggInputs.orderedWaveId,
-                                           PointerType::get(m_builder.getInt32Ty(), ADDR_SPACE_REGION)), // m0
-                  m_builder.getInt32(0),                                                                 // value to add
-                  m_builder.getInt32(0),                                                                 // ordering
-                  m_builder.getInt32(0),                                                                 // scope
-                  m_builder.getFalse(),                                                                  // isVolatile
-                  m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
-                                     (1 << 24)), // ordered count index, [27:24] is dword count
-                  m_builder.getFalse(),          // wave release
-                  m_builder.getFalse(),          // wave done
-              });
-        } else {
-          // ds_add_gs_reg
-          dwordsWritten[i] =
-              m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
-                                        {m_builder.getInt32(0),                                         // value to add
-                                         m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
-        }
-      } else {
-        llvm_unreachable("Not implemented!");
-      }
-
-      // NUM_RECORDS = SQ_BUF_RSRC_WORD2
-      Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
-      // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
-      Value *bufferSizeInDwords = m_builder.CreateLShr(numRecords, 2);
-      // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
-      Value *dwordsRemaining =
-          m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(m_streamOutBufOffsets[i], dwordsWritten[i]));
-      dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
-                                                  {dwordsRemaining, m_builder.getInt32(0)});
-      // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
-      dwordsPerPrim[i] = m_builder.getInt32(vertsPerPrim * xfbStrides[i] / sizeof(unsigned));
-      Value *primsCanWrite = m_builder.CreateUDiv(dwordsRemaining, dwordsPerPrim[i]);
-      numPrimsToWrite =
-          m_builder.CreateIntrinsic(Intrinsic::umin, numPrimsToWrite->getType(), {numPrimsToWrite, primsCanWrite});
-    }
-
-    // Increment dwordsWritten
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (!bufferActive[i])
-        continue;
-
-      Value *dwordsToWrite = m_builder.CreateMul(numPrimsToWrite, dwordsPerPrim[i]);
-
-      if (m_gfxIp.major <= 11) {
-        if (i == lastActiveXfbBuffer) {
-          // ds_ordered_count, wave done
-          dwordsWritten[i] = m_builder.CreateIntrinsic(
-              Intrinsic::amdgcn_ds_ordered_add, {},
-              {
-                  m_builder.CreateIntToPtr(m_nggInputs.orderedWaveId,
-                                           PointerType::get(m_builder.getInt32Ty(), ADDR_SPACE_REGION)), // m0
-                  dwordsToWrite,                                                                         // value to add
-                  m_builder.getInt32(0),                                                                 // ordering
-                  m_builder.getInt32(0),                                                                 // scope
-                  m_builder.getFalse(),                                                                  // isVolatile
-                  m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
-                                     (1 << 24)), // ordered count index, [27:24] is dword count
-                  m_builder.getTrue(),           // wave release
-                  m_builder.getTrue(),           // wave done
-              });
-        } else {
-          // ds_add_gs_reg
-          dwordsWritten[i] =
-              m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, dwordsToWrite->getType(),
-                                        {dwordsToWrite,                                                 // value to add
-                                         m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
-        }
-      } else {
-        llvm_unreachable("Not implemented!");
-      }
-    }
-
-    // Store transform feedback statistics info to LDS and GDS
-    const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbStats);
-    writeValueToLds(numPrimsToWrite, m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers));
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (!bufferActive[i])
-        continue;
-
-      writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i));
-    }
-
-    if (m_gfxIp.major <= 11) {
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_nggInputs.primCountInSubgroup->getType(),
-                                {m_nggInputs.primCountInSubgroup,                       // value to add
-                                 m_builder.getInt32(GDS_STRMOUT_PRIMS_NEEDED_0 << 2)}); // count index
-
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite->getType(),
-                                {numPrimsToWrite,                                        // value to add
-                                 m_builder.getInt32(GDS_STRMOUT_PRIMS_WRITTEN_0 << 2)}); // count index
-    } else {
-      llvm_unreachable("Not implemented!");
-    }
-
-    m_builder.CreateBr(endPrepareXfbExportBlock);
-  }
-
-  // Construct ".endPrepareXfbExport" block
-  {
-    m_builder.SetInsertPoint(endPrepareXfbExportBlock);
+    prepareSwXfb({m_nggInputs.primCountInSubgroup});
 
     // We are going to read transform feedback statistics info and outputs from LDS and export them to transform
-    // feedback buffers. Make sure the output values have been all written before this.
+    // feedback buffers. Make all values have been written before this.
     createFenceAndBarrier();
 
-    auto validThread =
-        m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_builder.getInt32(1 + MaxTransformFeedbackBuffers));
-    m_builder.CreateCondBr(validThread, readXfbStatInfoBlock, endReadXfbStatInfoBlock);
-  }
-
-  // Construct ".readXfbStatInfo" block
-  Value *xfbStatInfo = nullptr;
-  {
-    m_builder.SetInsertPoint(readXfbStatInfoBlock);
-
-    xfbStatInfo =
+    auto xfbStatInfo =
         readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave, PrimShaderLdsRegion::XfbStats);
-    m_builder.CreateBr(endReadXfbStatInfoBlock);
-  }
-
-  // Construct ".endReadXfbStatInfo" block
-  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
-  {
-    m_builder.SetInsertPoint(endReadXfbStatInfoBlock);
-
-    xfbStatInfo = createPhi(
-        {{xfbStatInfo, readXfbStatInfoBlock}, {PoisonValue::get(xfbStatInfo->getType()), endPrepareXfbExportBlock}});
-
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (bufferActive[i]) {
         streamOutOffsets[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
@@ -6491,104 +6379,105 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
                                                      {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers)});
 
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, numPrimsToWrite);
-    m_builder.CreateCondBr(validPrimitive, exportXfbOutputBlock, endExportXfbOutputBlock);
+    m_builder.CreateCondBr(validPrimitive, exportXfbOutputBlock[0], endExportXfbOutputBlock);
   }
 
-  // Construct ".exportXfbOutput" block
-  {
-    m_builder.SetInsertPoint(exportXfbOutputBlock);
+  Value *vertexIndices[3] = {};
+  vertexIndices[0] = m_nggInputs.vertexIndex0;
+  vertexIndices[1] = m_nggInputs.vertexIndex1;
+  vertexIndices[2] = m_nggInputs.vertexIndex2;
 
-    const unsigned vertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
-    Value *vertexIndices[3] = {};
-    vertexIndices[0] = m_nggInputs.vertexIndex0;
-    if (vertsPerPrim > 1)
-      vertexIndices[1] = m_nggInputs.vertexIndex1;
-    if (vertsPerPrim > 2)
-      vertexIndices[2] = m_nggInputs.vertexIndex2;
+  for (unsigned i = 0; i < possibleVertsPerPrim; ++i) {
+    // Construct ".exportXfbOutputInVertex[N]" block
+    m_builder.SetInsertPoint(exportXfbOutputBlock[i]);
 
-    for (unsigned i = 0; i < vertsPerPrim; ++i) {
-      for (unsigned j = 0; j < xfbOutputExports.size(); ++j) {
-        const auto &xfbOutputExport = xfbOutputExports[j];
-        auto outputValue = readXfbOutputFromLds(
-            xfbOutputExport.numElements > 1 ? FixedVectorType::get(m_builder.getFloatTy(), xfbOutputExport.numElements)
-                                            : m_builder.getFloatTy(),
-            vertexIndices[i], xfbOutputExport.offsetInVertex);
+    for (unsigned j = 0; j < xfbOutputExports.size(); ++j) {
+      const auto &xfbOutputExport = xfbOutputExports[j];
+      auto outputValue = readXfbOutputFromLds(
+          xfbOutputExport.numElements > 1 ? FixedVectorType::get(m_builder.getFloatTy(), xfbOutputExport.numElements)
+                                          : m_builder.getFloatTy(),
+          vertexIndices[i], xfbOutputExport.offsetInVertex);
 
-        if (xfbOutputExport.is16bit) {
-          // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
-          outputValue = m_builder.CreateBitCast(
-              outputValue, FixedVectorType::get(m_builder.getInt32Ty(), xfbOutputExport.numElements));
-          outputValue = m_builder.CreateTrunc(
-              outputValue, FixedVectorType::get(m_builder.getInt16Ty(), xfbOutputExport.numElements));
-          outputValue = m_builder.CreateBitCast(
-              outputValue, FixedVectorType::get(m_builder.getHalfTy(), xfbOutputExport.numElements));
-        }
+      if (xfbOutputExport.is16bit) {
+        // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
+        outputValue = m_builder.CreateBitCast(
+            outputValue, FixedVectorType::get(m_builder.getInt32Ty(), xfbOutputExport.numElements));
+        outputValue = m_builder.CreateTrunc(outputValue,
+                                            FixedVectorType::get(m_builder.getInt16Ty(), xfbOutputExport.numElements));
+        outputValue = m_builder.CreateBitCast(outputValue,
+                                              FixedVectorType::get(m_builder.getHalfTy(), xfbOutputExport.numElements));
+      }
 
-        unsigned format = 0;
-        switch (xfbOutputExport.numElements) {
-        case 1:
-          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_FLOAT : BUF_FORMAT_32_FLOAT;
-          break;
-        case 2:
-          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_FLOAT_GFX11;
-          break;
-        case 3:
-          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_32_FLOAT_GFX11;
-          break;
-        case 4:
-          format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_16_16_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
-          break;
-        default:
-          llvm_unreachable("Unexpected element number!");
-          break;
-        }
+      unsigned format = 0;
+      switch (xfbOutputExport.numElements) {
+      case 1:
+        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_FLOAT : BUF_FORMAT_32_FLOAT;
+        break;
+      case 2:
+        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_FLOAT_GFX11;
+        break;
+      case 3:
+        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_32_FLOAT_GFX11;
+        break;
+      case 4:
+        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_16_16_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
+        break;
+      default:
+        llvm_unreachable("Unexpected element number!");
+        break;
+      }
 
-        CoherentFlag coherent = {};
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-          coherent.bits.glc = true;
-          coherent.bits.slc = true;
-        }
+      CoherentFlag coherent = {};
+      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+        coherent.bits.glc = true;
+        coherent.bits.slc = true;
+      }
 
-        // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
-        Value *vertexOffset =
-            m_builder.CreateAdd(m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(vertsPerPrim)),
-                                m_builder.getInt32(i));
-        vertexOffset = m_builder.CreateMul(vertexOffset, m_builder.getInt32(xfbStrides[xfbOutputExport.xfbBuffer]));
-        // xfbOutputOffset = vertexOffset + xfbOffset
-        Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbOutputExport.xfbOffset));
+      // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
+      Value *vertexOffset = m_builder.CreateAdd(
+          m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_verticesPerPrimitive), m_builder.getInt32(i));
+      vertexOffset = m_builder.CreateMul(vertexOffset, m_builder.getInt32(xfbStrides[xfbOutputExport.xfbBuffer]));
+      // xfbOutputOffset = vertexOffset + xfbOffset
+      Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbOutputExport.xfbOffset));
 
-        if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
-          // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
-          // and 16scalar.
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, FixedVectorType::get(m_builder.getHalfTy(), 2),
-                                    {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
-                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
-                                     xfbOutputOffset,                                                 // offset
-                                     streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
-                                     m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
-                                     m_builder.getInt32(coherent.u32All)});                           // auxiliary data
+      if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
+        // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
+        // and 16scalar.
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, FixedVectorType::get(m_builder.getHalfTy(), 2),
+                                  {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
+                                   m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
+                                   xfbOutputOffset,                                                 // offset
+                                   streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
+                                   m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
+                                   m_builder.getInt32(coherent.u32All)});                           // auxiliary data
 
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, m_builder.getHalfTy(),
-                                    {m_builder.CreateExtractElement(outputValue, 2), // vdata
-                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                     m_builder.CreateAdd(xfbOutputOffset,
-                                                         m_builder.getInt32(2 * sizeof(uint16_t))), // offset
-                                     streamOutOffsets[xfbOutputExport.xfbBuffer],                   // soffset
-                                     m_builder.getInt32(BUF_FORMAT_16_FLOAT),                       // format
-                                     m_builder.getInt32(coherent.u32All)});                         // auxiliary data
-        } else {
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
-                                    {outputValue,                                    // vdata
-                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                     xfbOutputOffset,                                // offset
-                                     streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
-                                     m_builder.getInt32(format),                     // format
-                                     m_builder.getInt32(coherent.u32All)});          // auxiliary data
-        }
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, m_builder.getHalfTy(),
+                                  {m_builder.CreateExtractElement(outputValue, 2), // vdata
+                                   m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                   m_builder.CreateAdd(xfbOutputOffset,
+                                                       m_builder.getInt32(2 * sizeof(uint16_t))), // offset
+                                   streamOutOffsets[xfbOutputExport.xfbBuffer],                   // soffset
+                                   m_builder.getInt32(BUF_FORMAT_16_FLOAT),                       // format
+                                   m_builder.getInt32(coherent.u32All)});                         // auxiliary data
+      } else {
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
+                                  {outputValue,                                    // vdata
+                                   m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                   xfbOutputOffset,                                // offset
+                                   streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
+                                   m_builder.getInt32(format),                     // format
+                                   m_builder.getInt32(coherent.u32All)});          // auxiliary data
       }
     }
 
-    m_builder.CreateBr(endExportXfbOutputBlock);
+    if (i == possibleVertsPerPrim - 1) {
+      // Last vertex
+      m_builder.CreateBr(endExportXfbOutputBlock);
+    } else {
+      // Not last vertex, check if we need to export outputs of next vertex
+      auto exportNextVertex = m_builder.CreateICmpUGT(m_verticesPerPrimitive, m_builder.getInt32(i + 1));
+      m_builder.CreateCondBr(exportNextVertex, exportXfbOutputBlock[i + 1], endExportXfbOutputBlock);
+    }
   }
 
   // Construct ".endExportXfbOutput" block
@@ -6605,24 +6494,12 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
-  const unsigned waveCountInSubgroup = NggMaxThreadsPerSubgroup / waveSize;
 
   const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
-  const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
 
   bool bufferActive[MaxTransformFeedbackBuffers] = {};
-  unsigned firstActiveXfbBuffer = InvalidValue;
-  unsigned lastActiveXfbBuffer = InvalidValue;
-
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
     bufferActive[i] = xfbStrides[i] > 0;
-    if (!bufferActive[i])
-      continue; // Transform feedback buffer is inactive
-
-    if (firstActiveXfbBuffer == InvalidValue)
-      firstActiveXfbBuffer = i;
-    lastActiveXfbBuffer = i;
-  }
 
   unsigned firstActiveStream = InvalidValue;
   unsigned lastActiveStream = InvalidValue;
@@ -6636,31 +6513,18 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     lastActiveStream = i;
   }
 
-  unsigned xfbBufferToStream[MaxTransformFeedbackBuffers] = {};
-
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-    for (unsigned j = 0; j < MaxGsStreams; ++j) {
-      if ((streamXfbBuffers[j] & (1 << i)) != 0) {
-        // NOTE: According to GLSL spec, all outputs assigned to a given transform feedback buffer are required to
-        // come from a single vertex stream.
-        xfbBufferToStream[i] = j;
-        break;
-      }
-    }
-  }
-
   //
   // The processing is something like this:
   //
   // NGG_GS_XFB() {
-  //   if (threadIdInSubgroup < waveCount + 1)
+  //   if (threadIdInSubgroup < maxWaves + 1)
   //     Initialize per-wave and per-subgroup count of output primitives
   //   Barrier
   //
   //   if (threadIdInSubgroup < primCountInSubgroup)
   //     Check the draw flag of output primitives and compute draw mask
   //
-  //   if (threadIdInWave < waveCount - waveId)
+  //   if (threadIdInWave < maxWaves - waveId)
   //     Accumulate per-wave and per-subgroup count of output primitives
   //   Barrier
   //
@@ -6671,13 +6535,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   //
   //   Mutate copy shader to fetch XFB outputs
   //
-  //   if (threadIdInSubgroup == 0) {
-  //     Acquire the control of GDS_STRMOUT_DWORDS_WRITTEN_X
-  //     Calculate primsToWrite and dwordsToWrite
-  //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
-  //     Store GS XFB statistics info to LDS
-  //     Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
-  //   }
+  //   Prepare XFB and update its relevant counters
   //   Barrier
   //
   //   Read XFB statistics info from LDS
@@ -6723,14 +6581,8 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
   }
 
-  BasicBlock *prepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".prepareXfbExport");
-  prepareXfbExportBlock->moveAfter(insertPos);
-  BasicBlock *endPrepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".endPrepareXfbExport");
-  endPrepareXfbExportBlock->moveAfter(prepareXfbExportBlock);
-
   BasicBlock *exportXfbOutputBlock[MaxGsStreams] = {};
   BasicBlock *endExportXfbOutputBlock[MaxGsStreams] = {};
-  insertPos = endPrepareXfbExportBlock;
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
     if (m_pipelineState->isVertexStreamActive(i)) {
       exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInStream" + std::to_string(i));
@@ -6747,7 +6599,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   // Insert branching in current block to process transform feedback export
   {
     auto validWave =
-        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
+        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(m_maxWavesPerSubgroup + 1));
     m_builder.CreateCondBr(validWave, initPrimitiveCountsBlock, endInitPrimitiveCountsBlock);
   }
 
@@ -6758,7 +6610,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (m_pipelineState->isVertexStreamActive(i)) {
         writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup,
-                                PrimShaderLdsRegion::PrimitiveCounts, (NggMaxWavesPerSubgroup + 1) * i);
+                                PrimShaderLdsRegion::PrimitiveCounts, (m_maxWavesPerSubgroup + 1) * i);
       }
     }
 
@@ -6784,7 +6636,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
       if (m_pipelineState->isVertexStreamActive(i)) {
         // drawFlag = primData[N] != NullPrim
         auto primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                                 PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * i);
+                                                 PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * i);
         drawFlag[i] = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
       }
     }
@@ -6814,7 +6666,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         primCountInWave[i] = m_builder.CreateTrunc(primCountInWave[i], m_builder.getInt32Ty());
       }
     }
-    auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(waveCountInSubgroup), m_nggInputs.waveIdInSubgroup);
+    auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(m_maxWavesPerSubgroup), m_nggInputs.waveIdInSubgroup);
     auto validThread = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, threadIdUpbound);
 
     m_builder.CreateCondBr(validThread, accumPrimitiveCountsBlock, endAccumPrimitiveCountsBlock);
@@ -6831,8 +6683,8 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (m_pipelineState->isVertexStreamActive(i)) {
-        atomicAdd(primCountInWave[i],
-                  m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (NggMaxWavesPerSubgroup + 1) * i)));
+        atomicOp(AtomicRMWInst::Add, primCountInWave[i],
+                 m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (m_maxWavesPerSubgroup + 1) * i)));
       }
     }
 
@@ -6853,12 +6705,12 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       auto primCountInWaves =
           readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave,
-                                   PrimShaderLdsRegion::PrimitiveCounts, (NggMaxWavesPerSubgroup + 1) * i);
+                                   PrimShaderLdsRegion::PrimitiveCounts, (m_maxWavesPerSubgroup + 1) * i);
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output primitive count of
       // the entire subgroup
       primCountInSubgroup[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
-                                                         {primCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
+                                                         {primCountInWaves, m_builder.getInt32(m_maxWavesPerSubgroup)});
 
       // Get output primitive count for all waves prior to this wave
       primCountInPrevWaves[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
@@ -6893,7 +6745,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       compactedPrimitiveIndex = m_builder.CreateAdd(primCountInPrevWaves[i], compactedPrimitiveIndex);
       writePerThreadDataToLds(m_nggInputs.threadIdInSubgroup, compactedPrimitiveIndex,
-                              PrimShaderLdsRegion::PrimitiveIndexMap, NggMaxThreadsPerSubgroup * i);
+                              PrimShaderLdsRegion::PrimitiveIndexMap, m_maxThreadsPerSubgroup * i);
 
       m_builder.CreateBr(endCompactPrimitiveIndexBlock[i]);
     }
@@ -6906,9 +6758,6 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         // Start to fetch transform feedback outputs after we finish compacting primitive index of the last vertex
         // stream.
         fetchXfbOutput(m_gsHandlers.copyShader, args, xfbOutputExports);
-
-        auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
-        m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
       } else {
         unsigned nextActiveStream = i + 1;
         while (!m_pipelineState->isVertexStreamActive(nextActiveStream)) {
@@ -6922,141 +6771,10 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
   }
 
-  // Construct ".prepareXfbExport" block
-  {
-    m_builder.SetInsertPoint(prepareXfbExportBlock);
-
-    const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
-
-    Value *numPrimsToWrite[MaxGsStreams] = {};
-    for (unsigned i = 0; i < MaxGsStreams; ++i)
-      numPrimsToWrite[i] = primCountInSubgroup[i];
-
-    Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
-    Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
-
-    // Calculate numPrimsToWrite[N]
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (!bufferActive[i])
-        continue;
-
-      if (m_gfxIp.major <= 11) {
-        if (i == firstActiveXfbBuffer) {
-          // ds_ordered_count
-          dwordsWritten[i] = m_builder.CreateIntrinsic(
-              Intrinsic::amdgcn_ds_ordered_add, {},
-              {
-                  m_builder.CreateIntToPtr(m_nggInputs.orderedWaveId,
-                                           PointerType::get(m_builder.getInt32Ty(), ADDR_SPACE_REGION)), // m0
-                  m_builder.getInt32(0),                                                                 // value to add
-                  m_builder.getInt32(0),                                                                 // ordering
-                  m_builder.getInt32(0),                                                                 // scope
-                  m_builder.getFalse(),                                                                  // isVolatile
-                  m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
-                                     (1 << 24)), // ordered count index, [27:24] is dword count
-                  m_builder.getFalse(),          // wave release
-                  m_builder.getFalse(),          // wave done
-              });
-        } else {
-          // ds_add_gs_reg
-          dwordsWritten[i] =
-              m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
-                                        {m_builder.getInt32(0),                                         // value to add
-                                         m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
-        }
-      } else {
-        llvm_unreachable("Not implemented!");
-      }
-
-      // NUM_RECORDS = SQ_BUF_RSRC_WORD2
-      Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
-      // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
-      Value *bufferSizeInDwords = m_builder.CreateLShr(numRecords, 2);
-      // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
-      Value *dwordsRemaining =
-          m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(m_streamOutBufOffsets[i], dwordsWritten[i]));
-      dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
-                                                  {dwordsRemaining, m_builder.getInt32(0)});
-      // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
-      dwordsPerPrim[i] = m_builder.getInt32(outVertsPerPrim * xfbStrides[i] / sizeof(unsigned));
-      Value *primsCanWrite = m_builder.CreateUDiv(dwordsRemaining, dwordsPerPrim[i]);
-      numPrimsToWrite[xfbBufferToStream[i]] =
-          m_builder.CreateIntrinsic(Intrinsic::umin, numPrimsToWrite[xfbBufferToStream[i]]->getType(),
-                                    {numPrimsToWrite[xfbBufferToStream[i]], primsCanWrite});
-    }
-
-    // Increment dwordsWritten
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (!bufferActive[i])
-        continue;
-
-      Value *dwordsToWrite = m_builder.CreateMul(numPrimsToWrite[xfbBufferToStream[i]], dwordsPerPrim[i]);
-
-      if (m_gfxIp.major <= 11) {
-        if (i == lastActiveXfbBuffer) {
-          // ds_ordered_count, wave done
-          dwordsWritten[i] = m_builder.CreateIntrinsic(
-              Intrinsic::amdgcn_ds_ordered_add, {},
-              {
-                  m_builder.CreateIntToPtr(m_nggInputs.orderedWaveId,
-                                           PointerType::get(m_builder.getInt32Ty(), ADDR_SPACE_REGION)), // m0
-                  dwordsToWrite,                                                                         // value to add
-                  m_builder.getInt32(0),                                                                 // ordering
-                  m_builder.getInt32(0),                                                                 // scope
-                  m_builder.getFalse(),                                                                  // isVolatile
-                  m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
-                                     (1 << 24)), // ordered count index, [27:24] is dword count
-                  m_builder.getTrue(),           // wave release
-                  m_builder.getTrue(),           // wave done
-              });
-        } else {
-          // ds_add_gs_reg
-          dwordsWritten[i] =
-              m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, dwordsToWrite->getType(),
-                                        {dwordsToWrite,                                                 // value to add
-                                         m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
-        }
-      } else {
-        llvm_unreachable("Not implemented!");
-      }
-    }
-
-    // Store transform feedback statistics info to LDS and GDS
-    const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbStats);
-    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-      if (!bufferActive[i])
-        continue;
-
-      writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i));
-    }
-
-    for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (!m_pipelineState->isVertexStreamActive(i))
-        continue;
-
-      writeValueToLds(numPrimsToWrite[i], m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers + i));
-
-      if (m_gfxIp.major <= 11) {
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
-                                  {primCountInSubgroup[i],                                          // value to add
-                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
-
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite[i]->getType(),
-                                  {numPrimsToWrite[i],                                               // value to add
-                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
-      } else {
-        llvm_unreachable("Not implemented!");
-      }
-    }
-
-    m_builder.CreateBr(endPrepareXfbExportBlock);
-  }
-
-  // Construct ".endPrepareXfbExport" block
   Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
   Value *numPrimsToWrite[MaxGsStreams] = {};
   {
-    m_builder.SetInsertPoint(endPrepareXfbExportBlock);
+    prepareSwXfb(primCountInSubgroup);
 
     // We are going to read transform feedback statistics info from LDS. Make sure the info has been written before
     // this.
@@ -7098,7 +6816,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       Value *uncompactedPrimitiveIndex =
           readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                   PrimShaderLdsRegion::PrimitiveIndexMap, NggMaxThreadsPerSubgroup * i);
+                                   PrimShaderLdsRegion::PrimitiveIndexMap, m_maxThreadsPerSubgroup * i);
       Value *vertexIndex = uncompactedPrimitiveIndex;
 
       const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
@@ -7110,7 +6828,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         vertexIndices[2] = m_builder.CreateAdd(vertexIndex, m_builder.getInt32(2));
 
         Value *primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), uncompactedPrimitiveIndex,
-                                                   PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * i);
+                                                   PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * i);
         // NOTE: primData[N] corresponds to the forming vertex
         // The vertice indices in the first triangle <N, N+1, N+2>
         // If provoking vertex is the first one, the vertice indices in the second triangle is <N, N+2, N+1>, otherwise
@@ -7243,6 +6961,206 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
       }
     }
   }
+}
+
+// =====================================================================================================================
+// Prepare SW emulated transform feedback. Update various counter relevant to transform feedback, such as dwordsWritten,
+// primsNeed, and primsWritten.
+//
+// @param primCountInSubgroup : Number of primitives in subgroup for each vertex stream
+void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
+  assert(m_gfxIp.major >= 11); // Must be GFX11++
+
+  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+  bool bufferActive[MaxTransformFeedbackBuffers] = {};
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i)
+    bufferActive[i] = xfbStrides[i] > 0;
+
+  const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
+  unsigned xfbBufferToStream[MaxTransformFeedbackBuffers] = {};
+  if (m_hasGs) {
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      for (unsigned j = 0; j < MaxGsStreams; ++j) {
+        if ((streamXfbBuffers[j] & (1 << i)) != 0) {
+          // NOTE: According to GLSL spec, all outputs assigned to a given transform feedback buffer are required to
+          // come from a single vertex stream.
+          xfbBufferToStream[i] = j;
+          break;
+        }
+      }
+    }
+  }
+
+  // GFX11 SW emulated stream-out with GDS support
+  if (m_gfxIp.major == 11) {
+    //
+    // The processing is something like this:
+    //
+    // PREPARE_XFB() {
+    //   if (threadIdInSubgroup == 0) {
+    //     Acquire the control of GDS_STRMOUT_DWORDS_WRITTEN_X
+    //     Calculate primsToWrite and dwordsToWrite
+    //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
+    //     Store XFB statistics info to LDS
+    //     Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+    //   }
+    //
+    auto insertBlock = m_builder.GetInsertBlock();
+    auto primShader = insertBlock->getParent();
+
+    auto prepareXfbBlock = createBlock(primShader, ".prepareXfb");
+    prepareXfbBlock->moveAfter(insertBlock);
+
+    auto endPrepareXfbBlock = createBlock(primShader, ".endPrepareXfb");
+    endPrepareXfbBlock->moveAfter(prepareXfbBlock);
+
+    // Continue to construct insert block
+    {
+      auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+      m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbBlock, endPrepareXfbBlock);
+    }
+
+    // Construct ".prepareXfb" block
+    {
+      m_builder.SetInsertPoint(prepareXfbBlock);
+
+      unsigned firstActiveBuffer = InvalidValue;
+      unsigned lastActiveBuffer = InvalidValue;
+
+      for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+        if (!bufferActive[i])
+          continue; // Transform feedback buffer is inactive
+
+        if (firstActiveBuffer == InvalidValue)
+          firstActiveBuffer = i;
+        lastActiveBuffer = i;
+      }
+
+      Value *numPrimsToWrite[MaxGsStreams] = {};
+      for (unsigned i = 0; i < MaxGsStreams; ++i) {
+        if (m_pipelineState->isVertexStreamActive(i))
+          numPrimsToWrite[i] = primCountInSubgroup[i];
+      }
+
+      Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
+      Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
+
+      // Calculate numPrimsToWrite
+      for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+        if (!bufferActive[i])
+          continue;
+
+        if (i == firstActiveBuffer) {
+          // ds_ordered_count
+          dwordsWritten[i] = m_builder.CreateIntrinsic(
+              Intrinsic::amdgcn_ds_ordered_add, {},
+              {
+                  m_builder.CreateIntToPtr(m_nggInputs.orderedWaveId,
+                                           PointerType::get(m_builder.getInt32Ty(), ADDR_SPACE_REGION)), // m0
+                  m_builder.getInt32(0),                                                                 // value to add
+                  m_builder.getInt32(0),                                                                 // ordering
+                  m_builder.getInt32(0),                                                                 // scope
+                  m_builder.getFalse(),                                                                  // isVolatile
+                  m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
+                                     (1 << 24)), // ordered count index, [27:24] is dword count
+                  m_builder.getFalse(),          // wave release
+                  m_builder.getFalse(),          // wave done
+              });
+        } else {
+          // ds_add_gs_reg
+          dwordsWritten[i] =
+              m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
+                                        {m_builder.getInt32(0),                                         // value to add
+                                         m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+        }
+
+        // NUM_RECORDS = SQ_BUF_RSRC_WORD2
+        Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
+        // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
+        Value *bufferSizeInDwords = m_builder.CreateLShr(numRecords, 2);
+        // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
+        Value *dwordsRemaining =
+            m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(m_streamOutBufOffsets[i], dwordsWritten[i]));
+        dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
+                                                    {dwordsRemaining, m_builder.getInt32(0)});
+        // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
+        dwordsPerPrim[i] =
+            m_builder.CreateMul(m_verticesPerPrimitive, m_builder.getInt32(xfbStrides[i] / sizeof(unsigned)));
+        Value *primsCanWrite = m_builder.CreateUDiv(dwordsRemaining, dwordsPerPrim[i]);
+        numPrimsToWrite[xfbBufferToStream[i]] =
+            m_builder.CreateIntrinsic(Intrinsic::umin, numPrimsToWrite[xfbBufferToStream[i]]->getType(),
+                                      {numPrimsToWrite[xfbBufferToStream[i]], primsCanWrite});
+      }
+
+      // Increment dwordsWritten
+      for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+        if (!bufferActive[i])
+          continue;
+
+        Value *dwordsToWrite = m_builder.CreateMul(numPrimsToWrite[xfbBufferToStream[i]], dwordsPerPrim[i]);
+
+        if (i == lastActiveBuffer) {
+          // ds_ordered_count, wave done
+          dwordsWritten[i] = m_builder.CreateIntrinsic(
+              Intrinsic::amdgcn_ds_ordered_add, {},
+              {
+                  m_builder.CreateIntToPtr(m_nggInputs.orderedWaveId,
+                                           PointerType::get(m_builder.getInt32Ty(), ADDR_SPACE_REGION)), // m0
+                  dwordsToWrite,                                                                         // value to add
+                  m_builder.getInt32(0),                                                                 // ordering
+                  m_builder.getInt32(0),                                                                 // scope
+                  m_builder.getFalse(),                                                                  // isVolatile
+                  m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) |
+                                     (1 << 24)), // ordered count index, [27:24] is dword count
+                  m_builder.getTrue(),           // wave release
+                  m_builder.getTrue(),           // wave done
+              });
+        } else {
+          // ds_add_gs_reg
+          dwordsWritten[i] =
+              m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, dwordsToWrite->getType(),
+                                        {dwordsToWrite,                                                 // value to add
+                                         m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+        }
+      }
+
+      // Store transform feedback statistics info to LDS and GDS
+      const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbStats);
+      for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+        if (!bufferActive[i])
+          continue;
+
+        writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i));
+      }
+
+      for (unsigned i = 0; i < MaxGsStreams; ++i) {
+        if (!m_pipelineState->isVertexStreamActive(i))
+          continue;
+
+        writeValueToLds(numPrimsToWrite[i], m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers + i));
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
+                                  {primCountInSubgroup[i],                                          // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite[i]->getType(),
+                                  {numPrimsToWrite[i],                                               // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
+      }
+
+      m_builder.CreateBr(endPrepareXfbBlock);
+    }
+
+    // Construct ".endPrepareXfb" block
+    {
+      m_builder.SetInsertPoint(endPrepareXfbBlock);
+      // Nothing to do
+    }
+
+    return;
+  }
+
+  llvm_unreachable("Not implemented!");
 }
 
 // =====================================================================================================================
@@ -7684,7 +7602,7 @@ void NggPrimShader::collectPrimitiveStats() {
       if (m_pipelineState->isVertexStreamActive(i)) {
         // drawFlag = primData[N] != NullPrim
         auto primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                                 PrimShaderLdsRegion::PrimitiveData, NggMaxThreadsPerSubgroup * i);
+                                                 PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * i);
         drawFlag[i] = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
       }
     }
@@ -7726,9 +7644,8 @@ void NggPrimShader::collectPrimitiveStats() {
     unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::PrimitiveCounts);
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (m_pipelineState->isVertexStreamActive(i)) {
-        atomicAdd(primCountInWave[i], m_builder.getInt32(regionStart + i));
-      }
+      if (m_pipelineState->isVertexStreamActive(i))
+        atomicOp(AtomicRMWInst::Add, primCountInWave[i], m_builder.getInt32(regionStart + i));
     }
 
     m_builder.CreateBr(endCountPrimitivesBlock);
@@ -8035,18 +7952,19 @@ void NggPrimShader::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
 }
 
 // =====================================================================================================================
-// Do atomic add operation with the value stored in LDS.
+// Do atomic operation with the value stored in LDS.
 //
-// @param valueToAdd : Value to do atomic add
+// @param atomicOp : Atomic operation
+// @param value : Value to do atomic operation
 // @param ldsOffset : Start offset to do LDS atomic operations (in dwords)
-void NggPrimShader::atomicAdd(Value *ValueToAdd, Value *ldsOffset) {
-  assert(ValueToAdd->getType()->isIntegerTy(32));
+void NggPrimShader::atomicOp(AtomicRMWInst::BinOp atomicOp, Value *value, Value *ldsOffset) {
+  assert(value->getType()->isIntegerTy(32));
 
   Value *atomicPtr = m_builder.CreateGEP(m_builder.getInt32Ty(), m_lds, ldsOffset);
 
   SyncScope::ID syncScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
-  m_builder.CreateAtomicRMW(AtomicRMWInst::BinOp::Add, atomicPtr, ValueToAdd, MaybeAlign(),
-                            AtomicOrdering::SequentiallyConsistent, syncScope);
+  m_builder.CreateAtomicRMW(atomicOp, atomicPtr, value, MaybeAlign(), AtomicOrdering::SequentiallyConsistent,
+                            syncScope);
 }
 
 // =====================================================================================================================

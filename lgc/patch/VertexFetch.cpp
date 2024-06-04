@@ -1786,7 +1786,7 @@ std::pair<Value *, Value *> VertexFetchImpl::convertSrdToOffsetMode(Value *vbDes
   // Stride is from the third DWORD.
   auto srdStride = builder.CreateExtractElement(vbDesc, 3);
 
-  SqBufRsrcWord3 sqBufRsrcWord3;
+  SqBufRsrcWord3 sqBufRsrcWord3 = {};
   sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
   sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
   sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;

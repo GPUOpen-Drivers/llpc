@@ -133,6 +133,7 @@ struct PrimShaderCbLayout {
 };
 
 /// Constant buffer used by SW stream-out processing (GFX11+).
+
 struct StreamOutControlCb {
   unsigned bufOffsets[MaxTransformFeedbackBuffers];
 };

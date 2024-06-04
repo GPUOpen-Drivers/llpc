@@ -88,6 +88,12 @@ public:
   llvm::CallInst *CreateNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                                   llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, const llvm::Twine &instName = "");
 
+  // Create code to build a vector out of a number of scalar elements of the same type.
+  llvm::Value *CreateBuildVector(llvm::ArrayRef<llvm::Value *> elements, const llvm::Twine &instName = "");
+
+  // Create an "if..endif" or "if..else..endif" structure.
+  llvm::BranchInst *CreateIf(llvm::Value *condition, bool wantElse, const llvm::Twine &instName = "");
+
   // =====================================================================================================================
   // Create alloca for given input type.
   //
@@ -107,131 +113,6 @@ public:
 
   // Get the LGC type of a cooperative matrix with the given element type and layout.
   llvm::Type *getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
-
-  // Determine the "length" of a cooperative matrix for purposes of extract/insert operations.
-  llvm::Value *CreateCooperativeMatrixLength(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                             const llvm::Twine &instName = "");
-
-  // Create an "extractelement"-equivalent operation for a cooperative matrix value.
-  llvm::Value *CreateCooperativeMatrixExtract(llvm::Value *matrix, llvm::Value *index,
-                                              CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                              const llvm::Twine &instName = "");
-
-  // Create an "insertelement"-equivalent operation for a cooperative matrix value.
-  llvm::Value *CreateCooperativeMatrixInsert(llvm::Value *matrix, llvm::Value *value, llvm::Value *index,
-                                             CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                             const llvm::Twine &instName = "");
-
-  // Create an "fill"-equaivalent operation for a cooperative matrix value.
-  llvm::Value *CreateCooperativeMatrixFill(llvm::Value *value, CooperativeMatrixElementType elemType,
-                                           CooperativeMatrixLayout layout, const llvm::Twine &instName = "");
-
-  // Create cooperative matrix load.
-  //
-  // @param pointer : The pointer to a data array.
-  // @param stride : The number of bytes in memory between the first component of consecutive rows (or
-  // columns) in the result.
-  // @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
-  // @param layout : Identify it's factor or accumulator
-  // @param memoryAccess : Parsed from Memory operands in SPIRV-reader
-  // @param alignment : Alignment for memory operation.
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateCooperativeMatrixLoad(llvm::Value *pointer, llvm::Value *stride, bool colMajor,
-                                           CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                           unsigned memoryAccess, llvm::Align alignment,
-                                           const llvm::Twine &instName = "");
-
-  // Create cooperative matrix store.
-  //
-  // @param pointer : The pointer to a data array.
-  // @param matrix : The cooperative matrix to store.
-  // @param stride : The number of bytes in memory between the first component of consecutive rows (or
-  // columns) in the result.
-  // @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
-  // @param layout : Identify it's factor or accumulator
-  // @param memoryAccess : Parsed from Memory operands in SPIRV-reader
-  // @param alignment : Alignment for memory operation.
-  // @param instName : Name to give instruction(s).
-  llvm::Value *CreateCooperativeMatrixStore(llvm::Value *pointer, llvm::Value *matrix, llvm::Value *stride,
-                                            bool colMajor, CooperativeMatrixElementType elemType,
-                                            CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                            llvm::Align alignment, const llvm::Twine &instName = "");
-
-  // Create cooperative matrix conversion.
-  // @param opCode : The convert opCode.
-  // @param source : The source cooperative matrix.
-  // @param dest : The conversion target.
-  // @param instName : Name to give instruction(s).
-  llvm::CallInst *CreateCooperativeMatrixConvert(llvm::CastInst::CastOps opCode, llvm::Value *source,
-                                                 CooperativeMatrixElementType srcElemType,
-                                                 CooperativeMatrixElementType dstElemType,
-                                                 CooperativeMatrixLayout srcLayout, CooperativeMatrixLayout dstLayout,
-                                                 const llvm::Twine &instName = "");
-
-  // Create cooperative matrix binary operation
-  //
-  // @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
-  // @param operand1 : The first operand.
-  // @param operand2 : The second operand.
-  // @param instName : Name to give instruction(s).
-  llvm::Value *CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, llvm::Value *lhs,
-                                               llvm::Value *rhs, CooperativeMatrixElementType elemType,
-                                               CooperativeMatrixLayout layout, const llvm::Twine &instName = "");
-
-  // Create cooperative MatrixTimesScalar binary operation
-  //
-  // @param matrix : It should be cooperative matrix.
-  // @param scalar : It should be scalar type. If the matrix is a packed
-  // accumulator matrix, the scalar has to be a <2 x half> vector.
-  // @param elemType : Name to give instruction(s).
-  // @param layout : Identify A/B matrices or C/D matrices.
-  llvm::Value *CreateCoopMatrixTimesScalar(llvm::Value *matrix, llvm::Value *scalar,
-                                           CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                           const llvm::Twine &instName = "");
-
-  // =====================================================================================================================
-  // Create cooperative matrix transpose operation
-  //
-  // @param matrix : The first operand and it should be a cooperative matrix.
-  // @param elemType : The component type of the matrix.
-  // @param srcLayout : Identify whether it's A/B or C/D
-  llvm::CallInst *CreateCooperativeMatrixTranspose(llvm::Value *matrix, CooperativeMatrixElementType elemType,
-                                                   CooperativeMatrixLayout srcLayout, const llvm::Twine &instName = "");
-
-  // Create cooperative matrix muladd operation
-  // @param coopMatrixa : Factor cooperative matrix.
-  // @param coopMatrixb : Factor cooperative matrix.
-  // @param coopMatrixc : Accumulator cooperative matrix.
-  // @param isSignedA : Identify the signess for matrix A's element type
-  // @param isSignedB : Identify the signess for matrix B's element type
-  // @param isSatOrOpsel : SaturatingAccumulation for calculation. In the
-  // case of 16-bit floating point matrices, this bit acts as an opsel bit. If
-  // it is set to false, we store the result in the lower half of the registers.
-  // If it is true, we store it in the upper half.
-  // @param isTied : If true, the output matrix has to be the same as the
-  // input accumulator (i.e., D has to be C)
-  // @param accumElemType : The component type of the matrix c
-  // @param factorElemType : The component type of the matrix a
-  llvm::Value *CreateCooperativeMatrixMulAdd(llvm::Value *coopMatrixa, llvm::Value *coopMatrixb,
-                                             llvm::Value *coopMatrixc, bool isSignedA, bool isSignedB,
-                                             bool isSatOrOpsel, bool isTied, CooperativeMatrixElementType accumElemType,
-                                             CooperativeMatrixElementType factorElemType,
-                                             const llvm::Twine &instName = "");
-
-  // =====================================================================================================================
-  // Create cooperative matrix pack operation
-  //
-  // @param matrixCLo : Lower Accumulator cooperative matrix.
-  // @param matrixCHi : Upper Accumulator cooperative matrix.
-  llvm::Value *CreateCooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi,
-                                           const llvm::Twine &instName = "");
-
-  // =====================================================================================================================
-  // Create cooperative matrix unpack operation
-  //
-  // @param packedMatrix : Packed Accumulator cooperative matrices.
-  // @param high: Whether to get the matrix stored in the upper half of the registers.
-  llvm::Value *CreateCooperativeMatrixUnpack(llvm::Value *packedMatrix, bool high, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

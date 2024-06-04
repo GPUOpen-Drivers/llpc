@@ -167,9 +167,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
         auto *continuationRef = builder.CreatePtrToInt(called, IntegerType::get(context, 32));
         CpsLevel calleeLevel =
             getCpsLevelFromRtStage(mdconst::extract<ConstantInt>(calleeStage->getOperand(0))->getSExtValue());
-        // RayGen level is zero, so it does not need a logic OR here.
-        if (calleeLevel != CpsLevel::RayGen)
-          continuationRef = builder.CreateOr(continuationRef, builder.getInt32((uint32_t)calleeLevel));
+        continuationRef = builder.CreateOr(continuationRef, builder.getInt32((uint32_t)calleeLevel));
 
         // Always put a shader-index.
         SmallVector<Value *> tailArgs = {PoisonValue::get(builder.getInt32Ty())};

@@ -126,6 +126,7 @@ static constexpr char String[] = ".string";
 static constexpr char Name[] = ".name";
 static constexpr char Type[] = ".type";
 static constexpr char InternalPipelineHash[] = ".internal_pipeline_hash";
+static constexpr char ResourceHash[] = ".resource_hash";
 static constexpr char XglCacheInfo[] = ".xgl_cache_info";
 static constexpr char CacheHash128Bits[] = ".128_bit_cache_hash";
 static constexpr char LlpcVersion[] = ".llpc_version";
@@ -187,6 +188,7 @@ static constexpr char ShaderSpillThreshold[] = ".shader_spill_threshold";
 namespace ShaderMetadataKey {
 static constexpr char ApiShaderHash[] = ".api_shader_hash";
 static constexpr char HardwareMapping[] = ".hardware_mapping";
+static constexpr char ShaderSubtype[] = ".shader_subtype";
 }; // namespace ShaderMetadataKey
 
 namespace ComputeRegisterMetadataKey {
@@ -589,6 +591,9 @@ enum class UserDataMapping : unsigned {
 
   DynamicDualSrcBlendInfo =
       0x10000022, // Dual source blend dynamic info, dynamicStateHasChange + dsBlendDynamicEnable Pattern
+
+  CompositeData = 0x10000023, // sample info + DynamicDualSrcBlendInfo + topology, this will replace the two
+                              // userdata above.
 
   // Values used in a user data PAL metadata register to be resolved at link time.
   // This is part of the "unlinked" ABI, so should arguably be in AbiUnlinked.h.

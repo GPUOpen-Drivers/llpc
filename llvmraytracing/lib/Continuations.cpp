@@ -32,10 +32,11 @@
 #include "llvmraytracing/Continuations.h"
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm-dialects/Dialect/OpSet.h"
-#include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "llvm/ADT/IntervalTree.h"
@@ -99,6 +100,19 @@ const llvm_dialects::OpMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {{
 }};
 
 #undef GPURTMAP_ENTRY
+
+void llvm::replaceCallsToFunction(Function &F, Value &Replacement) {
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    // Basic sanity check. We should also check for dominance.
+    assert((!isa<Instruction>(&Replacement) ||
+            cast<Instruction>(&Replacement)->getFunction() ==
+                CInst.getFunction()) &&
+           "llvm::replaceCallsToFunction: Replacement should "
+           "reside in the same function as CallInst to replace!");
+    CInst.replaceAllUsesWith(&Replacement);
+    CInst.eraseFromParent();
+  });
+}
 
 bool llvm::isLgcRtOp(const llvm::Function *F) {
   return F && F->getName().starts_with("lgc.rt");
@@ -180,12 +194,10 @@ Type *ContHelper::getPaddingType(const DataLayout &DL, LLVMContext &Context,
 
   assert(DwordsOccupied <= TargetNumDwords);
   unsigned DwordsRemaining = TargetNumDwords - DwordsOccupied;
-  if (DwordsRemaining > 0) {
-    auto I32 = Type::getInt32Ty(Context);
-    return ArrayType::get(I32, DwordsRemaining);
-  } else {
-    return StructType::get(Context);
-  }
+  if (DwordsRemaining > 0)
+    return ArrayType::get(Type::getInt32Ty(Context), DwordsRemaining);
+
+  return StructType::get(Context);
 }
 
 void ContHelper::addPaddingType(const DataLayout &DL, LLVMContext &Context,
@@ -608,11 +620,10 @@ DialectContextAnalysis::Result
 DialectContextAnalysis::run(llvm::Module &M,
                             llvm::ModuleAnalysisManager &AnalysisManager) {
   if (NeedDialectContext) {
-    Context =
-        llvm_dialects::DialectContext::make<continuations::ContinuationsDialect,
-                                            lgc::rt::LgcRtDialect,
-                                            lgc::cps::LgcCpsDialect>(
-            M.getContext());
+    Context = llvm_dialects::DialectContext::make<lgc::ilcps::LgcIlCpsDialect,
+                                                  lgc::rt::LgcRtDialect,
+                                                  lgc::cps::LgcCpsDialect>(
+        M.getContext());
   }
   return DialectContextAnalysis::Result();
 }
@@ -955,15 +966,15 @@ static void replaceEnqueueIntrinsic(Function &F, Function *NewFunc) {
   for (auto &Use : make_early_inc_range(F.uses())) {
     if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
       if (CInst->isCallee(&Use)) {
-        IRBuilder<> B(CInst);
+        llvm_dialects::Builder B(CInst);
         SmallVector<Value *> Args(CInst->args());
         bool IsEnqueue = F.getName().contains("Enqueue");
         // Add the current function as return address to the call.
         // Used when Traversal calls AnyHit or Intersection.
         if (IsEnqueue && F.getName().contains("EnqueueCall")) {
           bool HasWaitMask = F.getName().contains("WaitEnqueue");
-          auto *RetAddr =
-              B.CreatePtrToInt(CInst->getFunction(), B.getInt64Ty());
+          auto *RetAddr = B.create<lgc::cps::AsContinuationReferenceOp>(
+              B.getInt64Ty(), CInst->getFunction());
           Args.insert(Args.begin() + (HasWaitMask ? 3 : 2), RetAddr);
         }
 
@@ -983,10 +994,7 @@ static void handleContinuationStackIsGlobal(Function &Func,
   auto *IsGlobal = ConstantInt::getBool(
       Func.getContext(), StackAddrspace == ContStackAddrspace::Global);
 
-  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst.replaceAllUsesWith(IsGlobal);
-    CInst.eraseFromParent();
-  });
+  llvm::replaceCallsToFunction(Func, *IsGlobal);
 }
 
 static void handleContinuationsGetFlags(Function &Func, uint32_t Flags) {
@@ -997,10 +1005,7 @@ static void handleContinuationsGetFlags(Function &Func, uint32_t Flags) {
   auto *FlagsConst =
       ConstantInt::get(IntegerType::get(Func.getContext(), 32), Flags);
 
-  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst.replaceAllUsesWith(FlagsConst);
-    CInst.eraseFromParent();
-  });
+  llvm::replaceCallsToFunction(Func, *FlagsConst);
 }
 
 static void handleGetRtip(Function &Func, uint32_t RtipLevel) {
@@ -1034,7 +1039,7 @@ static void handleGetUninitialized(Function &Func) {
   });
 }
 
-static void handleGetSetting(Function &F, ArrayRef<ContSetting> Settings) {
+void ContHelper::handleGetSetting(Function &F, ArrayRef<ContSetting> Settings) {
   auto *Ty = dyn_cast<IntegerType>(F.getReturnType());
   if (!Ty)
     report_fatal_error(Twine("Only integer settings are supported but '") +
@@ -1071,10 +1076,7 @@ static void handleGetSetting(Function &F, ArrayRef<ContSetting> Settings) {
 
   auto *Val = ConstantInt::get(Ty, Value);
 
-  forEachCall(F, [&](CallInst &Call) {
-    Call.replaceAllUsesWith(Val);
-    Call.eraseFromParent();
-  });
+  replaceCallsToFunction(F, *Val);
 }
 
 void llvm::terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall) {
@@ -1098,7 +1100,7 @@ void llvm::terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall) {
          "terminateShader: Invalid terminator instruction provided!");
 
   // If there is some code after the call to _AmdComplete or the intended
-  // continuation.return that aborts the shader, do the following:
+  // lgc.ilcps.return that aborts the shader, do the following:
   // - Split everything after the completion call into a separate block
   // - Remove the newly inserted unconditional branch to the split block
   // - Remove the complete call.
@@ -1158,7 +1160,7 @@ bool llvm::earlyDriverTransform(Module &M) {
       handleGetUninitialized(F);
     } else if (Name.starts_with("_AmdGetSetting")) {
       Changed = true;
-      handleGetSetting(F, GpurtSettings);
+      ContHelper::handleGetSetting(F, GpurtSettings);
     }
   }
 

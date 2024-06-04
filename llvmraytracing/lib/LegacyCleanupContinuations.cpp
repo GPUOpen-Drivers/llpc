@@ -38,10 +38,10 @@
 
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -61,7 +61,7 @@ public:
   LegacyCleanupContinuationsPassImpl(
       llvm::Module &Mod, llvm::ModuleAnalysisManager &AnalysisManager);
 
-  llvm::PreservedAnalyses run();
+  PreservedAnalyses run();
 
 private:
   struct ContinuationData {
@@ -94,7 +94,7 @@ private:
   void handleContinue(ContinuationData &Data, Instruction *Ret);
   void handleSingleContinue(ContinuationData &Data, CallInst *Call,
                             Value *ResumeFun);
-  void handleReturn(ContinuationData &Data, CallInst *ContRet);
+  void handleReturn(ContinuationData &Data, lgc::ilcps::ReturnOp &ContRet);
 
   Module &M;
   LLVMContext &Context;
@@ -252,8 +252,8 @@ uint32_t getIncomingRegisterCount(Function *ResumeFunc) {
   std::optional<uint32_t> RegCount;
   while (!Worklist.empty()) {
     auto *U = Worklist.pop_back_val();
-    if (auto *Const = dyn_cast<Constant>(U)) {
-      Worklist.append(Const->user_begin(), Const->user_end());
+    if (isa<Constant>(U) || isa<lgc::cps::AsContinuationReferenceOp>(U)) {
+      Worklist.append(U->user_begin(), U->user_end());
       continue;
     }
     assert(isa<CallInst>(U) &&
@@ -369,9 +369,13 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
     } else {
       B.SetInsertPoint(&*F->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
 
-      // Find arguments from continuation.returnvalue calls
+      AllArgTypes.push_back(
+          B.getInt64Ty()); // Dummy return address for resume functions
+      AllArgValues.push_back(nullptr);
+
+      // Find arguments from lgc.ilcps.getreturnvalue calls
       for (auto &I : F->getEntryBlock()) {
-        if (auto *Intr = dyn_cast<continuations::GetReturnValueOp>(&I)) {
+        if (auto *Intr = dyn_cast<lgc::ilcps::GetReturnValueOp>(&I)) {
           AllArgTypes.push_back(Intr->getType());
           AllArgValues.push_back(Intr);
           InstsToRemove.push_back(Intr);
@@ -410,14 +414,18 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
     llvm::moveFunctionBody(*F, *NewFunc);
 
     // Set arg names for new function
+    // Skip the dummy return address for non-start functions
     for (unsigned Idx = 0; Idx != NewFunc->getFunctionType()->params().size();
          ++Idx) {
-      Argument *Arg = NewFunc->getArg(Idx);
       Value *OldVal = AllArgValues[Idx];
-      if (OldVal) {
-        Arg->setName(OldVal->getName());
-        OldVal->replaceAllUsesWith(Arg);
-      }
+      // Skip the dummy return address.
+      if (!OldVal)
+        continue;
+
+      Argument *Arg = NewFunc->getArg(Idx);
+      Arg->setName(OldVal->getName());
+      OldVal->replaceAllUsesWith(Arg);
+
       if (IsStart) {
         Argument *OldArg = F->getArg(Idx);
         if (OldArg->hasInRegAttr())
@@ -465,8 +473,8 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
       } else if (I->getOpcode() == Instruction::Unreachable) {
         if (auto *Call = dyn_cast<CallInst>(--I->getIterator())) {
           if (auto *Called = Call->getCalledFunction()) {
-            if (Called->getName() == "continuation.return")
-              handleReturn(FuncData, Call);
+            if (auto *ContRet = dyn_cast<lgc::ilcps::ReturnOp>(Call))
+              handleReturn(FuncData, *ContRet);
           }
         }
       }
@@ -587,7 +595,8 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(
   // Pass resume address as argument
   B.SetInsertPoint(Call);
 
-  auto *ReturnAddrInt = B.CreatePtrToInt(ResumeFun, I64);
+  auto *ContinuationReference =
+      B.create<lgc::cps::AsContinuationReferenceOp>(I64, ResumeFun);
 
   bool IsWait = ContHelper::isWaitAwaitCall(*Call);
   Function *ContinueFunction = IsWait ? WaitContinue : Continue;
@@ -598,7 +607,8 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(
   // The wait mask is the first argument after the function pointer
   if (IsWait)
     Args.push_back(*Call->arg_begin());
-  Args.push_back(ReturnAddrInt);
+  Args.push_back(ContinuationReference);
+
   Args.append(Call->arg_begin() + (IsWait ? 1 : 0), Call->arg_end());
   auto *ContinueCall = B.CreateCall(ContinueFunction, Args);
 
@@ -620,39 +630,41 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(
 }
 
 /// Transform
-///   call void (i64, ...) @continuation.return(i64 %returnaddr, <return value>)
-///   unreachable
+///   call void (i64, ...) @lgc.ilcps.return(i64 %returnaddr, <return
+///   value>) unreachable
 /// to
 ///   <decrement CSP>
 ///   call void @continuation.continue(i64 %returnaddr, <return value>)
 ///   unreachable
-void LegacyCleanupContinuationsPassImpl::handleReturn(ContinuationData &Data,
-                                                      CallInst *ContRet) {
-  LLVM_DEBUG(dbgs() << "Converting return to continue: " << *ContRet << "\n");
-  bool IsEntry = isa<UndefValue>(ContRet->getArgOperand(0));
-  B.SetInsertPoint(ContRet);
+void LegacyCleanupContinuationsPassImpl::handleReturn(
+    ContinuationData &Data, lgc::ilcps::ReturnOp &ContRet) {
+  LLVM_DEBUG(dbgs() << "Converting return to continue: " << ContRet << "\n");
+  bool IsEntry = isa<UndefValue>(ContRet.getReturnAddr());
+  B.SetInsertPoint(&ContRet);
 
   uint32_t NeededStackSize = Data.getContStateStackBytes();
   if (NeededStackSize > 0)
     B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
 
   if (IsEntry) {
-    assert(ContRet->arg_size() == 1 &&
+    assert(ContRet.getArgs().empty() &&
            "Entry functions ignore the return value");
 
-    llvm::terminateShader(B, ContRet);
+    llvm::terminateShader(B, &ContRet);
   } else {
     // Create the call to continuation.continue, but with the same argument list
-    // as for continuation.return. The CSP is appended during
+    // as for lgc.ilcps.return. The CSP is appended during
     // DXILContPostProcess.
-    SmallVector<Value *> Args(ContRet->args());
+    // Append the dummy return address as well.
+    SmallVector<Value *> Args(ContRet.args());
+    Args.insert(Args.begin() + 1, PoisonValue::get(B.getInt64Ty()));
     auto *ContinueCall = B.CreateCall(Continue, Args);
     Data.NewReturnContinues.push_back(ContinueCall);
 
-    ContinueCall->copyMetadata(*ContRet);
+    ContinueCall->copyMetadata(ContRet);
     assert(ContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
            "Missing registercount metadata!");
-    ContRet->eraseFromParent();
+    ContRet.eraseFromParent();
   }
 }
 
@@ -667,7 +679,7 @@ LegacyCleanupContinuationsPassImpl::LegacyCleanupContinuationsPassImpl(
   ContFree = M.getFunction("continuation.free");
 }
 
-llvm::PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
+PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
   bool Changed = false;
 
   // Map the entry function of a continuation to the analysis result
@@ -676,14 +688,18 @@ llvm::PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
       continue;
     if (auto *MD = F.getMetadata(ContHelper::MDContinuationName)) {
       analyzeContinuation(F, MD);
-    } else if (lgc::rt::getLgcRtShaderStage(&F) ==
-               lgc::rt::RayTracingShaderStage::Traversal) {
-      Changed = true;
-      // Add !continuation metadata to Traversal after coroutine passes.
-      // The traversal loop is written as like the coroutine passes were applied
-      // manually.
-      MDTuple *ContMDTuple = MDTuple::get(Context, {ValueAsMetadata::get(&F)});
-      F.setMetadata(ContHelper::MDContinuationName, ContMDTuple);
+    } else {
+      auto ShaderStage = lgc::rt::getLgcRtShaderStage(&F);
+      if (ShaderStage == lgc::rt::RayTracingShaderStage::Traversal ||
+          ShaderStage == lgc::rt::RayTracingShaderStage::KernelEntry) {
+        Changed = true;
+        // Add !continuation metadata to KernelEntry and Traversal after
+        // coroutine passes. The traversal loop is written as like the coroutine
+        // passes were applied manually.
+        MDTuple *ContMDTuple =
+            MDTuple::get(Context, {ValueAsMetadata::get(&F)});
+        F.setMetadata(ContHelper::MDContinuationName, ContMDTuple);
+      }
     }
   }
 
@@ -707,9 +723,7 @@ llvm::PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
     fixupDxilMetadata(M);
   }
 
-  if (Changed)
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
+  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 } // namespace

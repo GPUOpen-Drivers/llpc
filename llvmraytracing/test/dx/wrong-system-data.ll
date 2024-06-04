@@ -1,8 +1,8 @@
-; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,remove-types-metadata' -S %s 2>&1 | FileCheck %s
+; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: Invalid system data struct: Did not contain the needed struct type
 
-target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
+target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
 %dx.types.Handle = type { i8* }
 %struct.TraversalData = type { %struct.SystemData }
@@ -42,6 +42,10 @@ declare !types !37 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %st
 declare !types !38 i1 @_cont_IsEndSearch(%struct.TraversalData*) #0
 
 declare !types !39 i32 @_cont_HitKind(%struct.SystemData*) #0
+
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+  ret void
+}
 
 define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, float %6, float %7, float %8, float %9, float %10, float %11, float %12, float %13) #0 !types !40 {
   %sys_data = insertvalue %struct.SystemData undef, i32 1, 0

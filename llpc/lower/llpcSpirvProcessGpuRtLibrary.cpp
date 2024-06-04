@@ -102,6 +102,7 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
 #endif
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ShaderMarker"] = &SpirvProcessGpuRtLibrary::createShaderMarker;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_WaveScan"] = &SpirvProcessGpuRtLibrary::createWaveScan;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
       &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
   m_libFuncPtrs["AmdExtDispatchThreadIdFlat"] = &SpirvProcessGpuRtLibrary::createDispatchThreadIdFlat;
@@ -217,6 +218,17 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   } else if (funcName.starts_with("_AmdRestoreSystemData")) {
     // We don't need this, leave it as dummy function so that it does nothing.
     return;
+  } else if (funcName.starts_with("_AmdGetSetting")) {
+    auto rtContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+    SmallVector<ContSetting> contSettings;
+    for (unsigned i = 0; i < rtContext->getRayTracingPipelineBuildInfo()->gpurtOptionCount; i++) {
+      ContSetting setting;
+      setting.NameHash = rtContext->getRayTracingPipelineBuildInfo()->pGpurtOptions[i].nameHash;
+      setting.Value = rtContext->getRayTracingPipelineBuildInfo()->pGpurtOptions[i].value;
+      contSettings.push_back(setting);
+    }
+    ContHelper::handleGetSetting(*func, contSettings);
+    return;
   }
 
   // Create implementation for intrinsic functions.
@@ -239,7 +251,11 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   }
 
   bool isAmdAwaitLike = funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait");
-  if (funcName.starts_with("_cont_") || funcName.starts_with("_Amd")) {
+  // NOTE: GPURT now preserves all function names started with "_Amd", but some of them are not intrinsics, e.g.,
+  // "_AmdSystemData.IsTraversal", which are methods of system data structs. Skip those to let them be inlined
+  // automatically.
+  bool isAmdIntrinsic = funcName.starts_with("_Amd") && !funcName.contains(".");
+  if (funcName.starts_with("_cont_") || isAmdIntrinsic) {
     func->setLinkage(GlobalValue::WeakAnyLinkage);
 
     // Skip _AmdAwaitTraversal function resulting from calls to _AmdWaitAwaitTraversal.
@@ -341,7 +357,7 @@ void SpirvProcessGpuRtLibrary::createGetStackStride(Function *func) {
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsStackInit(Function *func) {
-  m_builder->CreateRet(m_builder->create<GpurtLdsStackInitOp>());
+  m_builder->CreateRet(m_builder->create<GpurtLdsStackInitOp>(false));
 }
 
 // =====================================================================================================================
@@ -363,10 +379,14 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(llvm::Function *func) 
 void SpirvProcessGpuRtLibrary::createLdsStackStore(Function *func) {
   auto argIt = func->arg_begin();
   Value *stackAddr = argIt++;
+  Value *stackAddrPos = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
   Value *lastVisited = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
   auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
   Value *data = m_builder->CreateLoad(int32x4Ty, argIt);
-  m_builder->CreateRet(m_builder->create<GpurtLdsStackStoreOp>(stackAddr, lastVisited, data));
+  auto ret = m_builder->create<GpurtLdsStackStoreOp>(stackAddrPos, lastVisited, data);
+  Value *newStackPos = m_builder->CreateExtractValue(ret, 1);
+  m_builder->CreateStore(newStackPos, stackAddr);
+  m_builder->CreateRet(m_builder->CreateExtractValue(ret, 0));
 }
 
 // =====================================================================================================================
@@ -909,18 +929,12 @@ void SpirvProcessGpuRtLibrary::createEnqueue(Function *func) {
   Value *addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
 
   SmallVector<Value *> tailArgs;
-  // _AmdEnqueueTraversal and _AmdWaitEnqueueRayGen do not have return-address.
-  bool hasRetAddrArg = !funcName.contains("RayGen") && !funcName.contains("Traversal");
   bool hasWaitMaskArg = funcName.contains("Wait");
-  if (hasRetAddrArg) {
-    // Skip waitMask
-    unsigned retAddrArgIdx = hasWaitMaskArg ? 2 : 1;
-    tailArgs.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(retAddrArgIdx)));
-  } else {
-    tailArgs.push_back(PoisonValue::get(m_builder->getInt32Ty()));
-  }
+  // Skip waitMask
+  unsigned retAddrArgIdx = hasWaitMaskArg ? 2 : 1;
+  tailArgs.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(retAddrArgIdx)));
   // Get shader-index from system-data.
-  unsigned systemDataArgIdx = 1 + (hasRetAddrArg ? 1 : 0) + (hasWaitMaskArg ? 1 : 0);
+  unsigned systemDataArgIdx = retAddrArgIdx + 1;
   tailArgs.push_back(m_builder->CreateNamedCall("_cont_GetLocalRootIndex", m_builder->getInt32Ty(),
                                                 {func->getArg(systemDataArgIdx)}, {}));
   // Process system-data and arguments after.
@@ -960,6 +974,20 @@ void SpirvProcessGpuRtLibrary::createShaderMarker(llvm::Function *func) {
   Value *dataPtr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
   m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata, {}, dataPtr);
   m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Fill in function to write wave scan
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createWaveScan(llvm::Function *func) {
+  auto argIt = func->arg_begin();
+  auto retType = cast<FixedVectorType>(func->getReturnType());
+  auto int32Ty = m_builder->getInt32Ty();
+  Value *waveOp = m_builder->CreateLoad(int32Ty, argIt++);
+  Value *flags = m_builder->CreateLoad(int32Ty, argIt++);
+  Value *src0 = m_builder->CreateLoad(retType, argIt);
+  m_builder->CreateRet(m_builder->create<GpurtWaveScanOp>(waveOp, flags, src0));
 }
 
 } // namespace Llpc

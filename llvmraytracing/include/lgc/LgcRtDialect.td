@@ -44,10 +44,15 @@
 //   get that with setShaderPaq() and getShaderPaq() functions in LgcRtDialect.h. A PAQ is a constant array
 //   of ints; currently the only supported form is a single-entry array where the value is the size in bytes
 //   of the payload. This is the same form of PAQ that is passed as an arg to TraceRayOp.
+//   A pipeline-wide upper bound on the payload size in bytes can be accessed via getMaxPayloadSize() and
+//   getMaxPayloadSize().
 //
-// * A shader with a hit attribute arg has a metadata item giving the hit attribute size in bytes, which
-//   is the same for all shaders in the pipeline. That is set and got using setShaderHitAttributeSize() and
+// * A shader with a hit attribute arg has a metadata item giving the hit attribute size in bytes,
+//   which is guaranteed to be not larger than the pipeline-wide max hit attribute size.
+//   The per-shader hit attribute size is accessed using setShaderHitAttributeSize() and
 //   getHitShaderAttributeSize() in LgcRtDialect.h.
+//   The pipeline-wide maximum sizes can be accessed accessed using getMaxHitAttributeSize()
+//   and setMaxHitAttributeSize().
 //
 // * A callable shader has a metadata item giving the callable data size in bytes; that is set and got using
 //   setShaderArgSize() and getShaderArgSize() in LgcRtDialect.h.

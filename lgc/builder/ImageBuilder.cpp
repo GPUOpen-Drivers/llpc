@@ -439,6 +439,9 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
   if (origTexelTy->isIntOrIntVectorTy(64)) {
     // Only load the first component for 64-bit texel, casted to <2 x i32>
     texelTy = FixedVectorType::get(getInt32Ty(), 2);
+  } else if (origTexelTy->isIntOrIntVectorTy(16)) {
+    // Treat i16 load as f16 load and cast it back later.
+    texelTy = FixedVectorType::get(getHalfTy(), 4);
   }
 
   if (auto vectorResultTy = dyn_cast<FixedVectorType>(texelTy))
@@ -512,40 +515,45 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(imageInst, imageDescArgIndex);
 
-  // For 64-bit texel, only the first component is loaded, other components are filled in with (0, 0, 1). This
-  // operation could be viewed as supplement of the intrinsic call.
-  if (origTexelTy->isIntOrIntVectorTy(64)) {
+  if (texelTy != origTexelTy) {
     Value *texel = result;
-    if (isa<StructType>(resultTy))
-      texel = CreateExtractValue(result, uint64_t(0));
-    texel = CreateBitCast(texel, getInt64Ty()); // Casted to i64
+    bool tfe = isa<StructType>(resultTy);
+    if (tfe)
+      texel = CreateExtractValue(result, 0);
 
-    if (origTexelTy->isVectorTy()) {
-      texel = CreateInsertElement(PoisonValue::get(origTexelTy), texel, uint64_t(0));
+    // For 64-bit texel, only the first component is loaded, other components are filled in with (0, 0, 1). This
+    // operation could be viewed as supplement of the intrinsic call.
+    if (origTexelTy->isIntOrIntVectorTy(64)) {
+      texel = CreateBitCast(texel, getInt64Ty()); // Casted to i64
 
-      SmallVector<Value *, 3> defaults = {getInt64(0), getInt64(0), getInt64(1)};
-      // The default of W channel is set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
-      if (m_pipelineState->getOptions().allowNullDescriptor) {
-        // Check dword3 against 0 for a null descriptor
-        Value *descWord3 = CreateExtractElement(imageDesc, 3);
-        if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
-          GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
-          SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
-          unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
-          // Mask off the type bits for the null descriptor
-          descWord3 = CreateAnd(descWord3, getInt32(~typeMask));
+      if (origTexelTy->isVectorTy()) {
+        texel = CreateInsertElement(PoisonValue::get(origTexelTy), texel, uint64_t(0));
+
+        SmallVector<Value *, 3> defaults = {getInt64(0), getInt64(0), getInt64(1)};
+        // The default of W channel is set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
+        if (m_pipelineState->getOptions().allowNullDescriptor) {
+          // Check dword3 against 0 for a null descriptor
+          Value *descWord3 = CreateExtractElement(imageDesc, 3);
+          if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
+            GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+            SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
+            unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
+            // Mask off the type bits for the null descriptor
+            descWord3 = CreateAnd(descWord3, getInt32(~typeMask));
+          }
+          Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
+          defaults[2] = CreateSelect(isNullDesc, getInt64(0), getInt64(1));
         }
-        Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
-        defaults[2] = CreateSelect(isNullDesc, getInt64(0), getInt64(1));
+        for (unsigned i = 1; i < cast<FixedVectorType>(origTexelTy)->getNumElements(); ++i)
+          texel = CreateInsertElement(texel, defaults[i - 1], i);
       }
-      for (unsigned i = 1; i < cast<FixedVectorType>(origTexelTy)->getNumElements(); ++i)
-        texel = CreateInsertElement(texel, defaults[i - 1], i);
+    } else if (origTexelTy->isIntOrIntVectorTy(16)) {
+      texel = CreateBitCast(texel, origTexelTy);
     }
 
-    if (isa<StructType>(resultTy)) {
-      // TFE
+    if (tfe) {
       intrinsicDataTy = StructType::get(origTexelTy->getContext(), {origTexelTy, getInt32Ty()});
-      result = CreateInsertValue(CreateInsertValue(PoisonValue::get(intrinsicDataTy), texel, uint64_t(0)),
+      result = CreateInsertValue(CreateInsertValue(PoisonValue::get(intrinsicDataTy), texel, 0),
                                  CreateExtractValue(result, 1), 1);
     } else {
       result = texel;

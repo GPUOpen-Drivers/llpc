@@ -37,6 +37,7 @@
 #include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -479,14 +480,31 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
   // 7, Dispatch Id
   m_builder->CreateStore(getDispatchId(), traceRaysArgs[7]);
 
-  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters)
-    generateTraceRayStaticId();
-
   StringRef rayQueryInitialize =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
-  m_builder->CreateNamedCall(rayQueryInitialize, m_builder->getVoidTy(), traceRaysArgs,
-                             {Attribute::NoUnwind, Attribute::AlwaysInline});
+  m_crossModuleInliner.value().inlineCall(*m_builder, getGpurtFunction(rayQueryInitialize), traceRaysArgs);
   m_builder->CreateRetVoid();
+
+  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters) {
+    SmallVector<CallInst *> tobeErased;
+    struct Payload {
+      SmallVectorImpl<CallInst *> &tobeErased;
+      SpirvLowerRayQuery *self;
+    };
+    Payload payload = {tobeErased, this};
+    static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                              .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                              .add<lgc::GpurtGetRayStaticIdOp>([](auto &payload, auto &op) {
+                                auto builder = payload.self->m_builder;
+                                builder->SetInsertPoint(&op);
+                                payload.tobeErased.push_back(&op);
+                                op.replaceAllUsesWith(builder->getInt32(payload.self->generateTraceRayStaticId()));
+                              })
+                              .build();
+    visitor.visit(payload, *func);
+    for (auto *call : tobeErased)
+      call->eraseFromParent();
+  }
 }
 
 // =====================================================================================================================

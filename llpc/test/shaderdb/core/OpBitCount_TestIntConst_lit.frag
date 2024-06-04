@@ -11,7 +11,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
-; SHADERTEST: call i32 @llvm.ctpop.i32
+; SHADERTEST: call {{(range.*)?}}i32 @llvm.ctpop.i32
 ; SHADERTEST: add nuw nsw i32 %{{[0-9*]}}, 2
 
 ; SHADERTEST: AMDLLPC SUCCESS

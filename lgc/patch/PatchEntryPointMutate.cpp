@@ -83,6 +83,7 @@
 
 using namespace llvm;
 using namespace lgc;
+using namespace cps;
 
 // =====================================================================================================================
 PatchEntryPointMutate::PatchEntryPointMutate()
@@ -168,6 +169,11 @@ PreservedAnalyses PatchEntryPointMutate::run(Module &module, ModuleAnalysisManag
 
 // =====================================================================================================================
 // Split the input into pieces of i32.
+//
+// @param layout : Data layout
+// @param builder : IR builder
+// @param input : A collection of inputs (structures, arrays, vectors, pointers, or basic primitive types)
+// @param [out] output : A collection of outputs by flattening the inputs to scalar values
 static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
                          SmallVector<Value *> &output) {
   for (auto *x : input) {
@@ -217,6 +223,10 @@ static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRe
 
 // =====================================================================================================================
 // Merge the input into a single struct type.
+//
+// @param builder : IR builder
+// @param input : An array of inputs to be structure members
+// @returns : A structure-typed value with inputs as its members
 static Value *mergeIntoStruct(IRBuilder<> &builder, ArrayRef<Value *> input) {
   SmallVector<Type *> types;
   for (auto *v : input)
@@ -230,6 +240,10 @@ static Value *mergeIntoStruct(IRBuilder<> &builder, ArrayRef<Value *> input) {
 
 // =====================================================================================================================
 // Construct vectors of dword, the input should be i32 type.
+//
+// @param builder : IR builder
+// @param input : An array of i32 scalar inputs
+// @returns : An arrayed value of inputs
 static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> input) {
   unsigned numElem = input.size();
   Type *vecTy = FixedVectorType::get(builder.getInt32Ty(), numElem);
@@ -241,27 +255,36 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
 }
 
 // =====================================================================================================================
+// Process LoadDriverTableEntryOp.
+//
+// @param module : LLVM module
 void PatchEntryPointMutate::processDriverTableLoad(Module &module) {
-  SmallVector<CallInst *> toBeErased;
+  SmallVector<CallInst *> callsToRemove;
+
   struct Payload {
-    SmallVectorImpl<CallInst *> &toBeErased;
+    SmallVectorImpl<CallInst *> &callsToRemove;
     PatchEntryPointMutate *self;
   };
-  Payload payload = {toBeErased, this};
+
+  Payload payload = {callsToRemove, this};
 
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add<LoadDriverTableEntryOp>([](auto &payload, auto &op) {
                               payload.self->lowerDriverTableLoad(op);
-                              payload.toBeErased.push_back(&op);
+                              payload.callsToRemove.push_back(&op);
                             })
                             .build();
   visitor.visit(payload, module);
-  for (auto call : payload.toBeErased)
+
+  for (auto call : payload.callsToRemove)
     call->eraseFromParent();
 }
 
 // =====================================================================================================================
+// Lower LoadDriverTableEntryOp.
+//
+// @param loadDriverTablePtrOp : Call instruction to load driver table pointer
 void PatchEntryPointMutate::lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp) {
   BuilderBase builder(&loadDriverTablePtrOp);
   Function *entryPoint = loadDriverTablePtrOp.getFunction();
@@ -276,29 +299,36 @@ void PatchEntryPointMutate::lowerDriverTableLoad(LoadDriverTableEntryOp &loadDri
 }
 
 // =====================================================================================================================
-// Lower GroupMemcpyOp
+// Process GroupMemcpyOp.
+//
+// @param module : LLVM module
 void PatchEntryPointMutate::processGroupMemcpy(Module &module) {
-  SmallVector<CallInst *> toBeErased;
+  SmallVector<CallInst *> callsToRemove;
+
   struct Payload {
-    SmallVectorImpl<CallInst *> &tobeErased;
+    SmallVectorImpl<CallInst *> &callsToRemove;
     PatchEntryPointMutate *self;
   };
-  Payload payload = {toBeErased, this};
+
+  Payload payload = {callsToRemove, this};
 
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add<GroupMemcpyOp>([](auto &payload, auto &op) {
                               payload.self->lowerGroupMemcpy(op);
-                              payload.tobeErased.push_back(&op);
+                              payload.callsToRemove.push_back(&op);
                             })
                             .build();
   visitor.visit(payload, module);
-  for (auto call : payload.tobeErased)
+
+  for (auto call : payload.callsToRemove)
     call->eraseFromParent();
 }
 
 // =====================================================================================================================
 // Lower GroupMemcpyOp - Copy memory using threads in a workgroup (scope=2) or subgroup (scope=3).
+//
+// @param groupMemcpyOp : Call instruction to do group memory copy
 void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
   BuilderImpl builder(m_pipelineState);
   Function *entryPoint = groupMemcpyOp.getFunction();
@@ -631,7 +661,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   unsigned vcrIndexInVgpr = haveLocalInvocationId ? 1 : 0;
   auto *vcr = builder.CreateExtractValue(vgprArg, vcrIndexInVgpr);
   auto *vcrTy = vcr->getType();
-
+  Value *pendingBallot = nullptr;
   if (isCpsFunc) {
     auto *vcrShaderArg = func->getArg(numShaderArg);
     // When we are working with LLVM version without the llvm.amdgcn.set.inactive.chain.arg, we cannot simply declare
@@ -642,11 +672,30 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
       vcr = builder.CreateIntrinsic(vcrTy, m_setInactiveChainArgId, {vcr, vcrShaderArg});
     else
       vcr = builder.CreateIntrinsic(vcrTy, Intrinsic::amdgcn_set_inactive, {vcr, vcrShaderArg});
+
+    auto level = builder.CreateAnd(vcr, builder.getInt32(0x7));
+    auto funcLevel = static_cast<unsigned>(cps::getCpsLevelFromFunction(*func));
+    static const std::vector<cps::CpsLevel> priorities[] = {
+        // RayGen: Continue with RayGen or hit shaders
+        {CpsLevel::Traversal, CpsLevel::ClosestHit_Miss_Callable, CpsLevel::RayGen},
+        // ClosestHit_Miss_Callable: Continue with hit shaders, then resume RayGen
+        {CpsLevel::Traversal, CpsLevel::RayGen, CpsLevel::ClosestHit_Miss_Callable},
+        // Traversal: Call Intersection or AnyHit, then call hit shaders or continue with RayGen
+        // Traversal can continue with traversal when it wants to wait, so try that last
+        {CpsLevel::Traversal, CpsLevel::RayGen, CpsLevel::ClosestHit_Miss_Callable,
+         CpsLevel::AnyHit_CombinedIntersection_AnyHit, CpsLevel::Intersection},
+        // AnyHit_CombinedIntersection_AnyHit: Continue with AnyHit, then resume Traversal
+        {CpsLevel::Traversal, CpsLevel::Intersection, CpsLevel::AnyHit_CombinedIntersection_AnyHit},
+        // Intersection: Continue with Intersection, then resume Traversal
+        {CpsLevel::Traversal, CpsLevel::AnyHit_CombinedIntersection_AnyHit, CpsLevel::Intersection}};
+    // Get non-zero level execution Mask
+    pendingBallot = takeLevel(level, builder, waveMaskTy, priorities[funcLevel - 1]);
+  } else {
+    // Find first lane having non-null vcr, and use as next jump target.
+    auto *vcrMask = builder.CreateICmpNE(vcr, builder.getInt32(0));
+    pendingBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, vcrMask);
   }
 
-  // Find first lane having non-null vcr, and use as next jump target.
-  auto *vcrMask = builder.CreateICmpNE(vcr, builder.getInt32(0));
-  auto *pendingBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, vcrMask);
   Value *firstActive = builder.CreateIntrinsic(Intrinsic::cttz, waveMaskTy, {pendingBallot, builder.getTrue()});
   if (!waveMaskTy->isIntegerTy(32))
     firstActive = builder.CreateTrunc(firstActive, builder.getInt32Ty());
@@ -828,6 +877,28 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   newFunc->setCallingConv(CallingConv::AMDGPU_CS_Chain);
 #endif
   return newFunc;
+}
+
+// =====================================================================================================================
+// Take the level from priorities list
+
+// @param level : the level to select
+// @param builder: IRBuilder to build instructions
+// @param waveMaskTy : Wave Mask type
+// @param priorties : Priorities list
+Value *PatchEntryPointMutate::takeLevel(Value *level, IRBuilder<> &builder, Type *waveMaskTy,
+                                        ArrayRef<CpsLevel> priorties) {
+  auto levelMask = builder.CreateICmpNE(level, builder.getInt32(0));
+  Value *levelBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, levelMask);
+  Value *cond = nullptr;
+
+  for (auto cpsLevel : priorties) {
+    auto lvMask = builder.CreateICmpEQ(level, builder.getInt32(static_cast<unsigned>(cpsLevel)));
+    Value *lvBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, lvMask);
+    cond = builder.CreateICmpNE(lvBallot, builder.getInt32(0));
+    levelBallot = builder.CreateSelect(cond, lvBallot, levelBallot);
+  }
+  return levelBallot;
 }
 
 // =====================================================================================================================
@@ -1758,6 +1829,12 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex));
     }
 
+    if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) && !m_hasGs && !m_hasTs &&
+        m_pipelineState->enableXfb() &&
+        (m_pipelineState->getOptions().dynamicTopology || m_pipelineState->isUnlinked())) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "compositeData", UserDataMapping::CompositeData,
+                                                &intfData->entryArgIdxs.vs.compositeData));
+    }
   } else if (m_shaderStage == ShaderStage::Compute) {
     // Pass the gl_NumWorkgroups pointer in user data registers.
     // Always enable this, even if unused, if compute library is in use.
@@ -1819,16 +1896,12 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
           UserDataArg(builder.getInt32Ty(), "colorExpAddr", UserDataMapping::ColorExportAddr));
     }
 
-    if (m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.runAtSampleRate &&
-        (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo)) {
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "sampleInfo", UserDataMapping::SampleInfo,
-                                                &intfData->entryArgIdxs.fs.sampleInfo));
-    }
-
-    if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::DynamicDualSrcBlendInfo)) {
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "dualSourceBlendUpdateInfo",
-                                                UserDataMapping::DynamicDualSrcBlendInfo,
-                                                &intfData->entryArgIdxs.fs.dynamicDualSrcBlendInfo));
+    bool useDynamicSampleInfo =
+        m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.runAtSampleRate &&
+        (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo);
+    if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::CompositeData) || useDynamicSampleInfo) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "compositeData", UserDataMapping::CompositeData,
+                                                &intfData->entryArgIdxs.fs.compositeData));
     }
   }
 
@@ -1920,8 +1993,10 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
                                    : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
 
   // FIXME Restricting user data as the backend does not support more sgprs as arguments
-  if (m_computeWithCalls && userDataAvailable > 16)
-    userDataAvailable = 16;
+  unsigned maxCsUserDataCount = InterfaceData::MaxCsUserDataCount;
+
+  if (m_computeWithCalls)
+    userDataAvailable = std::min(userDataAvailable, maxCsUserDataCount);
 
   for (const auto &userDataArg : specialUserDataArgs)
     userDataAvailable -= userDataArg.argDwordSize;
@@ -2020,11 +2095,13 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
 
   // Add the special args and the spill table pointer (if any).
   // (specialUserDataArgs is empty for compute, and thus for compute-with-calls.)
-  userDataArgs.insert(userDataArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
   if (spill) {
     userDataArgs.emplace_back(builder.getInt32Ty(), "spillTable", UserDataMapping::SpillTable,
                               &userDataUsage->spillTableEntryArgIdx);
   }
+  // Make sure the special user data is placed after generic user data because the special user data
+  // of shader debug address must be in the tail of all user data.
+  userDataArgs.insert(userDataArgs.end(), specialUserDataArgs.begin(), specialUserDataArgs.end());
 }
 
 // =====================================================================================================================

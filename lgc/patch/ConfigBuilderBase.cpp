@@ -81,15 +81,29 @@ ConfigBuilderBase::~ConfigBuilderBase() {
 
 // =====================================================================================================================
 /// Adds the .shaders.$(apiStage).hardware_mapping node to the PAL metadata.
+/// Also add .shader_subtype if it is a compute shader.
 ///
 /// @param [in] apiStage : The API shader stage
 /// @param [in] hwStages : The HW stage(s) that the API shader is mapped to, as a combination of
 ///                      @ref Util::Abi::HardwareStageFlagBits.
 void ConfigBuilderBase::addApiHwShaderMapping(ShaderStageEnum apiStage, unsigned hwStages) {
-  auto hwMappingNode = getApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping].getArray(true);
+  msgpack::MapDocNode apiShaderNode = getApiShaderNode(apiStage);
+  auto hwMappingNode = apiShaderNode[Util::Abi::ShaderMetadataKey::HardwareMapping].getArray(true);
   for (unsigned hwStage = 0; hwStage < unsigned(Util::Abi::HardwareStage::Count); ++hwStage) {
     if (hwStages & (1 << hwStage))
       hwMappingNode.push_back(m_document->getNode(HwStageNames[hwStage]));
+  }
+  if (apiStage == ShaderStage::Compute) {
+    // Find the only export function in the module, get the subtype from it, and add the .shader_subtype metadata
+    // item.
+    for (Function &func : *m_module) {
+      if (!func.isDeclaration() && func.getLinkage() != GlobalValue::InternalLinkage) {
+        StringRef subtype = getShaderSubtype(&func);
+        if (!subtype.empty())
+          apiShaderNode[Util::Abi::ShaderMetadataKey::ShaderSubtype] = subtype;
+        break;
+      }
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-﻿//===- SPIRVReader.cpp - Converts SPIR-V to LLVM ----------------*- C++ -*-===//
+//===- SPIRVReader.cpp - Converts SPIR-V to LLVM ----------------*- C++ -*-===//
 //
 //                     The LLVM/SPIR-V Translator
 //
@@ -1339,7 +1339,9 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   assert(CastInst::isCast(co) && "Invalid cast op code");
   if (bb) {
     if (bv->getType()->isTypeCooperativeMatrixKHR()) {
-      return getBuilder()->CreateCooperativeMatrixConvert(co, src, srcElemTy, dstElemTy, srcLayout, dstLayout);
+      Type *matrixType = getBuilder()->getCooperativeMatrixTy(dstElemTy, dstLayout);
+      return getBuilder()->create<CooperativeMatrixConvertOp>(matrixType, co, src, srcElemTy, dstElemTy, srcLayout,
+                                                              dstLayout, "convert");
     }
     bool srcIsPtr = srcType->isPtrOrPtrVectorTy();
     bool dstIsPtr = dstType->isPtrOrPtrVectorTy();
@@ -2971,7 +2973,7 @@ Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
   SPIRVType *spvElementTy = spvImageLoadPtr->getType()->getPointerElementType();
   Type *elementTy = transType(spvElementTy, 0, false, false, LayoutMode::Native);
   BasicBlock *bb = getBuilder()->GetInsertBlock();
-  Value *base = transValue(spvImageLoadPtr, bb->getParent(), bb);
+  Value *base = transValueMulti(spvImageLoadPtr, bb->getParent(), bb)[0];
   return loadImageSampler(elementTy, base);
 }
 
@@ -3052,7 +3054,8 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
 
   if (spvImagePtr->getOpCode() != OpVariable ||
       static_cast<SPIRVTypePointer *>(spvImagePtr->getType())->getStorageClass() != StorageClassUniformConstant) {
-    Value *v = transValue(spvImagePtr, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+    Value *v =
+        transValueMulti(spvImagePtr, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock())[0];
 
     // For function parameter, if it translated to an pointer type, then, it's a struct with sampler type, we should not
     // return it.
@@ -3072,8 +3075,19 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
   (void)hasDescriptorSet;
 
   SPIRVType *spvTy = spvImagePtr->getType()->getPointerElementType();
-  while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
-    spvTy = spvTy->getArrayElementType();
+  SmallVector<SPIRVType *> elementWorklist;
+  elementWorklist.push_back(spvTy);
+  while (!elementWorklist.empty()) {
+    spvTy = elementWorklist.pop_back_val();
+    if (spvTy->getOpCode() == OpTypeImage || spvTy->getOpCode() == OpTypeSampler ||
+        spvTy->getOpCode() == OpTypeSampledImage)
+      break;
+    else if (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
+      elementWorklist.push_back(spvTy->getArrayElementType());
+    else if (spvTy->getOpCode() == OpTypeStruct)
+      for (int i = 0, e = spvTy->getStructMemberCount(); i < e; i++)
+        elementWorklist.push_back(spvTy->getStructMemberType(i));
+  }
 
   Value *imageDescPtr = nullptr;
   Value *samplerDescPtr = nullptr;
@@ -3196,8 +3210,18 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
   // to detect whether it is a converting sampler, and set up the converting sampler index.
   unsigned convertingSamplerIdx = 0;
   unsigned nextIdx = 1;
+  unsigned convertingSamplerDescriptorSet = descriptorSet;
+  if (getPipelineOptions()->replaceSetWithResourceType &&
+      descriptorSet ==
+          PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler)) {
+    // When using 'replaceSetWithResourceType' option (OGL default) it's not possible to match converting samplers
+    // for 'DescriptorResource' and 'DescriptorSampler' at the same time, which is needed to handle YCbCr formats.
+    // Converting sampler with YCbCr metadata has 'DescriptorResource' set assigned, hence looking for it instead.
+    convertingSamplerDescriptorSet =
+        PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
+  }
   for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
-    if (convertingSampler.set == descriptorSet && convertingSampler.binding == binding) {
+    if (convertingSampler.set == convertingSamplerDescriptorSet && convertingSampler.binding == binding) {
       convertingSamplerIdx = nextIdx;
       break;
     }
@@ -3417,48 +3441,42 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     }
   }
 
-  // Special for UniformConstant: determine whether result/base is the mixed image/non-image case
-  bool baseHasImage = false;
-  bool baseHasNonImage = false;
-  bool resultHasImage = false;
-  bool resultHasNonImage = false;
-  if (storageClass == StorageClassUniformConstant) {
-    auto detectImage = [](SPIRVType *type) -> std::pair<bool, bool> {
-      bool hasImage = false;
-      bool hasNonImage = false;
-      SmallVector<SPIRVType *> elementWorklist;
-      elementWorklist.push_back(type);
-      while (!elementWorklist.empty()) {
-        SPIRVType *spvTy = elementWorklist.pop_back_val();
-        switch (spvTy->getOpCode()) {
-        case OpTypeImage:
-        case OpTypeSampler:
-        case OpTypeSampledImage:
-          hasImage = true;
-          break;
-        case OpTypeArray:
-        case OpTypeRuntimeArray:
-          elementWorklist.push_back(spvTy->getArrayElementType());
-          break;
-        case OpTypeStruct:
-          for (int i = 0, e = spvTy->getStructMemberCount(); i < e; i++)
-            elementWorklist.push_back(spvTy->getStructMemberType(i));
-          hasNonImage = true;
-          break;
-        default:
-          hasNonImage = true;
-        }
+  // Determine whether result/base is the mixed image/non-image case
+  auto detectImage = [](SPIRVType *type) -> std::pair<bool, bool> {
+    bool hasImage = false;
+    bool hasNonImage = false;
+    SmallVector<SPIRVType *> elementWorklist;
+    elementWorklist.push_back(type);
+    while (!elementWorklist.empty()) {
+      SPIRVType *spvTy = elementWorklist.pop_back_val();
+      switch (spvTy->getOpCode()) {
+      case OpTypeImage:
+      case OpTypeSampler:
+      case OpTypeSampledImage:
+        hasImage = true;
+        break;
+      case OpTypeArray:
+      case OpTypeRuntimeArray:
+        elementWorklist.push_back(spvTy->getArrayElementType());
+        break;
+      case OpTypeStruct:
+        for (int i = 0, e = spvTy->getStructMemberCount(); i < e; i++)
+          elementWorklist.push_back(spvTy->getStructMemberType(i));
+        hasNonImage = true;
+        break;
+      default:
+        hasNonImage = true;
       }
-      return std::make_pair(hasImage, hasNonImage);
-    };
+    }
+    return std::make_pair(hasImage, hasNonImage);
+  };
 
-    auto pair = detectImage(spvResultType);
-    resultHasImage = pair.first;
-    resultHasNonImage = pair.second;
-    pair = detectImage(spvAccessType);
-    baseHasImage = pair.first;
-    baseHasNonImage = pair.second;
-  }
+  auto pair = detectImage(spvResultType);
+  bool resultHasImage = pair.first;
+  bool resultHasNonImage = pair.second;
+  pair = detectImage(spvAccessType);
+  bool baseHasImage = pair.first;
+  bool baseHasNonImage = pair.second;
 
   // Translate the base variable and indices
   auto fullBase = transValueMulti(spvBase, f, bb);
@@ -3471,8 +3489,9 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
   SmallVector<Value *> result;
 
   // First, translate the access chain for any non-image parts.
-  if (!resultHasImage) {
+  if (resultHasNonImage) {
     Value *base = fullBase[0];
+
     const SPIRVStorageClassKind pointerStorageClass = spvBaseType->getPointerStorageClass();
 
     const bool typeMaybeRemapped = isStorageClassExplicitlyLaidOut(m_bm, pointerStorageClass) ||
@@ -3488,9 +3507,6 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     }
     assert(spvBaseType->isTypePointer());
     gepIndices.push_back(srcIndices[0]);
-
-    if (spvBaseType->isTypePointer())
-      spvAccessType = spvBaseType->getPointerElementType();
 
     auto flushGep = [&]() {
       if (gepIndices.size() == 1) {
@@ -3512,21 +3528,23 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     // Run over the indices and map the SPIR-V level indices to LLVM indices, which may be different because the LLVM
     // types may contain manual padding fields to model the power of Vulkan's layout options.
     // Additionally, break up the GEP sequence to handle some special cases like row major matrices.
-    for (Value *index : ArrayRef(srcIndices).drop_front()) {
-      switch (spvAccessType->getOpCode()) {
+    SPIRVType *spvAccessElementType = spvAccessType;
+    ArrayRef<Value *> srcIndicesArray = srcIndices;
+    for (Value *index : srcIndicesArray.drop_front()) {
+      switch (spvAccessElementType->getOpCode()) {
       case OpTypeStruct: {
         ConstantInt *constIndex = cast<ConstantInt>(index);
         const uint64_t origMemberIndex = constIndex->getZExtValue();
         Type *castType = nullptr;
 
         if (typeMaybeRemapped) {
-          if (isRemappedTypeElements(spvAccessType)) {
-            const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, origMemberIndex);
+          if (isRemappedTypeElements(spvAccessElementType)) {
+            const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessElementType, origMemberIndex);
             constIndex = getBuilder()->getInt32(remappedMemberIndex);
           }
 
           // If the struct member was actually overlapping another struct member, we need a split here.
-          const auto structIndexPair = std::make_pair(spvAccessType, origMemberIndex);
+          const auto structIndexPair = std::make_pair(spvAccessElementType, origMemberIndex);
 
           if (m_overlappingStructTypeWorkaroundMap.count(structIndexPair) > 0)
             castType = m_overlappingStructTypeWorkaroundMap[structIndexPair];
@@ -3541,20 +3559,20 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
                                              basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace()));
         }
 
-        spvAccessType = spvAccessType->getStructMemberType(origMemberIndex);
+        spvAccessElementType = spvAccessElementType->getStructMemberType(origMemberIndex);
         break;
       }
       case OpTypeArray:
       case OpTypeRuntimeArray: {
         gepIndices.push_back(index);
 
-        if (typeMaybeRemapped && isRemappedTypeElements(spvAccessType)) {
+        if (typeMaybeRemapped && isRemappedTypeElements(spvAccessElementType)) {
           // If we have padding in an array, we inserted a struct to add that
           // padding, and so we need an extra constant 0 index.
           gepIndices.push_back(getBuilder()->getInt32(0));
         }
 
-        spvAccessType = spvAccessType->getArrayElementType();
+        spvAccessElementType = spvAccessElementType->getArrayElementType();
         break;
       }
       case OpTypeMatrix: {
@@ -3579,22 +3597,22 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
           }
         }
 
-        spvAccessType = spvAccessType->getMatrixColumnType();
+        spvAccessElementType = spvAccessElementType->getMatrixColumnType();
         break;
       }
       case OpTypeVector: {
         gepIndices.push_back(index);
-        spvAccessType = spvAccessType->getVectorComponentType();
+        spvAccessElementType = spvAccessElementType->getVectorComponentType();
         break;
       }
       case OpTypeCooperativeMatrixKHR: {
         flushGep();
-        auto use = spvAccessType->getCooperativeMatrixKHRUse();
-        unsigned rows = spvAccessType->getCooperativeMatrixKHRRows();
-        unsigned columns = spvAccessType->getCooperativeMatrixKHRColumns();
-        spvAccessType = spvAccessType->getCooperativeMatrixKHRComponentType();
-        basePointeeType = transType(spvAccessType);
-        lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvAccessType);
+        auto use = spvAccessElementType->getCooperativeMatrixKHRUse();
+        unsigned rows = spvAccessElementType->getCooperativeMatrixKHRRows();
+        unsigned columns = spvAccessElementType->getCooperativeMatrixKHRColumns();
+        spvAccessElementType = spvAccessElementType->getCooperativeMatrixKHRComponentType();
+        basePointeeType = transType(spvAccessElementType);
+        lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvAccessElementType);
         lgc::CooperativeMatrixLayout layout =
             getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(use), elemType, rows, columns);
 
@@ -3623,8 +3641,10 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     result.push_back(base);
   }
 
-  // Second, translate the access chain for any mixed-image parts.
+  // Second, translate the access chain for any image parts.
   if (resultHasImage) {
+    assert(baseHasImage);
+    (void)baseHasImage;
     Value *base = fullBase[baseHasNonImage ? 1 : 0];
 
     if (spvIndices.empty()) {
@@ -3632,25 +3652,19 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
     } else {
       // 'proxyType' is the replaced type for struct/array type with image/sampler member.
       // In which, image/sampler member is replaced by int8 type, and non-image member is replaced by empty sturct.
-      Type *proxyType = transType(spvAccessType, 0, true, true, layout);
+      Type *proxyType = nullptr;
       SPIRVTypeContext ctx(spvAccessType, 0, true, true, layout);
       auto it = m_imageTypeMap.find(ctx.asTuple());
       if (it != m_imageTypeMap.end())
         proxyType = it->second;
+      assert(proxyType != nullptr);
 
-      // Calculate the offset:
-      // 1. Calculate the current accessed member in the proxyType: offset = offsetof(proxyType, proxyType[srcIndices]);
-      // 2. Correct offset if 'proxyType' is sturct:
-      //    a. If it has pre OpAccessChain, add the pre offset value from pre OpAccessChain
-      //    b. If not have pre OpAccessChain, the 'offset' value won't be modified.
-      //       Because during transValueMultiWithOpcode<OpVariable>(spvBase), we append a constant value 0, so this
-      //       always add 0.
-      //    c. If 'proxyType' is array type(which means the `baseHasNonImage` is false), we didn't append 0 for base
-      //    variable, so should NOT correct the offset value.
+      // Calculate the current accessed member in the proxyType: offset = offsetof(proxyType, proxyType[srcIndices]);
       Value *proxy = getBuilder()->CreateGEP(proxyType, ConstantPointerNull::get(getBuilder()->getPtrTy()), srcIndices);
       Value *offset = getBuilder()->CreatePtrToInt(proxy, getBuilder()->getInt32Ty());
 
-      // Translate the image/sampler member pointer.
+      // If result type NOT have non-image type, it does not have pre OpAccessChain, so look up the image member type,
+      // and translate the image pointer.
       SPIRVType *spvElementType = spvAccessType;
 
       SmallVector<SPIRVType *> elementWorklist;
@@ -3860,7 +3874,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupAll>(SPIRVValue *con
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate);
+  return getBuilder()->create<SubgroupAllOp>(predicate);
 }
 
 // =====================================================================================================================
@@ -3977,7 +3991,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRV
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate);
+  return getBuilder()->create<SubgroupAllOp>(predicate);
 }
 
 // =====================================================================================================================
@@ -4005,7 +4019,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value);
+  return getBuilder()->create<SubgroupAllEqualOp>(value);
 }
 
 // =====================================================================================================================
@@ -4023,7 +4037,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformRotateKHR>
   Value *const delta = transValue(spvOperands[2], func, block);
   Value *const clusterSize =
       spvOperands.size() > 3 ? transValue(spvOperands[3], func, block) : PoisonValue::get(Type::getInt32Ty(*m_context));
-  return getBuilder()->CreateSubgroupRotate(value, delta, clusterSize);
+  return getBuilder()->create<SubgroupRotateOp>(value, delta, clusterSize);
 }
 
 // =====================================================================================================================
@@ -4649,7 +4663,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllKHR>(SPIRVValu
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[0], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate);
+  return getBuilder()->create<SubgroupAllOp>(predicate);
 }
 
 // =====================================================================================================================
@@ -4677,7 +4691,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSubgroupAllEqualKHR>(SPIR
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[0], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value);
+  return getBuilder()->create<SubgroupAllEqualOp>(value);
 }
 
 // =====================================================================================================================
@@ -4979,11 +4993,20 @@ SmallVector<Value *> SPIRVToLLVM::transValueMultiWithOpcode<OpVariable>(SPIRVVal
   bool variableHasImage = false;
   if (storageClass == StorageClassUniformConstant) {
     SPIRVType *spvElementType = spvVar->getType()->getPointerElementType();
-    while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
-      spvElementType = spvElementType->getArrayElementType();
-    if (spvElementType->getOpCode() == OpTypeImage || spvElementType->getOpCode() == OpTypeSampler ||
-        spvElementType->getOpCode() == OpTypeSampledImage) {
-      variableHasImage = true;
+
+    SmallVector<SPIRVType *> elementWorklist;
+    elementWorklist.push_back(spvElementType);
+    while (!elementWorklist.empty()) {
+      SPIRVType *spvTy = elementWorklist.pop_back_val();
+      if (spvTy->getOpCode() == OpTypeImage || spvTy->getOpCode() == OpTypeSampler ||
+          spvTy->getOpCode() == OpTypeSampledImage) {
+        variableHasImage = true;
+        break;
+      } else if (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
+        elementWorklist.push_back(spvTy->getArrayElementType());
+      else if (spvTy->getOpCode() == OpTypeStruct)
+        for (int i = 0, e = spvTy->getStructMemberCount(); i < e; i++)
+          elementWorklist.push_back(spvTy->getStructMemberType(i));
     }
   }
 
@@ -4992,6 +5015,10 @@ SmallVector<Value *> SPIRVToLLVM::transValueMultiWithOpcode<OpVariable>(SPIRVVal
     IRBuilderBase::InsertPointGuard ipg(*getBuilder());
     getBuilder()->SetInsertPointPastAllocas(f);
     values.push_back(transImagePointer(spvVar, spvVar->getMemObjType()));
+
+    // Append const value 0 as default offset if this variable is struct type with image member.
+    if (itNonImage->second)
+      values.push_back(getBuilder()->getInt32(0));
   }
 
   m_variableMap.try_emplace({spvValue, f}, values);
@@ -5016,7 +5043,8 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
     case OpTypeImage:
     case OpTypeSampler:
     case OpTypeSampledImage:
-      // Do nothing for image/sampler/sampledimage.
+      // Only translate image/sampler array type to record the m_imageTypeMap
+      transType(spvVarType, 0, true, true, layout);
       return nullptr;
     default:
       if (!isAccelerationStructureType(spvElementType))
@@ -5222,7 +5250,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(SPIRVV
     lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
         static_cast<CooperativeMatrixUse>(spvOperands[0]->getType()->getCooperativeMatrixKHRUse()), elemType, rows,
         columns);
-    return getBuilder()->CreateCoopMatrixTimesScalar(matrix, scalar, elemType, layout);
+    return getBuilder()->create<CooperativeMatrixTimesScalarOp>(matrix->getType(), matrix, scalar, elemType, layout);
   } else {
     return getBuilder()->CreateMatrixTimesScalar(matrix, scalar);
   }
@@ -5419,7 +5447,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLengthKH
   unsigned rows = matrixType->getCooperativeMatrixKHRRows();
   unsigned columns = matrixType->getCooperativeMatrixKHRColumns();
   auto layout = getCooperativeMatrixKHRLayout(matrixUse, elemType, rows, columns);
-  return getBuilder()->CreateCooperativeMatrixLength(elemType, layout);
+  return getBuilder()->create<CooperativeMatrixLengthOp>(layout);
 }
 
 // =====================================================================================================================
@@ -5507,8 +5535,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLoadKHR>
   unsigned alignmentInRowCol = (isColMajor ? rows : columns) * elementSize;
   unsigned loadAlignment = std::min((unsigned)16, alignmentInRowCol);
   lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(use, elemType, rows, columns);
-  auto CoopMatLoadInst = getBuilder()->CreateCooperativeMatrixLoad(pointer, stride, isColMajor, elemType, layout,
-                                                                   memoryAccess, Align(loadAlignment));
+  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+  auto CoopMatLoadInst = getBuilder()->create<CooperativeMatrixLoadOp>(
+      coopMatrixTy, pointer, stride, isColMajor, elemType, layout, memoryAccess, loadAlignment, "load");
   return CoopMatLoadInst;
 }
 
@@ -5603,8 +5632,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixStoreKHR
   unsigned elementSize = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(elemltType) / 8);
   unsigned alignmentInRowCol = (isColMajor ? rows : columns) * elementSize;
   unsigned storeAlignment = std::min((unsigned)16, alignmentInRowCol);
-  getBuilder()->CreateCooperativeMatrixStore(pointer, matrix, stride, isColMajor, elemType, layout, memoryAccess,
-                                             Align(storeAlignment));
+  getBuilder()->create<CooperativeMatrixStoreOp>(pointer, stride, isColMajor, elemType, layout, memoryAccess,
+                                                 storeAlignment, matrix);
   return nullptr;
 }
 
@@ -5630,8 +5659,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
   bool isSignedB = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixBSigned());
   bool isSat = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixSatAccumulation());
 
-  Value *coopMatrixD = getBuilder()->CreateCooperativeMatrixMulAdd(coopMatrixA, coopMatrixB, coopMatrixC, isSignedA,
-                                                                   isSignedB, isSat, 0, elemBasicTypeC, elemBasicTypeA);
+  Value *coopMatrixD = getBuilder()->create<CooperativeMatrixMulAddOp>(coopMatrixC->getType(), coopMatrixA, coopMatrixB,
+                                                                       coopMatrixC, isSignedA, isSignedB, isSat, 0,
+                                                                       elemBasicTypeC, elemBasicTypeA, "mulAdd");
   return coopMatrixD;
 }
 
@@ -6115,9 +6145,11 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       unsigned columns = matrixType->getCooperativeMatrixKHRColumns();
       auto layout = getCooperativeMatrixKHRLayout(
           static_cast<CooperativeMatrixUse>(matrixType->getCooperativeMatrixKHRUse()), elemType, rows, columns);
+      Type *extractElementType = getBuilder()->transCooperativeMatrixElementType(elemType);
       Value *matrix = transValue(ce->getComposite(), f, bb);
       Value *index = getBuilder()->getInt32(ce->getIndices()[0]);
-      return mapValue(bv, getBuilder()->CreateCooperativeMatrixExtract(matrix, index, elemType, layout));
+      return mapValue(
+          bv, getBuilder()->create<CooperativeMatrixExtractOp>(extractElementType, matrix, index, elemType, layout));
     }
 
     auto cv = transValue(ce->getComposite(), f, bb);
@@ -6168,7 +6200,8 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       Value *matrix = transValue(ci->getComposite(), f, bb);
       Value *value = transValue(ci->getObject(), f, bb);
       Value *index = getBuilder()->getInt32(ci->getIndices()[0]);
-      return mapValue(bv, getBuilder()->CreateCooperativeMatrixInsert(matrix, value, index, elemType, layout));
+      return mapValue(bv, getBuilder()->create<CooperativeMatrixInsertOp>(matrix->getType(), matrix, value, index,
+                                                                          elemType, layout));
     }
 
     auto cv = transValue(ci->getComposite(), f, bb);
@@ -6318,8 +6351,10 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       lgc::CooperativeMatrixLayout dstLayout = getCooperativeMatrixKHRLayout(
           static_cast<CooperativeMatrixUse>(bc->getType()->getCooperativeMatrixKHRUse()), basicDstElemTy,
           bc->getType()->getCooperativeMatrixKHRRows(), bc->getType()->getCooperativeMatrixKHRColumns());
-      return mapValue(bv, getBuilder()->CreateCooperativeMatrixConvert(co, val, basicSrcElemTy, basicDstElemTy,
-                                                                       srcLayout, dstLayout));
+
+      Type *matrixType = getBuilder()->getCooperativeMatrixTy(basicDstElemTy, dstLayout);
+      return mapValue(bv, getBuilder()->create<CooperativeMatrixConvertOp>(
+                              matrixType, co, val, basicSrcElemTy, basicDstElemTy, srcLayout, dstLayout, "fConvert"));
     }
     if (val->getType()->getScalarType()->getPrimitiveSizeInBits() <= destTy->getScalarType()->getPrimitiveSizeInBits())
       return mapValue(bv, getBuilder()->CreateFPExt(val, destTy));
@@ -6648,7 +6683,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
   case OpEndStreamPrimitive:
     return mapValue(bv, transValueWithOpcode<OpEndStreamPrimitive>(bv));
   case OpAccessChain:
-    return mapValue(bv, transValueMultiWithOpcode<OpAccessChain>(bv));
+    return {mapValue(bv, transValueMultiWithOpcode<OpAccessChain>(bv))[0]};
   case OpArrayLength:
     return mapValue(bv, transValueWithOpcode<OpArrayLength>(bv));
   case OpInBoundsAccessChain:
@@ -8540,6 +8575,7 @@ bool SPIRVToLLVM::transMetadata() {
         execModel == ExecutionModelTaskEXT || execModel == ExecutionModelMeshEXT) {
       // Give the shader modes to middle-end
       if (execModel == ExecutionModelVertex) {
+        // Nothing to do.
       } else if (execModel == ExecutionModelTessellationControl || execModel == ExecutionModelTessellationEvaluation) {
         TessellationMode tessellationMode = {};
 
@@ -10409,10 +10445,12 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRV
 
   switch (memScope) {
   case ScopeCrossDevice:
-  case ScopeDevice:
+    scope = SyncScope::System;
+    break;
   case ScopeQueueFamilyKHR:
   case ScopeShaderCallKHR:
-    scope = SyncScope::System;
+  case ScopeDevice:
+    scope = m_context->getOrInsertSyncScopeID("agent");
     break;
   case ScopeInvocation:
     scope = SyncScope::SingleThread;
@@ -10978,8 +11016,9 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
           static_cast<CooperativeMatrixUse>(unary->getOperand(0)->getType()->getCooperativeMatrixKHRUse()), elemType,
           rows, columns);
     }
-    return getBuilder()->CreateCooperativeMatrixBinaryOp(arithOp, Constant::getNullValue(srcVal->getType()), srcVal,
-                                                         elemType, layout);
+    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+    return getBuilder()->create<CooperativeMatrixBinaryOp>(resultTy, arithOp, Constant::getNullValue(srcVal->getType()),
+                                                           srcVal, elemType, layout);
   } else {
     auto binary = static_cast<SPIRVBinary *>(spvVal);
     Value *lhs = transValue(binary->getOperand(0), func, bb);
@@ -10993,7 +11032,8 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
           static_cast<CooperativeMatrixUse>(binary->getOperand(0)->getType()->getCooperativeMatrixKHRUse()), elemType,
           rows, columns);
     }
-    return getBuilder()->CreateCooperativeMatrixBinaryOp(arithOp, lhs, rhs, elemType, layout);
+    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+    return getBuilder()->create<CooperativeMatrixBinaryOp>(resultTy, arithOp, lhs, rhs, elemType, layout);
   }
 }
 
@@ -11005,7 +11045,8 @@ Value *SPIRVToLLVM::transCooperativeMatrixKHRFromConstruct(SPIRVType *spvCoopMat
   lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
       static_cast<CooperativeMatrixUse>(spvCoopMatTy->getCooperativeMatrixKHRUse()), elemType,
       spvCoopMatTy->getCooperativeMatrixKHRRows(), spvCoopMatTy->getCooperativeMatrixKHRColumns());
-  return getBuilder()->CreateCooperativeMatrixFill(constituents[0], elemType, layout);
+  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+  return getBuilder()->create<CooperativeMatrixFillOp>(coopMatrixTy, constituents[0], elemType, layout);
 }
 
 } // namespace SPIRV

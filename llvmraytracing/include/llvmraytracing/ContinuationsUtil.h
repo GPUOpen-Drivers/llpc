@@ -272,13 +272,6 @@ private:
   // Marks an await as a waiting one with a wait mask.
   static constexpr const char *MDIsWaitAwaitName = "continuation.wait.await";
 
-  // Function-scope metadata for payload and hit attribute size limits,
-  // referring to the app-defined structs only.
-  static constexpr const char *MDMaxHitAttributeBytesName =
-      "continuation.maxHitAttributeBytes";
-  static constexpr const char *MDMaxPayloadBytesName =
-      "continuation.maxPayloadBytes";
-
   // Whether this is a load instruction that should translate to a last_use
   // load.
   static constexpr const char *MDIsLastUseName = "amdgpu.last.use";
@@ -484,21 +477,6 @@ public:
     MD->addOperand(getI32MDConstant(M.getContext(), MaxPayloadRegisterCount));
   }
 
-  static void setMaxHitAttributeByteCount(Function &F,
-                                          uint32_t MaxHitAttributeByteCount) {
-    lgc::rt::setShaderHitAttributeSize(&F, MaxHitAttributeByteCount);
-  }
-
-  static void setMaxPayloadByteCount(Function &F,
-                                     uint32_t MaxPayloadByteCount) {
-    F.setMetadata(MDMaxPayloadBytesName,
-                  getI32MDConstant(F.getContext(), MaxPayloadByteCount));
-  }
-
-  static std::optional<uint32_t> tryGetMaxPayloadByteCount(const Function &F) {
-    return extractZExtI32Constant(F.getMetadata(MDMaxPayloadBytesName));
-  }
-
   static void setStackSize(Function *F, uint32_t StackSize) {
     F->setMetadata(MDStackSizeName,
                    getI32MDConstant(F->getContext(), StackSize));
@@ -657,6 +635,9 @@ public:
   // using the GpuRt version flags intrinsic. If the intrinsic is not found,
   // returns true, enabling new behavior (e.g. for tests).
   static bool getGpurtVersionFlag(Module &GpurtModule, GpuRtVersionFlag Flag);
+
+  // Handles _AmdGetSetting_* intrinsics.
+  static void handleGetSetting(Function &F, ArrayRef<ContSetting> Settings);
 };
 
 class ShaderStageHelper final {
@@ -718,6 +699,7 @@ DRIVER_FUNC_NAME(GetCandidateState)
 DRIVER_FUNC_NAME(GetCommittedState)
 DRIVER_FUNC_NAME(GetContinuationStackAddr)
 DRIVER_FUNC_NAME(SetupRayGen)
+DRIVER_FUNC_NAME(ExitRayGen)
 DRIVER_FUNC_NAME(IsEndSearch)
 DRIVER_FUNC_NAME(GetLocalRootIndex)
 DRIVER_FUNC_NAME(SetLocalRootIndex)
@@ -731,6 +713,7 @@ DRIVER_FUNC_NAME(HitKind)
 DRIVER_FUNC_NAME(Traversal)
 DRIVER_FUNC_NAME(KernelEntry)
 DRIVER_FUNC_NAME(GpurtVersionFlags)
+DRIVER_FUNC_NAME(ShaderStart)
 
 #undef DRIVER_FUNC_NAME
 } // namespace ContDriverFunc
@@ -749,6 +732,10 @@ void forEachCall(Function &F, CallbackTy Callback) {
         Callback(*CInst);
   }
 }
+
+// Replace all calls to a given function with some value.
+// Removes the original call.
+void replaceCallsToFunction(llvm::Function &F, llvm::Value &Replacement);
 
 bool isLgcRtOp(const llvm::Function *F);
 

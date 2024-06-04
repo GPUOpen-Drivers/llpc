@@ -61,6 +61,7 @@ struct GpuProperty {
   unsigned gsOnChipDefaultPrimsPerSubgroup;   // Default target number of primitives per subgroup for GS on-chip mode.
   unsigned gsOnChipDefaultLdsSizePerSubgroup; // Default value for the maximum LDS size per subgroup for
   unsigned gsOnChipMaxLdsSize;                // Max LDS size used by GS on-chip mode (in dwords)
+  unsigned maxMsaaRasterizerSamples;          // Maximum number of MSAA samples supported by the rasterizer
 
   // TODO: Setup gsPrimBufferDepth from hardware config option, will be done in another change.
   unsigned gsPrimBufferDepth; // Comes from the hardware GPU__GC__GSPRIM_BUFF_DEPTH configuration option

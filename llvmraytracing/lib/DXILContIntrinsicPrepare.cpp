@@ -144,13 +144,14 @@ static bool isUtilFunction(StringRef Name) {
       "ContinuationStackIsGlobal",
       "ContStack",
       "Enqueue", // To detect the mangled name of a declaration
-      "GetI32",
+      "ExitRayGen",
       "GetCandidateState",
       "GetCommittedState",
       "GetContinuationStackAddr",
       "GetContinuationStackGlobalMemBase",
       "GetCurrentFuncAddr",
       "GetFuncAddr",
+      "GetI32",
       "GetLocalRootIndex",
       "GetResumePointAddr",
       "GetRtip",
@@ -169,6 +170,7 @@ static bool isUtilFunction(StringRef Name) {
       "SetupRayGen",
       "TraceRay",
       "Traversal",
+      "ShaderStart",
   };
 
   for (const char *UtilName : UtilNames) {
@@ -182,6 +184,8 @@ static bool isUtilFunction(StringRef Name) {
 llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(
     llvm::Module &M, llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the dxil-cont-intrinsic-prepare pass\n");
+
+  AnalysisManager.getResult<DialectContextAnalysis>(M);
 
   SmallVector<Function *> Funcs(make_pointer_range(M.functions()));
 

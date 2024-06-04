@@ -150,9 +150,9 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[CR_1]] to ptr
 ; LOWER-AWAIT-NEXT:    [[TMP5:%.*]] = call ptr [[TMP4]](i32 [[CR_1]], i32 4, i32 [[X]], ptr addrspace(1) [[DST]])
 ; LOWER-AWAIT-NEXT:    [[TMP6:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP5]])
-; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call [2 x i32] @continuations.getReturnValue__a2i32()
+; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call [2 x i32] @lgc.ilcps.getReturnValue__a2i32()
 ; LOWER-AWAIT-NEXT:    store [2 x i32] [[TMP7]], ptr addrspace(1) [[DST]], align 4
-; LOWER-AWAIT-NEXT:    call void (...) @continuation.return()
+; LOWER-AWAIT-NEXT:    call void (...) @lgc.ilcps.return(i32 poison)
 ; LOWER-AWAIT-NEXT:    unreachable
 ;
 ;
@@ -167,7 +167,7 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[CR_1]] to ptr
 ; LOWER-AWAIT-NEXT:    [[TMP5:%.*]] = call ptr [[TMP4]](i32 [[CR_1]], i32 2, i32 [[X]])
 ; LOWER-AWAIT-NEXT:    [[TMP6:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP5]])
-; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call i32 @continuations.getReturnValue__i32()
+; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call i32 @lgc.ilcps.getReturnValue__i32()
 ; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 5, i32 [[TMP7]])
 ; LOWER-AWAIT-NEXT:    unreachable
 ;
@@ -190,6 +190,6 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP5:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP4]])
 ; LOWER-AWAIT-NEXT:    br label [[EXIT]]
 ; LOWER-AWAIT:       exit:
-; LOWER-AWAIT-NEXT:    call void (...) @continuation.return()
+; LOWER-AWAIT-NEXT:    call void (...) @lgc.ilcps.return(i32 poison)
 ; LOWER-AWAIT-NEXT:    unreachable
 ;

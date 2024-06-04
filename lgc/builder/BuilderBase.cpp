@@ -293,3 +293,13 @@ Instruction *BuilderBase::CreateWaterfallEnd(Value *nonUniform, Value *waterfall
 
   return resultValue;
 }
+
+// =====================================================================================================================
+// Create code to build a vector out of a number of scalar elements of the same type.
+Value *BuilderCommon::CreateBuildVector(llvm::ArrayRef<llvm::Value *> elements, const llvm::Twine &instName) {
+  Value *vector = PoisonValue::get(FixedVectorType::get(elements[0]->getType(), elements.size()));
+  for (unsigned idx = 0; idx != elements.size() - 1; ++idx)
+    vector = CreateInsertElement(vector, elements[idx], idx);
+  vector = CreateInsertElement(vector, elements.back(), elements.size() - 1, instName);
+  return vector;
+}

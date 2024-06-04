@@ -35,8 +35,8 @@ void main(void)
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call i1 @lgc.subgroup.any(
-; SHADERTEST: call i1 (...) @lgc.create.subgroup.all.i1(
-; SHADERTEST: call i1 (...) @lgc.create.subgroup.all.equal.i1(
+; SHADERTEST: call i1 @lgc.subgroup.all(
+; SHADERTEST: call i1 (...) @lgc.subgroup.all.equal(
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v2f32
 ; SHADERTEST: AMDLLPC SUCCESS
 */

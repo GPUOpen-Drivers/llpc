@@ -77,6 +77,7 @@ static void setGfx10BaseInfo(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 0; // GFX9+ does not use this
   targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 8192;
   targetInfo->getGpuProperty().numShaderEngines = 4;
+  targetInfo->getGpuProperty().maxMsaaRasterizerSamples = 16;
 }
 
 // gfx10

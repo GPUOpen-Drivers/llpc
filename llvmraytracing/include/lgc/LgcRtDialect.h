@@ -36,6 +36,7 @@
 namespace llvm {
 class Constant;
 class Function;
+class Module;
 } // namespace llvm
 
 namespace lgc {
@@ -56,13 +57,19 @@ enum class RayTracingShaderStage {
 
 // Set shader stage metadata on a LLVM function and erase it by setting
 // std::nullopt.
-void setLgcRtShaderStage(llvm::Function *func,
+// func can instead be a GlobalVariable, allowing a front-end to use a
+// GlobalVariable to represent a shader retrieved from the cache, and wants to
+// mark it with a shader stage.
+void setLgcRtShaderStage(llvm::GlobalObject *func,
                          std::optional<RayTracingShaderStage> stage);
 
 // Gets the shader stage from the specified LLVM function or std::nullopt
 // if no metadata is apparent.
+// func can instead be a GlobalVariable, allowing a front-end to use a
+// GlobalVariable to represent a shader retrieved from the cache, and wants to
+// mark it with a shader stage.
 std::optional<RayTracingShaderStage>
-getLgcRtShaderStage(const llvm::Function *func);
+getLgcRtShaderStage(const llvm::GlobalObject *func);
 
 // Get the metadata IDs associated with the lgc.rt dialect, so the caller knows
 // which ones can be removed when the dialect is processed.
@@ -94,6 +101,22 @@ std::optional<size_t> getShaderHitAttributeSize(const llvm::Function *func);
 // Set attribute size (in bytes) metadata for a ray-tracing shader
 // function.
 void setShaderHitAttributeSize(llvm::Function *func, size_t size);
+
+// Get max hit attribute size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function hit attribute sizes.
+std::optional<size_t> getMaxHitAttributeSize(const llvm::Module *module);
+
+// Set max hit attribute size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function hit attribute sizes.
+void setMaxHitAttributeSize(llvm::Module *module, size_t size);
+
+// Get max payload size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function payload sizes.
+std::optional<size_t> getMaxPayloadSize(const llvm::Module *module);
+
+// Set max hit attribute size (in bytes) metadata for a ray-tracing module.
+// This is a pipeline-wide upper bound on the per-function payload sizes.
+void setMaxPayloadSize(llvm::Module *module, size_t size);
 
 } // namespace rt
 } // namespace lgc

@@ -16,7 +16,6 @@ option(LLVMRAYTRACING_BUILD_TESTS "Build raytracing tests")
 add_llvm_library(LLVMRaytracing
   lib/CleanupContinuations.cpp
   lib/Continuations.cpp
-  lib/ContinuationsDialect.cpp
   lib/CpsStackLowering.cpp
   lib/DXILContIntrinsicPrepare.cpp
   lib/DXILContLgcRtOpConverter.cpp
@@ -26,6 +25,7 @@ add_llvm_library(LLVMRaytracing
   lib/GpurtDialect.cpp
   lib/LegacyCleanupContinuations.cpp
   lib/LgcCpsDialect.cpp
+  lib/LgcIlCpsDialect.cpp
   lib/LgcRtDialect.cpp
   lib/LgcRtqDialect.cpp
   lib/LowerAwait.cpp
@@ -82,7 +82,7 @@ macro(raytracing_tablegen DIALECTNAME FILE OUTPUT_FILENAME)
   target_sources(LLVMRaytracing PRIVATE ${FILE})
 endmacro()
 
-raytracing_tablegen(continuations include/llvmraytracing/ContinuationsDialect.td ContinuationsDialect)
+raytracing_tablegen(lgc.ilcps include/lgc/LgcIlCpsDialect.td LgcIlCpsDialect)
 raytracing_tablegen(lgc.cps include/lgc/LgcCpsDialect.td LgcCpsDialect)
 raytracing_tablegen(lgc.rt include/lgc/LgcRtDialect.td LgcRtDialect)
 raytracing_tablegen(lgc.rtq include/lgc/LgcRtqDialect.td LgcRtqDialect)
@@ -94,7 +94,7 @@ set_target_properties(LLVMRaytracing PROPERTIES CXX_EXTENSIONS OFF)
 add_subdirectory(plugin)
 
 if(CONTINUATIONS_BUILD_TESTS)
-  message(WARNING "Deprecated flag CONTINUATIONS_BUILD_TEST used; use LLVMRAYTRACING_BUILD_TESTS instead")
+  message(WARNING "Deprecated flag CONTINUATIONS_BUILD_TESTS used; use LLVMRAYTRACING_BUILD_TESTS instead")
   set(LLVMRAYTRACING_BUILD_TESTS ON)
 endif()
 if(LLVMRAYTRACING_BUILD_TESTS)

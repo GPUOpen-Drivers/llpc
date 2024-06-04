@@ -695,7 +695,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.fastMathFlags = " << shaderInfo->options.fastMathFlags << "\n";
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
-  dumpFile << "options.scalarizeWaterfallLoads = " << shaderInfo->options.scalarizeWaterfallLoads << "\n";
+  if (shaderInfo->options.scalarizeWaterfallLoads.has_value())
+    dumpFile << "options.scalarizeWaterfallLoads = " << *shaderInfo->options.scalarizeWaterfallLoads << "\n";
   dumpFile << "options.overrideForceThreadIdSwizzling = " << shaderInfo->options.overrideForceThreadIdSwizzling << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeX = " << shaderInfo->options.overrideShaderThreadGroupSizeX << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeY = " << shaderInfo->options.overrideShaderThreadGroupSizeY << "\n";
@@ -1039,6 +1040,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
   dumpFile << "useSoftwareVertexBufferDescriptors = " << pipelineInfo->useSoftwareVertexBufferDescriptors << "\n";
+  dumpFile << "dynamicTopology = " << pipelineInfo->dynamicTopology << "\n";
+  dumpFile << "enableColorClampVs = " << pipelineInfo->glState.enableColorClampVs << "\n";
+  dumpFile << "enableColorClampFs = " << pipelineInfo->glState.enableColorClampFs << "\n";
 
   dumpFile << "originUpperLeft = " << pipelineInfo->getGlState().originUpperLeft << "\n";
   if (pipelineInfo->clientMetadataSize > 0) {
@@ -1245,11 +1249,20 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
   dumpFile << "indirectStageMask = " << pipelineInfo->indirectStageMask << "\n";
   dumpFile << "libraryMode = " << static_cast<unsigned>(pipelineInfo->libraryMode) << "\n";
   dumpFile << "mode = " << static_cast<unsigned>(pipelineInfo->mode) << "\n";
+  dumpFile << "cpsFlags = " << pipelineInfo->cpsFlags << "\n";
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
   dumpFile << "payloadSizeMaxInLib = " << pipelineInfo->payloadSizeMaxInLib << "\n";
   dumpFile << "attributeSizeMaxInLib = " << pipelineInfo->attributeSizeMaxInLib << "\n";
   dumpFile << "hasPipelineLibrary = " << pipelineInfo->hasPipelineLibrary << "\n";
   dumpFile << "pipelineLibStageMask = " << pipelineInfo->pipelineLibStageMask << "\n";
+
+  for (unsigned i = 0; i < pipelineInfo->gpurtOptionCount; ++i) {
+    auto gpurtOption = &pipelineInfo->pGpurtOptions[i];
+    dumpFile << "gpurtOptions[" << i << "].nameHash = "
+             << "0x" << std::hex << gpurtOption->nameHash << "\n";
+    dumpFile << "gpurtOptions[" << i << "].value = "
+             << "0x" << std::hex << gpurtOption->value << "\n";
+  }
 }
 
 // =====================================================================================================================
@@ -1522,6 +1535,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked);
   hasher.Update(pipeline->enableEarlyCompile);
+  hasher.Update(pipeline->dynamicTopology);
   if (unlinkedShaderType == UnlinkedStageFragment && isCacheHash)
     hasher.Update(pipeline->enableColorExportShader);
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, unlinkedShaderType);
@@ -1553,6 +1567,9 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 
   hasher.Update(pipeline->advancedBlendInfo.enableAdvancedBlend);
   hasher.Update(pipeline->advancedBlendInfo.binding);
+
+  hasher.Update(pipeline->glState.enableColorClampVs);
+  hasher.Update(pipeline->glState.enableColorClampFs);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1629,6 +1646,7 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
   hasher.Update(pipeline->maxRecursionDepth);
   hasher.Update(pipeline->indirectStageMask);
   hasher.Update(pipeline->mode);
+  hasher.Update(pipeline->cpsFlags);
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
 
   hasher.Update(pipeline->libraryMode);
@@ -1655,6 +1673,14 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
   if (pipeline->clientMetadataSize > 0) {
     hasher.Update(reinterpret_cast<const uint8_t *>(pipeline->pClientMetadata), pipeline->clientMetadataSize);
   }
+
+  hasher.Update(pipeline->gpurtOptionCount);
+  for (unsigned i = 0; i < pipeline->gpurtOptionCount; ++i) {
+    auto gpurtOption = &pipeline->pGpurtOptions[i];
+    hasher.Update(gpurtOption->nameHash);
+    hasher.Update(gpurtOption->value);
+  }
+
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 

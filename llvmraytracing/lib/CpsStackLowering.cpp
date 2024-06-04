@@ -191,21 +191,22 @@ void CpsStackLowering::visitStore(llvm::StoreInst &Store) {
 // @param Func: the function where stack pointers should be added to continue
 //              calls
 void CpsStackLowering::visitContinueCalls(llvm::Function *Func) {
-  llvm::forEachTerminator(Func, {Instruction::Unreachable, Instruction::Ret},
-                          [&](Instruction &Terminator) {
-                            auto *BB = Terminator.getParent();
-                            if (&Terminator != &*BB->begin()) {
-                              auto Before = --Terminator.getIterator();
-                              if (auto *CInst = dyn_cast<CallInst>(Before)) {
-                                if (auto *Func = CInst->getCalledFunction()) {
-                                  auto Name = Func->getName();
-                                  if (Name == "continuation.continue" ||
-                                      Name == "continuation.waitContinue")
-                                    visitContinueCall(*CInst);
-                                }
-                              }
-                            }
-                          });
+  llvm::forEachTerminator(
+      Func, {Instruction::Unreachable, Instruction::Ret},
+      [&](Instruction &Terminator) {
+        auto *BB = Terminator.getParent();
+        if (&Terminator != &*BB->begin()) {
+          auto Before = --Terminator.getIterator();
+          if (auto *CInst = dyn_cast<CallInst>(Before)) {
+            if (auto *Func = CInst->getCalledFunction()) {
+              auto Name = Func->getName();
+              if (Name.starts_with("continuation.continue") ||
+                  Name.starts_with("continuation.waitContinue"))
+                visitContinueCall(*CInst);
+            }
+          }
+        }
+      });
 }
 
 // =====================================================================================================================

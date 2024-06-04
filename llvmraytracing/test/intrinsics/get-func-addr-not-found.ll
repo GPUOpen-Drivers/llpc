@@ -1,4 +1,4 @@
-; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint' -S %s 2>&1 | FileCheck %s
+; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: ERROR: Did not find function '' requested by _AmdGetFuncAddr
 
@@ -9,6 +9,10 @@ declare i64 @_AmdGetFuncAddr()
 declare %struct.DispatchSystemData @_cont_SetupRayGen()
 
 declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+  ret void
+}
 
 define i64 @main() {
 entry:

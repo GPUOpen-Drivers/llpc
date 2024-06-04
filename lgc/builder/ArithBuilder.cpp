@@ -1267,9 +1267,20 @@ Value *BuilderImpl::CreateFDot2(Value *a, Value *b, Value *scalar, Value *clamp,
   assert(scalar->getType()->isFloatTy());
   assert(clamp->getType()->isIntegerTy() && clamp->getType()->getIntegerBitWidth() == 1);
 
-  Value *result = CreateIntrinsic(scalar->getType(), Intrinsic::amdgcn_fdot2, {a, b, scalar, clamp});
-  result->setName(instName);
-  return result;
+  // GFX10.1 doesn't support v_dot2_f32_f16.
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})) {
+    Value *result = CreateIntrinsic(scalar->getType(), Intrinsic::amdgcn_fdot2, {a, b, scalar, clamp});
+    result->setName(instName);
+    return result;
+  }
+
+  // The half dot product result cannot be +/-inf if it exceeds the range of half. Two v_fma_mix_f32 can do this but
+  // it is currently unavailable.
+  Type *floatVecTy = FixedVectorType::get(scalar->getType(), 2);
+  Value *fa = CreateFPExt(a, floatVecTy);
+  Value *fb = CreateFPExt(b, floatVecTy);
+  Value *dot = CreateDotProduct(fa, fb);
+  return CreateFAdd(dot, scalar, instName);
 }
 
 // =====================================================================================================================

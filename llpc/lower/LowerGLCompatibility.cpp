@@ -46,8 +46,10 @@ namespace Llpc {
 
 // =====================================================================================================================
 LowerGLCompatibility::LowerGLCompatibility()
-    : m_retInst(nullptr), m_out(nullptr), m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr),
-      m_frontColor(nullptr), m_backColor(nullptr), m_frontSecondaryColor(nullptr), m_backSecondaryColor(nullptr) {
+    : m_retInst(nullptr), m_entryPointEnd(nullptr), m_originalEntryBlock(nullptr), m_out(nullptr),
+      m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr), m_frontColor(nullptr), m_backColor(nullptr),
+      m_frontSecondaryColor(nullptr), m_backSecondaryColor(nullptr), m_color(nullptr), m_secondaryColor(nullptr),
+      m_frontFacing(nullptr), m_patchTexCoord(nullptr), m_fragColor(nullptr), m_fragDepth(), m_fragStencilRef() {
 }
 
 // =====================================================================================================================
@@ -65,7 +67,8 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
   collectEmulationResource();
 
   if (!needLowerClipVertex() && !needLowerFrontColor() && !needLowerBackColor() && !needLowerFrontSecondaryColor() &&
-      !needLowerBackSecondaryColor())
+      !needLowerBackSecondaryColor() && !needEmulateDrawPixels() && !needEmulateTwoSideLighting() &&
+      !needEmulateBitmap() && !needLowerFragColor())
     return PreservedAnalyses::all();
 
   buildPatchPositionInfo();
@@ -85,6 +88,20 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
   if (needLowerBackSecondaryColor())
     lowerBackSecondaryColor();
 
+  if (needLowerFragColor())
+    lowerFragColor();
+
+  if (needEmulateDrawPixels())
+    emulateDrawPixels();
+
+  // Two side lighting patch should place just before bitmap patch.
+  if (needEmulateTwoSideLighting())
+    emulateTwoSideLighting();
+
+  // Bit map patch should be the last patch in the pass.
+  if (needEmulateBitmap())
+    emulateBitmap();
+
   return PreservedAnalyses::none();
 }
 
@@ -97,11 +114,17 @@ bool LowerGLCompatibility::needRun() {
         static_cast<const ShaderModuleData *>(static_cast<GraphicsContext *>(m_context->getPipelineContext())
                                                   ->getPipelineShaderInfo(m_shaderStage)
                                                   ->pModuleData);
+    auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
     result |= moduleData->usage.useClipVertex;
     result |= moduleData->usage.useFrontColor;
     result |= moduleData->usage.useBackColor;
     result |= moduleData->usage.useFrontSecondaryColor;
     result |= moduleData->usage.useBackSecondaryColor;
+    result |= buildInfo->glState.drawPixelsType != Vkgc::DrawPixelsTypeNone;
+    result |= buildInfo->glState.enableTwoSideLighting;
+    result |= buildInfo->glState.enableBitmap;
+    result |= buildInfo->glState.enableBitmapLsb;
+    result |= buildInfo->glState.enableColorClampFs;
   }
   return result;
 }
@@ -198,6 +221,8 @@ void LowerGLCompatibility::decodeInOutMetaRecursively(llvm::Type *valueTy, llvm:
 
 // =====================================================================================================================
 // Collect "Return" instructions and replace those instructions with a branch instruction point to "ReturnBlock".
+//
+// @param [in]  func : The entry function of the shader module.
 void LowerGLCompatibility::unifyFunctionReturn(Function *func) {
   SmallVector<ReturnInst *> retInsts;
   for (BasicBlock &block : *func) {
@@ -211,7 +236,7 @@ void LowerGLCompatibility::unifyFunctionReturn(Function *func) {
 
   if (retInsts.size() > 1) {
     // Only create unify return block when the function's return instruction more then one.
-    auto retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
+    auto retBlock = BasicBlock::Create(*m_context, ".gl.compatibility.ret", m_entryPoint);
     m_retInst = ReturnInst::Create(*m_context, retBlock);
     for (auto inst : retInsts) {
       BranchInst::Create(retBlock, inst->getParent());
@@ -252,7 +277,35 @@ void LowerGLCompatibility::collectEmulationResource() {
         m_clipPlane = &global;
       }
     } else if (global.getType()->getAddressSpace() == SPIRAS_Input) {
-      continue;
+      llvm::SmallVector<ShaderInOutMetadata> mds;
+      MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
+      assert(metaNode);
+      auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+      auto valueType = global.getValueType();
+      bool isStructureOrArrayOfStructure =
+          (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
+      decodeInOutMetaRecursively(valueType, inOutMetaConst, mds);
+      if (m_shaderStage == ShaderStageFragment) {
+        // In fragment shader, gl_Color have same location with gl_FrontColor in pre-stage outputs.
+        // gl_SecondaryColor have same location with gl_FrontSecondaryColor in pre-stage outputs.
+        // So we can use location of gl_FrontColor and gl_FrontSecondaryColor to find gl_Color and gl_FrontColor
+        for (auto md : mds) {
+          if (md.IsLoc) {
+            if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor) {
+              if (isStructureOrArrayOfStructure)
+                m_out = &global;
+              else
+                m_color = &global;
+            }
+            if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor) {
+              if (isStructureOrArrayOfStructure)
+                m_out = &global;
+              else
+                m_secondaryColor = &global;
+            }
+          }
+        }
+      }
     } else if (global.getType()->getAddressSpace() == SPIRAS_Output) {
       llvm::SmallVector<ShaderInOutMetadata> mds;
       MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
@@ -262,6 +315,21 @@ void LowerGLCompatibility::collectEmulationResource() {
       bool isStructureOrArrayOfStructure =
           (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
       decodeInOutMetaRecursively(valueType, inOutMetaConst, mds);
+      if (m_shaderStage == ShaderStageFragment) {
+        for (auto md : mds) {
+          if (md.IsBuiltIn) {
+            if (md.Value == spv::BuiltInFragDepth) {
+              m_fragDepth = &global;
+            }
+            if (md.Value == spv::BuiltInFragStencilRefEXT) {
+              m_fragStencilRef = &global;
+            }
+          } else {
+            assert(m_fragColor == nullptr);
+            m_fragColor = &global;
+          }
+        }
+      }
       for (auto md : mds) {
         if (md.IsLoc) {
           if (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex) {
@@ -294,11 +362,15 @@ void LowerGLCompatibility::collectEmulationResource() {
             else
               m_backSecondaryColor = &global;
           }
-        } else if (md.IsBuiltIn && md.Value == spv::BuiltInClipDistance) {
-          if (isStructureOrArrayOfStructure)
-            m_out = &global;
-          else
-            m_clipDistance = &global;
+        } else if (md.IsBuiltIn) {
+          if (md.Value == spv::BuiltInClipDistance) {
+            if (isStructureOrArrayOfStructure)
+              m_out = &global;
+            else
+              m_clipDistance = &global;
+          }
+          if (md.Value == spv::BuiltInFrontFacing)
+            m_frontFacing = &global;
         }
       }
     }
@@ -375,6 +447,18 @@ void LowerGLCompatibility::buildPatchPositionInfo() {
     collectEmitInst();
   else
     unifyFunctionReturn(m_entryPoint);
+
+  // Create early kill block for bitmap, bitmap require a early return in masked thread.
+  if (needEmulateBitmap()) {
+    m_originalEntryBlock = &(m_entryPoint->getEntryBlock());
+    m_originalEntryBlock->splitBasicBlockBefore(m_originalEntryBlock->getFirstInsertionPt(), ".gl.compatibility.entry");
+    m_entryPointEnd = m_originalEntryBlock->splitBasicBlockBefore(m_originalEntryBlock->getFirstInsertionPt(),
+                                                                  ".gl.compatibility.kill");
+    m_builder->SetInsertPoint(m_entryPointEnd->begin());
+    m_builder->CreateKill();
+    ReturnInst::Create(*m_context, m_entryPointEnd);
+    m_entryPointEnd->back().eraseFromParent();
+  }
 }
 
 // =====================================================================================================================
@@ -390,25 +474,88 @@ bool LowerGLCompatibility::needLowerFrontColor() {
 }
 
 // =====================================================================================================================
-// Check whether need do lower for FrontColor.
+// Check whether need do lower for BackColor.
 bool LowerGLCompatibility::needLowerBackColor() {
   return (m_backColor != nullptr && !m_backColor->user_empty());
 }
 
 // =====================================================================================================================
-// Check whether need do lower for FrontColor.
+// Check whether need do lower for FrontSecondaryColor.
 bool LowerGLCompatibility::needLowerFrontSecondaryColor() {
   return (m_frontSecondaryColor != nullptr && !m_frontSecondaryColor->user_empty());
 }
 
 // =====================================================================================================================
-// Check whether need do lower for FrontColor.
+// Check whether need do lower for BackSecondaryColor.
 bool LowerGLCompatibility::needLowerBackSecondaryColor() {
   return (m_backSecondaryColor != nullptr && !m_backSecondaryColor->user_empty());
 }
 
 // =====================================================================================================================
-// Create the SPIR-V output builtin variable "ClipDistance".
+// Check whether need do emulate for draw pixels.
+bool LowerGLCompatibility::needEmulateDrawPixels() {
+  auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  return (m_shaderStage == ShaderStageFragment) && (buildInfo->glState.drawPixelsType != Vkgc::DrawPixelsTypeNone);
+}
+
+// =====================================================================================================================
+// Check whether need do emulate for two-side lighting.
+bool LowerGLCompatibility::needEmulateTwoSideLighting() {
+  auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  return (m_shaderStage == ShaderStageFragment) && buildInfo->glState.enableTwoSideLighting &&
+         (m_color != nullptr || m_secondaryColor != nullptr);
+}
+
+// =====================================================================================================================
+// Check whether need do emulate for bitmap.
+bool LowerGLCompatibility::needEmulateBitmap() {
+  auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  return (m_shaderStage == ShaderStageFragment) &&
+         (buildInfo->glState.enableBitmap || buildInfo->glState.enableBitmapLsb);
+}
+
+// =====================================================================================================================
+// Check whether need do clamp fs
+bool LowerGLCompatibility::needLowerFragColor() {
+  auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  return m_fragColor && (m_shaderStage == ShaderStageFragment) && (buildInfo->glState.enableColorClampFs);
+}
+
+// =====================================================================================================================
+// Create InOut global variable Metadata.
+//
+// @param [in] md : The base information of the in/out meta date.
+MDTuple *LowerGLCompatibility::createInOutMd(const ShaderInOutMetadata &md) {
+  auto int64Type = m_builder->getInt64Ty();
+  // Built metadata for the array element
+  std::vector<Constant *> mdValues;
+  // int64Type : Content of "ShaderInOutMetadata.U64All[0]"
+  // int64Type : Content of "ShaderInOutMetadata.U64All[1]"
+  auto elmdTy = StructType::get(*m_context, {int64Type, int64Type});
+  assert(elmdTy != nullptr);
+  mdValues.push_back(ConstantInt::get(int64Type, md.U64All[0]));
+  mdValues.push_back(ConstantInt::get(int64Type, md.U64All[1]));
+  auto mdVariable = ConstantStruct::get(elmdTy, mdValues);
+
+  // Setup input/output metadata
+  std::vector<Metadata *> mDs;
+  mDs.push_back(ConstantAsMetadata::get(mdVariable));
+  return MDNode::get(*m_context, mDs);
+}
+
+// =====================================================================================================================
+// Create builtin InOut global variable Metadata.
+//
+// @param [in] builtIn : The built-in kind of the in/out meta date.
+MDTuple *LowerGLCompatibility::createBuiltInInOutMd(lgc::BuiltInKind builtIn) {
+  ShaderInOutMetadata inOutMd = {};
+  inOutMd.IsBuiltIn = true;
+  inOutMd.Value = builtIn;
+  return createInOutMd(inOutMd);
+}
+
+// =====================================================================================================================
+// Create the SPIR-V output builtin variable "gl_ClipDistance".
 void LowerGLCompatibility::createClipDistance() {
   assert(m_clipDistance == nullptr);
   auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
@@ -491,6 +638,86 @@ void LowerGLCompatibility::createClipPlane() {
 }
 
 // =====================================================================================================================
+// Create the GLSL builtin variable "gl_BackColor".
+void LowerGLCompatibility::createBackColor() {
+  auto vec4Type = FixedVectorType::get(m_builder->getFloatTy(), 4);
+  auto backColor = new GlobalVariable(*m_module, vec4Type, false, GlobalValue::ExternalLinkage, nullptr, "gl_BackColor",
+                                      nullptr, GlobalVariable::GeneralDynamicTLSModel, SPIRV::SPIRAS_Input);
+  ShaderInOutMetadata inOutMd = {};
+  inOutMd.IsLoc = true;
+  inOutMd.Value = Vkgc::GlCompatibilityInOutLocation::BackColor;
+  inOutMd.InterpMode = InterpModeSmooth;
+  inOutMd.InterpLoc = InterpLocCenter;
+  backColor->addMetadata(gSPIRVMD::InOut, *createInOutMd(inOutMd));
+  m_backColor = backColor;
+}
+
+// =====================================================================================================================
+// Create the GLSL builtin variable "gl_BackSecondaryColor".
+void LowerGLCompatibility::createBackSecondaryColor() {
+  auto vec4Type = FixedVectorType::get(m_builder->getFloatTy(), 4);
+  auto backSecondaryColor =
+      new GlobalVariable(*m_module, vec4Type, false, GlobalValue::ExternalLinkage, nullptr, "gl_BackSecondaryColor",
+                         nullptr, GlobalVariable::GeneralDynamicTLSModel, SPIRV::SPIRAS_Input);
+  ShaderInOutMetadata inOutMd = {};
+  inOutMd.IsLoc = true;
+  inOutMd.Value = Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor;
+  inOutMd.InterpMode = InterpModeSmooth;
+  inOutMd.InterpLoc = InterpLocCenter;
+  backSecondaryColor->addMetadata(gSPIRVMD::InOut, *createInOutMd(inOutMd));
+  m_backSecondaryColor = backSecondaryColor;
+}
+
+// =====================================================================================================================
+// Create the GLSL builtin variable "gl_FrontFacing".
+void LowerGLCompatibility::createFrontFacing() {
+  assert(m_frontFacing == nullptr);
+  auto frontFacing =
+      new GlobalVariable(*m_module, m_builder->getInt1Ty(), false, GlobalValue::ExternalLinkage, nullptr,
+                         "gl_FrontFacing", nullptr, GlobalVariable::GeneralDynamicTLSModel, SPIRV::SPIRAS_Input);
+  frontFacing->addMetadata(gSPIRVMD::InOut, *createBuiltInInOutMd(lgc::BuiltInKind::BuiltInFrontFacing));
+  m_frontFacing = frontFacing;
+}
+
+// =====================================================================================================================
+// Create the ARB builtin variable "patchTexCoord".
+void LowerGLCompatibility::createPatchTexCoord() {
+  auto vec2Type = FixedVectorType::get(m_builder->getFloatTy(), 2);
+  auto patchTexCoord =
+      new GlobalVariable(*m_module, vec2Type, false, GlobalValue::ExternalLinkage, nullptr, "patchTexCoord", nullptr,
+                         GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Input);
+  ShaderInOutMetadata inOutMd = {};
+  inOutMd.IsLoc = true;
+  inOutMd.Value = Vkgc::GlCompatibilityInOutLocation::PatchTexCoord;
+  inOutMd.InterpMode = InterpModeSmooth;
+  inOutMd.InterpLoc = InterpLocCenter;
+  patchTexCoord->addMetadata(gSPIRVMD::InOut, *createInOutMd(inOutMd));
+  m_patchTexCoord = patchTexCoord;
+}
+
+// =====================================================================================================================
+// Create the GLSL builtin variable "gl_FragDepth".
+void LowerGLCompatibility::createFragDepth() {
+  assert(m_fragDepth == nullptr);
+  auto fragDepth =
+      new GlobalVariable(*m_module, m_builder->getFloatTy(), false, GlobalValue::ExternalLinkage, nullptr,
+                         "gl_FragDepth", nullptr, GlobalVariable::GeneralDynamicTLSModel, SPIRV::SPIRAS_Output);
+  fragDepth->addMetadata(gSPIRVMD::InOut, *createBuiltInInOutMd(lgc::BuiltInKind::BuiltInFragDepth));
+  m_fragDepth = fragDepth;
+}
+
+// =====================================================================================================================
+// Create the GLSL builtin variable "gl_fragStencilRef".
+void LowerGLCompatibility::createFragStencilRef() {
+  assert(m_fragStencilRef == nullptr);
+  auto fragStencilRef =
+      new GlobalVariable(*m_module, m_builder->getInt32Ty(), false, GlobalValue::ExternalLinkage, nullptr,
+                         "gl_FragStencilRef", nullptr, GlobalVariable::GeneralDynamicTLSModel, SPIRV::SPIRAS_Output);
+  fragStencilRef->addMetadata(gSPIRVMD::InOut, *createBuiltInInOutMd(lgc::BuiltInKind::BuiltInFragStencilRef));
+  m_fragStencilRef = fragStencilRef;
+}
+
+// =====================================================================================================================
 // Inline the emulation instruction of clip vertex.
 void LowerGLCompatibility::emulateStoreClipVertex() {
   auto floatType = m_builder->getFloatTy();
@@ -519,15 +746,153 @@ void LowerGLCompatibility::emulateStoreClipVertex() {
 
 // =====================================================================================================================
 // Inline the emulation instruction of front/back/front secondary/back secondary color.
+//
+// @param [in] color : One of front/back/front secondary/back secondary color.
 void LowerGLCompatibility::emulationOutputColor(llvm::User *color) {
   auto floatType = m_builder->getFloatTy();
   Type *vec4Type = VectorType::get(floatType, 4, false);
   // Load frontColor
-  Value *colorOperand = m_builder->CreateLoad(vec4Type, color);
-  Value *clampedColor =
-      m_builder->CreateFClamp(colorOperand, ConstantFP::get(vec4Type, 0.0), ConstantFP::get(vec4Type, 1.0));
-  // Store frontColor
-  m_builder->CreateStore(clampedColor, color);
+  auto info = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  if ((m_shaderStage == ShaderStageVertex && info->glState.enableColorClampVs) ||
+      (m_shaderStage == ShaderStageFragment && info->glState.enableColorClampFs)) {
+    Value *colorOperand = m_builder->CreateLoad(vec4Type, color);
+    Value *clampedColor =
+        m_builder->CreateFClamp(colorOperand, ConstantFP::get(vec4Type, 0.0), ConstantFP::get(vec4Type, 1.0));
+    // Store color
+    m_builder->CreateStore(clampedColor, color);
+  }
+}
+
+// =====================================================================================================================
+// Emulate for draw pixels emulation.
+void LowerGLCompatibility::emulateDrawPixels() {
+  m_builder->SetInsertPoint(m_entryPoint->getEntryBlock().begin());
+  auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  auto floatType = m_builder->getFloatTy();
+  auto int32Type = m_builder->getInt32Ty();
+  auto vec2Type = FixedVectorType::get(floatType, 2);
+  auto vec4Type = FixedVectorType::get(floatType, 4);
+  auto ivec2Type = FixedVectorType::get(int32Type, 2);
+  auto ivec8Type = FixedVectorType::get(int32Type, 8);
+  if (m_patchTexCoord == nullptr) {
+    createPatchTexCoord();
+  }
+  Value *patchTexcoord = m_builder->CreateLoad(vec2Type, m_patchTexCoord);
+  Value *texcoord = m_builder->CreateFPToUI(patchTexcoord, ivec2Type);
+  auto imageDesc = m_builder->CreateGetDescPtr(
+      lgc::ResourceNodeType::DescriptorResource, lgc::ResourceNodeType::DescriptorResource,
+      PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource),
+      Vkgc::InternalBinding::PixelOpInternalBinding);
+  auto descriptor = m_builder->CreateLoad(ivec8Type, imageDesc);
+  descriptor->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+  Value *texel = m_builder->CreateImageLoad(vec4Type, Dim2D, 0, descriptor, texcoord, nullptr);
+
+  // Write Color
+  if (buildInfo->glState.drawPixelsType == Vkgc::DrawPixelsTypeColor) {
+    if (m_color != nullptr) {
+      // replace scale and bias constant with real value
+      std::vector<Constant *> vals;
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferScale[0]));
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferScale[1]));
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferScale[2]));
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferScale[3]));
+      auto scale = ConstantVector::get(vals);
+
+      vals.clear();
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferBias[0]));
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferBias[1]));
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferBias[2]));
+      vals.push_back(ConstantFP::get(floatType, buildInfo->glState.pixelTransferBias[3]));
+      auto bias = ConstantVector::get(vals);
+      auto color = m_builder->CreateFma(texel, scale, bias);
+      m_builder->CreateStore(color, m_color);
+    }
+  }
+
+  // Write Depth
+  if (buildInfo->glState.drawPixelsType == Vkgc::DrawPixelsTypeDepth) {
+    if (m_fragDepth == nullptr)
+      createFragDepth();
+    auto depth = m_builder->CreateExtractElement(texel, ConstantInt::get(int32Type, 0));
+    m_builder->CreateStore(depth, m_fragDepth);
+  }
+
+  // Write Stencil
+  if (buildInfo->glState.drawPixelsType == Vkgc::DrawPixelsTypeStencil) {
+    if (m_fragStencilRef == nullptr)
+      createFragStencilRef();
+    auto stencil = m_builder->CreateExtractElement(texel, ConstantInt::get(int32Type, 0));
+    auto stencilInt = m_builder->CreateBitCast(stencil, int32Type);
+    m_builder->CreateStore(stencilInt, m_fragStencilRef);
+  }
+}
+
+// =====================================================================================================================
+// Emulate for two-side lighting.
+void LowerGLCompatibility::emulateTwoSideLighting() {
+  auto vec4Type = FixedVectorType::get(m_builder->getFloatTy(), 4);
+  if (m_shaderStage == ShaderStageFragment) {
+    m_builder->SetInsertPoint(m_entryPoint->getEntryBlock().begin());
+    if (m_color != nullptr || m_secondaryColor != nullptr) {
+      if (m_frontFacing == nullptr) {
+        createFrontFacing();
+      }
+      if (m_color != nullptr) {
+        assert(m_backColor == nullptr);
+        createBackColor();
+        auto frontColorLoad = m_builder->CreateLoad(vec4Type, m_color);
+        auto backColorLoad = m_builder->CreateLoad(vec4Type, m_backColor);
+        auto frontFacingLoad = m_builder->CreateLoad(m_builder->getInt1Ty(), m_frontFacing);
+        auto color = m_builder->CreateSelect(frontFacingLoad, frontColorLoad, backColorLoad);
+        m_builder->CreateStore(color, m_color);
+      }
+      if (m_secondaryColor != nullptr) {
+        assert(m_backSecondaryColor == nullptr);
+        createBackSecondaryColor();
+        auto frontSecondaryColorLoad = m_builder->CreateLoad(vec4Type, m_secondaryColor);
+        auto backSecondaryColorLoad = m_builder->CreateLoad(vec4Type, m_backSecondaryColor);
+        auto frontFacingLoad = m_builder->CreateLoad(m_builder->getInt1Ty(), m_frontFacing);
+        auto secondaryColor = m_builder->CreateSelect(frontFacingLoad, frontSecondaryColorLoad, backSecondaryColorLoad);
+        m_builder->CreateStore(secondaryColor, m_secondaryColor);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Emulate for bitmap emulation.
+void LowerGLCompatibility::emulateBitmap() {
+  auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  m_builder->SetInsertPoint(m_entryPoint->getEntryBlock().begin());
+  auto floatType = m_builder->getFloatTy();
+  auto int32Type = m_builder->getInt32Ty();
+  auto vec2Type = FixedVectorType::get(floatType, 2);
+  auto ivec2Type = FixedVectorType::get(int32Type, 2);
+  auto ivec8Type = FixedVectorType::get(int32Type, 8);
+  if (!m_patchTexCoord) {
+    createPatchTexCoord();
+  }
+  Value *constInt0x7 = ConstantInt::get(ivec2Type, 0x7);
+  Value *constInt0x3 = ConstantInt::get(ivec2Type, 0x3);
+  Value *patchTexcoord = m_builder->CreateLoad(vec2Type, m_patchTexCoord);
+  Value *texcoord = m_builder->CreateFPToUI(patchTexcoord, ivec2Type);
+  Value *mask = m_builder->CreateAnd(texcoord, constInt0x7);
+  if (buildInfo->glState.enableBitmapLsb) {
+    mask = m_builder->CreateSub(mask, constInt0x7);
+  }
+  mask = m_builder->CreateShl(ConstantInt::get(ivec2Type, 1), mask);
+  Value *texCoordSrc = m_builder->CreateLShr(constInt0x3, texcoord);
+  auto imageDesc = m_builder->CreateGetDescPtr(
+      lgc::ResourceNodeType::DescriptorResource, lgc::ResourceNodeType::DescriptorResource,
+      PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource),
+      Vkgc::InternalBinding::PixelOpInternalBinding);
+  auto descriptor = m_builder->CreateLoad(ivec8Type, imageDesc);
+  descriptor->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+  Value *texel = m_builder->CreateImageLoad(ivec2Type, Dim2D, 0, descriptor, texCoordSrc, nullptr);
+  Value *val = m_builder->CreateAnd(mask, texel);
+  val = m_builder->CreateExtractElement(val, ConstantInt::get(int32Type, 0));
+  auto cmp = m_builder->CreateICmpEQ(val, ConstantInt::get(int32Type, 0));
+  m_builder->CreateCondBr(cmp, m_entryPointEnd, m_originalEntryBlock);
 }
 
 // =====================================================================================================================
@@ -554,9 +919,11 @@ void LowerGLCompatibility::lowerClipVertex() {
 // =====================================================================================================================
 // Does lowering operations for GLSL variable "gl_FrontColor" or "gl_BackColor" or "gl_FrontSecondaryColor" or
 // "gl_BackSecondaryColor".
+//
+// @param [in] color : One of gl_FrontColor/gl_BackColor/gl_FrontSecondaryColor/gl_BackSecondaryColor.
 void LowerGLCompatibility::lowerColor(llvm::User *color) {
   if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessControl ||
-      m_shaderStage == ShaderStageTessEval) {
+      m_shaderStage == ShaderStageTessEval || m_shaderStage == ShaderStageFragment) {
     assert(m_retInst != nullptr);
     m_builder->SetInsertPoint(m_retInst);
     emulationOutputColor(color);
@@ -590,6 +957,12 @@ void LowerGLCompatibility::lowerFrontSecondaryColor() {
 // Does lowering operations for GLSL variable "gl_BackSecondaryColor".
 void LowerGLCompatibility::lowerBackSecondaryColor() {
   lowerColor(m_backSecondaryColor);
+}
+
+// =====================================================================================================================
+// Does clamp fragment color
+void LowerGLCompatibility::lowerFragColor() {
+  lowerColor(m_fragColor);
 }
 
 } // namespace Llpc

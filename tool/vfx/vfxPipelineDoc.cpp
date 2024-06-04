@@ -407,6 +407,7 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypeRtState, SectionRtState)
     CASE_SUBSECTION(MemberTypeRayTracingShaderExportConfig, SectionRayTracingShaderExportConfig)
     CASE_SUBSECTION(MemberTypeIndirectCalleeSavedRegs, SectionIndirectCalleeSavedRegs)
+    CASE_SUBSECTION(MemberTypeGpurtOption, SectionGpurtOption)
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
     CASE_SUBSECTION(MemberTypeGpurtFuncTable, SectionGpurtFuncTable)
 #endif

@@ -30,32 +30,32 @@ void main() {
   coopMatStore(A[idx2], buf.x, 64, 4, 0);
 }
 
-// CHECK-LABEL:  @lgc.shader.CS.main(
-// CHECK-LABEL:  .entry:
+// CHECK-LABEL: @lgc.shader.CS.main(
+// CHECK-NEXT:  .entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(4) (...) @lgc.create.load.push.constants.ptr.p4()
 // CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
-// CHECK-NEXT:    [[TMP2:%.*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP1]], i32 32, i1 true, i32 1, i32 0, i32 0) #[[ATTR1:[0-9]+]]
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds <{ [4294967295 x [4 x i32]] }>, ptr addrspace(7) [[TMP1]], i32 0, i32 0, i32 32
-// CHECK-NEXT:    [[TMP4:%.*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP3]], i32 32, i1 true, i32 1, i32 0, i32 0) #[[ATTR1]]
-// CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(4) [[TMP0]], align 4
-// CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 [[TMP5]], 2
-// CHECK-NEXT:    br i1 [[TMP6]], label %[[LABEL7:.*]], label %[[LABEL12:.*]]
-// CHECK:       [[LABEL7]]:
-// CHECK-NEXT:    [[TMP8:%.*]] = icmp eq i32 [[TMP5]], 1
-// CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP8]], <8 x float> [[TMP4]], <8 x float> [[TMP2]]
-// CHECK-NEXT:    [[TMP10:%.*]] = call half @lgc.cooperative.matrix.extract.f16.v8f32.i32.i32.i32(<8 x float> [[TMP9]], i32 3, i32 1, i32 0) #[[ATTR3:[0-9]+]]
-// CHECK-NEXT:    [[TMP11:%.*]] = fptoui half [[TMP10]] to i32
-// CHECK-NEXT:    br label %[[LABEL12]]
-// CHECK:       [[LABEL12]]:
-// CHECK-NEXT:    [[TMP13:%.*]] = phi i32 [ 0, [[DOTENTRY:%.*]] ], [ [[TMP11]], %[[LABEL7]] ]
-// CHECK-NEXT:    store i32 [[TMP13]], ptr addrspace(7) [[TMP1]], align 4
-// CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds <{ i32, i32 }>, ptr addrspace(4) [[TMP0]], i64 0, i32 1
-// CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(4) [[TMP14]], align 4
-// CHECK-NEXT:    [[TMP16:%.*]] = icmp ult i32 [[TMP15]], 2
-// CHECK-NEXT:    [[TMP17:%.*]] = icmp eq i32 [[TMP15]], 1
-// CHECK-NEXT:    [[TMP18:%.*]] = select i1 [[TMP17]], <8 x float> [[TMP4]], <8 x float> [[TMP2]]
-// CHECK-NEXT:    [[TMP19:%.*]] = select i1 [[TMP16]], <8 x float> [[TMP18]], <8 x float> zeroinitializer
-// CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds <{ [4294967295 x [4 x i32]] }>, ptr addrspace(7) [[TMP1]], i32 0, i32 0, i32 64
-// CHECK-NEXT:    call void @lgc.cooperative.matrix.store.p7.i32.i1.i32.i32.i32.v8f32(ptr addrspace(7) [[TMP20]], i32 64, i1 true, i32 1, i32 0, i32 0, <8 x float> [[TMP19]]) #[[ATTR2:[0-9]+]]
+// CHECK-NEXT:    [[LOAD:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP1]], i32 32, i1 true, i32 1, i32 0, i32 0, i32 16)
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP1]], i32 512
+// CHECK-NEXT:    [[LOAD2:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP2]], i32 32, i1 true, i32 1, i32 0, i32 0, i32 16)
+// CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(4) [[TMP0]], align 4
+// CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 2
+// CHECK-NEXT:    br i1 [[TMP4]], label [[TMP5:%.*]], label [[TMP10:%.*]]
+// CHECK:       5:
+// CHECK-NEXT:    [[TMP6:%.*]] = icmp eq i32 [[TMP3]], 1
+// CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], <8 x float> [[LOAD2]], <8 x float> [[LOAD]]
+// CHECK-NEXT:    [[TMP8:%.*]] = call half (...) @lgc.cooperative.matrix.extract__f16(<8 x float> [[TMP7]], i32 3, i32 1, i32 0)
+// CHECK-NEXT:    [[TMP9:%.*]] = fptoui half [[TMP8]] to i32
+// CHECK-NEXT:    br label [[TMP10]]
+// CHECK:       10:
+// CHECK-NEXT:    [[TMP11:%.*]] = phi i32 [ 0, [[DOTENTRY:%.*]] ], [ [[TMP9]], [[TMP5]] ]
+// CHECK-NEXT:    store i32 [[TMP11]], ptr addrspace(7) [[TMP1]], align 4
+// CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i8, ptr addrspace(4) [[TMP0]], i64 4
+// CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(4) [[TMP12]], align 4
+// CHECK-NEXT:    [[TMP14:%.*]] = icmp ult i32 [[TMP13]], 2
+// CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[TMP13]], 1
+// CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP15]], <8 x float> [[LOAD2]], <8 x float> [[LOAD]]
+// CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[TMP14]], <8 x float> [[TMP16]], <8 x float> zeroinitializer
+// CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP1]], i32 1024
+// CHECK-NEXT:    call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) [[TMP18]], i32 64, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> [[TMP17]])
 // CHECK-NEXT:    ret void
 //

@@ -56,7 +56,7 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[CR]] to ptr
 ; LOWER-AWAIT-NEXT:    [[TMP5:%.*]] = call ptr [[TMP4]](i32 [[CR]], i32 2, float [[T0]])
 ; LOWER-AWAIT-NEXT:    [[TMP6:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP5]])
-; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call float @continuations.getReturnValue__f32()
+; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call float @lgc.ilcps.getReturnValue__f32()
 ; LOWER-AWAIT-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[TMP7]], [[ARG]]
 ; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 2, {} poison, i32 poison, float [[RETURNVALUE]])
 ; LOWER-AWAIT-NEXT:    unreachable

@@ -251,20 +251,13 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   // 3. Then it will merge non-fs generated in noia.2 and fs which is saved in cached after noia.0
   // There will be a merge on threshold here, just merge fs_threshold@fs_in_cache not
   // Pipelinelevel_threshold@fs_in_cache
+  auto hwPsStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Ps)];
   unsigned srcSpillValue = USHRT_MAX;
-  if (pContext->getGfxIpVersion().major > 10) {
-    auto srcPsHwStage = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages]
-                            .getMap(true)[static_cast<unsigned>(Util::Abi::HardwareStage::Ps)]
-                            .getMap(true);
-    auto srcSpillThreshold = &srcPsHwStage[ShaderSpillThreshold];
-    if (!srcSpillThreshold->isEmpty()) {
-      srcSpillValue = srcPsHwStage[ShaderSpillThreshold].getUInt();
-    }
-  } else {
-    // This is to revert and keep legacy behavior on gfx10 as to fix the block issue: hang on PAL for
-    // gfx_bench. Todo: Needs to keep same with gfx10+
-    srcSpillValue = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
-  }
+  auto srcPsHwStage =
+      srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages].getMap(true)[hwPsStageName].getMap(true);
+  auto srcSpillThresholdIt = srcPsHwStage.find(ShaderSpillThreshold);
+  if (srcSpillThresholdIt != srcPsHwStage.end())
+    srcSpillValue = srcSpillThresholdIt->second.getUInt();
 
   unsigned destSpillThreshold = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold].getUInt();
   destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::SpillThreshold] =
@@ -279,7 +272,6 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   // Copy whole .ps hw stage
   auto destHwStages = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages].getMap(true);
   auto srcHwStages = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages].getMap(true);
-  auto hwPsStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Ps)];
   destHwStages[hwPsStageName] = srcHwStages[hwPsStageName];
 
   // Copy whole .pixel shader

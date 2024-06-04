@@ -158,16 +158,10 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           shaderModuleUsage.useGenericBuiltIn = true;
           break;
         }
-        case BuiltInBaryCoordKHR:
-        case BuiltInBaryCoordNoPerspKHR:
-          shaderModuleUsage.useBarycentric = true;
-          break;
         default: {
           break;
         }
         }
-      } else if (decoration == DecorationPerVertexKHR) {
-        shaderModuleUsage.useBarycentric = true;
       } else if (decoration == DecorationIndex) {
         hasIndexDecoration = true;
       }

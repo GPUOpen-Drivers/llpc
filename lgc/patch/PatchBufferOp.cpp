@@ -32,6 +32,7 @@
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -122,7 +123,7 @@ PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipeli
 // @param [in,out] function : LLVM function to be run on
 // @returns : True if the module was modified by the transformation and false otherwise
 bool PatchBufferOpImpl::run(Function &function) {
-  LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op\n");
+  LLVM_DEBUG(dbgs() << "Run the pass Patch-Buffer-Op on: " << function.getName() << '\n');
 
   static const auto visitor = llvm_dialects::VisitorBuilder<PatchBufferOpImpl>()
                                   .nest(&BufferOpLowering::registerVisitors)
@@ -195,6 +196,7 @@ void BufferOpLowering::registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLo
   builder.add(&BufferOpLowering::visitAtomicCmpXchgInst);
   builder.add(&BufferOpLowering::visitAtomicRMWInst);
   builder.add(&BufferOpLowering::visitBitCastInst);
+  builder.add(&BufferOpLowering::visitBufferAddrToPtr);
   builder.add(&BufferOpLowering::visitBufferDescToPtr);
   builder.add(&BufferOpLowering::visitStridedBufferDescToPtr);
   builder.add(&BufferOpLowering::visitStridedBufferAddrAndStrideToPtr);
@@ -202,6 +204,7 @@ void BufferOpLowering::registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLo
   builder.add(&BufferOpLowering::visitBufferLength);
   builder.add(&BufferOpLowering::visitBufferPtrDiff);
   builder.add(&BufferOpLowering::visitGetElementPtrInst);
+  builder.add(&BufferOpLowering::visitLoadTfeOp);
   builder.add(&BufferOpLowering::visitLoadInst);
   builder.add(&BufferOpLowering::visitMemCpyInst);
   builder.add(&BufferOpLowering::visitMemMoveInst);
@@ -228,12 +231,14 @@ void BufferOpLowering::finish() {
       if (newPhi->getParent() == originalPhi->getParent()) {
         DescriptorInfo &di = m_descriptors[newPhi];
         di.divergent = true;
+        LLVM_DEBUG(dbgs() << "Divergent PHI of descriptor: " << *newPhi << '\n');
       }
     }
   }
 
   static const auto visitor = llvm_dialects::VisitorBuilder<BufferOpLowering>()
                                   .add(&BufferOpLowering::postVisitLoadInst)
+                                  .add(&BufferOpLowering::postVisitLoadTfeOp)
                                   .add(&BufferOpLowering::postVisitMemCpyInst)
                                   .add(&BufferOpLowering::postVisitMemSetInst)
                                   .add(&BufferOpLowering::postVisitStoreInst)
@@ -273,8 +278,10 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
             searchWorklist.push_back(incoming);
         } else if (auto *select = dyn_cast<SelectInst>(current)) {
           assert(select->getOperandUse(0).get() == select->getCondition());
-          if (m_uniformityInfo.isDivergentUse(select->getOperandUse(0)))
+          if (m_uniformityInfo.isDivergentUse(select->getOperandUse(0))) {
             di.divergent = true;
+            LLVM_DEBUG(dbgs() << "Divergent descriptor: " << *select << '\n');
+          }
 
           if (!di.invariant.has_value() || !di.divergent.has_value()) {
             searchWorklist.push_back(select->getTrueValue());
@@ -289,6 +296,8 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
           if (!di.divergent.has_value()) {
             // TODO: This would be entirely unnecessary if we had updatable divergence info.
             di.divergent = !isConstant;
+            LLVM_DEBUG(dbgs() << (di.divergent.value() ? "Divergent" : "Uniform") << " descriptor: " << *current
+                              << '\n');
           }
         }
       }
@@ -319,10 +328,12 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
       auto &userDi = m_descriptors[user];
       bool propagate = false;
       if (!userDi.invariant.has_value() && !di.invariant.value_or(true)) {
+        LLVM_DEBUG(dbgs() << "Variant descriptor: " << *user << '\n');
         userDi.invariant = false;
         propagate = true;
       }
       if (!userDi.divergent.has_value() && di.divergent.value_or(false)) {
+        LLVM_DEBUG(dbgs() << "Divergent descriptor: " << *user << '\n');
         userDi.divergent = true;
         propagate = true;
       }
@@ -334,10 +345,14 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
   // At this point, seen values that are not "variant"/"divergent" are known to be "invariant"/"uniform".
   for (Value *current : seen) {
     auto &di = m_descriptors[current];
-    if (!di.invariant.has_value())
+    if (!di.invariant.has_value()) {
       di.invariant = true;
-    if (!di.divergent.has_value())
+      LLVM_DEBUG(dbgs() << "Invariant descriptor: " << *current << '\n');
+    }
+    if (!di.divergent.has_value()) {
       di.divergent = false;
+      LLVM_DEBUG(dbgs() << "Uniform descriptor: " << *current << '\n');
+    }
   }
 
   return m_descriptors.find(desc)->second;
@@ -654,6 +669,30 @@ void BufferOpLowering::visitBitCastInst(BitCastInst &bitCastInst) {
 }
 
 // =====================================================================================================================
+// Lower a buffer.addr.to.ptr op, to convert an i64 address to a buffer fat pointer.
+void BufferOpLowering::visitBufferAddrToPtr(BufferAddrToPtrOp &op) {
+  BuilderImpl builder(&m_pipelineState);
+  builder.setShaderStage(getShaderStage(op.getFunction()));
+  builder.SetInsertPoint(&op);
+
+  // Extend the i64 address to a <4 x i32> descriptor.
+  Value *descriptor = builder.buildBufferCompactDesc(
+      builder.CreateBitCast(op.getAddr(), FixedVectorType::get(builder.getInt32Ty(), 2)), 0);
+  m_typeLowering.replaceInstruction(&op, {descriptor, ConstantPointerNull::get(m_offsetType)});
+
+  auto &di = m_descriptors[descriptor];
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  di.divergent = m_uniformityInfo.isDivergent(*descriptor);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  di.divergent = m_uniformityInfo.isDivergent(descriptor);
+#endif
+  LLVM_DEBUG(dbgs() << (di.divergent.value() ? "Divergent" : "Uniform") << " descriptor: " << *descriptor << '\n');
+}
+
+// =====================================================================================================================
 // Visits "buffer.desc.to.ptr" instruction.
 //
 // @param descToPtr : The instruction
@@ -672,6 +711,7 @@ void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
   // New version of the code (also handles unknown version, which we treat as latest)
   di.divergent = m_uniformityInfo.isDivergent(descriptor);
 #endif
+  LLVM_DEBUG(dbgs() << (di.divergent.value() ? "Divergent" : "Uniform") << " descriptor: " << *descriptor << '\n');
 }
 
 // =====================================================================================================================
@@ -694,6 +734,7 @@ void BufferOpLowering::visitStridedBufferDescToPtr(StridedBufferDescToPtrOp &des
   // New version of the code (also handles unknown version, which we treat as latest)
   di.divergent = m_uniformityInfo.isDivergent(descriptor);
 #endif
+  LLVM_DEBUG(dbgs() << (di.divergent.value() ? "Divergent" : "Uniform") << " descriptor: " << *descriptor << '\n');
 }
 
 // =====================================================================================================================
@@ -889,6 +930,8 @@ void BufferOpLowering::postVisitLoadInst(LoadInst &loadInst) {
 
   // Record the load instruction so we remember to delete it later.
   m_typeLowering.eraseInstruction(&loadInst);
+  // Replace the mapping.
+  m_typeLowering.replaceValue(&loadInst, newLoad);
 
   loadInst.replaceAllUsesWith(newLoad);
 }
@@ -1297,6 +1340,48 @@ void BufferOpLowering::postVisitMemSetInst(MemSetInst &memSetInst) {
 }
 
 // =====================================================================================================================
+// Visits "load.tfe" instruction.
+//
+// @param loadTfe : The instruction
+void BufferOpLowering::visitLoadTfeOp(LoadTfeOp &loadTfe) {
+  assert(isAnyBufferPointer(loadTfe.getPointer()));
+  m_postVisitInsts.push_back(&loadTfe);
+}
+
+// =====================================================================================================================
+// Visits "load.tfe" instruction after the initial pass, when phi nodes have been fixed up and potentially simplified.
+//
+// @param loadTfe : the instruction
+void BufferOpLowering::postVisitLoadTfeOp(LoadTfeOp &loadTfe) {
+  Value *pointerOperand = loadTfe.getPointer();
+
+  m_builder.SetInsertPoint(&loadTfe);
+  auto pointerValues = m_typeLowering.getValue(pointerOperand);
+  Value *bufferDesc = pointerValues[0];
+  Value *const offset = m_builder.CreatePtrToInt(pointerValues[1], m_builder.getInt32Ty());
+  Instruction *bufferLoad = nullptr;
+
+  if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
+    bufferLoad = m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, loadTfe.getType(),
+                                           {bufferDesc, offset, m_builder.getInt32(0), m_builder.getInt32(0)});
+  } else {
+    bufferLoad = m_builder.CreateIntrinsic(
+        Intrinsic::amdgcn_struct_buffer_load, loadTfe.getType(),
+        {bufferDesc, m_builder.getInt32(0), offset, m_builder.getInt32(0), m_builder.getInt32(0)});
+  }
+  if (getDescriptorInfo(bufferDesc).divergent.value()) {
+    BuilderImpl builderImpl(&m_pipelineState);
+    bufferLoad = builderImpl.createWaterfallLoop(bufferLoad, 0, false);
+  }
+
+  // Record the load instruction so we remember to delete it later.
+  m_typeLowering.eraseInstruction(&loadTfe);
+  // Replace the mapping.
+  m_typeLowering.replaceValue(&loadTfe, bufferLoad);
+  loadTfe.replaceAllUsesWith(bufferLoad);
+}
+
+// =====================================================================================================================
 // Extract the 64-bit address from a buffer descriptor.
 //
 // @param bufferDesc : The buffer descriptor to extract the address from
@@ -1522,10 +1607,27 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         coherent.bits.dlc = isDlc;
       }
       if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
-        CallInst *call = m_builder.CreateIntrinsic(
-            Intrinsic::amdgcn_struct_buffer_load, intAccessType,
-            {bufferDesc, pointerValues[2], offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+        Value *indexValue = pointerValues[2];
+        CallInst *call = nullptr;
+        // Especially when the index is a constant, and the stride is known at compile-time,
+        // we should create s_buffer_load instructions with constant offsets: index * stride + offset
+        if ((isInvariant && accessSize >= 4) && isa<ConstantInt>(indexValue)) {
+          Value *desc1 = m_builder.CreateExtractElement(bufferDesc, 1);
+          // stride is 61:48 bits in descriptor, which will always be constantInt when create BufferDesc
+          Value *stride =
+              m_builder.CreateAnd(m_builder.CreateLShr(desc1, m_builder.getInt32(16)), m_builder.getInt32(0x3fff));
+          Value *indexOffsetVal = m_builder.CreateMul(indexValue, stride);
+          offsetVal = m_builder.CreateAdd(offsetVal, indexOffsetVal);
+          call = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
+                                           {bufferDesc, offsetVal, m_builder.getInt32(coherent.u32All)});
+        } else {
+          call = m_builder.CreateIntrinsic(
+              Intrinsic::amdgcn_struct_buffer_load, intAccessType,
+              {bufferDesc, indexValue, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+        }
         copyMetadata(call, &inst);
+        if (isInvariant)
+          call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
         part = call;
       } else if (isInvariant && accessSize >= 4) {
         CallInst *call = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,

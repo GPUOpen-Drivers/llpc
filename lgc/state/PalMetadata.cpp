@@ -367,7 +367,6 @@ ShaderStageMask PalMetadata::getShaderStageMask() {
         stageMask |= ShaderStageMask(entry.stage);
     }
   }
-  assert(!stageMask.empty());
   return stageMask;
 }
 
@@ -477,11 +476,13 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   if (m_pipelineState->isGraphics())
     finalizeRegisterSettings(isWholePipeline);
 
-  // Set pipeline hash.
+  // Set pipeline hash and resource hash.
   auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
   const auto &options = m_pipelineState->getOptions();
   pipelineHashNode[0] = options.hash[0];
   pipelineHashNode[1] = options.hash[1];
+  if (options.resourceHash != 0)
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::ResourceHash] = options.resourceHash;
 
   // The rest of this function is used only for whole pipeline PAL metadata or an ELF link.
   if (!isWholePipeline)

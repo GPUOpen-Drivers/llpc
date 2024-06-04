@@ -127,7 +127,8 @@ void LowerCooperativeMatrix::visitPointerUsers(Value *ptr, CooperativeMatrixElem
 
       Type *matrixType = m_builder.getCooperativeMatrixTy(elemTypeEnum, layout);
       Value *matrix = m_builder.CreateLoad(matrixType, matrixPtr);
-      Value *element = m_builder.CreateCooperativeMatrixExtract(matrix, index, elemTypeEnum, layout);
+      Type *elemTy = m_builder.transCooperativeMatrixElementType(elemTypeEnum);
+      Value *element = m_builder.create<CooperativeMatrixExtractOp>(elemTy, matrix, index, elemTypeEnum, layout);
       load->replaceAllUsesWith(element);
     } else if (auto *store = dyn_cast<StoreInst>(inst)) {
       assert(store->getPointerOperand() == ptr);
@@ -135,7 +136,8 @@ void LowerCooperativeMatrix::visitPointerUsers(Value *ptr, CooperativeMatrixElem
 
       Type *matrixType = m_builder.getCooperativeMatrixTy(elemTypeEnum, layout);
       Value *matrix = m_builder.CreateLoad(matrixType, matrixPtr);
-      matrix = m_builder.CreateCooperativeMatrixInsert(matrix, store->getValueOperand(), index, elemTypeEnum, layout);
+      matrix = m_builder.create<CooperativeMatrixInsertOp>(matrix->getType(), matrix, store->getValueOperand(), index,
+                                                           elemTypeEnum, layout);
       m_builder.CreateStore(matrix, matrixPtr);
     } else if (auto *gep = dyn_cast<GetElementPtrInst>(inst)) {
       assert(gep->getPointerOperand() == ptr);

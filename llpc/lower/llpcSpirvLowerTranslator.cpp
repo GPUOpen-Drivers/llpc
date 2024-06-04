@@ -100,8 +100,12 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
   SmallVector<SPIRV::ConvertingSampler, 4> convertingSamplers;
   for (const auto &range : descriptorRangeValues) {
     if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+      uint32_t rangeSet = range.set;
+      if (context->getPipelineContext()->getPipelineOptions()->replaceSetWithResourceType && range.set == 0) {
+        rangeSet = PipelineContext::getGlResourceNodeSetFromType(range.type);
+      }
       convertingSamplers.push_back(
-          {range.set, range.binding,
+          {rangeSet, range.binding,
            ArrayRef<unsigned>(range.pValue, range.arraySize * SPIRV::ConvertingSamplerDwordCount)});
     }
   }

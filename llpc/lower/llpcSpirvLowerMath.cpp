@@ -660,7 +660,7 @@ void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
   // Replace fma with amdgcn_fma_legacy intrinsic when detect patterns like:
   // fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
   auto mangledName = callee->getName();
-  if (mangledName.startswith("lgc.create.fma")) {
+  if (mangledName.starts_with("lgc.create.fma")) {
     emitFFmazInst(&callInst);
   }
 }

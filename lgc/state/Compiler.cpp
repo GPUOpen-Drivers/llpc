@@ -63,9 +63,11 @@ ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, llvm::ArrayRef<llvm
 // with irLink(). This is a static method in Pipeline, as it does not need a Pipeline object, and can be used
 // in the front-end before a shader is associated with a pipeline.
 //
-// @param func : Shader entry-point function
+// @param func : Function to mark. This can instead be a GlobalVariable; that functionality is not used by LGC,
+//               but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+//               from the cache, and wants to mark it with a shader stage
 // @param stage : Shader stage or ShaderStage::Invalid
-void Pipeline::markShaderEntryPoint(Function *func, ShaderStageEnum stage) {
+void Pipeline::markShaderEntryPoint(GlobalObject *func, ShaderStageEnum stage) {
   // We mark the shader entry-point function by
   // 1. marking it external linkage and DLLExportStorageClass; and
   // 2. adding the shader stage metadata.
@@ -81,19 +83,29 @@ void Pipeline::markShaderEntryPoint(Function *func, ShaderStageEnum stage) {
 // =====================================================================================================================
 // Get a function's shader stage.
 //
-// @param func : Function to check
+// @param func : Function to check. This can instead be a GlobalVariable; that functionality is not used by LGC,
+//               but can be used by a front-end that uses a GlobalVariable to represent a part-pipeline retrieved
+//               from the cache, and wants to mark it with a shader stage
 // @returns stage : Shader stage, or nullopt if none
-std::optional<ShaderStageEnum> Pipeline::getShaderStage(llvm::Function *func) {
+std::optional<ShaderStageEnum> Pipeline::getShaderStage(GlobalObject *func) {
   return lgc::getShaderStage(func);
+}
+
+// =====================================================================================================================
+// Set a function's shader subtype. Only has an effect on a compute shader or non-shader export function,
+// where it causes the .shader_subtype PAL metadata item to be set to the arbitrary string given here.
+void Pipeline::setShaderSubtype(GlobalObject *func, StringRef subtype) {
+  lgc::setShaderSubtype(func, subtype);
 }
 
 // =====================================================================================================================
 // Find the shader entry-point from shader module, and set pipeline stage.
 //
 // @param module : Shader module to attach
-void PipelineState::attachModule(llvm::Module *module) {
+void PipelineState::attachModule(llvm::Module *module, PipelineLink pipelineLink) {
   if (!module)
     return;
+  m_pipelineLink = pipelineLink;
 
   // Find the shader entry-point (marked with irLink()), and get the shader stage from that.
   std::optional<ShaderStageEnum> stage;
@@ -136,7 +148,7 @@ std::unique_ptr<Module> PipelineState::irLink(MutableArrayRef<std::unique_ptr<Mo
     if (!module)
       continue;
 
-    attachModule(module.get());
+    attachModule(module.get(), pipelineLink);
   }
 
   // The front-end was using a BuilderRecorder; record pipeline state into IR metadata.

@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in all
- *  copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in
+ *all copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -23,32 +23,10 @@
  *
  **********************************************************************************************************************/
 
-//===- ContinuationsDialect.td - Dialect definitions -------*- tablegen -*-===//
+//===- LgcIlCpsDialect.h - Dialect definitions -----------------------===//
 
-include "llvm-dialects/Dialect/Dialect.td"
+#pragma once
 
-def ContinuationsDialect : Dialect {
-  let name = "continuations";
-  let cppNamespace = "continuations";
-}
-
-class ContinuationsOp<string mnemonic_, list<Trait> traits_ = []>
-    : Op<ContinuationsDialect, mnemonic_, traits_ # [NoUnwind]>;
-
-def GetReturnValueOp : ContinuationsOp<"getReturnValue", [NoUnwind, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs value:$result);
-
-  let defaultBuilderHasExplicitResultType = true;
-
-  let summary =
-    "represents the return value of an asynchronously called function";
-  let description = [{
-    The coroutine passes do not support passing additional arguments to resume
-    functions. We add this intrinsic after a resume point that creates
-    a value out of thin air. After the coroutine passes, values created by
-    this intrinsic are added as arguments to resume functions.
-    The arguments to resume functions are the return values of the called
-    coroutine.
-  }];
-}
+#define GET_INCLUDES
+#define GET_DIALECT_DECLS
+#include "LgcIlCpsDialect.h.inc"

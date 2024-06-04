@@ -1,21 +1,15 @@
-; RUN: grep -v SKIP_LINE_BY_DEFAULT %s | \
-; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2> %t0.stderr | \
-; RUN:    FileCheck -check-prefix=POSTPROCESS-REGCOUNT %s
-; RUN: count 0 < %t0.stderr
+; RUN: grep -v MAX_REG_10 %s | \
+; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S --lint-abort-on-error | \
+; RUN:    FileCheck -check-prefixes=COMMON,MAX30 %s
 ;
-; RUN: grep -v SKIP_LINE_BY_DEFAULT %s | \
-; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2> %t1.stderr | \
-; RUN:    FileCheck -check-prefix=POSTPROCESS-REGCOUNT2 %s
-; RUN: count 0 < %t1.stderr
-;
-; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2> %t2.stderr | \
-; RUN:    FileCheck -check-prefix=POSTPROCESS-REGCOUNT-FEWREGS %s
-; RUN: count 0 < %t2.stderr
+; RUN: grep -v MAX_REG_30 %s | \
+; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' -S --lint-abort-on-error | \
+; RUN:    FileCheck -check-prefixes=COMMON,MAX10 %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
 ; The 'grep' commands filter out a metadata node that reduces the payload register count.
 
-target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
+target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
 %dx.types.Handle = type { i8* }
 %struct.DispatchSystemData = type { i32 }
@@ -25,7 +19,8 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %struct.AnyHitTraversalData = type { %struct.TraversalData, %struct.HitData }
 %struct.HitData = type { float, i32 }
 %struct.TheirParams = type { [10 x i32] }
-%struct.RayPayload = type { [9 x i32] }
+%struct.RayPayload = type { [15 x i32] }
+%struct.PayloadWithI16 = type { i16, i16 }
 %dx.types.ResourceProperties = type { i32, i32 }
 %struct.MyParams = type { [26 x i32] }
 %struct.TheirParams2 = type { [27 x i32] }
@@ -66,6 +61,10 @@ declare !types !29 void @_cont_AcceptHit(%struct.AnyHitTraversalData* nocapture 
 
 ; Function Attrs: alwaysinline
 declare i1 @opaqueIsEnd() #0
+
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+  ret void
+}
 
 ; Function Attrs: alwaysinline
 define i1 @_cont_IsEndSearch(%struct.TraversalData* %data) #0 !types !31 {
@@ -121,8 +120,15 @@ define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hi
   ret i1 true
 }
 
-; POSTPROCESS-REGCOUNT-DAG: call void (i64, ...) @continuation.continue(i64 2, {{.*}}, %struct.DispatchSystemData %{{[^ ]+}}), !continuation.registercount ![[callshader_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: ![[callshader_registercount]] = !{i32 10}
+; COMMON-DAG: ![[MD_I32_1:[0-9]+]] = !{i32 1}
+; COMMON-DAG: ![[MD_I32_10:[0-9]+]] = !{i32 10}
+; MAX30-DAG: ![[MD_I32_15:[0-9]+]] = !{i32 15}
+; MAX30-DAG: ![[MD_I32_26:[0-9]+]] = !{i32 26}
+; MAX30-DAG: ![[MD_I32_27:[0-9]+]] = !{i32 27}
+; MAX30-DAG: ![[MD_I32_30:[0-9]+]] = !{i32 30}
+
+; COMMON-DAG: define void @main(
+; COMMON-DAG: call void (i64, ...) @continuation.continue(i64 2, {{.*}}, %struct.DispatchSystemData %{{[^ ]+}}), !continuation.registercount ![[MD_I32_10]]
 
 define void @main() {
   %params = alloca %struct.TheirParams, align 4
@@ -130,8 +136,9 @@ define void @main() {
   ret void
 }
 
-; POSTPROCESS-REGCOUNT-DAG: call void (i64, ...) @continuation.continue(i64 4, {{.*}} %struct.TraversalData %{{[^ ]+}}), !continuation.registercount ![[traceray_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: ![[traceray_registercount]] = !{i32 15}
+; COMMON-DAG: define void @mainTrace(
+; MAX10-DAG: call void (i64, ...) @continuation.continue(i64 4, {{.*}} %struct.TraversalData %{{.*}}), !continuation.registercount ![[MD_I32_10]]
+; MAX30-DAG: call void (i64, ...) @continuation.continue(i64 4, {{.*}} %struct.TraversalData %{{.*}}), !continuation.registercount ![[MD_I32_15]]
 
 define void @mainTrace() {
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
@@ -144,16 +151,11 @@ define void @mainTrace() {
   ret void
 }
 
-; POSTPROCESS-REGCOUNT-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[called_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[called_resume_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: ![[called_registercount]] = !{i32 26}
-; POSTPROCESS-REGCOUNT-DAG: ![[called_resume_registercount]] = !{i32 27}
-
 ; If we set maxPayloadRegisterCount to 10, both functions use only 10 payload registers.
-; Note that due to metadata uniquing, both use the same metadata node.
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[registercount]]
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: ![[registercount]] = !{i32 10}
+; MAX10-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX10-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData{{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX30-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[MD_I32_26]]
+; MAX30-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData{{.*}} !continuation.registercount ![[MD_I32_27]]
 
 define void @called(%struct.MyParams* %arg) !types !39 {
   %params = alloca %struct.TheirParams2, align 4
@@ -161,10 +163,12 @@ define void @called(%struct.MyParams* %arg) !types !39 {
   ret void
 }
 
-; POSTPROCESS-REGCOUNT-DAG: define void @Intersection({{.*}}%struct.AnyHitTraversalData %0){{.*}} !continuation.registercount ![[intersection_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: define dso_local void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData %0){{.*}} !continuation.registercount ![[intersection_registercount]]
-; POSTPROCESS-REGCOUNT-DAG: call void (i64, ...) @continuation.continue(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}), !continuation.registercount ![[intersection_registercount]]
-; POSTPROCESS-REGCOUNT-DAG: ![[intersection_registercount]] = !{i32 30}
+; MAX10-DAG: define void @Intersection({{.*}}%struct.AnyHitTraversalData %0){{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX10-DAG: define dso_local void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData{{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX10-DAG: call void (i64, ...) @continuation.continue(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}), !continuation.registercount ![[MD_I32_10]]
+; MAX30-DAG: define void @Intersection({{.*}}%struct.AnyHitTraversalData %0){{.*}} !continuation.registercount ![[MD_I32_30]]
+; MAX30-DAG: define dso_local void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData{{.*}} !continuation.registercount ![[MD_I32_30]]
+; MAX30-DAG: call void (i64, ...) @continuation.continue(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}), !continuation.registercount ![[MD_I32_30]]
 
 define void @Intersection() #3 {
   %a = alloca %struct.BuiltInTriangleIntersectionAttributes, align 4
@@ -172,33 +176,36 @@ define void @Intersection() #3 {
   ret void
 }
 
-; POSTPROCESS-REGCOUNT2-DAG: define void @AnyHit({{.*}}%struct.AnyHitTraversalData %0, %struct.BuiltInTriangleIntersectionAttributes %1){{.*}} !continuation.registercount ![[anyhit_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT2-DAG: ![[anyhit_registercount]] = !{i32 15}
+; MAX10-DAG: define void @AnyHit({{.*}}%struct.AnyHitTraversalData %0, %struct.BuiltInTriangleIntersectionAttributes %1){{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX30-DAG: define void @AnyHit({{.*}}%struct.AnyHitTraversalData %0, %struct.BuiltInTriangleIntersectionAttributes %1){{.*}} !continuation.registercount ![[MD_I32_15]]
 
 define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readonly %attr) #3 !types !41 {
   ret void
 }
 
-; With fixed hit attribute registers and without PAQs, ClosestHitOut also contains storage for hit attributes,
-; so we re-used the anyhit_registercount metadata for the match.
-; POSTPROCESS-REGCOUNT2-DAG: define void @ClosestHit({{.*}}%struct.SystemData %0){{.*}} !continuation.registercount ![[anyhit_registercount]]
+; With fixed hit attribute registers and without PAQs, ClosestHitOut also contains storage for hit attributes
+; MAX10-DAG: define void @ClosestHit({{.*}}%struct.SystemData %0){{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX30-DAG: define void @ClosestHit({{.*}}%struct.SystemData %0){{.*}} !continuation.registercount ![[MD_I32_15]]
 
 define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readonly %attr) #3 !types !41 {
   ret void
 }
 
-declare void @continuation.continue(i64, ...)
+; COMMON-DAG: define void @Miss16({{.*}}%struct.SystemData %0){{.*}} !continuation.registercount ![[MD_I32_1]]
+define void @Miss16(%struct.PayloadWithI16* noalias nocapture %payload) !types !55 {
+  ret void
+}
 
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define %struct._AmdTraversalResultData @_cont_Traversal({{.*}} !continuation.registercount ![[registercount]]
-;                                                                                                       ^--- this MD node has value 10
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: call {{.*}} @continuation.continue({{.*}} !continuation.registercount ![[registercount]]
-; POSTPROCESS-REGCOUNT-DAG: define %struct._AmdTraversalResultData @_cont_Traversal({{.*}} !continuation.registercount ![[intersection_registercount]]
-;                                                                                               ^--- this MD node has value 30
-; POSTPROCESS-REGCOUNT-DAG: call {{.*}} @continuation.continue({{.*}} !continuation.registercount ![[intersection_registercount]]
+declare void @_AmdEnqueueAnyHit(i64, %struct._AmdSystemData) #0
+
+; MAX10-DAG: define void @_cont_Traversal({{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX10-DAG: call {{.*}} @continuation.continue({{.*}} !continuation.registercount ![[MD_I32_10]]
+; MAX30-DAG: define void @_cont_Traversal({{.*}} !continuation.registercount ![[MD_I32_27]]
+; MAX30-DAG: call {{.*}} @continuation.continue({{.*}} !continuation.registercount ![[MD_I32_27]]
 
 define void @_cont_Traversal(%struct._AmdTraversalResultData* noalias nocapture sret(%struct._AmdTraversalResultData) %agg.result, %struct._AmdSystemData* noalias %data) !types !44 {
-  call void (i64, ...) @continuation.continue(i64 0, i8 addrspace(21)* undef)
-  ret void
+  call void @_AmdEnqueueAnyHit(i64 0, %struct._AmdSystemData undef)
+  unreachable
 }
 
 ; Function Attrs: nounwind
@@ -227,8 +234,12 @@ attributes #3 = { nounwind }
 !dx.version = !{!1}
 !dx.valver = !{!1}
 !dx.shaderModel = !{!2}
-!dx.entryPoints = !{!3, !6, !13, !15, !17, !19, !21}
-!continuation.maxPayloadRegisterCount = !{!23} ; SKIP_LINE_BY_DEFAULT
+!dx.entryPoints = !{!3, !6, !13, !15, !17, !19, !21, !57}
+!continuation.maxPayloadRegisterCount = !{!23} ; 10; only for MAX_REG_10
+!continuation.maxPayloadRegisterCount = !{!53} ; 30; only for MAX_REG_30
+!continuation.preservedPayloadRegisterCount = !{!23} ; 10; only for MAX_REG_10
+!continuation.preservedPayloadRegisterCount = !{!54} ; 27; only for MAX_REG_30
+!lgc.rt.max.attribute.size = !{!60}
 
 !0 = !{!"clang version 3.7.0 (tags/RELEASE_370/final)"}
 !1 = !{i32 1, i32 6}
@@ -283,3 +294,11 @@ attributes #3 = { nounwind }
 !50 = !{!"function", !"void", i32 poison, i32 poison, !51}
 !51 = !{i32 0, %struct.TheirParams2 poison}
 !52 = !{!"function", i1 poison, i32 poison, float poison, i32 poison, !43}
+!53 = !{i32 30}
+!54 = !{i32 27}
+!55 = !{!"function", !"void", !56}
+!56 = !{i32 0, %struct.PayloadWithI16 poison}
+!57 = !{void (%struct.PayloadWithI16*)* @Miss16, !"Miss16", null, null, !58}
+!58 = !{i32 8, i32 11, i32 6, i32 24, i32 5, !59}
+!59 = !{i32 0}
+!60 = !{i32 8}

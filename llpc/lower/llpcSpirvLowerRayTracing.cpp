@@ -516,6 +516,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
                               .add(&SpirvLowerRayTracing::visitShaderRecordBufferOp)
                               .add(&SpirvLowerRayTracing::visitStackReadOp)
                               .add(&SpirvLowerRayTracing::visitStackWriteOp)
+                              .add(&SpirvLowerRayTracing::visitLdsStackInitOp)
                               .build();
 
     visitor.visit(*this, *m_module);
@@ -2522,6 +2523,17 @@ void SpirvLowerRayTracing::visitStackWriteOp(lgc::GpurtStackWriteOp &inst) {
   // NOTE: If RayQuery is used inside intersection or any-hit shaders, where we already holding a traversal stack for
   // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
   if ((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit))
+    inst.setUseExtraStack(true);
+}
+
+// =====================================================================================================================
+// Visits "lgc.gpurt.stack.init" instructions
+//
+// @param inst : The instruction
+void SpirvLowerRayTracing::visitLdsStackInitOp(lgc::GpurtLdsStackInitOp &inst) {
+  // NOTE: If RayQuery is used inside any-hit shaders, where we already holding a traversal stack for
+  // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
+  if (m_shaderStage == ShaderStageRayTracingAnyHit)
     inst.setUseExtraStack(true);
 }
 

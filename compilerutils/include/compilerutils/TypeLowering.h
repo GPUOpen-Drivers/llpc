@@ -144,6 +144,7 @@ public:
 
   llvm::SmallVector<llvm::Value *> getValue(llvm::Value *);
   llvm::SmallVector<llvm::Value *> getValueOptional(llvm::Value *);
+  void replaceValue(llvm::Value *toReplace, llvm::Value *with) { replaceMappingWith(toReplace, with); }
   void replaceInstruction(llvm::Instruction *, llvm::ArrayRef<llvm::Value *>);
   void eraseInstruction(llvm::Instruction *);
 

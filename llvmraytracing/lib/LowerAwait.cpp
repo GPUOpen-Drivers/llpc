@@ -29,27 +29,39 @@
 // a resume point.
 //
 // This pass introduces a global for the return address, which is saved at the
-// start of a function and used in a `@continuation.return(i64)` call in the
+// start of a function and used in a `@lgc.ilcps.return(i64)` call in the
 // end.
 //
 //===----------------------------------------------------------------------===//
 
-#include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcCpsDialect.h"
-#include "llvm-dialects/Dialect/Builder.h"
+#include "lgc/LgcIlCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/ContinuationsDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
-#include <cassert>
 
 using namespace llvm;
 
 #define DEBUG_TYPE "lower-await"
+
+namespace {
+class LowerAwaitPassImpl final {
+public:
+  LowerAwaitPassImpl(Module &Mod);
+  PreservedAnalyses run();
+
+private:
+  Module &Mod;
+  MapVector<Function *, SmallVector<CallInst *>> ToProcess;
+  void collectContinuationFunctions();
+  void processContinuations(bool IsLgcCpsMode);
+};
+} // anonymous namespace
 
 Function *llvm::getContinuationWaitContinue(Module &M) {
   auto *Name = "continuation.waitContinue";
@@ -66,35 +78,36 @@ Function *llvm::getContinuationWaitContinue(Module &M) {
 
 Function *llvm::getContinuationAwait(Module &M, Type *TokenTy,
                                      StructType *RetTy) {
-  std::string Name = "await.";
-  Name += RetTy->getStructName();
-  if (auto *F = M.getFunction(Name))
-    return F;
+  std::string Name = "await";
   auto &C = M.getContext();
-  AttributeList AL =
+  auto *AwaitTy = FunctionType::get(RetTy, TokenTy, false);
+  auto *AwaitFun = Function::Create(
+      AwaitTy, GlobalValue::LinkageTypes::ExternalLinkage, Name, &M);
+  AwaitFun->setAttributes(
       AttributeList::get(C, AttributeList::FunctionIndex,
-                         {Attribute::NoUnwind, Attribute::WillReturn});
-  return cast<Function>(
-      M.getOrInsertFunction(Name, AL, RetTy, TokenTy).getCallee());
+                         {Attribute::NoUnwind, Attribute::WillReturn}));
+  return AwaitFun;
 }
 
-static Function *getContinuationReturn(Module &M) {
-  auto *Name = "continuation.return";
-  if (auto *F = M.getFunction(Name))
-    return F;
-  auto &C = M.getContext();
-  auto *Void = Type::getVoidTy(C);
-  auto *FuncTy = FunctionType::get(Void, {}, true);
-  AttributeList AL = AttributeList::get(C, AttributeList::FunctionIndex,
-                                        {Attribute::NoReturn});
-  return cast<Function>(M.getOrInsertFunction(Name, FuncTy, AL).getCallee());
+LowerAwaitPassImpl::LowerAwaitPassImpl(Module &Mod) : Mod{Mod} {}
+
+void LowerAwaitPassImpl::collectContinuationFunctions() {
+  for (auto &F : Mod.functions()) {
+    if (!F.getName().starts_with("await")) {
+      // Force processing annotated functions, even if they don't have await
+      // calls
+      if (F.hasMetadata(ContHelper::MDContinuationName))
+        ToProcess.insert({&F, {}});
+      continue;
+    }
+    for (auto *U : F.users()) {
+      if (auto *Inst = dyn_cast<CallInst>(U))
+        ToProcess[Inst->getFunction()].push_back(Inst);
+    }
+  }
 }
 
-LowerAwaitPass::LowerAwaitPass() {}
-
-static void processContinuations(
-    Module &M, const MapVector<Function *, SmallVector<CallInst *>> &ToProcess,
-    bool IsLgcCpsMode) {
+void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
   // We definitely have a call that requires continuation in this function
   //
   // If this is the first time we've done this for this function
@@ -105,7 +118,7 @@ static void processContinuations(
   // Replace the call with
   //    co.flag = llvm.coro.suspend.retcon
   //       unreachable
-  auto &Context = M.getContext();
+  auto &Context = Mod.getContext();
   auto *I8Ptr = Type::getInt8Ty(Context)->getPointerTo();
   auto *I32 = Type::getInt32Ty(Context);
   auto *I64 = Type::getInt64Ty(Context);
@@ -129,11 +142,10 @@ static void processContinuations(
 
     // Lgc.cps dialect will handle stack pointer and return address in
     // DXILContPostProcessPass.
+    bool IsTraversal = lgc::rt::getLgcRtShaderStage(F) ==
+                       lgc::rt::RayTracingShaderStage::Traversal;
     bool IsLegacyNonEntry =
-        !ContHelper::isLegacyEntryFunction(F) && !IsLgcCpsMode;
-    // Add passed return address.
-    if (IsLegacyNonEntry)
-      AllArgTypes.push_back(I64);
+        !ContHelper::isLegacyEntryFunction(F) && !IsLgcCpsMode && !IsTraversal;
 
     for (auto const &Arg : F->args())
       AllArgTypes.push_back(Arg.getType());
@@ -151,13 +163,9 @@ static void processContinuations(
     // Transfer code from old function to new function
     llvm::moveFunctionBody(*F, *NewFunc);
 
-    // Set arg names for new function
-    if (IsLegacyNonEntry)
-      NewFunc->getArg(0)->setName("returnAddr");
-
     for (unsigned Idx = 0; Idx != F->getFunctionType()->params().size();
          ++Idx) {
-      Argument *Arg = NewFunc->getArg(Idx + (IsLegacyNonEntry ? 1 : 0));
+      Argument *Arg = NewFunc->getArg(Idx);
       Argument *OldArg = F->getArg(Idx);
       Arg->setName(OldArg->getName());
       OldArg->replaceAllUsesWith(Arg);
@@ -177,11 +185,11 @@ static void processContinuations(
     // We need one per continuation because they have different metadata
     SmallVector<char> StrBuf;
     auto *ContProtoFunc = cast<Function>(
-        M.getOrInsertFunction(
-             (Twine("continuation.prototype.") + NewFunc->getName())
-                 .toStringRef(StrBuf),
-             FunctionType::get(NewRetTy, {I8Ptr, Type::getInt1Ty(Context)},
-                               false))
+        Mod.getOrInsertFunction(
+               (Twine("continuation.prototype.") + NewFunc->getName())
+                   .toStringRef(StrBuf),
+               FunctionType::get(NewRetTy, {I8Ptr, Type::getInt1Ty(Context)},
+                                 false))
             .getCallee());
 
     // Add metadata, marking it as a continuation function
@@ -195,13 +203,15 @@ static void processContinuations(
     // Alloc and free prototypes too
     auto *ContMallocTy = FunctionType::get(I8Ptr, {I32}, false);
     auto *ContMalloc = dyn_cast<Function>(
-        M.getOrInsertFunction("continuation.malloc", ContMallocTy).getCallee());
+        Mod.getOrInsertFunction("continuation.malloc", ContMallocTy)
+            .getCallee());
     auto *ContMallocPtr = ConstantExpr::getBitCast(ContMalloc, I8Ptr);
 
     auto *ContDeallocTy =
         FunctionType::get(Type::getVoidTy(Context), {I8Ptr}, false);
     auto *ContDealloc = dyn_cast<Function>(
-        M.getOrInsertFunction("continuation.free", ContDeallocTy).getCallee());
+        Mod.getOrInsertFunction("continuation.free", ContDeallocTy)
+            .getCallee());
     auto *ContDeallocPtr = ConstantExpr::getBitCast(ContDealloc, I8Ptr);
 
     llvm_dialects::Builder B(
@@ -242,7 +252,7 @@ static void processContinuations(
                         SuspendRetconArg);
       auto *RetTy = CI->getType();
       if (!RetTy->isVoidTy()) {
-        auto *RetVal = B.create<continuations::GetReturnValueOp>(RetTy);
+        auto *RetVal = B.create<lgc::ilcps::GetReturnValueOp>(RetTy);
         CI->replaceAllUsesWith(RetVal);
       }
       CI->eraseFromParent();
@@ -257,34 +267,68 @@ static void processContinuations(
         SavedRetAddr = NewFunc->getArg(0); // Return addr
       else
         SavedRetAddr = UndefValue::get(I64);
+    } else {
+      // We omit the "return address" later, make sure the
+      // dialects verifier doesn't fail since we disallow `nullptr` arguments
+      // right now.
+      SavedRetAddr = PoisonValue::get(I32);
     }
-    // Convert returns to continuation.return calls
-    auto *ContRet = getContinuationReturn(M);
+
+    // Convert returns to lgc.ilcps.return calls
     for (auto &BB : *NewFunc) {
       auto *I = BB.getTerminator();
       if (I->getOpcode() == Instruction::Ret) {
-        // Replace this instruction with a call to continuation.return
+        // Replace this instruction with a call to lgc.ilcps.return
         B.SetInsertPoint(I);
-        SmallVector<Value *, 2> RetVals;
+        SmallVector<Value *, 1> RetVals;
 
         if (!IsLgcCpsMode) {
-          RetVals.push_back(SavedRetAddr);
           if (I->getNumOperands() != 0)
             RetVals.push_back(I->getOperand(0));
         }
 
-        auto *ContRetCall = B.CreateCall(ContRet, RetVals);
+        auto *ContRetOp = B.create<lgc::ilcps::ReturnOp>(SavedRetAddr, RetVals);
         // DXILCont passes use annotations on the ret to pass information
         // on the shader exit to later passes. Copy such metadata to the ContRet
         // so later passes can pick it up from there.
-        ContRetCall->copyMetadata(*I);
+        ContRetOp->copyMetadata(*I);
         B.CreateUnreachable();
         I->eraseFromParent();
       }
     }
   }
-  fixupDxilMetadata(M);
 }
+
+PreservedAnalyses LowerAwaitPassImpl::run() {
+  struct VisitorPayload {
+    LowerAwaitPassImpl &Self;
+    bool HasCpsAwaitCalls = false;
+  };
+
+  static auto Visitor =
+      llvm_dialects::VisitorBuilder<VisitorPayload>()
+          .add<lgc::cps::AwaitOp>([](VisitorPayload &Payload, auto &Op) {
+            Payload.Self.ToProcess[Op.getFunction()].push_back(&Op);
+            Payload.HasCpsAwaitCalls = true;
+          })
+          .build();
+
+  VisitorPayload P{*this};
+  Visitor.visit(P, Mod);
+
+  collectContinuationFunctions();
+
+  if (!ToProcess.empty()) {
+    bool IsLgcCpsMode = P.HasCpsAwaitCalls || ContHelper::isLgcCpsModule(Mod);
+    processContinuations(IsLgcCpsMode);
+    fixupDxilMetadata(Mod);
+    return PreservedAnalyses::none();
+  }
+
+  return PreservedAnalyses::all();
+}
+
+LowerAwaitPass::LowerAwaitPass() {}
 
 llvm::PreservedAnalyses
 LowerAwaitPass::run(llvm::Module &M,
@@ -292,35 +336,7 @@ LowerAwaitPass::run(llvm::Module &M,
   LLVM_DEBUG(dbgs() << "Run the lower-await pass\n");
   AnalysisManager.getResult<DialectContextAnalysis>(M);
 
-  MapVector<Function *, SmallVector<CallInst *>> ToProcess;
-  static auto Visitor =
-      llvm_dialects::VisitorBuilder<
-          MapVector<Function *, SmallVector<CallInst *>>>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-          .add<lgc::cps::AwaitOp>([](auto &ToProcess, auto &Op) {
-            ToProcess[Op.getFunction()].push_back(&Op);
-          })
-          .build();
-  Visitor.visit(ToProcess, M);
-  bool IsLgcCpsMode = !ToProcess.empty() || ContHelper::isLgcCpsModule(M);
+  LowerAwaitPassImpl Impl{M};
 
-  for (auto &F : M.functions()) {
-    if (!F.getName().starts_with("await.")) {
-      // Force processing annotated functions, even if they don't have await
-      // calls
-      if (F.hasMetadata(ContHelper::MDContinuationName))
-        ToProcess[&F].size();
-      continue;
-    }
-    for (auto *U : F.users()) {
-      if (auto *Inst = dyn_cast<CallInst>(U))
-        ToProcess[Inst->getFunction()].push_back(Inst);
-    }
-  }
-
-  if (!ToProcess.empty()) {
-    processContinuations(M, ToProcess, IsLgcCpsMode);
-    return PreservedAnalyses::none();
-  }
-  return PreservedAnalyses::all();
+  return Impl.run();
 }

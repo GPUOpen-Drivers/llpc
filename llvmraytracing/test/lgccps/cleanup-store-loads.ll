@@ -164,7 +164,7 @@ bb2:                                              ; preds = %entry
 define internal { ptr, ptr } @test.resume.0(ptr noalias noundef nonnull align 4 dereferenceable(8) %0, i1 %1) !lgc.cps !0 !continuation !1 {
 entryresume.0:
   %2 = load ptr, ptr %0, align 8
-  %3 = call float @continuations.getReturnValue__f32()
+  %3 = call float @lgc.ilcps.getReturnValue__f32()
   %arg.reload.addr = getelementptr inbounds %test.Frame, ptr %2, i32 0, i32 1
   %arg.reload = load float, ptr %arg.reload.addr, align 4
   %rcr.reload.addr = getelementptr inbounds %test.Frame, ptr %2, i32 0, i32 0
@@ -197,7 +197,7 @@ declare ptr @llvm.coro.begin(token, ptr writeonly) #1
 declare i1 @llvm.coro.suspend.retcon.i1(...) #1
 
 ; Function Attrs: nounwind willreturn
-declare float @continuations.getReturnValue__f32() #2
+declare float @lgc.ilcps.getReturnValue__f32() #2
 
 ; Function Attrs: noreturn
 declare void @continuation.return(...) #3

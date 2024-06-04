@@ -339,6 +339,9 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
       if (tessMode.pointMode || tessMode.primitiveMode == PrimitiveMode::Isolines)
         return false;
     } else {
+      // Primitive topology is unknown, disable NGG culling.
+      if (m_pipelineState->getOptions().dynamicTopology || m_pipelineState->isUnlinked())
+        return false;
       // Check primitive type specified in pipeline state
       if (primType < PrimitiveType::TriangleList)
         return false;
@@ -583,8 +586,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     bool enableMaxVertOut = false;
 
     if (hasGs) {
-      unsigned maxVertOut = geometryMode.outputVertices;
-      assert(maxVertOut >= primAmpFactor);
+      unsigned maxVertOut = std::max(geometryMode.outputVertices, primAmpFactor);
       assert(gsInstanceCount >= 1);
 
       // Each input GS primitive can generate at most maxVertOut vertices. Each output vertex will be emitted
@@ -971,8 +973,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     LLPC_OUTS("\n");
     LLPC_OUTS("GS is on-chip (Mesh)\n");
   } else if (m_pipelineState->getNggControl()->enableNgg) {
-    LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
-    LLPC_OUTS("GS enable max output vertices per instance: "
+    LLPC_OUTS("GS primitive amplifier: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
+    LLPC_OUTS("GS enable max output vertices: "
               << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false") << "\n");
     LLPC_OUTS("\n");
     LLPC_OUTS("GS is on-chip (NGG)\n");
@@ -2318,62 +2320,36 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     unsigned availPerPrimitiveOutMapLoc = inOutUsage.perPrimitiveOutputMapLocCount;
 
     // Map per-vertex built-in outputs to generic ones
-    if (builtInUsage.mesh.position) {
-      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {4, BuiltInPosition}; // vec4
-      ++availOutMapLoc;
-    }
+    if (builtInUsage.mesh.position)
+      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
 
-    if (builtInUsage.mesh.pointSize) {
-      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {1, BuiltInPointSize}; // float
-      ++availOutMapLoc;
-    }
+    if (builtInUsage.mesh.pointSize)
+      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
 
     if (builtInUsage.mesh.clipDistance > 0) {
-      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {static_cast<unsigned>(builtInUsage.mesh.clipDistance),
-                                                                BuiltInClipDistance}; // float[]
-      ++availOutMapLoc;
-
+      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
       if (builtInUsage.mesh.clipDistance > 4)
         ++availOutMapLoc;
     }
 
     if (builtInUsage.mesh.cullDistance > 0) {
-      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc;
-      inOutUsage.mesh.vertexOutputComponents[availOutMapLoc] = {static_cast<unsigned>(builtInUsage.mesh.cullDistance),
-                                                                BuiltInCullDistance}; // float[]
-      ++availOutMapLoc;
-
+      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
       if (builtInUsage.mesh.cullDistance > 4)
         ++availOutMapLoc;
     }
 
     // Map per-primitive built-in outputs to generic ones
-    if (builtInUsage.mesh.primitiveId) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveId] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInPrimitiveId}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.primitiveId)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveId] = availPerPrimitiveOutMapLoc++;
 
-    if (builtInUsage.mesh.viewportIndex) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInViewportIndex] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInViewportIndex}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.viewportIndex)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInViewportIndex] = availPerPrimitiveOutMapLoc++;
 
-    if (builtInUsage.mesh.layer) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInLayer] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInLayer}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.layer)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInLayer] = availPerPrimitiveOutMapLoc++;
 
-    if (builtInUsage.mesh.primitiveShadingRate) {
-      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveShadingRate] = availPerPrimitiveOutMapLoc;
-      inOutUsage.mesh.primitiveOutputComponents[availPerPrimitiveOutMapLoc] = {1, BuiltInPrimitiveShadingRate}; // int
-      ++availPerPrimitiveOutMapLoc;
-    }
+    if (builtInUsage.mesh.primitiveShadingRate)
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[BuiltInPrimitiveShadingRate] = availPerPrimitiveOutMapLoc++;
 
     // Map per-vertex built-in outputs to exported locations
     if (nextStage == ShaderStage::Fragment) {
@@ -2453,6 +2429,9 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (builtInUsage.mesh.viewportIndex)
         inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInViewportIndex] = availPerPrimitiveExportLoc++;
     }
+
+    inOutUsage.mesh.vertexGenericOutputExportCount = inOutUsage.outputMapLocCount;
+    inOutUsage.mesh.primitiveGenericOutputExportCount = inOutUsage.perPrimitiveOutputMapLocCount;
 
     inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, availOutMapLoc);
     inOutUsage.perPrimitiveOutputMapLocCount =
@@ -3011,25 +2990,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
       if (m_shaderStage == ShaderStage::Geometry)
         inOutUsage.gs.outLocCount[streamId] = std::max(inOutUsage.gs.outLocCount[streamId], newLocMappedTo + 1);
     }
-
-    // After location mapping is done, we update the location/components map of mesh shader vertex outputs with new
-    // locations.
-    if (m_shaderStage == ShaderStage::Mesh) {
-      // Make a copy and clear the old map
-      auto vertexOutputComponents = inOutUsage.mesh.vertexOutputComponents;
-      inOutUsage.mesh.vertexOutputComponents.clear();
-
-      // Setup a new map with new locations
-      for (auto &locInfoPair : outputLocInfoMap) {
-        const unsigned location = locInfoPair.first.getLocation();
-        const unsigned newLocation = locInfoPair.second.getLocation();
-
-        if (vertexOutputComponents.count(location) == 0)
-          continue; // Skip if not found
-
-        inOutUsage.mesh.vertexOutputComponents[newLocation] = vertexOutputComponents[location];
-      }
-    }
   }
 
   //
@@ -3121,25 +3081,6 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 
       assert(newLocMappedTo != InvalidValue);
       locPair.second = newLocMappedTo;
-    }
-
-    // After location mapping is done, we update the location/components map of mesh shader primitive outputs with
-    // new locations.
-    if (m_shaderStage == ShaderStage::Mesh) {
-      // Make a copy and clear the old map
-      auto primitiveOutputComponents = inOutUsage.mesh.primitiveOutputComponents;
-      inOutUsage.mesh.primitiveOutputComponents.clear();
-
-      // Setup a new map with new locations
-      for (auto &locPair : perPrimitiveOutputLocMap) {
-        const unsigned location = locPair.first;
-        const unsigned newLocation = locPair.second;
-
-        if (primitiveOutputComponents.count(location) == 0)
-          continue; // Skip if not found
-
-        inOutUsage.mesh.primitiveOutputComponents[newLocation] = primitiveOutputComponents[location];
-      }
     }
   }
 

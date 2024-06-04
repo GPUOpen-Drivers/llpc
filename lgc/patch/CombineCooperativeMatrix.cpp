@@ -38,6 +38,7 @@
 #include "lgc/state/Defs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallVector.h"
 #include <optional>
 
@@ -46,7 +47,11 @@
 using namespace llvm;
 using namespace lgc;
 
-namespace {
+namespace lgc {
+
+class CooperativeMatrixConvertOp;
+class CooperativeMatrixTransposeOp;
+class CooperativeMatrixMulAddOp;
 
 struct Shape {
   CooperativeMatrixElementType elementType;
@@ -81,21 +86,21 @@ public:
   bool run();
 
 private:
-  Shape getShapeOfTranspose(CallInst *transpose);
+  Shape getShapeOfTranspose(CooperativeMatrixTransposeOp &transpose);
   void foldTo(Value *from, Value *to);
   bool tryFold(CallInst *op);
   bool tryFoldComponentContaining(Value *start);
   Instruction *findFirstUser(Instruction *instruction);
   Value *tryFoldTimesScalar(CallInst *timesScalarLo, CallInst *timesScalarHi, Value *packedMatrix);
-  bool tryFoldMuladd(SmallVector<CallInst *> muladds);
+  bool tryFoldMuladd(SmallVector<CooperativeMatrixMulAddOp *> muladds);
 
   Function &m_function;
   BuilderCommon b;
   GfxIpVersion m_gfxIpVersion;
   std::vector<Instruction *> m_eraseList;
+  std::vector<WeakVH> m_ops;
+  MapVector<BasicBlock *, SmallVector<CooperativeMatrixMulAddOp *>> m_muladds;
 };
-
-} // anonymous namespace
 
 // =====================================================================================================================
 // Run the combiner.
@@ -107,46 +112,24 @@ bool CooperativeMatrixCombiner::run() {
   bool changed = false;
 
   // Step 1: Collect transposes, converts and muladds
-  std::vector<WeakVH> ops;
-  MapVector<BasicBlock *, SmallVector<CallInst *>> muladds;
-
-  for (Function &fn : m_function.getParent()->functions()) {
-    if (!fn.isDeclaration())
-      continue;
-
-    if (fn.getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
-      for (User *user : fn.users()) {
-        if (auto *call = dyn_cast<CallInst>(user)) {
-          if (call->getFunction() == &m_function)
-            ops.push_back(call);
-        }
-      }
-    } else if (fn.getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-      for (User *user : fn.users()) {
-        if (auto *call = dyn_cast<CallInst>(user)) {
-          if (call->getFunction() == &m_function)
-            ops.push_back(call);
-        }
-      }
+  static const auto visitor = llvm_dialects::VisitorBuilder<CooperativeMatrixCombiner>()
+                                  .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                                  .addSet<CooperativeMatrixConvertOp, CooperativeMatrixTransposeOp>(
+                                      [](auto &self, auto &op) { self.m_ops.push_back(&op); })
+                                  .add<CooperativeMatrixMulAddOp>([](auto &self, auto &op) {
 #if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
-      // wmma packing on gfx11 only possible with new wmma_f16_tied intrinsic
-    } else if (m_gfxIpVersion.major == 11 && fn.getName().starts_with(lgcName::CooperativeMatrixMulAdd)) {
-      for (User *user : fn.users()) {
-        if (auto *call = dyn_cast<CallInst>(user)) {
-          auto accumElemType =
-              static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(call->getOperand(7))->getZExtValue());
-          bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
-          if (call->getFunction() == &m_function && isPackable) {
-            muladds[call->getParent()].push_back(call);
-          }
-        }
-      }
+                                    auto accumElemType = op.getAccuElemType();
+                                    bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
+                                    if ((self.m_gfxIpVersion.major == 11) && isPackable) {
+                                      self.m_muladds[op.getParent()].push_back(&op);
+                                    }
 #endif
-    }
-  }
+                                  })
+                                  .build();
+  visitor.visit(*this, m_function);
 
   // Step 2: Attempt folds.
-  for (const WeakVH &handle : ops) {
+  for (const WeakVH &handle : m_ops) {
     auto *op = cast_or_null<CallInst>(handle);
     if (!op)
       continue;
@@ -163,7 +146,7 @@ bool CooperativeMatrixCombiner::run() {
   }
 #if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
   // wmma packing on gfx11 only possible with new wmma_f16_tied intrinsic
-  for (auto muladdsPerBB : muladds) {
+  for (auto muladdsPerBB : m_muladds) {
     changed |= tryFoldMuladd(std::move(muladdsPerBB.second));
 
     for (Instruction *inst : llvm::reverse(m_eraseList)) {
@@ -173,10 +156,10 @@ bool CooperativeMatrixCombiner::run() {
     m_eraseList.clear();
   }
 
-  muladds.clear();
+  m_muladds.clear();
 #endif
 
-  ops.clear();
+  m_ops.clear();
 
   return changed;
 }
@@ -186,9 +169,9 @@ bool CooperativeMatrixCombiner::run() {
 //
 // @param [in] transpose : the transpose operation
 // @returns : the cooperative matrix shape
-Shape CooperativeMatrixCombiner::getShapeOfTranspose(CallInst *transpose) {
-  unsigned elemType = cast<ConstantInt>(transpose->getArgOperand(1))->getZExtValue();
-  unsigned layout = cast<ConstantInt>(transpose->getArgOperand(2))->getZExtValue();
+Shape CooperativeMatrixCombiner::getShapeOfTranspose(CooperativeMatrixTransposeOp &transpose) {
+  auto elemType = transpose.getElemType();
+  auto layout = transpose.getLayout();
   return {(CooperativeMatrixElementType)elemType, (CooperativeMatrixLayout)layout};
 }
 
@@ -219,12 +202,13 @@ void CooperativeMatrixCombiner::foldTo(Value *from, Value *to) {
 bool CooperativeMatrixCombiner::tryFold(CallInst *op) {
   Value *src;
   bool isConvert = false;
-  if (op->getCalledFunction()->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-    src = op->getArgOperand(1);
+  if (auto *convertOp = dyn_cast<CooperativeMatrixConvertOp>(op)) {
+    src = convertOp->getSource();
     isConvert = true;
+  } else if (auto *transposeOp = dyn_cast<CooperativeMatrixTransposeOp>(op)) {
+    src = transposeOp->getMatrix();
   } else {
-    assert(op->getCalledFunction()->getName().starts_with(lgcName::CooperativeMatrixTranspose));
-    src = op->getArgOperand(0);
+    llvm_unreachable("the operation is not supported here.");
   }
 
   if (auto *constant = dyn_cast<Constant>(src)) {
@@ -237,8 +221,8 @@ bool CooperativeMatrixCombiner::tryFold(CallInst *op) {
       // transpose/convert(undef) -> undef, if legal
       bool isFoldable = true;
       if (isConvert) {
-        auto srcElementType = (CooperativeMatrixElementType)cast<ConstantInt>(op->getArgOperand(2))->getZExtValue();
-        auto dstElementType = (CooperativeMatrixElementType)cast<ConstantInt>(op->getArgOperand(3))->getZExtValue();
+        auto srcElementType = cast<CooperativeMatrixConvertOp>(op)->getSrcElemType();
+        auto dstElementType = cast<CooperativeMatrixConvertOp>(op)->getDstElemType();
         if (srcElementType != dstElementType) {
           // This is slightly conservative, but the point here is that e.g. `zext undef(i16) to i32` can't be folded
           // to undef because the result can't truly take all possible bit patterns.
@@ -294,30 +278,27 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       }
       return true;
     }
-    if (auto *call = dyn_cast<CallInst>(val)) {
-      if (auto *callee = call->getCalledFunction()) {
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixTimesScalar)) {
-          if (is_contained(component.inner.timesScalars, call))
-            return true;
 
-          component.inner.timesScalars.push_back(call);
-          worklistForward.push_back(call);
-          worklistBackward.push_back(call->getArgOperand(0));
-          return true;
-        }
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixBinOp)) {
-          if (is_contained(component.inner.binOps, call))
-            return true;
+    if (auto *timesScalarOp = dyn_cast<CooperativeMatrixTimesScalarOp>(val)) {
+      if (is_contained(component.inner.timesScalars, val))
+        return true;
 
-          component.inner.binOps.push_back(call);
-          worklistForward.push_back(call);
-          worklistBackward.push_back(call->getArgOperand(1));
-          worklistBackward.push_back(call->getArgOperand(2));
-          return true;
-        }
-        return false;
-      }
+      component.inner.timesScalars.push_back(cast<CallInst>(val));
+      worklistForward.push_back(val);
+      worklistBackward.push_back(timesScalarOp->getMatrix());
+      return true;
     }
+    if (auto *binOp = dyn_cast<CooperativeMatrixBinaryOp>(val)) {
+      if (is_contained(component.inner.binOps, val))
+        return true;
+
+      component.inner.binOps.push_back(cast<CallInst>(val));
+      worklistForward.push_back(val);
+      worklistBackward.push_back(binOp->getLhs());
+      worklistBackward.push_back(binOp->getRhs());
+      return true;
+    }
+
     return false;
   };
 
@@ -387,34 +368,28 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       continue;
     }
 
-    if (auto *call = dyn_cast<CallInst>(input)) {
-      if (auto *callee = call->getCalledFunction()) {
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixLoad))
-          continue; // loads can be adjusted at zero cost
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
-          foundComponentShape(getShapeOfTranspose(call));
-          ++numTransposeInputs;
-          continue;
-        }
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-          auto srcElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-          auto dstElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
-          if (srcElemType != dstElemType) {
-            LLVM_DEBUG(dbgs() << "  unhandled element type input conversion: " << *call << '\n');
-            ++numUnhandledInputs;
-            continue;
-          }
-
-          auto srcLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
-          auto dstLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
-          foundComponentShape({dstElemType, dstLayout});
-          foundOtherLayout(srcLayout, call->getArgOperand(1)->getType());
-
-          ++numRelayoutInputs;
-          continue;
-        }
+    if (isa<CooperativeMatrixLoadOp>(input))
+      continue; // loads can be adjusted at zero cost
+    if (auto *transposeOp = dyn_cast<CooperativeMatrixTransposeOp>(input)) {
+      foundComponentShape(getShapeOfTranspose(*transposeOp));
+      ++numTransposeInputs;
+      continue;
+    }
+    if (auto *convertOp = dyn_cast<CooperativeMatrixConvertOp>(input)) {
+      auto srcElemType = convertOp->getSrcElemType();
+      auto dstElemType = convertOp->getDstElemType();
+      if (srcElemType != dstElemType) {
+        LLVM_DEBUG(dbgs() << "  unhandled element type input conversion: " << *input << '\n');
+        ++numUnhandledInputs;
+        continue;
       }
-      ++numUnhandledInputs;
+
+      auto srcLayout = convertOp->getSrcLayout();
+      auto dstLayout = convertOp->getDstLayout();
+      foundComponentShape({dstElemType, dstLayout});
+      foundOtherLayout(srcLayout, convertOp->getSource()->getType());
+
+      ++numRelayoutInputs;
       continue;
     }
 
@@ -422,33 +397,29 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
   }
 
   for (Use *use : component.outputs) {
-    if (auto *call = dyn_cast<CallInst>(use->getUser())) {
-      if (auto *callee = call->getCalledFunction()) {
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixStore))
-          continue; // stores can be adapted at zero cost
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
-          foundComponentShape(getShapeOfTranspose(call));
-          transposeOutputs.insert(use->get());
-          continue;
-        }
-        if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-          auto srcElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-          auto dstElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
-          if (srcElemType != dstElemType) {
-            LLVM_DEBUG(dbgs() << "  unhandled element type output conversion: " << *call << '\n');
-            ++numUnhandledInputs;
-            continue;
-          }
-
-          auto srcLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
-          auto dstLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
-          foundComponentShape({srcElemType, srcLayout});
-          foundOtherLayout(dstLayout, call->getType());
-
-          relayoutOutputs.insert(use->get());
-          continue;
-        }
+    if (dyn_cast<CooperativeMatrixStoreOp>(use->getUser()))
+      continue; // stores can be adapted at zero cost
+    if (auto *transposeOp = dyn_cast<CooperativeMatrixTransposeOp>(use->getUser())) {
+      foundComponentShape(getShapeOfTranspose(*transposeOp));
+      transposeOutputs.insert(use->get());
+      continue;
+    }
+    if (auto *convertOp = dyn_cast<CooperativeMatrixConvertOp>(use->getUser())) {
+      auto srcElemType = convertOp->getSrcElemType();
+      auto dstElemType = convertOp->getDstElemType();
+      if (srcElemType != dstElemType) {
+        LLVM_DEBUG(dbgs() << "  unhandled element type output conversion: " << *use->getUser() << '\n');
+        ++numUnhandledInputs;
+        continue;
       }
+
+      auto srcLayout = convertOp->getSrcLayout();
+      auto dstLayout = convertOp->getDstLayout();
+      foundComponentShape({srcElemType, srcLayout});
+      foundOtherLayout(dstLayout, use->getUser()->getType());
+
+      relayoutOutputs.insert(use->get());
+      continue;
     }
 
     unhandledOutputs.insert(use->get());
@@ -466,22 +437,18 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
 
     for (Value *input : component.inputs) {
       // Handle inputs that can be folded away / absorbed.
-      if (auto *call = dyn_cast<CallInst>(input)) {
-        if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
-            Value *src = call->getArgOperand(0);
-            foldTo(input, src);
+      if (auto *transposeOp = dyn_cast<CooperativeMatrixTransposeOp>(input)) {
+        Value *src = transposeOp->getMatrix();
+        foldTo(input, src);
 
-            // Prepopulate the transpose cache to re-use the old transpose operation instead of creating a new one.
-            outTransposed.try_emplace(src, input);
-            continue;
-          }
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixLoad)) {
-            bool colMajor = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-            call->setArgOperand(2, b.getInt1(!colMajor));
-            continue;
-          }
-        }
+        // Prepopulate the transpose cache to re-use the old transpose operation instead of creating a new one.
+        outTransposed.try_emplace(src, input);
+        continue;
+      }
+      if (auto *loadOp = dyn_cast<CooperativeMatrixLoadOp>(input)) {
+        bool colMajor = loadOp->getColMajor();
+        loadOp->setColMajor(!colMajor);
+        continue;
       }
 
       // Handle generic inputs that need to be transposed explicitly.
@@ -492,26 +459,23 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
         b.SetInsertPointPastAllocas(&m_function);
       }
 
-      auto *transposed = b.CreateCooperativeMatrixTranspose(PoisonValue::get(input->getType()),
-                                                            component.shape->elementType, component.shape->layout);
+      Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, component.shape->layout);
+      auto *transposed = b.create<CooperativeMatrixTransposeOp>(resultMatrixTy, PoisonValue::get(input->getType()),
+                                                                component.shape->elementType, component.shape->layout);
       foldTo(input, transposed);
-      transposed->setArgOperand(0, input);
+      transposed->setMatrix(input);
     }
 
     for (Use *use : component.outputs) {
       // Handle outputs that can be folded away / absorbed.
-      if (auto *call = dyn_cast<CallInst>(use->getUser())) {
-        if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
-            foldTo(call, use->get());
-            continue;
-          }
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixStore)) {
-            bool colMajor = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-            call->setArgOperand(2, b.getInt1(!colMajor));
-            continue;
-          }
-        }
+      if (isa<CooperativeMatrixTransposeOp>(use->getUser())) {
+        foldTo(use->getUser(), use->get());
+        continue;
+      }
+      if (auto *storeOp = dyn_cast<CooperativeMatrixStoreOp>(use->getUser())) {
+        bool colMajor = storeOp->getColMajor();
+        storeOp->setColMajor(!colMajor);
+        continue;
       }
 
       // Handle generic outputs that need to be transposed explicitly.
@@ -524,8 +488,9 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           b.SetInsertPoint(def->getNextNode());
         }
 
-        transposed =
-            b.CreateCooperativeMatrixTranspose(use->get(), component.shape->elementType, component.shape->layout);
+        Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, component.shape->layout);
+        transposed = b.create<CooperativeMatrixTransposeOp>(resultMatrixTy, use->get(), component.shape->elementType,
+                                                            component.shape->layout);
       }
 
       use->set(transposed);
@@ -568,46 +533,40 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
 
     for (CallInst *timesScalar : component.inner.timesScalars) {
       timesScalar->mutateType(otherType);
-      timesScalar->setArgOperand(3, b.getInt32((unsigned)*otherLayout));
+      cast<CooperativeMatrixTimesScalarOp>(timesScalar)->setLayout(*otherLayout);
       continue;
     }
 
     for (CallInst *binOp : component.inner.binOps) {
       binOp->mutateType(otherType);
-      binOp->setArgOperand(4, b.getInt32((unsigned)*otherLayout));
+      cast<CooperativeMatrixBinaryOp>(binOp)->setLayout(*otherLayout);
       continue;
     }
 
     for (Value *input : component.inputs) {
       // Handle inputs for which the relayout can be folded or absorbed.
-      if (auto *call = dyn_cast<CallInst>(input)) {
-        if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-            unsigned srcElemType = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-            unsigned dstElemType = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
+      if (auto *convertOp = dyn_cast<CooperativeMatrixConvertOp>(input)) {
+        auto srcElemType = convertOp->getSrcElemType();
+        auto dstElemType = convertOp->getDstElemType();
 
-            if (srcElemType == dstElemType) {
-              auto srcLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
-              assert(srcLayout == *otherLayout);
-              (void(srcLayout)); // unused
+        if (srcElemType == dstElemType) {
+          assert(convertOp->getSrcLayout() == *otherLayout);
 
-              Value *src = call->getArgOperand(1);
-              foldTo(input, src);
+          Value *src = convertOp->getSource();
+          foldTo(input, src);
 
-              // Pre-populate the cache to re-use the relayout operation instead of creating a new one.
-              outRelayouted.try_emplace(src, input);
-              continue;
-            }
-
-            // Integrate the relayouting into a merged conversion op.
-            call->setArgOperand(5, b.getInt32((unsigned)*otherLayout));
-            continue;
-          }
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixLoad)) {
-            call->setArgOperand(4, b.getInt32((unsigned)*otherLayout));
-            continue;
-          }
+          // Pre-populate the cache to re-use the relayout operation instead of creating a new one.
+          outRelayouted.try_emplace(src, input);
+          continue;
         }
+
+        // Integrate the relayouting into a merged conversion op.
+        convertOp->setDstLayout(*otherLayout);
+        continue;
+      }
+      if (auto *loadOp = dyn_cast<CooperativeMatrixLoadOp>(input)) {
+        loadOp->setLayout(*otherLayout);
+        continue;
       }
 
       // Handle generic inputs that need a new convert operation inserted.
@@ -618,35 +577,30 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
         b.SetInsertPointPastAllocas(&m_function);
       }
 
-      CallInst *convert = b.CreateCooperativeMatrixConvert((CastInst::CastOps)0, PoisonValue::get(input->getType()),
-                                                           component.shape->elementType, component.shape->elementType,
-                                                           component.shape->layout, *otherLayout);
+      Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, *otherLayout);
+      CooperativeMatrixConvertOp *convert = b.create<CooperativeMatrixConvertOp>(
+          resultMatrixTy, (CastInst::CastOps)0, PoisonValue::get(input->getType()), component.shape->elementType,
+          component.shape->elementType, component.shape->layout, *otherLayout);
       foldTo(input, convert);
-      convert->setArgOperand(1, input);
+      convert->setSource(input);
     }
 
     for (Use *use : component.outputs) {
       // Handle outputs for which the relayout can be folded or absorbed.
-      if (auto *call = dyn_cast<CallInst>(use->getUser())) {
-        if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-            unsigned srcElemType = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-            unsigned dstElemType = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
+      if (auto *convertOp = dyn_cast<CooperativeMatrixConvertOp>(use->getUser())) {
+        auto srcElemType = convertOp->getSrcElemType();
+        auto dstElemType = convertOp->getDstElemType();
 
-            if (srcElemType == dstElemType) {
-              auto dstLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
-              assert(dstLayout == *otherLayout);
-              (void(dstLayout)); // unused
+        if (srcElemType == dstElemType) {
+          assert(convertOp->getDstLayout() == *otherLayout);
 
-              foldTo(call, use->get());
-              continue;
-            }
-          }
-          if (callee->getName().starts_with(lgcName::CooperativeMatrixStore)) {
-            call->setArgOperand(4, b.getInt32((unsigned)*otherLayout));
-            continue;
-          }
+          foldTo(use->getUser(), use->get());
+          continue;
         }
+      }
+      if (auto *storeOp = dyn_cast<CooperativeMatrixStoreOp>(use->getUser())) {
+        storeOp->setLayout(*otherLayout);
+        continue;
       }
 
       // Handle generic outputs that need a new convert operation inserted.
@@ -659,9 +613,10 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           b.SetInsertPoint(def->getNextNode());
         }
 
-        relayouted =
-            b.CreateCooperativeMatrixConvert((CastInst::CastOps)0, use->get(), component.shape->elementType,
-                                             component.shape->elementType, *otherLayout, component.shape->layout);
+        Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, component.shape->layout);
+        relayouted = b.create<CooperativeMatrixConvertOp>(resultMatrixTy, (CastInst::CastOps)0, use->get(),
+                                                          component.shape->elementType, component.shape->elementType,
+                                                          *otherLayout, component.shape->layout);
       }
 
       use->set(relayouted);
@@ -682,7 +637,7 @@ Instruction *CooperativeMatrixCombiner::findFirstUser(Instruction *instruction) 
     if (instruction->getParent() != userInst->getParent())
       continue;
 
-    if (dyn_cast<PHINode>(userInst))
+    if (isa<PHINode>(userInst))
       continue;
 
     if (!earliestUser || userInst->comesBefore(earliestUser))
@@ -691,7 +646,7 @@ Instruction *CooperativeMatrixCombiner::findFirstUser(Instruction *instruction) 
   return earliestUser;
 }
 
-bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
+bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CooperativeMatrixMulAddOp *> muladds) {
   bool changed = false;
 
   auto cmp = [](CallInst *a, CallInst *b) { return b->comesBefore(a); };
@@ -708,19 +663,18 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
     };
     SmallVector<PackingComponents> worklist;
     SmallVector<std::pair<Use &, bool>> unpackedUses;
-    SmallVector<CallInst *> muladdChain;
+    SmallVector<CooperativeMatrixMulAddOp *> muladdChain;
 
-    auto *matCLo = muladdLo->getArgOperand(2);
+    auto *matCLo = muladdLo->getMatrixC();
 
     muladdChain.push_back(muladdLo);
-    muladdLo->setArgOperand(5, b.getInt1(false));
+    muladdLo->setIsSatOrOpsel(false);
     while (muladdLo->hasOneUse()) {
-      auto *next = dyn_cast<CallInst>(*muladdLo->users().begin());
+      auto *next = dyn_cast<CooperativeMatrixMulAddOp>(*muladdLo->users().begin());
 
       if (!is_contained(muladds, next))
         break;
-
-      next->setArgOperand(5, b.getInt1(false));
+      next->setIsSatOrOpsel(false);
       muladdChain.push_back(next);
       muladdLo = next;
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
@@ -732,12 +686,12 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
 
     Instruction *firstLoUser = findFirstUser(muladdLo);
 
-    CallInst *muladdHi = nullptr;
+    CooperativeMatrixMulAddOp *muladdHi = nullptr;
     for (auto *candidate : llvm::reverse(muladds)) {
       if (firstLoUser && firstLoUser->comesBefore(candidate))
         continue;
 
-      if (auto *matCHi = dyn_cast<Instruction>(candidate->getArgOperand(2))) {
+      if (auto *matCHi = dyn_cast<Instruction>(candidate->getMatrixC())) {
         if (matCHi->getParent() == muladdLo->getParent() && packInsertPoint->comesBefore(matCHi)) {
           continue;
         }
@@ -750,17 +704,17 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
     if (!muladdHi)
       continue;
 
-    auto *matCHi = muladdHi->getArgOperand(2);
+    auto *matCHi = muladdHi->getMatrixC();
 
     muladdChain.push_back(muladdHi);
-    muladdHi->setArgOperand(5, b.getInt1(true));
+    muladdHi->setIsSatOrOpsel(true);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
     llvm::erase_value(muladds, muladdLo);
 #else
     llvm::erase(muladds, muladdHi);
 #endif
     while (muladdHi->hasOneUse()) {
-      auto *next = dyn_cast<CallInst>(*muladdHi->users().begin());
+      auto *next = dyn_cast<CooperativeMatrixMulAddOp>(*muladdHi->users().begin());
       if (!is_contained(muladds, next)) {
         break;
       }
@@ -768,7 +722,7 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
       if (firstLoUser && firstLoUser->comesBefore(next)) {
         break;
       }
-      next->setArgOperand(5, b.getInt1(true));
+      next->setIsSatOrOpsel(true);
       muladdChain.push_back(next);
       muladdHi = next;
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
@@ -786,13 +740,14 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
     // incoming values are packed accumulators.
     PHINode *const phiLo = dyn_cast<PHINode>(matCLo);
     PHINode *const phiHi = dyn_cast<PHINode>(matCHi);
+    Type *packedTy = FixedVectorType::get(b.getFloatTy(), 8);
     Value *curAccum = nullptr;
     if (phiLo && phiHi && phiLo->getParent() == phiHi->getParent()) {
       for (BasicBlock *incoming : phiLo->blocks()) {
         b.SetInsertPoint(incoming->getTerminator());
         auto *matCLo = phiLo->getIncomingValueForBlock(incoming);
         auto *matCHi = phiHi->getIncomingValueForBlock(incoming);
-        auto *packed = b.CreateCooperativeMatrixPack(matCLo, matCHi);
+        auto *packed = b.create<CooperativeMatrixPackOp>(packedTy, matCLo, matCHi);
         phiLo->setIncomingValueForBlock(incoming, packed);
         phiHi->setIncomingValueForBlock(incoming, packed);
       }
@@ -801,12 +756,12 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
     } else {
       // otherwise, we pack just before the first muladd
       b.SetInsertPoint(packInsertPoint);
-      curAccum = b.CreateCooperativeMatrixPack(matCLo, matCHi);
+      curAccum = b.create<CooperativeMatrixPackOp>(packedTy, matCLo, matCHi);
     }
 
     for (auto *next : muladdChain) {
-      next->setArgOperand(2, curAccum);
-      next->setArgOperand(6, b.getInt1(true));
+      next->setMatrixC(curAccum);
+      next->setIsTied(true);
       curAccum = next;
     }
 
@@ -824,35 +779,28 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
         if (is_contained(muladdChain, use.getUser()))
           continue;
 
-        if (auto *call = dyn_cast<CallInst>(use.getUser())) {
-          if (auto *callee = call->getCalledFunction()) {
-            if (callee->getName().starts_with(lgcName::CooperativeMatrixTimesScalar)) {
-              auto *candidate = llvm::find_if(unpackedUses, [&](auto pair) {
-                if (auto *call = dyn_cast<CallInst>(pair.first.getUser())) {
-                  if (auto *callee = call->getCalledFunction()) {
-                    if (callee->getName().starts_with(lgcName::CooperativeMatrixTimesScalar) &&
-                        call->getArgOperand(0) == current.matrixLo) {
-                      return true;
-                    }
-                  }
-                }
-                return false;
-              });
-
-              if (candidate == unpackedUses.end()) {
-                unpackedUses.push_back({use, true});
-                continue;
-              }
-
-              auto *timesScalarLo = cast<CallInst>(candidate->first.getUser());
-              auto *timesScalarHi = call;
-              auto *timesScalarPacked = tryFoldTimesScalar(timesScalarLo, timesScalarHi, current.packedAccum);
-
-              if (timesScalarPacked) {
-                worklist.push_back({timesScalarLo, timesScalarHi, timesScalarPacked});
-                continue;
+        if (auto *call = dyn_cast<CooperativeMatrixTimesScalarOp>(use.getUser())) {
+          auto *candidate = llvm::find_if(unpackedUses, [&](auto pair) {
+            if (auto *timesScalarOp = dyn_cast<CooperativeMatrixTimesScalarOp>(pair.first.getUser())) {
+              if (timesScalarOp->getMatrix() == current.matrixLo) {
+                return true;
               }
             }
+            return false;
+          });
+
+          if (candidate == unpackedUses.end()) {
+            unpackedUses.push_back({use, true});
+            continue;
+          }
+
+          auto *timesScalarLo = cast<CallInst>(candidate->first.getUser());
+          auto *timesScalarHi = call;
+          auto *timesScalarPacked = tryFoldTimesScalar(timesScalarLo, timesScalarHi, current.packedAccum);
+
+          if (timesScalarPacked) {
+            worklist.push_back({timesScalarLo, timesScalarHi, timesScalarPacked});
+            continue;
           }
         }
 
@@ -863,10 +811,9 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
         if (is_contained(m_eraseList, use.first.getUser()))
           continue;
 
-        if (auto *call = dyn_cast<CallInst>(use.first.getUser())) {
-          if (call->getCalledFunction()->getName().starts_with(lgcName::CooperativeMatrixPack) &&
-              call->getArgOperand(0) == current.matrixLo && call->getArgOperand(1) == current.matrixHi) {
-            foldTo(call, current.packedAccum);
+        if (auto *packOp = dyn_cast<CooperativeMatrixPackOp>(use.first.getUser())) {
+          if (packOp->getMatrixCLo() == current.matrixLo && packOp->getMatrixCHi() == current.matrixHi) {
+            foldTo(use.first.getUser(), current.packedAccum);
             continue;
           }
         }
@@ -877,7 +824,8 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
         } else {
           b.SetInsertPoint(cast<Instruction>(use.first.getUser()));
         }
-        auto unpacked = b.CreateCooperativeMatrixUnpack(current.packedAccum, use.second);
+        Type *unpackedTy = FixedVectorType::get(b.getFloatTy(), 8);
+        auto unpacked = b.create<CooperativeMatrixUnPackOp>(unpackedTy, current.packedAccum, use.second);
         use.first.set(unpacked);
       }
       unpackedUses.clear();
@@ -908,11 +856,13 @@ Value *CooperativeMatrixCombiner::tryFoldTimesScalar(CallInst *timesScalarLo, Ca
   b.SetInsertPoint(laterInst);
 
   auto *scalarVec = b.CreateVectorSplat(2, PoisonValue::get(b.getHalfTy()));
-  scalarVec = b.CreateInsertElement(scalarVec, timesScalarLo->getArgOperand(1), b.getInt32(0));
-  scalarVec = b.CreateInsertElement(scalarVec, timesScalarHi->getArgOperand(1), b.getInt32(1));
-  auto *timesScalarPacked =
-      b.CreateCoopMatrixTimesScalar(packedMatrix, scalarVec, CooperativeMatrixElementType::Float16Packed,
-                                    CooperativeMatrixLayout::AccumulatorMatrixLayout);
+  auto *loScalar = cast<CooperativeMatrixTimesScalarOp>(*timesScalarLo).getScalar();
+  auto *hiScalar = cast<CooperativeMatrixTimesScalarOp>(*timesScalarHi).getScalar();
+  scalarVec = b.CreateInsertElement(scalarVec, loScalar, b.getInt32(0));
+  scalarVec = b.CreateInsertElement(scalarVec, hiScalar, b.getInt32(1));
+  auto *timesScalarPacked = b.create<CooperativeMatrixTimesScalarOp>(packedMatrix->getType(), packedMatrix, scalarVec,
+                                                                     CooperativeMatrixElementType::Float16Packed,
+                                                                     CooperativeMatrixLayout::AccumulatorMatrixLayout);
   m_eraseList.push_back(timesScalarLo);
   m_eraseList.push_back(timesScalarHi);
   return timesScalarPacked;
@@ -937,3 +887,4 @@ PreservedAnalyses CombineCooperativeMatrix::run(Function &function, FunctionAnal
   }
   return PreservedAnalyses::all();
 }
+} // namespace lgc

@@ -254,6 +254,7 @@ Options GraphicsContext::computePipelineOptions() const {
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
   options.vbAddressLowBitsKnown = pipelineInfo->getGlState().vbAddressLowBitsKnown;
+  options.dynamicTopology = pipelineInfo->dynamicTopology;
   // Only set NGG options for a GFX10+ graphics pipeline.
   const auto &nggState = pipelineInfo->nggState;
   if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG

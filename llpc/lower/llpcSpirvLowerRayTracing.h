@@ -79,6 +79,7 @@ class GpurtSetParentIdOp;
 class GpurtGetRayStaticIdOp;
 class GpurtStackReadOp;
 class GpurtStackWriteOp;
+class GpurtLdsStackInitOp;
 } // namespace lgc
 
 namespace Llpc {
@@ -250,6 +251,7 @@ private:
   void visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst);
   void visitStackReadOp(lgc::GpurtStackReadOp &inst);
   void visitStackWriteOp(lgc::GpurtStackWriteOp &inst);
+  void visitLdsStackInitOp(lgc::GpurtLdsStackInitOp &inst);
   void visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst);
   void visitDispatchRaysDimensionsOp(lgc::rt::DispatchRaysDimensionsOp &inst);
   void visitWorldRayOriginOp(lgc::rt::WorldRayOriginOp &inst);

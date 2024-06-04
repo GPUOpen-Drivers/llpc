@@ -155,6 +155,7 @@ private:
 class BuilderDefs : public BuilderCommon {
 public:
   BuilderDefs(llvm::LLVMContext &context) : BuilderCommon(context) {}
+  BuilderDefs(llvm::Instruction *insertPoint) : BuilderCommon(insertPoint) {}
 
   // Bit settings for integer dot product
   enum : unsigned {
@@ -164,7 +165,7 @@ public:
 
   // The group arithmetic operations the builder can consume.
   // NOTE : We rely on casting this implicitly to an integer, so we cannot use an enum class.
-  enum GroupArithOp { IAdd = 0, FAdd, IMul, FMul, SMin, UMin, FMin, SMax, UMax, FMax, And, Or, Xor };
+  enum GroupArithOp { Nop = -1, IAdd = 0, FAdd, IMul, FMul, SMin, UMin, FMin, SMax, UMax, FMax, And, Or, Xor };
 
   // Bit settings for flags argument in CreateLoadBufferDesc.
   enum {
@@ -384,6 +385,7 @@ public:
 class Builder : public BuilderDefs {
 public:
   Builder(llvm::LLVMContext &context) : BuilderDefs(context) {}
+  Builder(llvm::Instruction *insertPoint) : BuilderDefs(insertPoint) {}
 
   // -----------------------------------------------------------------------------------------------------------------
   // Base class operations
@@ -1424,27 +1426,6 @@ public:
   //
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName = "");
-
-  // Create a subgroup all.
-  //
-  // @param value : The value to compare
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
-
-  // Create a subgroup all equal.
-  //
-  // @param value : The value to compare
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
-
-  // Create a subgroup rotate call.
-  //
-  // @param value : The value to read from the chosen rotated lane to all active lanes.
-  // @param delta : The delta/offset added to lane id.
-  // @param clusterSize : The cluster size if exists.
-  // @param instName : Name to give final instruction.
-  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
-                                    const llvm::Twine &instName = "");
 
   // Create a subgroup broadcast.
   //
