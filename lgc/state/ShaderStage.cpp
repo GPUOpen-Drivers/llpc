@@ -82,8 +82,9 @@ void lgc::setShaderStage(GlobalObject *func, std::optional<ShaderStageEnum> stag
         MDNode::get(func->getContext(),
                     {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(func->getContext()), stage.value()))});
     func->setMetadata(mdKindId, stageMetaNode);
-  } else
+  } else {
     func->eraseMetadata(mdKindId);
+  }
 }
 
 // =====================================================================================================================
@@ -137,13 +138,28 @@ bool lgc::isShaderEntryPoint(const Function *func) {
 //
 // @param shaderStage : Shader stage
 const char *lgc::getShaderStageAbbreviation(ShaderStageEnum shaderStage) {
-  if (shaderStage == ShaderStage::CopyShader)
+  switch (shaderStage) {
+  case ShaderStage::Compute:
+    return "CS";
+  case ShaderStage::Fragment:
+    return "FS";
+  case ShaderStage::Vertex:
+    return "VS";
+  case ShaderStage::Geometry:
+    return "GS";
+  case ShaderStage::CopyShader:
     return "COPY";
-  if (shaderStage > ShaderStage::Compute)
-    return "Bad";
-
-  static const char *ShaderStageAbbrs[] = {"TASK", "VS", "TCS", "TES", "GS", "MESH", "FS", "CS"};
-  return ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
+  case ShaderStage::TessControl:
+    return "TCS";
+  case ShaderStage::TessEval:
+    return "TES";
+  case ShaderStage::Task:
+    return "TASK";
+  case ShaderStage::Mesh:
+    return "MESH";
+  default:
+    llvm_unreachable("Unhandled ShaderStage");
+  }
 }
 
 // =====================================================================================================================

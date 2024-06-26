@@ -311,10 +311,10 @@ Options PipelineContext::computePipelineOptions() const {
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
-  options.disableSampleMask = getPipelineOptions()->disableSampleMask;
-  options.disableTruncCoordForGather = getPipelineOptions()->disableTruncCoordForGather;
+  options.disableSampleMask = getPipelineOptions()->getGlState().disableSampleMask;
+  options.disableTruncCoordForGather = getPipelineOptions()->getGlState().disableTruncCoordForGather;
   options.enablePrimGeneratedQuery = getPipelineOptions()->enablePrimGeneratedQuery;
-  options.enableFragColor = getPipelineOptions()->enableFragColor;
+  options.enableFragColor = getPipelineOptions()->getGlState().enableFragColor;
 
   options.rtBoxSortHeuristicMode = m_rtState.boxSortHeuristicMode;
   options.rtStaticPipelineFlags = m_rtState.staticPipelineFlags;
@@ -481,7 +481,7 @@ void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappi
     else
       dst.concreteType = static_cast<ResourceNodeType>(src.type);
 
-    if (getPipelineOptions()->replaceSetWithResourceType && src.srdRange.set == 0) {
+    if (getPipelineOptions()->getGlState().replaceSetWithResourceType && src.srdRange.set == 0) {
       // Special value InternalDescriptorSetId(-1) will be passed in for internal usage
       dst.set = getGlResourceNodeSetFromType(src.type);
     } else {

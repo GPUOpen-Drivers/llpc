@@ -41,6 +41,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include <map>
+#include <optional>
 
 namespace llvm {
 
@@ -256,9 +257,9 @@ public:
   bool hasShaderStage(ShaderStageEnum stage) { return getShaderStageMask().contains(stage); }
   bool isGraphics();
   bool isComputeLibrary() const { return m_computeLibrary; }
-  ShaderStageEnum getLastVertexProcessingStage() const;
-  ShaderStageEnum getPrevShaderStage(ShaderStageEnum shaderStage) const;
-  ShaderStageEnum getNextShaderStage(ShaderStageEnum shaderStage) const;
+  std::optional<ShaderStageEnum> getLastVertexProcessingStage() const;
+  std::optional<ShaderStageEnum> getPrevShaderStage(ShaderStageEnum shaderStage) const;
+  std::optional<ShaderStageEnum> getNextShaderStage(ShaderStageEnum shaderStage) const;
 
   // Get client name
   const char *getClient() const { return m_client.c_str(); }

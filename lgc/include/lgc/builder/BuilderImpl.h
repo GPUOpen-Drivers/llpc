@@ -74,7 +74,7 @@ protected:
   PipelineState *getPipelineState() const { return m_pipelineState; }
 
   // Get whether the context we are building in supports ds_bpermute or v_bpermute across all lanes in the wave.
-  bool supportWaveWideBPermute() const;
+  bool supportWaveWideBPermute(ShaderStageEnum shaderStage) const;
 
   // Get whether the context we are building in supports permute lane 64 DPP operations.
   bool supportPermLane64Dpp() const;
@@ -441,6 +441,12 @@ private:
   // Modify sampler descriptor to force set trunc_coord as 0 for gather4 instruction.
   llvm::Value *modifySamplerDescForGather(llvm::Value *samplerDesc);
 
+  // Transform 32-bit image descriptor pointer to a i32 type or a descriptor load instruction.
+  llvm::Value *transformImageDesc(llvm::Value *imageDesc, bool mustLoad, bool isTexelBuffer, llvm::Type *texelType);
+
+  // Transform 32-bit sampler descriptor pointer to a i32 type or a descriptor load instruction.
+  llvm::Value *transformSamplerDesc(llvm::Value *samplerDesc);
+
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
     IMG_DATA_FORMAT_8_8_8_8 = 10,
@@ -657,7 +663,9 @@ public:
                                                 const llvm::Twine &instName = "");
 
   // Create a subgroup broadcast first.
-  llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName = "");
+  llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName = "") {
+    return createSubgroupBroadcastFirst(value, m_shaderStage.value(), instName);
+  }
 
   // Create a subgroup ballot.
   llvm::Value *CreateSubgroupBallot(llvm::Value *const value, const llvm::Twine &instName = "");
@@ -686,7 +694,9 @@ public:
 
   // Create a subgroup shuffle.
   llvm::Value *CreateSubgroupShuffle(llvm::Value *const value, llvm::Value *const index,
-                                     const llvm::Twine &instName = "");
+                                     const llvm::Twine &instName = "") {
+    return createSubgroupShuffle(value, index, m_shaderStage.value(), instName);
+  }
 
   // Create a subgroup shuffle xor.
   llvm::Value *CreateSubgroupShuffleXor(llvm::Value *const value, llvm::Value *const mask,
@@ -771,20 +781,28 @@ private:
   llvm::Value *createPermLaneX16(llvm::Value *const origValue, llvm::Value *const updateValue, unsigned selectBitsLow,
                                  unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl);
   llvm::Value *createPermLane64(llvm::Value *const updateValue);
+  llvm::Value *createReadFirstLane(llvm::Value *const updateValue);
 
   llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
   llvm::Value *createWwm(llvm::Value *const value);
-  llvm::Value *createWqm(llvm::Value *const value);
+  llvm::Value *createWqm(llvm::Value *const value) { return createWqm(value, m_shaderStage.value()); }
   llvm::Value *createThreadMask();
   llvm::Value *createThreadMaskedSelect(llvm::Value *const threadMask, uint64_t andMask, llvm::Value *const value1,
                                         llvm::Value *const value2);
   uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
 
-protected:
-  llvm::Value *createGroupBallot(llvm::Value *const value, bool excludeHelperLanes);
   llvm::Value *createGroupBallot(llvm::Value *const value);
+
+protected:
+  // The subgroup operation with explicit shader stage as parameter.
   llvm::Value *createFindMsb(llvm::Value *const mask);
+  llvm::Value *createGroupBallot(llvm::Value *const value, ShaderStageEnum shaderStage);
+  llvm::Value *createSubgroupBroadcastFirst(llvm::Value *const value, ShaderStageEnum shaderStage,
+                                            const llvm::Twine &instName);
+  llvm::Value *createSubgroupShuffle(llvm::Value *const value, llvm::Value *const index, ShaderStageEnum shaderStage,
+                                     const llvm::Twine &instName);
+  llvm::Value *createWqm(llvm::Value *const value, ShaderStageEnum shaderStage);
 };
 
 } // namespace lgc

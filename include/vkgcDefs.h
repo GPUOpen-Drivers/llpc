@@ -472,6 +472,7 @@ struct PipelineOptions {
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 73
   bool replaceSetWithResourceType;        ///< For OGL only, replace 'set' with resource type during spirv translate
   bool disableSampleMask;                 ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
   bool buildResourcesDataForShaderModule; ///< For OGL only, build resources usage data while building shader module
@@ -482,6 +483,25 @@ struct PipelineOptions {
   bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
   bool disableBaseVertex;                 ///< For OGL only, force the BaseVertex builtin to 0 instead of
                                           ///  loading it from userdata
+  bool bindlessTextureMode;               ///< For OGL only, true if bindless textures are used
+  bool bindlessImageMode;                 ///< For OGL only, true if bindless images are used
+  const auto &getGlState() const { return *this; }
+#else
+  struct GLState {
+    bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
+    bool disableSampleMask;          ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
+    bool buildResourcesDataForShaderModule; ///< For OGL only, build resources usage data while building shader module
+    bool disableTruncCoordForGather;        ///< If set, trunc_coord of sampler srd is disabled for gather4
+    bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
+                                            ///< for sampled images and samplers
+    bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
+    bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
+    bool disableBaseVertex;                 ///< For OGL only, force the BaseVertex builtin to 0 instead of
+    bool bindlessTextureMode;               ///< For OGL only, true if bindless textures are used
+    bool bindlessImageMode;                 ///< For OGL only, true if bindless images are used
+  } glState;
+  const auto &getGlState() const { return glState; }
+#endif
   unsigned reserved20;
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
   bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
@@ -512,6 +532,7 @@ struct ResourceNodeData {
   unsigned isTexelFetchUsed;        ///< TRUE if texelFetch is used
   unsigned isDefaultUniformSampler; ///< TRUE if it's sampler image in default uniform struct
   unsigned columnCount;             ///< Column count if this is a matrix variable.
+  unsigned componentCount;          ///< Component count if this is a vector, row count if it is a matrix.
   BasicType basicType;              ///< Type of the variable or element
 };
 
@@ -545,6 +566,43 @@ struct ResourcesNodes {
   unsigned defaultUniformInfoCount;
 };
 
+// raytracing system value usage flags
+union RayTracingSystemValueUsage {
+  struct {
+    union {
+      struct {
+        uint16_t flags : 1;             // Shader calls gl_IncomingRayFlagsEXT
+        uint16_t worldRayOrigin : 1;    // Shader calls gl_WorldRayOriginEXT
+        uint16_t tMin : 1;              // Shader calls gl_RayTminEXT
+        uint16_t worldRayDirection : 1; // Shader calls gl_WorldRayDirectionEXT
+        uint16_t tCurrent : 1;          // Shader calls gl_HitTEXT
+        uint16_t launchId : 1;          // Shader calls gl_LaunchIDEXT
+        uint16_t launchSize : 1;        // Shader calls gl_LaunchSizeEXT
+        uint16_t reserved : 9;          // Reserved
+      };
+      uint16_t u16All;
+    } ray;
+
+    union {
+      struct {
+        uint16_t hitKind : 1;             // Shader calls gl_HitKindEXT
+        uint16_t instanceIndex : 1;       // Shader calls gl_InstanceCustomIndexEXT
+        uint16_t instanceID : 1;          // Shader calls gl_InstanceID
+        uint16_t primitiveIndex : 1;      // Shader calls gl_PrimitiveID
+        uint16_t geometryIndex : 1;       // Shader calls gl_GeometryIndexEXT
+        uint16_t objectToWorld : 1;       // Shader calls gl_ObjectToWorldEXT
+        uint16_t objectRayOrigin : 1;     // Shader calls gl_ObjectRayOriginEXT
+        uint16_t objectRayDirection : 1;  // Shader calls gl_ObjectRayDirectionEXT
+        uint16_t worldToObject : 1;       // Shader calls gl_WorldToObjectEXT
+        uint16_t hitTrianglePosition : 1; // Shader calls gl_HitTriangleVertexPositionsEXT
+        uint16_t reserved : 6;            // Reserved
+      };
+      uint16_t u16All;
+    } primitive;
+  };
+  uint32_t u32All;
+};
+
 /// Represents usage info of a shader module
 struct ShaderModuleUsage {
   bool enableVarPtrStorageBuf;    ///< Whether to enable "VariablePointerStorageBuffer" capability
@@ -573,12 +631,14 @@ struct ShaderModuleUsage {
   bool pixelCenterInteger;        ///< Whether pixel coord is Integer
   bool useGenericBuiltIn;         ///< Whether to use builtIn inputs that include gl_PointCoord, gl_PrimitiveId,
                                   ///  gl_Layer, gl_ClipDistance or gl_CullDistance.
+  bool useBarycentric;            ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
   bool enableXfb;                 ///< Whether transform feedback is enabled
   unsigned localSizeX;            ///< Compute shader work-group size in the X dimension
   unsigned localSizeY;            ///< Compute shader work-group size in the Y dimension
   unsigned localSizeZ;            ///< Compute shader work-group size in the Z dimension
   bool disableDualSource;         ///< Whether disable dualSource blend
   uint32_t clipDistanceArraySize; ///< Count of output clip distance
+  RayTracingSystemValueUsage rtSystemValueUsage; ///< Usage flags for ray tracing builtins
 };
 
 /// Represents common part of shader module data
@@ -1001,43 +1061,6 @@ enum RayTracingRayFlag : unsigned {
 };
 
 // =====================================================================================================================
-// raytracing system value usage flags
-union RayTracingSystemValueUsage {
-  struct {
-    union {
-      struct {
-        uint16_t flags : 1;             // Shader calls gl_IncomingRayFlagsEXT
-        uint16_t worldRayOrigin : 1;    // Shader calls gl_WorldRayOriginEXT
-        uint16_t tMin : 1;              // Shader calls gl_RayTminEXT
-        uint16_t worldRayDirection : 1; // Shader calls gl_WorldRayDirectionEXT
-        uint16_t tCurrent : 1;          // Shader calls gl_HitTEXT
-        uint16_t launchId : 1;          // Shader calls gl_LaunchIDEXT
-        uint16_t launchSize : 1;        // Shader calls gl_LaunchSizeEXT
-        uint16_t reserved : 9;          // Reserved
-      };
-      uint16_t u16All;
-    } ray;
-
-    union {
-      struct {
-        uint16_t hitKind : 1;             // Shader calls gl_HitKindEXT
-        uint16_t instanceIndex : 1;       // Shader calls gl_InstanceCustomIndexEXT
-        uint16_t instanceID : 1;          // Shader calls gl_InstanceID
-        uint16_t primitiveIndex : 1;      // Shader calls gl_PrimitiveID
-        uint16_t geometryIndex : 1;       // Shader calls gl_GeometryIndexEXT
-        uint16_t objectToWorld : 1;       // Shader calls gl_ObjectToWorldEXT
-        uint16_t objectRayOrigin : 1;     // Shader calls gl_ObjectRayOriginEXT
-        uint16_t objectRayDirection : 1;  // Shader calls gl_ObjectRayDirectionEXT
-        uint16_t worldToObject : 1;       // Shader calls gl_WorldToObjectEXT
-        uint16_t hitTrianglePosition : 1; // Shader calls gl_HitTriangleVertexPositionsEXT
-        uint16_t reserved : 6;            // Reserved
-      };
-      uint16_t u16All;
-    } primitive;
-  };
-  uint32_t u32All;
-};
-
 /// Represents ray-tracing shader export configuration
 struct RayTracingShaderExportConfig {
   unsigned indirectCallingConvention; ///< Indirect calling convention
@@ -1299,6 +1322,7 @@ struct GraphicsPipelineBuildInfo {
     float pixelTransferBias[4];                   ///< Bias apply to render color target
     bool enableColorClampVs;                      ///< Enable clamp vertex output color
     bool enableColorClampFs;                      ///< Enable clamp fragment output color
+    bool enableFlatShade;                         ///< Whether enable flat shade.
   } glState;
   const auto &getGlState() const { return glState; }
 #endif
@@ -1597,6 +1621,7 @@ public:
   ///
   /// @param [in] spvBin   SPIR-V binary
   static const char *VKAPI_CALL GetEntryPointNameFromSpirvBinary(const BinaryData *spvBin);
+  static const char *VKAPI_CALL GetResourceMappingNodeTypeName(ResourceMappingNodeType type);
 };
 
 /// 128-bit hash compatible structure

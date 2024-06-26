@@ -200,17 +200,19 @@ public:
 
   // Possible values for dimension argument for image methods.
   enum {
-    Dim1D = 0,          // Coordinate: x
-    Dim2D = 1,          // Coordinate: x, y
-    Dim3D = 2,          // Coordinate: x, y, z
-    DimCube = 3,        // Coordinate: x, y, face
-    Dim1DArray = 4,     // Coordinate: x, slice
-    Dim2DArray = 5,     // Coordinate: x, y, slice
-    Dim2DMsaa = 6,      // Coordinate: x, y, fragid
-    Dim2DArrayMsaa = 7, // Coordinate: x, y, slice, fragid
-    DimCubeArray = 8,   // Coordinate: x, y, face, slice (despite both SPIR-V and ISA
-                        //    combining face and slice into one component)
-    DimRect = 9,        // Coordinate: x, y
+    Dim1D = 0,             // Coordinate: x
+    Dim2D = 1,             // Coordinate: x, y
+    Dim3D = 2,             // Coordinate: x, y, z
+    DimCube = 3,           // Coordinate: x, y, face
+    Dim1DArray = 4,        // Coordinate: x, slice
+    Dim2DArray = 5,        // Coordinate: x, y, slice
+    Dim2DMsaa = 6,         // Coordinate: x, y, fragid
+    Dim2DArrayMsaa = 7,    // Coordinate: x, y, slice, fragid
+    DimCubeArray = 8,      // Coordinate: x, y, face, slice (despite both SPIR-V and ISA
+                           //    combining face and slice into one component)
+    DimRect = 9,           // Coordinate: x, y
+    Dim1DBuffer = 10,      // Coordinate: x (identify a texel buffer)
+    Dim1DArrayBuffer = 11, // Coordinate: x, slice (identify a texel buffer)
   };
 
   // Get the number of coordinates for the specified dimension argument.
@@ -219,6 +221,7 @@ public:
   static unsigned getImageNumCoords(unsigned dim) {
     switch (dim) {
     case Dim1D:
+    case Dim1DBuffer:
       return 1;
     case Dim2D:
       return 2;
@@ -227,6 +230,7 @@ public:
     case DimCube:
       return 3;
     case Dim1DArray:
+    case Dim1DArrayBuffer:
       return 2;
     case Dim2DArray:
       return 3;
@@ -249,6 +253,7 @@ public:
   static unsigned getImageQuerySizeComponentCount(unsigned dim) {
     switch (dim) {
     case Dim1D:
+    case Dim1DBuffer:
       return 1;
     case Dim2D:
       return 2;
@@ -257,6 +262,7 @@ public:
     case DimCube:
       return 2;
     case Dim1DArray:
+    case Dim1DArrayBuffer:
       return 2;
     case Dim2DArray:
       return 3;
@@ -279,6 +285,7 @@ public:
   static unsigned getImageDerivativeComponentCount(unsigned dim) {
     switch (dim) {
     case Dim1D:
+    case Dim1DBuffer:
       return 1;
     case Dim2D:
       return 2;
@@ -287,6 +294,7 @@ public:
     case DimCube:
       return 3;
     case Dim1DArray:
+    case Dim1DArrayBuffer:
       return 1;
     case Dim2DArray:
       return 2;

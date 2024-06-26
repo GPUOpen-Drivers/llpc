@@ -180,7 +180,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   }
 
   passMgr.addPass(IPSCCPPass());
-  passMgr.addPass(LowerDebugPrintf());
 
   passMgr.addPass(createModuleToFunctionPassAdaptor(CombineCooperativeMatrix()));
   // Lower the cooperative matrix
@@ -201,6 +200,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(PatchCopyShader());
   passMgr.addPass(LowerVertexFetch());
   passMgr.addPass(LowerFragColorExport());
+  passMgr.addPass(LowerDebugPrintf());
   passMgr.addPass(LowerDesc());
   passMgr.addPass(PatchEntryPointMutate());
   passMgr.addPass(PatchInitializeWorkgroupMemory());

@@ -205,7 +205,6 @@ if(ICD_BUILD_LLPC)
         context/llpcGraphicsContext.cpp
         context/llpcPipelineContext.cpp
         context/llpcRayTracingContext.cpp
-        context/GfxRuntimeContext.cpp
     )
 
 # llpc/lower

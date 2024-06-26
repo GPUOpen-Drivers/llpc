@@ -569,7 +569,7 @@ void DXILContPostProcessPassImpl::handleContStackIntrinsic(
           Align(CpsStackLowering::getContinuationStackAlignment()));
 
       if (FuncName.starts_with("LoadLastUse"))
-        ContHelper::setIsLastUseLoad(*cast<LoadInst>(Replacement));
+        CompilerUtils::setIsLastUseLoad(*cast<LoadInst>(Replacement));
 
       IsMemoryAccess = true;
     } else if (FuncName.starts_with("Store")) {

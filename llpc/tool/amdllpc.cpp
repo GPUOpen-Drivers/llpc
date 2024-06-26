@@ -680,8 +680,15 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs, bool
 
   const InputSpec &firstInput = inputSpecs.front();
   if (isPipelineInfoFile(firstInput.filename)) {
+    bool unlinked = Unlinked;
+
+    if (firstInput.filename.starts_with("PipelineLib") && !unlinked && !Unlinked.getNumOccurrences()) {
+      LLPC_WARN("Input filename starts with \"PipelineLib\". Assuming you meant -unlinked.\n");
+      unlinked = true;
+    }
+
     compileInfo.autoLayoutDesc = false;
-    if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
+    if (Error err = processInputPipeline(compiler, compileInfo, firstInput, unlinked, IgnoreColorAttachmentFormats))
       return err;
 
     if (compileInfo.pipelineType == VfxPipelineTypeGraphicsLibrary) {
@@ -792,6 +799,9 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs, bool
     dumpOptions->filterPipelineDumpByType = FilterPipelineDumpByType;
     dumpOptions->filterPipelineDumpByHash = FilterPipelineDumpByHash;
     dumpOptions->dumpDuplicatePipelines = DumpDuplicatePipelines;
+
+    if (codegen::getFileType() != CodeGenFileType::ObjectFile)
+      return createResultError(Result::ErrorInvalidValue, "Pipeline dumps require the default (ELF) -filetype");
   }
 
   std::unique_ptr<PipelineBuilder> builder =

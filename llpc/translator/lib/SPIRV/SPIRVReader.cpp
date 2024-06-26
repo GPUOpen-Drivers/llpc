@@ -1,4 +1,4 @@
-//===- SPIRVReader.cpp - Converts SPIR-V to LLVM ----------------*- C++ -*-===//
+﻿//===- SPIRVReader.cpp - Converts SPIR-V to LLVM ----------------*- C++ -*-===//
 //
 //                     The LLVM/SPIR-V Translator
 //
@@ -277,7 +277,7 @@ SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const 
                          const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions)
     : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_entryTarget(nullptr),
       m_specConstMap(theSpecConstMap), m_convertingSamplers(convertingSamplers), m_dbgTran(m_bm, m_m, this),
-      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)), m_debugOutputBuffer(nullptr),
+      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)),
       m_shaderOptions(reinterpret_cast<const Vkgc::PipelineShaderOptions *>(shaderOptions)) {
   assert(m_m);
   m_context = &m_m->getContext();
@@ -1085,9 +1085,9 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     // image is not an array of three.)
     Type *imageTy = nullptr;
     if (st->getDescriptor().Dim == DimBuffer) {
-      imageTy = getBuilder()->getDescTy(ResourceNodeType::DescriptorTexelBuffer);
+      imageTy = PointerType::get(*m_context, SPIRAS_Constant);
     } else {
-      Type *singleImageTy = getBuilder()->getDescTy(ResourceNodeType::DescriptorResource);
+      Type *singleImageTy = PointerType::get(*m_context, SPIRAS_Constant);
       imageTy = ArrayType::get(singleImageTy, 3);
       if (st->getDescriptor().MS) {
         // A multisampled image is represented by a struct containing both the
@@ -1105,7 +1105,7 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     // Get sampler type.
     // A sampler is represented by a struct containing the sampler itself, and the convertingSamplerIdx, an i32
     // that is either 0 or the 1-based index into the converting samplers.
-    Type *ty = getBuilder()->getDescTy(ResourceNodeType::DescriptorSampler);
+    Type *ty = PointerType::get(*m_context, SPIRAS_Constant);
     ty = StructType::get(*m_context, {ty, getBuilder()->getInt32Ty()});
     if (t->getOpCode() == OpTypeSampledImage) {
       // A sampledimage is represented by a struct containing the image descriptor
@@ -1295,10 +1295,25 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *bv, Function *f, BasicBlock *bb, bool
 
 Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb) {
   SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
+  auto srcSpvType = bc->getOperand(0)->getType();
+  auto dstSpvType = bc->getType();
   auto src = transValue(bc->getOperand(0), f, bb, bb != nullptr);
   auto srcType = src->getType();
-  auto dstType = transType(bc->getType());
+  auto dstType = transType(dstSpvType);
   CastInst::CastOps co = Instruction::BitCast;
+
+  // Extension for OGLP: Only valid for bindless texture/image to convert uvec2 to gsampler/gimage
+  // uniform uvec2 textureHandle;
+  // vec4 result = texture(sampler2D(textureHandle), texCoord);
+  bool srcTypeUvec2 = srcSpvType->isTypeVectorInt(32) && (srcSpvType->getVectorComponentCount() == 2);
+  bool bindlessTexture = dstSpvType->isTypeSampledImage() && srcTypeUvec2;
+  bool bindlessImage = dstSpvType->isTypeImage() && srcTypeUvec2;
+
+  if (bindlessTexture || bindlessImage) {
+    // 64 bit handle is stored in uvec2, we need to convert texHandle to uint64 at first
+    Value *imgDescGpuAddress = getBuilder()->CreateBitCast(src, getBuilder()->getInt64Ty());
+    return transLoadBindlessImage(dstSpvType, imgDescGpuAddress, bindlessTexture);
+  }
 
   lgc::CooperativeMatrixElementType srcElemTy = lgc::CooperativeMatrixElementType::Unknown;
   lgc::CooperativeMatrixElementType dstElemTy = lgc::CooperativeMatrixElementType::Unknown;
@@ -1306,15 +1321,13 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   lgc::CooperativeMatrixLayout dstLayout = lgc::CooperativeMatrixLayout::InvalidLayout;
 
   if (bv->getType()->isTypeCooperativeMatrixKHR()) {
-    auto srcCompType = static_cast<SPIRVTypeCooperativeMatrixKHR *>(bc->getOperand(0)->getType())
-                           ->getCooperativeMatrixKHRComponentType();
+    auto srcCompType = static_cast<SPIRVTypeCooperativeMatrixKHR *>(srcSpvType)->getCooperativeMatrixKHRComponentType();
     srcElemTy = mapToBasicType(srcCompType);
-    auto dstCompType =
-        static_cast<SPIRVTypeCooperativeMatrixKHR *>(bc->getType())->getCooperativeMatrixKHRComponentType();
+    auto dstCompType = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRComponentType();
     dstElemTy = mapToBasicType(dstCompType);
-    auto dstUse = static_cast<SPIRVTypeCooperativeMatrixKHR *>(bc->getType())->getCooperativeMatrixKHRUse();
-    unsigned rows = static_cast<SPIRVTypeCooperativeMatrixKHR *>(bc->getType())->getCooperativeMatrixKHRRows();
-    unsigned columns = static_cast<SPIRVTypeCooperativeMatrixKHR *>(bc->getType())->getCooperativeMatrixKHRColumns();
+    auto dstUse = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRUse();
+    unsigned rows = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRRows();
+    unsigned columns = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRColumns();
     dstLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(dstUse), dstElemTy, rows, columns);
     srcLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(dstUse), srcElemTy, rows, columns);
   }
@@ -2373,12 +2386,16 @@ static SyncScope::ID transScope(LLVMContext &context, const SPIRVConstant *const
 // Translate memory semantics from SPIR-V to LLVM.
 //
 // @param spvMemorySemantics : The semantics to translate.
-// @param isAtomicRMW : Is the memory semantic from an atomic rmw operation.
-static AtomicOrdering transMemorySemantics(const SPIRVConstant *const spvMemorySemantics, const bool isAtomicRMW) {
+// @param readOnly : If the corresponding memory access only read.
+// @param writeNone : If the corresponding memory access only write.
+static AtomicOrdering transMemorySemantics(const SPIRVConstant *const spvMemorySemantics, const bool readOnly = false,
+                                           const bool writeOnly = false) {
   const unsigned semantics = static_cast<unsigned>(spvMemorySemantics->getZExtIntValue());
 
+  // We are safe to downgrade the SequentiallyConsistent to Acquire/Release/AcquireRelease based on Vulkan validation
+  // rules within a module.
   if (semantics & MemorySemanticsSequentiallyConsistentMask)
-    return AtomicOrdering::SequentiallyConsistent;
+    return readOnly ? AtomicOrdering::Acquire : writeOnly ? AtomicOrdering::Release : AtomicOrdering::AcquireRelease;
   if (semantics & MemorySemanticsAcquireReleaseMask)
     return AtomicOrdering::AcquireRelease;
   if (semantics & MemorySemanticsAcquireMask)
@@ -2400,8 +2417,7 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
   const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
-  const AtomicOrdering ordering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)), true);
+  const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                           getBuilder()->GetInsertBlock());
@@ -2439,8 +2455,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(SPIRVValue *c
   SPIRVAtomicLoad *const spvAtomicLoad = static_cast<SPIRVAtomicLoad *>(spvValue);
 
   const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicLoad->getOpValue(1)));
-  const AtomicOrdering ordering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicLoad->getOpValue(2)), false);
+  const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicLoad->getOpValue(2)),
+                                                       /*readOnly=*/true, /*writeOnly=*/false);
 
   Value *const loadPointer = transValue(spvAtomicLoad->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
@@ -2467,8 +2483,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(SPIRVValue *
   SPIRVAtomicStore *const spvAtomicStore = static_cast<SPIRVAtomicStore *>(spvValue);
 
   const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicStore->getOpValue(1)));
-  const AtomicOrdering ordering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicStore->getOpValue(2)), false);
+  const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicStore->getOpValue(2)),
+                                                       /*readOnly=*/false, /*writeOnly=*/true);
 
   Value *const storePointer = transValue(spvAtomicStore->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                          getBuilder()->GetInsertBlock());
@@ -2666,8 +2682,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(SPIRVVa
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
   const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
-  const AtomicOrdering ordering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)), true);
+  const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                           getBuilder()->GetInsertBlock());
@@ -2694,8 +2709,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(SPIRVVa
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
   const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
-  const AtomicOrdering ordering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)), true);
+  const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                           getBuilder()->GetInsertBlock());
@@ -2724,9 +2738,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(SP
 
   const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
   const AtomicOrdering successOrdering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)), true);
-  const AtomicOrdering failureOrdering =
-      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(3)), true);
+      transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
+  AtomicOrdering failureOrdering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(3)),
+                                                        /*readOnly=*/true, /*writeOnly=*/false);
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
                                           getBuilder()->GetInsertBlock());
@@ -2978,6 +2992,94 @@ Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
 }
 
 // =====================================================================================================================
+// Translate a load for UniformConstant that is image/sampledimage
+//
+// @param spvElementTy : The image/sampledimage pointer
+// @param imgDescGpuAddress : image descriptor's gpu memory address
+// @param bindlessTexture : true is bindless texture, false is bindless image
+Value *SPIRVToLLVM::transLoadBindlessImage(SPIRVType *spvElementTy, Value *imgDescGpuAddress, bool bindlessTexture) {
+
+  Type *elementTy = transType(spvElementTy, 0, false, false, LayoutMode::Native);
+  Type *gpuAddrAsPtrTy = getBuilder()->getPtrTy(SPIRAS_Constant);
+  auto imageDescAddr = getBuilder()->CreateIntToPtr(imgDescGpuAddress, gpuAddrAsPtrTy);
+
+  SPIRVTypeImage *spvImageTy = nullptr;
+  if (spvElementTy->getOpCode() == OpTypeSampledImage) {
+    spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvElementTy)->getImageType();
+  } else {
+    spvImageTy = static_cast<SPIRVTypeImage *>(spvElementTy);
+  }
+
+  auto desc = spvImageTy->getDescriptor();
+  Value *imageDescPtr = nullptr;
+
+  // Handle samplerBuffer or imageBuffer
+  if (desc.Dim == DimBuffer) {
+    auto bufferDescStride = getBuilder()->getInt32(DescriptorSizeBuffer);
+    imageDescPtr = getBuilder()->CreateInsertValue(
+        PoisonValue::get(StructType::get(*m_context, {imageDescAddr->getType(), bufferDescStride->getType(),
+                                                      bufferDescStride->getType(), getBuilder()->getInt32Ty()})),
+        imageDescAddr, 0);
+    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, bufferDescStride, 1);
+  } else {
+    // The descriptor stride is unimportant for bindless texture/image, just use it as a placeholder
+    auto imageDescStride = getBuilder()->getInt32(DescriptorSizeResource);
+    imageDescPtr = getBuilder()->CreateInsertValue(
+        PoisonValue::get(StructType::get(*m_context, {imageDescAddr->getType(), imageDescStride->getType(),
+                                                      imageDescStride->getType(), getBuilder()->getInt32Ty()})),
+        imageDescAddr, 0);
+
+    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, imageDescStride, 1);
+    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, getBuilder()->getInt32(DescriptorSizeResource), 2);
+    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, getBuilder()->getInt32(1), 3);
+  }
+
+  // Insert fmask descriptor address into structure
+  if (desc.MS) {
+    auto fMaskOffset = getBuilder()->getInt64(DescriptorSizeResource + DescriptorSizeSampler);
+    constexpr unsigned descriptorSizeFmask = 8 * sizeof(uint32_t);
+    auto fmaskDescStride = getBuilder()->getInt32(descriptorSizeFmask);
+    Value *fMaskDescAddr =
+        getBuilder()->CreateIntToPtr(getBuilder()->CreateAdd(imgDescGpuAddress, fMaskOffset), gpuAddrAsPtrTy);
+
+    auto fmaskDescPtr = getBuilder()->CreateInsertValue(
+        PoisonValue::get(StructType::get(*m_context, {fMaskDescAddr->getType(), fmaskDescStride->getType(),
+                                                      fmaskDescStride->getType(), getBuilder()->getInt32Ty()})),
+        fMaskDescAddr, 0);
+    fmaskDescPtr = getBuilder()->CreateInsertValue(fmaskDescPtr, fmaskDescStride, 1);
+    imageDescPtr = getBuilder()->CreateInsertValue(
+        PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})), imageDescPtr,
+        0);
+    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, fmaskDescPtr, 1);
+  }
+
+  // True for bindless texture, otherwise is bindless image
+  if (bindlessTexture) {
+    auto samplerOffset = getBuilder()->getInt64(DescriptorSizeResource);
+    auto samplerDescStride = getBuilder()->getInt32(DescriptorSizeSampler);
+
+    Value *samplerDescAddr =
+        getBuilder()->CreateIntToPtr(getBuilder()->CreateAdd(imgDescGpuAddress, samplerOffset), gpuAddrAsPtrTy);
+
+    Type *samplerPtrTy = StructType::get(
+        *m_context, {samplerDescAddr->getType(), getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty()});
+    Value *samplerDescPtr = Constant::getNullValue(samplerPtrTy);
+
+    samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, samplerDescAddr, 0);
+    samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, samplerDescStride, 1);
+
+    Value *descPtr =
+        PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
+    descPtr = getBuilder()->CreateInsertValue(descPtr, imageDescPtr, 0);
+    descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
+
+    return loadImageSampler(elementTy, descPtr);
+  }
+
+  return loadImageSampler(elementTy, imageDescPtr);
+}
+
+// =====================================================================================================================
 // Generate a load of an image, sampler or sampledimage
 //
 // @param elementTy : Element type being loaded
@@ -3017,33 +3119,21 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     // an array of three image descriptors, to allow for multiple planes in YCbCr conversion. Normally we only
     // load one descriptor; if there are any converting samplers, we load all three, and rely on later optimizations
     // to remove the unused ones (and thus stop us reading off the end of the descriptor table).
-    elementTy = arrayTy->getElementType();
-    auto *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
-    oneVal->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-
-    Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(arrayTy), oneVal, 0);
+    Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(arrayTy), ptr, 0);
     // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
     if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 4) {
       Value *planeStride = getBuilder()->CreateExtractValue(base, 2);
       Type *ptrTy = ptr->getType();
 
       for (unsigned planeIdx = 1; planeIdx != arrayTy->getNumElements(); ++planeIdx) {
-        ptr = getBuilder()->CreateBitCast(
-            ptr, getBuilder()->getInt8Ty()->getPointerTo(ptr->getType()->getPointerAddressSpace()));
         ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, planeStride);
         ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
-        oneVal = getBuilder()->CreateLoad(elementTy, ptr);
-        oneVal->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-        result = getBuilder()->CreateInsertValue(result, oneVal, planeIdx);
+        result = getBuilder()->CreateInsertValue(result, ptr, planeIdx);
       }
     }
     return result;
   }
-
-  // Other cases: Just load the element from the pointer.
-  auto load = getBuilder()->CreateLoad(elementTy, ptr);
-  load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-  return load;
+  return ptr;
 }
 
 // =====================================================================================================================
@@ -3070,7 +3160,8 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
 
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
   bool hasDescriptorSet = spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
-  assert(!getPipelineOptions()->replaceSetWithResourceType || !hasDescriptorSet ||
+
+  assert(!getPipelineOptions()->getGlState().replaceSetWithResourceType || !hasDescriptorSet ||
          static_cast<SPIRVTypePointer *>(spvImagePtr->getType())->getStorageClass() == StorageClassUniformConstant);
   (void)hasDescriptorSet;
 
@@ -3092,7 +3183,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
   Value *imageDescPtr = nullptr;
   Value *samplerDescPtr = nullptr;
 
-  if (getPipelineOptions()->replaceSetWithResourceType)
+  if (getPipelineOptions()->getGlState().replaceSetWithResourceType)
     assert(spvTy->getOpCode() != OpTypeSampler);
 
   if (spvTy->getOpCode() != OpTypeSampler) {
@@ -3106,11 +3197,11 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
 
-    if (getPipelineOptions()->replaceSetWithResourceType) {
+    if (getPipelineOptions()->getGlState().replaceSetWithResourceType) {
       if (spvTy->getOpCode() == OpTypeImage) {
         descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorImage);
       } else if (spvTy->getOpCode() == OpTypeSampledImage) {
-        if (getPipelineOptions()->enableCombinedTexture) {
+        if (getPipelineOptions()->getGlState().enableCombinedTexture) {
           descriptorSet =
               PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
         } else {
@@ -3123,7 +3214,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
     imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, resType);
 
     if (desc->MS) {
-      if (getPipelineOptions()->replaceSetWithResourceType && spvTy->getOpCode() != OpTypeImage)
+      if (getPipelineOptions()->getGlState().replaceSetWithResourceType && spvTy->getOpCode() != OpTypeImage)
         descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
       Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
@@ -3136,7 +3227,8 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
-    if (getPipelineOptions()->replaceSetWithResourceType && !getPipelineOptions()->enableCombinedTexture)
+    if (getPipelineOptions()->getGlState().replaceSetWithResourceType &&
+        !getPipelineOptions()->getGlState().enableCombinedTexture)
       descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
     samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding,
@@ -3211,7 +3303,7 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
   unsigned convertingSamplerIdx = 0;
   unsigned nextIdx = 1;
   unsigned convertingSamplerDescriptorSet = descriptorSet;
-  if (getPipelineOptions()->replaceSetWithResourceType &&
+  if (getPipelineOptions()->getGlState().replaceSetWithResourceType &&
       descriptorSet ==
           PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler)) {
     // When using 'replaceSetWithResourceType' option (OGL default) it's not possible to match converting samplers
@@ -3743,8 +3835,6 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
 
   // Do the indexing operation by GEPping as a byte pointer.
   Type *ptrTy = ptr->getType();
-  ptr = getBuilder()->CreateBitCast(ptr,
-                                    getBuilder()->getInt8Ty()->getPointerTo(ptr->getType()->getPointerAddressSpace()));
   ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, index);
   ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
   base = getBuilder()->CreateInsertValue(base, ptr, 0);
@@ -4859,39 +4949,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 // @param bb : Which basicblock to generate code
 Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func,
                                      BasicBlock *bb) {
-  auto resMapping = getPipelineContext()->getResourceMapping();
-  unsigned nodeIndex = 0;
-  if (findResourceNode(resMapping->pUserDataNodes, resMapping->userDataNodeCount, Vkgc::InternalDescriptorSetId,
-                       Vkgc::PrintfBufferBindingId, &nodeIndex) == nullptr)
-    return getBuilder()->getInt64(0);
-
-  if (!m_debugOutputBuffer) {
-    auto spvArrType = m_bm->addRuntimeArray(m_bm->addIntegerType(32));
-    auto spvStructType = m_bm->addStructType({spvArrType});
-    Type *bufType = transType(spvStructType);
-
-    m_debugOutputBuffer =
-        new GlobalVariable(*m_m, bufType, false, GlobalValue::ExternalLinkage, nullptr, "debugOutputBuffer", nullptr,
-                           GlobalVariable::NotThreadLocal, SPIRAS_Uniform);
-
-    // Setup (desc,binding) resource metadata
-    auto intType = getBuilder()->getInt32Ty();
-    SmallVector<Metadata *, 4> resourceMetas = {
-        ConstantAsMetadata::get(ConstantInt::get(intType, Vkgc::InternalDescriptorSetId)),
-        ConstantAsMetadata::get(ConstantInt::get(intType, Vkgc::PrintfBufferBindingId)),
-        ConstantAsMetadata::get(ConstantInt::get(intType, 0))};
-
-    auto resMdNode = MDNode::get(*m_context, resourceMetas);
-    m_debugOutputBuffer->addMetadata(gSPIRVMD::Resource, *resMdNode);
-  }
-
   auto spvValueItr = spvValues.begin();
-  Value *formatStr = mapEntry(*spvValueItr++, nullptr);
+  const SPIRVEntry *spvStrEntry = *spvValueItr++;
+  auto spvStr = static_cast<const SPIRVString *>(spvStrEntry);
   SmallVector<Value *> args;
   for (; spvValueItr != spvValues.end(); ++spvValueItr) {
     args.push_back(transValue(*spvValueItr, func, bb));
   }
-  return getBuilder()->create<lgc::DebugPrintfOp>(m_debugOutputBuffer, formatStr, args);
+  return getBuilder()->create<lgc::DebugPrintfOp>(spvStr->getStr(), args);
 }
 
 // Translate an initializer. This has special handling for the case where the type to initialize to does not match the
@@ -7153,7 +7218,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
     case Dim1D:
       return lgc::Builder::Dim1D;
     case DimBuffer:
-      return lgc::Builder::Dim1D;
+      return lgc::Builder::Dim1DBuffer;
     case Dim2D:
       return lgc::Builder::Dim2D;
     case DimRect:
@@ -7172,7 +7237,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
     case Dim1D:
       return lgc::Builder::Dim1DArray;
     case DimBuffer:
-      return lgc::Builder::Dim1DArray;
+      return lgc::Builder::Dim1DArrayBuffer;
     case Dim2D:
       return lgc::Builder::Dim2DArray;
     case DimCube:
@@ -7720,8 +7785,11 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
   // Determine the atomic ordering.
   AtomicOrdering ordering = AtomicOrdering::NotAtomic;
   if (scope != ScopeInvocation) {
+    // We are safe to downgrade the SequentiallyConsistent to Acquire/AcquireRelease based on Vulkan validation rules
+    // within a module.
+    bool readOnly = bi->getOpCode() == OpAtomicLoad;
     if (semantics & MemorySemanticsSequentiallyConsistentMask)
-      ordering = AtomicOrdering::SequentiallyConsistent;
+      ordering = readOnly ? AtomicOrdering::Acquire : AtomicOrdering::AcquireRelease;
     else if (semantics & MemorySemanticsAcquireReleaseMask)
       ordering = AtomicOrdering::AcquireRelease;
     else if (semantics & MemorySemanticsAcquireMask)
@@ -8994,7 +9062,7 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
       Type *mdTy = nullptr;
       SPIRVType *bt = bv->getType()->getPointerElementType();
       bool vs64BitsAttribInputSingleLoc = (as == SPIRAS_Input && m_execModule == ExecutionModelVertex &&
-                                           getPipelineOptions()->vertex64BitsAttribSingleLoc);
+                                           getPipelineOptions()->getGlState().vertex64BitsAttribSingleLoc);
       auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy, vs64BitsAttribInputSingleLoc);
 
       // Setup input/output metadata
@@ -9036,7 +9104,7 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
         assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR() ||
                bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter);
 
-        if (getPipelineOptions()->replaceSetWithResourceType) {
+        if (getPipelineOptions()->getGlState().replaceSetWithResourceType) {
           bool hasBlock = blockTy->hasDecorate(DecorationBlock);
           bool hasBufferBlock = blockTy->hasDecorate(DecorationBufferBlock);
 
@@ -9340,6 +9408,14 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 
     inOutMd.Component = inOutDec.Component;
     inOutMd.InterpMode = inOutDec.Interp.Mode;
+    auto llpcContext = static_cast<Llpc::Context *>(m_context);
+    auto info = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+    if ((llpcContext->getPipelineType() == PipelineType::Graphics) && info->glState.enableFlatShade &&
+        (inOutMd.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor ||
+         inOutMd.Value == Vkgc::GlCompatibilityInOutLocation::BackColor ||
+         inOutMd.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor ||
+         inOutMd.Value == Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor))
+      inOutMd.InterpMode = InterpModeFlat;
     inOutMd.InterpLoc = inOutDec.Interp.Loc;
     inOutMd.PerPatch = inOutDec.PerPatch;
     inOutMd.PerPrimitive = inOutDec.PerPrimitive;
@@ -10418,8 +10494,10 @@ Instruction *SPIRVToLLVM::transBarrier(BasicBlock *bb, SPIRVWord execScope, SPIR
 Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope) {
   AtomicOrdering ordering = AtomicOrdering::NotAtomic;
 
+  // We are safe to downgrade the SequentiallyConsistent to AcquireRelease based on Vulkan validation rules within a
+  // module.
   if (memSema & MemorySemanticsSequentiallyConsistentMask)
-    ordering = AtomicOrdering::SequentiallyConsistent;
+    ordering = AtomicOrdering::AcquireRelease;
   else if (memSema & MemorySemanticsAcquireReleaseMask)
     ordering = AtomicOrdering::AcquireRelease;
   else if (memSema & MemorySemanticsAcquireMask)
@@ -10436,10 +10514,6 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRV
 
   if (ordering == AtomicOrdering::NotAtomic)
     return nullptr;
-
-  // Upgrade the ordering if we need to make it available or visible
-  if (memSema & (MemorySemanticsMakeAvailableKHRMask | MemorySemanticsMakeVisibleKHRMask))
-    ordering = AtomicOrdering::SequentiallyConsistent;
 
   SyncScope::ID scope = SyncScope::System;
 

@@ -882,6 +882,7 @@ public:
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, cbState, dualSourceBlendDynamic, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampVs, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampFs, MemberTypeBool, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableFlatShade, MemberTypeBool, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
                                      Vkgc::MaxColorTargets, true);
 
@@ -896,6 +897,7 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, useSoftwareVertexBufferDescriptors, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
+
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_clientMetadata, MemberTypeU8Array, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_uniformConstantMaps, MemberTypeUniformConstantMap,
                                      Vkgc::ShaderStageGfxCount, true);

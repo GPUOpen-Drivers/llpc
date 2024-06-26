@@ -35,7 +35,7 @@ void main() {
 // CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(4) (...) @lgc.create.load.push.constants.ptr.p4()
 // CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // CHECK-NEXT:    [[LOAD:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP1]], i32 32, i1 true, i32 1, i32 0, i32 0, i32 16)
-// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP1]], i32 512
+// CHECK-NEXT:    [[TMP2:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(7) [[TMP1]], i32 512
 // CHECK-NEXT:    [[LOAD2:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) [[TMP2]], i32 32, i1 true, i32 1, i32 0, i32 0, i32 16)
 // CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(4) [[TMP0]], align 4
 // CHECK-NEXT:    [[TMP4:%.*]] = icmp ult i32 [[TMP3]], 2
@@ -49,13 +49,13 @@ void main() {
 // CHECK:       10:
 // CHECK-NEXT:    [[TMP11:%.*]] = phi i32 [ 0, [[DOTENTRY:%.*]] ], [ [[TMP9]], [[TMP5]] ]
 // CHECK-NEXT:    store i32 [[TMP11]], ptr addrspace(7) [[TMP1]], align 4
-// CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i8, ptr addrspace(4) [[TMP0]], i64 4
+// CHECK-NEXT:    [[TMP12:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(4) [[TMP0]], i64 4
 // CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(4) [[TMP12]], align 4
 // CHECK-NEXT:    [[TMP14:%.*]] = icmp ult i32 [[TMP13]], 2
 // CHECK-NEXT:    [[TMP15:%.*]] = icmp eq i32 [[TMP13]], 1
 // CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP15]], <8 x float> [[LOAD2]], <8 x float> [[LOAD]]
 // CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[TMP14]], <8 x float> [[TMP16]], <8 x float> zeroinitializer
-// CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP1]], i32 1024
+// CHECK-NEXT:    [[TMP18:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(7) [[TMP1]], i32 1024
 // CHECK-NEXT:    call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) [[TMP18]], i32 64, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> [[TMP17]])
 // CHECK-NEXT:    ret void
 //

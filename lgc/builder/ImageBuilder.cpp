@@ -423,14 +423,9 @@ static Type *convertToFloatingPointType(Type *origTy) {
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                     Value *mipLevel, const Twine &instName) {
-  imageDesc = fixImageDescForRead(imageDesc);
-  // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
-  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceRead = true;
-  assert(coord->getType()->getScalarType()->isIntegerTy(32));
-  coord = handleFragCoordViewIndex(coord, flags, dim);
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(resultTy);
 
-  unsigned dmask = 1;
   Type *origTexelTy = resultTy;
   if (auto structResultTy = dyn_cast<StructType>(resultTy))
     origTexelTy = structResultTy->getElementType(0);
@@ -443,6 +438,21 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
     // Treat i16 load as f16 load and cast it back later.
     texelTy = FixedVectorType::get(getHalfTy(), 4);
   }
+
+  bool isTexelBuffer = (dim == Dim1DBuffer || dim == Dim1DArrayBuffer);
+  bool needFullDesc = texelTy != origTexelTy && origTexelTy->isIntOrIntVectorTy(64) && origTexelTy->isVectorTy() &&
+                      m_pipelineState->getOptions().allowNullDescriptor;
+  imageDesc = transformImageDesc(imageDesc, needFullDesc, isTexelBuffer, resultTy);
+  const bool isVecTyDesc = imageDesc->getType()->isVectorTy();
+  if (isVecTyDesc)
+    imageDesc = fixImageDescForRead(imageDesc);
+  // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceRead = true;
+  assert(coord->getType()->getScalarType()->isIntegerTy(32));
+  coord = handleFragCoordViewIndex(coord, flags, dim);
+
+  unsigned dmask = 1;
 
   if (auto vectorResultTy = dyn_cast<FixedVectorType>(texelTy))
     dmask = (1U << vectorResultTy->getNumElements()) - 1;
@@ -462,7 +472,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
   SmallVector<Value *, 16> args;
   Instruction *imageInst = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
+  if (!isTexelBuffer) {
     // Not texel buffer; use image load instruction.
     // Build the intrinsic arguments.
     bool tfe = isa<StructType>(intrinsicDataTy);
@@ -509,11 +519,13 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
 
   // Add a waterfall loop if needed.
   Value *result = imageInst;
-  if (flags & ImageFlagNonUniformImage)
-    result = createWaterfallLoop(imageInst, imageDescArgIndex,
-                                 getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
-  else if (flags & ImageFlagEnforceReadFirstLaneImage)
-    enforceReadFirstLane(imageInst, imageDescArgIndex);
+  if (imageDesc->getType()->isVectorTy()) {
+    if (flags & ImageFlagNonUniformImage)
+      result = createWaterfallLoop(imageInst, imageDescArgIndex,
+                                   getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
+    else if (flags & ImageFlagEnforceReadFirstLaneImage)
+      enforceReadFirstLane(imageInst, imageDescArgIndex);
+  }
 
   if (texelTy != origTexelTy) {
     Value *texel = result;
@@ -581,6 +593,8 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                              Value *fmaskDesc, Value *coord, Value *sampleNum, const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(resultTy);
   // Load texel from F-mask image.
   unsigned fmaskDim = dim;
   switch (dim) {
@@ -596,7 +610,7 @@ Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsig
   }
 
   // When the shadow table is disabled, we don't need to load F-mask descriptor
-  if (m_pipelineState->getOptions().enableFmask) {
+  if (m_pipelineState->getOptions().enableFmask && !isa<PoisonValue>(fmaskDesc)) {
     Value *fmaskTexel = CreateImageLoad(FixedVectorType::get(getInt32Ty(), 4), fmaskDim, flags, fmaskDesc, coord,
                                         nullptr, instName + ".fmaskload");
 
@@ -607,6 +621,11 @@ Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsig
     calcSampleNum = CreateAnd(calcSampleNum, getInt32(15));
 
     // Check whether the F-mask descriptor has a BUF_DATA_FORMAT_INVALID (0) format (dword[1].bit[20-25]).
+    if (!fmaskDesc->getType()->isVectorTy()) {
+      auto callInst = cast<CallInst>(fmaskTexel);
+      unsigned argIdx = callInst->arg_size() == 5 ? 0 : callInst->arg_size() - 3;
+      fmaskDesc = callInst->getArgOperand(argIdx);
+    }
     Value *fmaskFormat = CreateExtractElement(fmaskDesc, 1);
     fmaskFormat = CreateAnd(fmaskFormat, getInt32(63 << 20));
     Value *fmaskValidFormat = CreateICmpNE(fmaskFormat, getInt32(0));
@@ -634,6 +653,8 @@ Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsig
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                      Value *mipLevel, const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(texel->getType());
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
@@ -658,11 +679,14 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
   SmallVector<Value *, 6> derivatives;
   dim = prepareCoordinate(dim, coord, nullptr, nullptr, nullptr, coords, derivatives);
 
+  bool isTexelBuffer = (dim == Dim1DBuffer || dim == Dim1DArrayBuffer);
+  imageDesc = transformImageDesc(imageDesc, false, isTexelBuffer, texel->getType());
+
   Type *texelTy = texel->getType();
   SmallVector<Value *, 16> args;
   Instruction *imageStore = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
+  if (!isTexelBuffer) {
     // Not texel buffer; use image store instruction.
     // Build the intrinsic arguments.
     unsigned dmask = 1;
@@ -717,12 +741,14 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
         CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store_format, texel->getType(), args, nullptr, instName);
   }
 
-  // Add a waterfall loop if needed.
-  if (flags & ImageFlagNonUniformImage)
-    createWaterfallLoop(imageStore, imageDescArgIndex,
-                        getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
-  else if (flags & ImageFlagEnforceReadFirstLaneImage)
-    enforceReadFirstLane(imageStore, imageDescArgIndex);
+  if (imageDesc->getType()->isVectorTy()) {
+    // Add a waterfall loop if needed.
+    if (flags & ImageFlagNonUniformImage)
+      createWaterfallLoop(imageStore, imageDescArgIndex,
+                          getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
+    else if (flags & ImageFlagEnforceReadFirstLaneImage)
+      enforceReadFirstLane(imageStore, imageDescArgIndex);
+  }
 
   return imageStore;
 }
@@ -805,6 +831,10 @@ Value *BuilderImpl::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, 
   Value *imageDesc = imageDescArray;
   if (isa<ArrayType>(imageDescArray->getType()))
     imageDesc = CreateExtractValue(imageDescArray, 0);
+  if (isa<PoisonValue>(imageDesc))
+    imageDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), 8));
+  else
+    imageDesc = transformImageDesc(imageDesc, true, false, resultTy);
   imageDesc = fixImageDescForRead(imageDesc);
 
   YCbCrSampleInfo sampleInfoLuma = {resultTy, dim, flags, imageDesc, samplerDescLuma, address, instName.str(), true};
@@ -817,6 +847,10 @@ Value *BuilderImpl::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, 
   // Set image descriptor for chroma channel
   for (unsigned planeIdx = 1; planeIdx < yCbCrMetaData.word1.planes; ++planeIdx) {
     imageDesc = CreateExtractValue(imageDescArray, planeIdx);
+    if (isa<PoisonValue>(imageDesc))
+      imageDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), 8));
+    else
+      imageDesc = transformImageDesc(imageDesc, true, false, resultTy);
     imageDesc = fixImageDescForRead(imageDesc);
     YCbCrConverter.SetImgDescChroma(planeIdx, imageDesc);
   }
@@ -843,6 +877,9 @@ Value *BuilderImpl::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, 
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc,
                                       Value *samplerDesc, ArrayRef<Value *> address, const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc) || isa<PoisonValue>(samplerDesc))
+    return PoisonValue::get(resultTy);
+
   Value *coord = address[ImageAddressIdxCoordinate];
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
 
@@ -861,8 +898,7 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
       gatherTy = StructType::get(getContext(), {gatherTy, getInt32Ty()});
   }
 
-  // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
-  samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
+  samplerDesc = transformSamplerDesc(samplerDesc);
 
   if (m_pipelineState->getOptions().disableTruncCoordForGather) {
     samplerDesc = modifySamplerDescForGather(samplerDesc);
@@ -930,7 +966,16 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
 Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsigned flags, Value *coord,
                                             Value *imageDesc, Value *samplerDesc, ArrayRef<Value *> address,
                                             const Twine &instName, bool isSample) {
-  imageDesc = fixImageDescForRead(imageDesc);
+  if (isa<PoisonValue>(imageDesc) || isa<PoisonValue>(samplerDesc))
+    return PoisonValue::get(resultTy);
+
+  imageDesc = transformImageDesc(imageDesc, false, false, resultTy);
+  const bool isVecTyDesc = imageDesc->getType()->isVectorTy();
+  if (isVecTyDesc)
+    imageDesc = fixImageDescForRead(imageDesc);
+
+  samplerDesc = transformSamplerDesc(samplerDesc);
+
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
   // Set up the mask of address components provided, for use in searching the intrinsic ID table
@@ -1057,16 +1102,22 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
 
   // Add a waterfall loop if needed.
   SmallVector<unsigned, 2> nonUniformArgIndexes;
-  if (flags & ImageFlagNonUniformImage)
-    nonUniformArgIndexes.push_back(imageDescArgIndex);
-  else if (flags & ImageFlagEnforceReadFirstLaneImage)
-    enforceReadFirstLane(imageOp, imageDescArgIndex);
+  if (imageDesc->getType()->isVectorTy()) {
+    if (flags & ImageFlagNonUniformImage)
+      nonUniformArgIndexes.push_back(imageDescArgIndex);
+    else if (flags & ImageFlagEnforceReadFirstLaneImage)
+      enforceReadFirstLane(imageOp, imageDescArgIndex);
+  }
 
-  const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
-  if (flags & ImageFlagNonUniformSampler)
-    nonUniformArgIndexes.push_back(samplerDescArgIndex);
-  else if (flags & ImageFlagEnforceReadFirstLaneSampler)
-    enforceReadFirstLane(imageOp, samplerDescArgIndex);
+  if (samplerDesc->getType()->isVectorTy()) {
+    const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
+    if (flags & ImageFlagNonUniformSampler) {
+      nonUniformArgIndexes.push_back(samplerDescArgIndex);
+    } else {
+      // TODO: Re-add the condition once backend fix the waterfall loop bug.
+      enforceReadFirstLane(imageOp, samplerDescArgIndex);
+    }
+  }
 
   if (!nonUniformArgIndexes.empty())
     imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes,
@@ -1123,6 +1174,8 @@ Value *BuilderImpl::CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, A
 Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, unsigned flags, AtomicOrdering ordering,
                                             Value *imageDesc, Value *coord, Value *inputValue, Value *comparatorValue,
                                             const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(inputValue->getType());
   getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   coord = handleFragCoordViewIndex(coord, flags, dim);
@@ -1131,7 +1184,7 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
   case AtomicOrdering::Release:
   case AtomicOrdering::AcquireRelease:
   case AtomicOrdering::SequentiallyConsistent:
-    CreateFence(AtomicOrdering::Release, SyncScope::System);
+    CreateFence(AtomicOrdering::Release, getContext().getOrInsertSyncScopeID("agent"));
     break;
   default:
     break;
@@ -1142,10 +1195,13 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
   SmallVector<Value *, 6> derivatives;
   dim = prepareCoordinate(dim, coord, nullptr, nullptr, nullptr, coords, derivatives);
 
+  bool isTexelBuffer = (dim == Dim1DBuffer || dim == Dim1DArrayBuffer);
+  imageDesc = transformImageDesc(imageDesc, false, isTexelBuffer, nullptr);
+
   SmallVector<Value *, 8> args;
   Instruction *atomicInst = nullptr;
   unsigned imageDescArgIndex = 0;
-  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
+  if (!isTexelBuffer) {
     // Resource descriptor. Use the image atomic instruction.
     args.push_back(inputValue);
     if (atomicOp == AtomicOpCompareSwap)
@@ -1176,18 +1232,20 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
     atomicInst =
         CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp], inputValue->getType(), args, nullptr, instName);
   }
-  if (flags & ImageFlagNonUniformImage)
-    atomicInst =
-        createWaterfallLoop(atomicInst, imageDescArgIndex,
-                            getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
-  else if (flags & ImageFlagEnforceReadFirstLaneImage)
-    enforceReadFirstLane(atomicInst, imageDescArgIndex);
+  if (imageDesc->getType()->isVectorTy()) {
+    if (flags & ImageFlagNonUniformImage)
+      atomicInst =
+          createWaterfallLoop(atomicInst, imageDescArgIndex,
+                              getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
+    else if (flags & ImageFlagEnforceReadFirstLaneImage)
+      enforceReadFirstLane(atomicInst, imageDescArgIndex);
+  }
 
   switch (ordering) {
   case AtomicOrdering::Acquire:
   case AtomicOrdering::AcquireRelease:
   case AtomicOrdering::SequentiallyConsistent:
-    CreateFence(AtomicOrdering::Acquire, SyncScope::System);
+    CreateFence(AtomicOrdering::Acquire, getContext().getOrInsertSyncScopeID("agent"));
     break;
   default:
     break;
@@ -1204,7 +1262,11 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(getInt32Ty());
   dim = dim == DimCubeArray ? DimCube : dim;
+
+  imageDesc = transformImageDesc(imageDesc, true, false, nullptr);
 
   Value *numMipLevel = nullptr;
   GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
@@ -1242,6 +1304,10 @@ Value *BuilderImpl::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageQuerySamples(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(getInt32Ty());
+
+  imageDesc = transformImageDesc(imageDesc, true, false, nullptr);
   Value *descWord3 = CreateExtractElement(imageDesc, 3);
   Value *lastLevel = nullptr;
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
@@ -1299,7 +1365,11 @@ Value *BuilderImpl::CreateImageQuerySamples(unsigned dim, unsigned flags, Value 
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *imageDesc, Value *lod,
                                          const Twine &instName) {
-  if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorTexelBuffer)) {
+  if (isa<PoisonValue>(imageDesc))
+    return PoisonValue::get(getInt32Ty());
+  bool isTexelBuffer = (dim == Dim1DBuffer || dim == Dim1DArrayBuffer);
+  imageDesc = transformImageDesc(imageDesc, true, isTexelBuffer, nullptr);
+  if (isTexelBuffer) {
     // Texel buffer.
     // Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
     Value *numRecords = CreateExtractElement(imageDesc, 2);
@@ -1396,6 +1466,9 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc, Value *coord,
                                       const Twine &instName) {
+  if (isa<PoisonValue>(imageDesc) || isa<PoisonValue>(samplerDesc))
+    return PoisonValue::get(FixedVectorType::get(getFloatTy(), 2));
+
   // Remove array from dimension if any.
   switch (dim) {
   case Dim1DArray:
@@ -1417,8 +1490,13 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
   SmallVector<Value *, 6> derivatives;
   dim = prepareCoordinate(dim, coord, nullptr, nullptr, nullptr, coords, derivatives);
 
-  // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
-  samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
+  imageDesc = transformImageDesc(imageDesc, false, false, nullptr);
+  if (isa<FixedVectorType>(samplerDesc->getType())) {
+    // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
+    samplerDesc = CreateShuffleVector(samplerDesc, ArrayRef<int>{0, 1, 2, 3});
+  } else {
+    samplerDesc = transformSamplerDesc(samplerDesc);
+  }
 
   SmallVector<Value *, 9> args;
   args.push_back(getInt32(3)); // dmask
@@ -1432,19 +1510,23 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
 
   Instruction *result = CreateIntrinsic(ImageGetLodIntrinsicTable[dim],
                                         {FixedVectorType::get(getFloatTy(), 2), getFloatTy()}, args, nullptr, instName);
-  // Add a waterfall loop if needed.
+
   SmallVector<unsigned, 2> nonUniformArgIndexes;
-  if (flags & ImageFlagNonUniformImage)
-    nonUniformArgIndexes.push_back(imageDescArgIndex);
-  else if (flags & ImageFlagEnforceReadFirstLaneImage)
-    enforceReadFirstLane(result, imageDescArgIndex);
+  if (imageDesc->getType()->isVectorTy()) {
+    // Add a waterfall loop if needed.
+    if (flags & ImageFlagNonUniformImage)
+      nonUniformArgIndexes.push_back(imageDescArgIndex);
+    else if (flags & ImageFlagEnforceReadFirstLaneImage)
+      enforceReadFirstLane(result, imageDescArgIndex);
+  }
 
-  const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
-  if (flags & ImageFlagNonUniformSampler)
-    nonUniformArgIndexes.push_back(samplerDescArgIndex);
-  else if (flags & ImageFlagEnforceReadFirstLaneSampler)
-    enforceReadFirstLane(result, samplerDescArgIndex);
-
+  if (samplerDesc->getType()->isVectorTy()) {
+    const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
+    if (flags & ImageFlagNonUniformSampler)
+      nonUniformArgIndexes.push_back(samplerDescArgIndex);
+    else if (flags & ImageFlagEnforceReadFirstLaneSampler)
+      enforceReadFirstLane(result, samplerDescArgIndex);
+  }
   if (!nonUniformArgIndexes.empty())
     result = createWaterfallLoop(result, nonUniformArgIndexes,
                                  getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
@@ -1910,4 +1992,41 @@ Value *BuilderImpl::modifySamplerDescForGather(Value *samplerDesc) {
   samplerDesc = CreateInsertElement(samplerDesc, dword0, uint64_t(0));
 
   return samplerDesc;
+}
+
+// =====================================================================================================================
+// Transform image descriptor pointer to a i32 type or a descriptor load instruction.
+//
+// @param imageDesc : image descriptor pointer
+// @param mustLoad : Whether to load image descriptor from the pointer
+// @param isTexelBuffer : Whether it is a texel buffer
+// @param texelType : The type of the texel
+// @returns The transformed descriptor
+Value *BuilderImpl::transformImageDesc(Value *imageDesc, bool mustLoad, bool isTexelBuffer, Type *texelType) {
+  assert(!isa<PoisonValue>(imageDesc));
+  if (isa<FixedVectorType>(imageDesc->getType()))
+    return imageDesc;
+
+  // Explicitly load the descriptor from the descriptor pointer
+  Type *descType = FixedVectorType::get(getInt32Ty(), isTexelBuffer ? 4 : 8);
+  Value *desc = CreateLoad(descType, imageDesc);
+  cast<Instruction>(desc)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
+  return desc;
+}
+
+// =====================================================================================================================
+// Transform sampler descriptor pointer to a i32 type or a descriptor load instruction.
+//
+// @param samplerDesc : descriptor pointer or a full descriptor
+// @returns Transformed sampler descriptor
+Value *BuilderImpl::transformSamplerDesc(Value *samplerDesc) {
+  assert(!isa<PoisonValue>(samplerDesc));
+  if (isa<FixedVectorType>(samplerDesc->getType()))
+    return samplerDesc;
+
+  // Explicitly load the descriptor from the descriptor pointer
+  Type *descType = FixedVectorType::get(getInt32Ty(), 4);
+  Value *desc = CreateLoad(descType, samplerDesc);
+  cast<Instruction>(desc)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
+  return desc;
 }

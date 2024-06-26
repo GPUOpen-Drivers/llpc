@@ -24,34 +24,15 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  GfxRuntimeContext.h
- * @brief LLVMContext extension that stores a GfxRuntime library module
+ * @file  RuntimeContext.cpp
+ * @brief LLVMContext extension that stores a Runtime library module
  ***********************************************************************************************************************
  */
-#pragma once
 
-#include "llvm-dialects/Dialect/ContextExtension.h"
-#include <memory>
+#include "lgc/RuntimeContext.h"
+#include "llvm/IR/Module.h"
 
-namespace llvm {
-class Module;
-}
+using namespace llvm;
+using namespace lgc;
 
-namespace lgc {
-
-// This extension can be attached to an LLVMContext and queried via the
-// GfxRuntimeContext::get method inherited from the base class.
-//
-// Compiler drivers (like LLPC) are expected to set theModule to the GfxRuntime
-// library, so that advanced blend pass can cross-module inline
-// functions implemented there.
-class GfxRuntimeContext : public llvm_dialects::ContextExtensionImpl<GfxRuntimeContext> {
-public:
-  explicit GfxRuntimeContext(llvm::LLVMContext &) {}
-  ~GfxRuntimeContext();
-
-  static Key theKey;
-  std::unique_ptr<llvm::Module> theModule;
-};
-
-} // namespace lgc
+GfxRuntimeContext::Key GfxRuntimeContext::theKey;

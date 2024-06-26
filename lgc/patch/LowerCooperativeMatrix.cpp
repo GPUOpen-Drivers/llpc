@@ -1060,6 +1060,7 @@ Value *LowerCooperativeMatrix::cooperativeMatrixReshapeBetween16bitAnd32bitOnAcc
   } else {
     resultValue =
         builder.CreateBitCast(resultValue, FixedVectorType::get(builder.getFloatTy(), 4)); // 1st case:after convert
+    resultValue = builder.CreateShuffleVector(resultValue, {0, 1, 2, 3, -1, -1, -1, -1});
   }
   return resultValue;
 }
@@ -1542,8 +1543,8 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
         mulAB1 = createDotProductFp16Fp16(rowData1, colData, accumulator1, isSatOrOpsel, instName, &muladd);
         mulAB2 = createDotProductFp16Fp16(rowData2, colData, accumulator2, isSatOrOpsel, instName, &muladd);
       } else {
-        mulAB1 = createDotProductInt16Int16(rowData1, colData, accumulator1, flags, isSatOrOpsel, instName, &muladd);
-        mulAB2 = createDotProductInt16Int16(rowData2, colData, accumulator2, flags, isSatOrOpsel, instName, &muladd);
+        mulAB1 = createDotProductInt(rowData1, colData, accumulator1, flags, isSatOrOpsel, instName, &muladd);
+        mulAB2 = createDotProductInt(rowData2, colData, accumulator2, flags, isSatOrOpsel, instName, &muladd);
       }
       dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB1, accIdx);
       dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB2, accIdx + 1);
@@ -1575,6 +1576,8 @@ Value *LowerCooperativeMatrix::createDotProductFp16Fp32(Value *const vector1, Va
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
+  // Dot instructions are not available on gfx1010
+  const bool emulateDot = m_gfxIp.isGfx(10, 1) && m_gfxIp.stepping == 0;
   const unsigned compCount = cast<FixedVectorType>(vector1->getType())->getNumElements();
   Value *scalar = initAccumulator;
   auto intrinsicDot = Intrinsic::amdgcn_fdot2;
@@ -1583,8 +1586,18 @@ Value *LowerCooperativeMatrix::createDotProductFp16Fp32(Value *const vector1, Va
     input1 = builder.CreateBitCast(input1, FixedVectorType::get(builder.getHalfTy(), 2));
     Value *input2 = builder.CreateExtractElement(vector2, i);
     input2 = builder.CreateBitCast(input2, FixedVectorType::get(builder.getHalfTy(), 2));
-    scalar =
-        builder.CreateIntrinsic(intrinsicDot, {}, {input1, input2, scalar, builder.getInt1(isSat)}, nullptr, instName);
+    if (emulateDot) {
+      Value *input1Fp32 = builder.CreateFPCast(input1, FixedVectorType::get(builder.getFloatTy(), 2));
+      Value *input2Fp32 = builder.CreateFPCast(input2, FixedVectorType::get(builder.getFloatTy(), 2));
+      for (unsigned j = 0; j < 2; ++j) {
+        Value *lhs = builder.CreateExtractElement(input1Fp32, j);
+        Value *rhs = builder.CreateExtractElement(input2Fp32, j);
+        scalar = builder.CreateIntrinsic(Intrinsic::fmuladd, lhs->getType(), {lhs, rhs, scalar});
+      }
+    } else {
+      scalar = builder.CreateIntrinsic(intrinsicDot, {}, {input1, input2, scalar, builder.getInt1(isSat)}, nullptr,
+                                       instName);
+    }
   }
   scalar->setName(instName);
   return scalar;
@@ -1638,6 +1651,8 @@ Value *LowerCooperativeMatrix::createDotProductInt8Int32(Value *vector1, Value *
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
+  // Dot instructions are not available on gfx1010
+  const bool emulateDot = m_gfxIp.isGfx(10, 1) && m_gfxIp.stepping == 0;
   const bool isSigned = (flags & lgc::Builder::FirstVectorSigned);
   auto intrinsicDot = isSigned ? Intrinsic::amdgcn_sdot4 : Intrinsic::amdgcn_udot4;
 
@@ -1646,8 +1661,14 @@ Value *LowerCooperativeMatrix::createDotProductInt8Int32(Value *vector1, Value *
   for (unsigned i = 0; i < compCount; ++i) {
     Value *input1 = builder.CreateExtractElement(vector1, i);
     Value *input2 = builder.CreateExtractElement(vector2, i);
-    scalar =
-        builder.CreateIntrinsic(intrinsicDot, {}, {input1, input2, scalar, builder.getInt1(false)}, nullptr, instName);
+    if (emulateDot) {
+      input1 = builder.CreateBitCast(input1, FixedVectorType::get(builder.getInt8Ty(), 4));
+      input2 = builder.CreateBitCast(input2, FixedVectorType::get(builder.getInt8Ty(), 4));
+      scalar = createDotProductInt(input1, input2, scalar, flags, isSat, instName, insertPos);
+    } else {
+      scalar = builder.CreateIntrinsic(intrinsicDot, {}, {input1, input2, scalar, builder.getInt1(false)}, nullptr,
+                                       instName);
+    }
   }
 
   // Always use sadd_sat here as uint32@C is not supported.
@@ -1677,6 +1698,8 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int32(Value *vector1, Value 
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
+  // Dot instructions are not available on gfx1010
+  const bool emulateDot = m_gfxIp.isGfx(10, 1) && m_gfxIp.stepping == 0;
   const bool isSigned = (flags & lgc::Builder::FirstVectorSigned);
   auto intrinsicDot = isSigned ? Intrinsic::amdgcn_sdot2 : Intrinsic::amdgcn_udot2;
 
@@ -1687,8 +1710,12 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int32(Value *vector1, Value 
     input1 = builder.CreateBitCast(input1, FixedVectorType::get(builder.getInt16Ty(), 2));
     Value *input2 = builder.CreateExtractElement(vector2, i);
     input2 = builder.CreateBitCast(input2, FixedVectorType::get(builder.getInt16Ty(), 2));
-    scalar =
-        builder.CreateIntrinsic(intrinsicDot, {}, {input1, input2, scalar, builder.getInt1(isSat)}, nullptr, instName);
+    if (emulateDot) {
+      scalar = createDotProductInt(input1, input2, scalar, flags, isSat, instName, insertPos);
+    } else {
+      scalar = builder.CreateIntrinsic(intrinsicDot, {}, {input1, input2, scalar, builder.getInt1(isSat)}, nullptr,
+                                       instName);
+    }
   }
   scalar->setName(instName);
   return scalar;
@@ -1704,9 +1731,8 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int32(Value *vector1, Value 
 // @param isSat:  SaturatingAccumulation for calculation
 // @param instName : Name to give instruction(s)
 // @param insertPos : Where to insert the instruction
-Value *LowerCooperativeMatrix::createDotProductInt16Int16(Value *vector1, Value *vector2, Value *accumulator,
-                                                          unsigned flags, bool isSat, const Twine &instName,
-                                                          Instruction *insertPos) {
+Value *LowerCooperativeMatrix::createDotProductInt(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
+                                                   bool isSat, const Twine &instName, Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
   Type *inputTy = vector1->getType();
@@ -1720,9 +1746,13 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int16(Value *vector1, Value 
   // as unsigned.
   const bool isMixed = (flags == lgc::Builder::FirstVectorSigned);
 
-  Type *targetTy = builder.getInt64Ty();
+  const auto outputSizeInBits = outputTy->getScalarSizeInBits();
+  const auto compSizeInBits = inputTy->getScalarSizeInBits();
+  Type *targetTy = compSizeInBits * 2 >= outputSizeInBits ? builder.getIntNTy(outputSizeInBits * 2) : outputTy;
+  const auto targetSizeInBits = targetTy->getScalarSizeInBits();
+  assert(targetSizeInBits <= 64);
   // Emulate dot product with no HW support cases
-  Value *scalar = builder.getInt64(0);
+  Value *scalar = builder.getIntN(targetSizeInBits, 0);
   for (unsigned elemIdx = 0; elemIdx < compCount; ++elemIdx) {
     Value *elem1 = builder.CreateExtractElement(vector1, elemIdx);
     elem1 = isSigned ? builder.CreateSExt(elem1, targetTy) : builder.CreateZExt(elem1, targetTy);
@@ -1732,28 +1762,27 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int16(Value *vector1, Value 
     scalar = builder.CreateAdd(product, scalar);
   }
 
-  scalar = builder.CreateTrunc(scalar, builder.getInt32Ty());
-  accumulator = builder.CreateTrunc(accumulator, builder.getInt32Ty());
+  scalar = builder.CreateTrunc(scalar, outputTy);
+  accumulator = builder.CreateTrunc(accumulator, outputTy);
   Intrinsic::ID addIntrinsic = isSigned ? Intrinsic::sadd_sat : Intrinsic::uadd_sat;
   scalar = builder.CreateBinaryIntrinsic(addIntrinsic, scalar, accumulator, nullptr, instName);
 
-  const unsigned bitWidth = outputTy->getScalarSizeInBits();
-  auto unsignedMax = (2ULL << (bitWidth - 1)) - 1;
+  auto unsignedMax = (2ULL << (targetSizeInBits - 1)) - 1;
   auto signedMax = unsignedMax >> 1;
   auto signedMin = -1ULL - signedMax;
 
   Value *minimum = nullptr, *maximum = nullptr;
   Value *isUnderflow = nullptr, *isOverflow = nullptr;
   if (isSigned) {
-    scalar = builder.CreateSExt(scalar, builder.getInt64Ty());
-    minimum = ConstantInt::getSigned(builder.getInt64Ty(), signedMin);
-    maximum = ConstantInt::getSigned(builder.getInt64Ty(), signedMax);
+    scalar = builder.CreateSExt(scalar, targetTy);
+    minimum = ConstantInt::getSigned(targetTy, signedMin);
+    maximum = ConstantInt::getSigned(targetTy, signedMax);
     isUnderflow = builder.CreateICmpSLT(scalar, minimum);
     isOverflow = builder.CreateICmpSGT(scalar, maximum);
   } else {
-    scalar = builder.CreateZExt(scalar, builder.getInt64Ty());
-    minimum = builder.getInt64(0);
-    maximum = builder.getInt64(unsignedMax);
+    scalar = builder.CreateZExt(scalar, targetTy);
+    minimum = builder.getIntN(targetSizeInBits, 0);
+    maximum = builder.getIntN(targetSizeInBits, unsignedMax);
     isUnderflow = builder.CreateICmpULT(scalar, minimum);
     isOverflow = builder.CreateICmpUGT(scalar, maximum);
   }

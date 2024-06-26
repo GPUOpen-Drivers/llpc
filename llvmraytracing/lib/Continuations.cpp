@@ -1265,6 +1265,8 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
       // FIXME: switch to dialectOp check.
       if (CalledName.starts_with("lgc.user.data") ||
           CalledName.starts_with("lgc.shader.input") ||
+          CalledName.starts_with("lgc.create.get.desc.ptr") ||
+          CalledName.starts_with("lgc.load.buffer.desc") ||
           CalledName.starts_with("lgc.load.user.data"))
         return true;
     }

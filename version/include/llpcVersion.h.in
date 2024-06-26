@@ -37,6 +37,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     73.0 | Add all the ogl specific pipeline options in a new structure GLState                                  |
+//  |     72.4 | Add enableFlatShade to GraphicsPipelineBuildInfo.                                                     |
 //  |     72.3 | Add enableColorClampVs and enableColorClampFs to GraphicsPipelineBuildInfo.                           |
 //  |     72.2 | Add pGpurtOptions and gpurtOptionCount to RayTracingPipelineBuildInfo                                 |
 //  |     72.1 | Add dynamicTopology to GraphicsPipelineBuildInfo                                                      |

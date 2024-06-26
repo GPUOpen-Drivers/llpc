@@ -20,7 +20,7 @@ void main()
 // CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
 // CHECK-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
 // CHECK-NEXT:    [[TMP2:%.*]] = load <3 x float>, ptr addrspace(7) [[TMP0]], align 16
-// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds {{i8|<{ [[]3 x float], [[]4 x i8], [[]3 x float] }>}}, ptr addrspace(7) [[TMP0]], i32 {{16|0, i32 2}}
+// CHECK-NEXT:    [[TMP3:%.*]] = getelementptr {{(inbounds i8|<{ [[]3 x float], [[]4 x i8], [[]3 x float] }>)|i8}}, ptr addrspace(7) [[TMP0]], i32 {{16|0, i32 2}}
 // CHECK-NEXT:    [[TMP4:%.*]] = load <3 x float>, ptr addrspace(7) [[TMP3]], align 16
 // CHECK-NEXT:    [[TMP5:%.*]] = extractelement <3 x float> [[TMP2]], i64 0
 // CHECK-NEXT:    [[TMP6:%.*]] = extractelement <3 x float> [[TMP4]], i64 0

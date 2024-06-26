@@ -30,20 +30,24 @@
  */
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
+#include <set>
 
 #define DEBUG_TYPE "lower-debug-printf"
 
 using namespace llvm;
 using namespace lgc;
 
+constexpr unsigned PrintfBufferBindingId = 6;
 namespace lgc {
 
 // =====================================================================================================================
@@ -57,10 +61,40 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   m_pipelineState = pipelineState;
 
-  static const auto visitor =
-      llvm_dialects::VisitorBuilder<LowerDebugPrintf>().add(&LowerDebugPrintf::visitDebugPrintf).build();
+  // Find the function which contains DebugPrintf dialect
+  typedef SmallSetVector<Function *, 4> FuncSet;
+  FuncSet printfFuncs;
+  static const auto debugPrintfFuncsVisitor =
+      llvm_dialects::VisitorBuilder<FuncSet>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .add<DebugPrintfOp>([](FuncSet &pfunc, auto &inst) { pfunc.insert(inst.getFunction()); })
+          .build();
+  debugPrintfFuncsVisitor.visit(printfFuncs, module);
 
-  visitor.visit(*this, module);
+  if (printfFuncs.empty())
+    return PreservedAnalyses::all();
+
+  bool hasPrintfDesc =
+      pipelineState
+          ->findResourceNode(ResourceNodeType::DescriptorBuffer, InternalDescriptorSetId, PrintfBufferBindingId)
+          .second != nullptr;
+
+  static const auto lowerDebugfPrintOpVisitor = llvm_dialects::VisitorBuilder<LowerDebugPrintf>()
+                                                    .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                                                    .add(&LowerDebugPrintf::visitDebugPrintf)
+                                                    .build();
+
+  BuilderImpl builder(m_pipelineState);
+  for (auto func : printfFuncs) {
+    // Create printbuffer Descriptor at the beginning of the function which contains DebugPrintf dialect ops
+    builder.SetInsertPointPastAllocas(func);
+    m_debugPrintfBuffer = hasPrintfDesc
+                              ? m_debugPrintfBuffer = builder.create<BufferDescToPtrOp>(builder.CreateBufferDesc(
+                                    InternalDescriptorSetId, PrintfBufferBindingId, builder.getInt32(0), 2))
+                              : nullptr;
+
+    lowerDebugfPrintOpVisitor.visit(*this, *func);
+  }
 
   for (auto inst : m_toErase)
     inst->eraseFromParent();
@@ -79,9 +113,10 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
 void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
   m_toErase.push_back(&op);
 
-  Value *debugPrintfBuffer = op.getBuffer();
-  if (isa<PoisonValue>(debugPrintfBuffer))
+  if (!m_debugPrintfBuffer)
     return;
+
+  Value *debugPrintfBuffer = m_debugPrintfBuffer;
 
   BuilderBase builder(&op);
 
@@ -94,8 +129,7 @@ void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
     getDwordValues(var, printArgs, bit64Vector, builder);
   }
 
-  GlobalVariable *globalStr = cast<GlobalVariable>(op.getFormat());
-  StringRef strDebugStr = (cast<ConstantDataSequential>(globalStr->getInitializer()))->getAsString();
+  StringRef strDebugStr = op.getFormat();
 
   uint64_t hash = hash_value(strDebugStr);
 

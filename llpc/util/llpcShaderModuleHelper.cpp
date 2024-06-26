@@ -151,11 +151,84 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           break;
         }
         case BuiltInPointCoord:
-        case BuiltInPrimitiveId:
         case BuiltInLayer:
         case BuiltInClipDistance:
         case BuiltInCullDistance: {
           shaderModuleUsage.useGenericBuiltIn = true;
+          break;
+        }
+        case BuiltInBaryCoordKHR:
+        case BuiltInBaryCoordNoPerspKHR: {
+          shaderModuleUsage.useBarycentric = true;
+          break;
+        }
+        case BuiltInPrimitiveId: {
+          shaderModuleUsage.useGenericBuiltIn = true;
+          shaderModuleUsage.rtSystemValueUsage.primitive.primitiveIndex = 1;
+          break;
+        }
+        case BuiltInInstanceId: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.instanceID = 1;
+          break;
+        }
+        case BuiltInLaunchIdKHR: {
+          shaderModuleUsage.rtSystemValueUsage.ray.launchId = 1;
+          break;
+        }
+        case BuiltInLaunchSizeKHR: {
+          shaderModuleUsage.rtSystemValueUsage.ray.launchSize = 1;
+          break;
+        }
+        case BuiltInWorldRayOriginKHR: {
+          shaderModuleUsage.rtSystemValueUsage.ray.worldRayOrigin = 1;
+          break;
+        }
+        case BuiltInWorldRayDirectionKHR: {
+          shaderModuleUsage.rtSystemValueUsage.ray.worldRayDirection = 1;
+          break;
+        }
+        case BuiltInObjectRayOriginKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.objectRayOrigin = 1;
+          break;
+        }
+        case BuiltInObjectRayDirectionKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.objectRayDirection = 1;
+          break;
+        }
+        case BuiltInRayTminKHR: {
+          shaderModuleUsage.rtSystemValueUsage.ray.tMin = 1;
+          break;
+        }
+        case BuiltInInstanceCustomIndexKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.instanceIndex = 1;
+          break;
+        }
+        case BuiltInObjectToWorldKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.objectToWorld = 1;
+          break;
+        }
+        case BuiltInWorldToObjectKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.worldToObject = 1;
+          break;
+        }
+        case BuiltInHitTNV: {
+          shaderModuleUsage.rtSystemValueUsage.ray.tCurrent = 1;
+          break;
+        }
+        case BuiltInHitKindKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.hitKind = 1;
+          break;
+        }
+        case BuiltInHitTriangleVertexPositionsKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.hitTrianglePosition = 1;
+          break;
+        }
+        case BuiltInIncomingRayFlagsKHR: {
+          shaderModuleUsage.rtSystemValueUsage.ray.flags = 1;
+          break;
+        }
+        case BuiltInRayGeometryIndexKHR: {
+          shaderModuleUsage.rtSystemValueUsage.primitive.geometryIndex = 1;
           break;
         }
         default: {
@@ -164,7 +237,8 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
         }
       } else if (decoration == DecorationIndex) {
         hasIndexDecoration = true;
-      }
+      } else if (decoration == DecorationPerVertexKHR)
+        shaderModuleUsage.useBarycentric = true;
       break;
     }
     case OpSpecConstantTrue:

@@ -11,7 +11,7 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spirv.ExecutionModel !8 !lgc.shaderstage !9 {
 ; CHECK-LABEL: define dllexport spir_func void @lgc.shader.FS.main(
-; CHECK-SAME: ) local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !8 !lgc.shaderstage [[META9:![0-9]+]] {
+; CHECK-SAME: ) local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel [[META8:![0-9]+]] !lgc.shaderstage [[META9:![0-9]+]] {
 ; CHECK-NEXT:  .entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 ; CHECK-NEXT:    [[TMP1:%.*]] = bitcast i64 [[TMP0]] to <2 x i32>
@@ -38,8 +38,8 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[I6:%.*]] = mul i32 [[PHI_IND]], 48
 ; CHECK-NEXT:    [[I7:%.*]] = sext i32 [[I6]] to i64
 ; CHECK-NEXT:    [[I8:%.*]] = getelementptr i8, ptr addrspace(4) [[I2]], i64 [[I7]]
-; CHECK-NEXT:    [[I9:%.*]] = load <4 x i32>, ptr addrspace(4) [[I8]], align 16, !invariant.load [[META10:![0-9]+]]
-; CHECK-NEXT:    [[I10:%.*]] = load <8 x i32>, ptr addrspace(4) [[I5]], align 32, !invariant.load [[META10]]
+; CHECK-NEXT:    [[TMP25:%.*]] = load <8 x i32>, ptr addrspace(4) [[I5]], align 32, !invariant.load [[META10:![0-9]+]]
+; CHECK-NEXT:    [[TMP26:%.*]] = load <4 x i32>, ptr addrspace(4) [[I8]], align 16, !invariant.load [[META10]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[I3]])
 ; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP12]], i32 [[I3]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = sext i32 [[TMP13]] to i64
@@ -51,13 +51,14 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP20:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP16]], <4 x i32> [[TMP19]], i1 false, i32 0, i32 0)
 ; CHECK-NEXT:    [[I11]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP12]], <4 x float> [[TMP20]])
 ; CHECK-NEXT:    [[I12:%.*]] = fadd <4 x float> [[PHI_IMG]], <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+; CHECK-NEXT:    [[TMP27:%.*]] = load <8 x i32>, ptr addrspace(4) [[I8]], align 32, !invariant.load [[META10]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[I6]])
 ; CHECK-NEXT:    [[TMP22:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP21]], i32 [[I6]])
 ; CHECK-NEXT:    [[TMP23:%.*]] = sext i32 [[TMP22]] to i64
 ; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr addrspace(4) [[I2]], i64 [[TMP23]]
-; CHECK-NEXT:    [[TMP25:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP24]], align 16, !invariant.load [[META10]]
-; CHECK-NEXT:    [[TMP26:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.last.use.v4i32(i32 [[TMP21]], <4 x i32> [[TMP25]])
-; CHECK-NEXT:    call void @llvm.amdgcn.struct.buffer.store.format.v4f32(<4 x float> [[I12]], <4 x i32> [[TMP26]], i32 1, i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP28:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP24]], align 32, !invariant.load [[META10]]
+; CHECK-NEXT:    [[TMP29:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.last.use.v8i32(i32 [[TMP21]], <8 x i32> [[TMP28]])
+; CHECK-NEXT:    call void @llvm.amdgcn.image.store.1d.v4f32.i32(<4 x float> [[I12]], i32 15, i32 1, <8 x i32> [[TMP29]], i32 0, i32 0)
 ; CHECK-NEXT:    [[IND]] = add i32 [[PHI_IND]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = icmp ne i32 [[IND]], 1000
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[EXIT:%.*]]
@@ -81,11 +82,9 @@ loop:                                             ; preds = %loop, %.entry
   %i6 = mul i32 %phi.ind, %b
   %i7 = sext i32 %i6 to i64
   %i8 = getelementptr i8, ptr addrspace(4) %i2, i64 %i7
-  %i9 = load <4 x i32>, ptr addrspace(4) %i8, align 16, !invariant.load !10
-  %i10 = load <8 x i32>, ptr addrspace(4) %i5, align 32, !invariant.load !10
-  %i11 = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 24, <8 x i32> %i10, <4 x i32> %i9, i32 1, <2 x float> zeroinitializer)
+  %i11 = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 24, ptr addrspace(4) %i5, ptr addrspace(4) %i8, i32 1, <2 x float> zeroinitializer)
   %i12 = fadd <4 x float> %phi.img, <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
-  call void (...) @lgc.create.image.store(<4 x float> %i12, i32 0, i32 8, <4 x i32> %i9, i32 1)
+  call void (...) @lgc.create.image.store(<4 x float> %i12, i32 0, i32 8, ptr addrspace(4) %i8, i32 1)
   %ind = add i32 %phi.ind, 1
   %cond = icmp ne i32 %ind, 1000
   br i1 %cond, label %loop, label %exit
@@ -139,3 +138,8 @@ attributes #3 = { nounwind memory(write) }
 !8 = !{i32 4}
 !9 = !{i32 6}
 !10 = !{}
+;.
+; CHECK: [[META8]] = !{i32 4}
+; CHECK: [[META9]] = !{i32 6}
+; CHECK: [[META10]] = !{}
+;.

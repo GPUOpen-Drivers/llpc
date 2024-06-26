@@ -1,0 +1,32 @@
+; RUN: lgc -march=amdgcn -o - --mcpu=gfx1010 -filetype=asm %s | FileCheck -check-prefixes=CHECK %s
+
+define void @matmul_f16f32_emulator(ptr addrspace(3) %out0, <8 x float> %a, <8 x float> %b, <8 x float> %c0) !lgc.shaderstage !0 {
+; CHECK-NOT: v_dot
+  %value = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f8(<8 x float> %a, <8 x float> %b, <8 x float> %c0, i1 true, i1 true, i1 false, i1 false, i32 2, i32 1)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> %value)
+  ret void
+}
+
+define void @matmul_i16i32_emulator(ptr addrspace(3) %out0, <8 x i32> %a, <8 x i32> %b, <8 x i32> %c0) !lgc.shaderstage !0 {
+; CHECK-NOT: v_dot
+  %value = call <8 x i32> (...) @lgc.cooperative.matrix.muladd__v8i32(<8 x i32> %a, <8 x i32> %b, <8 x i32> %c0, i1 true, i1 true, i1 false, i1 false, i32 5, i32 4)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x i32> %value)
+  ret void
+}
+
+define void @matmul_i8i32_emulator(ptr addrspace(3) %out0, <8 x i32> %a, <8 x i32> %b, <8 x i32> %c0) !lgc.shaderstage !0 {
+; CHECK-NOT: v_dot
+  %value = call <8 x i32> (...) @lgc.cooperative.matrix.muladd__v8i32(<8 x i32> %a, <8 x i32> %b, <8 x i32> %c0, i1 true, i1 true, i1 false, i1 false, i32 5, i32 3)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x i32> %value)
+  ret void
+}
+
+declare <8 x float> @lgc.cooperative.matrix.muladd__v8f8(...)
+declare <8 x i32> @lgc.cooperative.matrix.muladd__v8i32(...)
+declare void @lgc.cooperative.matrix.store(...)
+
+; ShaderStage::Compute
+!0 = !{i32 7}
+; Setting Threadgroup Dimensions to 64 x 1 x 1
+!llpc.compute.mode = !{!1}
+!1 = !{i32 64, i32 1, i32 1}

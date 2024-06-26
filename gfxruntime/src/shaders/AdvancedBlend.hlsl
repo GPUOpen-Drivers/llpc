@@ -49,8 +49,8 @@
 float4 AmdExtFragCoord() DUMMY_FLOAT4_FUNC
 int AmdExtSampleId() DUMMY_INT_FUNC
 
-float4 AmdAdvancedBlendTexelLoad(int4 imageLow, int4 imageHigh, int2 iCoord, int lod) DUMMY_FLOAT4_FUNC
-float4 AmdAdvancedBlendTexelLoadFmask(int4 imageMsLow, int4 imageMsHigh, int4 fmaskLow, int4 fmaskHigh, int2 iCoord, int lod) DUMMY_FLOAT4_FUNC
+float4 AmdAdvancedBlendTexelLoad(int64_t imageDesc, int2 iCoord, int lod) DUMMY_FLOAT4_FUNC
+float4 AmdAdvancedBlendTexelLoadFmask(int64_t imageDesc, int64_t fmaskDesc, int2 iCoord, int lod) DUMMY_FLOAT4_FUNC
 
 float4 AmdAdvancedBlendCoherentTexelLoad(float4 color, int2 iCoord, int sampleId) DUMMY_FLOAT4_FUNC
 void AmdAdvancedBlendCoherentTexelStore(float4 color, int2 iCoord, int sampleId) DUMMY_VOID_FUNC
@@ -224,8 +224,8 @@ float AmdAdvancedBlendDivide(float dividend, float divisor) {
   }
 }
 
-export float4 AmdAdvancedBlendInternal(float4 inColor, int4 imageMsLow, int4 imageMsHigh, int4 imageLow, int4 imageHigh,
-                                       int4 fmaskLow, int4 fmaskHigh, int mode, bool isMsaa) {
+export float4 AmdAdvancedBlendInternal(float4 inColor, int64_t imageDescMs, int64_t imageDesc, int64_t fmaskDesc,
+                                       int mode, bool isMsaa) {
   float4 srcColor = inColor;
   if (mode == 0) {
     return srcColor;
@@ -234,9 +234,9 @@ export float4 AmdAdvancedBlendInternal(float4 inColor, int4 imageMsLow, int4 ima
   int2 iCoord = int2(fragCoord.x, fragCoord.y);
   float4 dstColor;
   if (isMsaa) {
-    dstColor = AmdAdvancedBlendTexelLoadFmask(imageMsLow, imageMsHigh, fmaskLow, fmaskHigh, iCoord, 0);
+    dstColor = AmdAdvancedBlendTexelLoadFmask(imageDescMs, fmaskDesc, iCoord, 0);
   } else {
-    dstColor = AmdAdvancedBlendTexelLoad(imageLow, imageHigh, iCoord, 0);
+    dstColor = AmdAdvancedBlendTexelLoad(imageDesc, iCoord, 0);
   }
   // TODO: Uncomment them once ROV is support in LLPC
   // int sampleId = AmdExtSampleId();

@@ -175,13 +175,13 @@ static void createAtomic(Function *func, Builder *builder, bool is64, bool isCmp
   // Create GEP to get the byte address with byte offset
   gpuAddrAsPtr = builder->CreateGEP(builder->getInt8Ty(), gpuAddrAsPtr, offset);
   Value *atomicValue = nullptr;
+  SyncScope::ID scope = func->getContext().getOrInsertSyncScopeID("agent");
   if (!isCmpXchg) {
     assert(binOp != AtomicRMWInst::BAD_BINOP);
-    atomicValue = builder->CreateAtomicRMW(binOp, gpuAddrAsPtr, value, MaybeAlign(), AtomicOrdering::Monotonic,
-                                           SyncScope::System);
+    atomicValue = builder->CreateAtomicRMW(binOp, gpuAddrAsPtr, value, MaybeAlign(), AtomicOrdering::Monotonic, scope);
   } else {
     atomicValue = builder->CreateAtomicCmpXchg(gpuAddrAsPtr, compare, value, MaybeAlign(), AtomicOrdering::Monotonic,
-                                               AtomicOrdering::Monotonic, SyncScope::System);
+                                               AtomicOrdering::Monotonic, scope);
     atomicValue = builder->CreateExtractValue(atomicValue, 0);
   }
   builder->CreateRet(atomicValue);

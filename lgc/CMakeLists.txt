@@ -191,6 +191,7 @@ target_sources(LLVMlgc PRIVATE
     state/ShaderModes.cpp
     state/ShaderStage.cpp
     state/TargetInfo.cpp
+    state/RuntimeContext.cpp
 )
 
 # lgc/util

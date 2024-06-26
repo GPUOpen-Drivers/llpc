@@ -66,6 +66,9 @@ if 'Address' in config.xgl_sanitizers:
 if 'Undefined' in config.xgl_sanitizers:
     config.available_features.add('ubsan')
 
+if config.llpc_is_standalone != 'ON':
+    config.available_features.add('gpurt')
+
 llvm_config.use_default_substitutions()
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))

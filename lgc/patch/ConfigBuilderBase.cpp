@@ -111,10 +111,11 @@ void ConfigBuilderBase::addApiHwShaderMapping(ShaderStageEnum apiStage, unsigned
 // Get the MsgPack map node for the specified API shader in the ".shaders" map
 //
 // @param apiStage : API shader stage
-msgpack::MapDocNode ConfigBuilderBase::getApiShaderNode(unsigned apiStage) {
+msgpack::MapDocNode ConfigBuilderBase::getApiShaderNode(ShaderStageEnum apiStage) {
   if (m_apiShaderNodes[apiStage].isEmpty()) {
     m_apiShaderNodes[apiStage] =
-        m_pipelineNode[Util::Abi::PipelineMetadataKey::Shaders].getMap(true)[ApiStageNames[apiStage]].getMap(true);
+        m_pipelineNode[Util::Abi::PipelineMetadataKey::Shaders].getMap(true)[shaderStageToApiName(apiStage)].getMap(
+            true);
   }
   return m_apiShaderNodes[apiStage];
 }
@@ -139,7 +140,7 @@ msgpack::MapDocNode ConfigBuilderBase::getHwShaderNode(Util::Abi::HardwareStage 
 // @param apiStage : API shader stage
 unsigned ConfigBuilderBase::setShaderHash(ShaderStageEnum apiStage) {
   const ShaderOptions &shaderOptions = m_pipelineState->getShaderOptions(apiStage);
-  auto hashNode = getApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
+  auto hashNode = getApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
   hashNode[0] = shaderOptions.hash[0];
   hashNode[1] = shaderOptions.hash[1];
   return shaderOptions.hash[0] >> 32 ^ shaderOptions.hash[0] ^ shaderOptions.hash[1] >> 32 ^ shaderOptions.hash[1];
@@ -314,7 +315,7 @@ void ConfigBuilderBase::setThreadgroupDimensions(llvm::ArrayRef<unsigned> values
 }
 
 // =====================================================================================================================
-// Set stream-out vertex strides (GFX11+)
+// Set stream-out vertex strides
 //
 // @param values : Values to set
 void ConfigBuilderBase::setStreamOutVertexStrides(ArrayRef<unsigned> values) {

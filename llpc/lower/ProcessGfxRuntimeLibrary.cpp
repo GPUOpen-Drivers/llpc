@@ -113,37 +113,35 @@ void ProcessGfxRuntimeLibrary::processLibraryFunction(Function *&func) {
 // =====================================================================================================================
 // Create texel load
 void ProcessGfxRuntimeLibrary::createTexelLoad(Function *func) {
-  // Arguments: imageDescLow, imageDescHigh, icoord, lod
-  constexpr unsigned argCount = 4;
-  Type *int4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
+  // Arguments: imageDesc, icoord, lod
+  constexpr unsigned argCount = 3;
   Type *int2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-  Type *argTypes[] = {int4Ty, int4Ty, int2Ty, m_builder->getInt32Ty()};
+  Type *argTypes[] = {m_builder->getInt64Ty(), int2Ty, m_builder->getInt32Ty()};
   std::array<Value *, argCount> loadArgs;
   for (unsigned i = 0; i < argCount; ++i)
     loadArgs[i] = m_builder->CreateLoad(argTypes[i], func->getArg(i));
   unsigned imageFlag = Builder::ImageFlagInvariant | Builder::ImageFlagNotAliased;
-  auto imageDesc = m_builder->CreateShuffleVector(loadArgs[0], loadArgs[1], ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
-  auto imageLoad =
-      m_builder->CreateImageLoad(func->getReturnType(), Builder::Dim2D, imageFlag, imageDesc, loadArgs[2], loadArgs[3]);
+  loadArgs[0] = m_builder->CreateIntToPtr(loadArgs[0], PointerType::get(m_builder->getContext(), ADDR_SPACE_CONST));
+  auto imageLoad = m_builder->CreateImageLoad(func->getReturnType(), Builder::Dim2D, imageFlag, loadArgs[0],
+                                              loadArgs[1], loadArgs[2]);
   m_builder->CreateRet(imageLoad);
 }
 
 // =====================================================================================================================
 // Create texel load with fmask
 void ProcessGfxRuntimeLibrary::createTexelLoadFmask(Function *func) {
-  // Argument: imageDescLow, imageDescHigh, fmaskDescLow, fmaskDescHigh, icoord, lod
-  constexpr unsigned argCount = 6;
-  Type *int4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
+  // Argument: imageDescMs, fmaskDesc, icoord, lod
+  constexpr unsigned argCount = 4;
   Type *int2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-  Type *argTypes[] = {int4Ty, int4Ty, int4Ty, int4Ty, int2Ty, m_builder->getInt32Ty()};
+  Type *argTypes[] = {m_builder->getInt64Ty(), m_builder->getInt64Ty(), int2Ty, m_builder->getInt32Ty()};
   std::array<Value *, argCount> loadArgs;
   for (unsigned i = 0; i < argCount; ++i)
     loadArgs[i] = m_builder->CreateLoad(argTypes[i], func->getArg(i));
   unsigned imageFlag = Builder::ImageFlagInvariant | Builder::ImageFlagNotAliased;
-  auto imageDesc = m_builder->CreateShuffleVector(loadArgs[0], loadArgs[1], ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
-  auto fmaskDesc = m_builder->CreateShuffleVector(loadArgs[2], loadArgs[3], ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
-  auto imageLoad = m_builder->CreateImageLoadWithFmask(func->getReturnType(), Builder::Dim2DMsaa, imageFlag, imageDesc,
-                                                       fmaskDesc, loadArgs[4], loadArgs[5]);
+  loadArgs[0] = m_builder->CreateIntToPtr(loadArgs[0], PointerType::get(m_builder->getContext(), ADDR_SPACE_CONST));
+  loadArgs[1] = m_builder->CreateIntToPtr(loadArgs[1], PointerType::get(m_builder->getContext(), ADDR_SPACE_CONST));
+  auto imageLoad = m_builder->CreateImageLoadWithFmask(func->getReturnType(), Builder::Dim2DMsaa, imageFlag,
+                                                       loadArgs[0], loadArgs[1], loadArgs[2], loadArgs[3]);
   m_builder->CreateRet(imageLoad);
 }
 

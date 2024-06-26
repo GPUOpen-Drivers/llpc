@@ -4,7 +4,7 @@
 
 ; CHECK-LABEL: IR Dump After Patch LLVM for workarounds
 ; GFX1010: extractelement <8 x i32> %{{[0-9]+}}, i64 3
-; GFX1010-NEXT: icmp sge i32
+; GFX1010: icmp sge i32
 ; GFX1010-NEXT: and i32
 ; GFX1010-NEXT: select i1
 ; GFX1010-NEXT: [[PATCHED_DESC0:%[.a-zA-Z0-9]+]] = insertelement <8 x i32> %{{[0-9]+}}
@@ -12,7 +12,7 @@
 
 ; GFX1010: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> %{{[0-9]+}}, i32 0, i32 0)
 
-; GFX1010: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %.sampler, i1 false, i32 0, i32 0)
+; GFX1010: %.sample = call <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
 
 ; GFX1010: %.gather = call <4 x float> @llvm.amdgcn.image.gather4.l.2d.v4f32.f32(i32 1, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
 
@@ -40,22 +40,20 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc
   %.desc.ptr1 = bitcast <8 x i32> addrspace(4)* %.desc.ptr2 to i8 addrspace(4)*
   %.desc.ptr0 = getelementptr i8, i8 addrspace(4)* %.desc.ptr1, i64 0
   %.desc.ptr = bitcast i8 addrspace(4)* %.desc.ptr0 to <8 x i32> addrspace(4)*
-  %.desc = load <8 x i32>, <8 x i32> addrspace(4)* %.desc.ptr, align 32
   %.sampler.ptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 2, i32 0, i32 13)
-  %.sampler = load <4 x i32>, <4 x i32> addrspace(4)* %.sampler.ptr, align 16
 
-  %.load = call <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 128, <8 x i32> %.desc, i32 1)
-  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 1, i32 128, <8 x i32> %.desc, <2 x i32> zeroinitializer)
+  %.load = call <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 128, <8 x i32> addrspace(4)* %.desc.ptr, i32 1)
+  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 1, i32 128, <8 x i32> addrspace(4)* %.desc.ptr, <2 x i32> zeroinitializer)
 
-  %.sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 128, <8 x i32> %.desc, <4 x i32> %.sampler, i32 1, <2 x float> zeroinitializer)
-  %.gather = call <4 x float> (...) @lgc.create.image.gather.v4f32(i32 1, i32 128, <8 x i32> %.desc, <4 x i32> %.sampler, i32 37, <2 x float> zeroinitializer, i32 0, float 0.000000e+00)
+  %.sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 128, <8 x i32> addrspace(4)* %.desc.ptr, <4 x i32> addrspace(4)* %.sampler.ptr, i32 1, <2 x float> zeroinitializer)
+  %.gather = call <4 x float> (...) @lgc.create.image.gather.v4f32(i32 1, i32 128, <8 x i32> addrspace(4)* %.desc.ptr, <4 x i32> addrspace(4)* %.sampler.ptr, i32 37, <2 x float> zeroinitializer, i32 0, float 0.000000e+00)
 
-  %.atomic = call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 128, i32 0, <8 x i32> %.desc, i32 0, i32 1) #0
+  %.atomic = call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 128, i32 0, <8 x i32> addrspace(4)* %.desc.ptr, i32 0, i32 1) #0
 
-  %.lod = call <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 128, <8 x i32> %.desc, <4 x i32> %.sampler, <2 x float> zeroinitializer)
+  %.lod = call <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 128, <8 x i32> addrspace(4)* %.desc.ptr, <4 x i32> addrspace(4)* %.sampler.ptr, <2 x float> zeroinitializer)
 
-  %.query.size = call <2 x i32> (...) @lgc.create.image.query.size.v2i32(i32 1, i32 128, <8 x i32> %.desc, i32 0)
-  %.query.levels = call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 128, <8 x i32> %.desc)
+  %.query.size = call <2 x i32> (...) @lgc.create.image.query.size.v2i32(i32 1, i32 128, <8 x i32> addrspace(4)* %.desc.ptr, i32 0)
+  %.query.levels = call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 128, <8 x i32> addrspace(4)* %.desc.ptr)
 
   %lane = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)  ; just some source of divergence
   %ofs = mul i32 %lane, 32
@@ -65,8 +63,7 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc
   %.desc2.ptr1 = bitcast <8 x i32> addrspace(4)* %.desc2.ptr2 to i8 addrspace(4)*
   %.desc2.ptr0 = getelementptr i8, i8 addrspace(4)* %.desc2.ptr1, i32 %ofs
   %.desc2.ptr = bitcast i8 addrspace(4)* %.desc2.ptr0 to <8 x i32> addrspace(4)*
-  %.desc2 = load <8 x i32>, <8 x i32> addrspace(4)* %.desc2.ptr, align 32
-  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 0, i32 8, <8 x i32> %.desc2, i32 zeroinitializer)
+  call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 0, i32 8, <8 x i32> addrspace(4)* %.desc2.ptr, i32 zeroinitializer)
 
   ret void
 }

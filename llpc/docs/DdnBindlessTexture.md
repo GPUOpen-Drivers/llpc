@@ -250,7 +250,7 @@ If a bindless texture is declared as uvec2,  it behaves identically to a normal 
 
 The ARB_bindless_texture extension was published in 2013, when we implemented this extension in OGLP driver there was no SPIR-V opcode or extension support it, so we had to add two flags to indicate whether the bindless texture/image are used in the program, we can get this state from glslang, when one texture/image in a shader is declared as bindless, all the textures/images in the given program will be handled as bindless mode, which can simplify our driver’s implementation, so in LLPC’s implementation we will continue to follow this way.
 
-Two pipeline options are added to indicate whether the bindless texture or image is used, these flags are set at program link-time, so that when Llpc::Compiler::buildShaderModuleResourceUsage() is called,  the texture variables can be recognized as its real type variables (eg. if declared as `layout(bindless_sampler) uniform sampler2D s1;`, it will be recognized as a 64bit uint typed default uniform variable, instead of a texture), so that we can create the correct resourceMappingNode table for each kind of resource. And these two flags will also be checked at pipeline compile-time, so that we can generate the correct LLVM IR for bindless texture.
+Two pipeline options are added to indicate whether the bindless texture or image is used, these two flags will be checked at pipeline compile-time, so that we can generate the correct LLVM IR for bindless texture.
 
 ``` c++
 struct PipelineOptions {
@@ -314,7 +314,7 @@ If declare a bindless texture handle as samplerXX type, it will be a `OpTypeSamp
 - At program link-time, when calling `Llpc::Compiler::buildShaderModuleResourceUsage()`, we need to recognize `OpTypeSampledImage` type variable as a 64-bit unsigned integer typed default uniform, so that we will not generate resource mapping node for texture, but generate a default uniform instead;
 - At pipeline compile time, we only need to add two patches in spirvReader:
 
-    1). When calls `SPIRVToLLVM::transVariable()` to translate variable `%13`, we need to force to change the variable type from `OpTypedSapledImage` to int64, so that we can generate a uniform variable’s declaration, and we can handle `OpLoad` instruction correctly;
+    1). When calls `SPIRVToLLVM::transVariable()` to translate variable `%13`, we need to force to change the variable type from `OpTypedSampledImage` to int64, so that we can generate a uniform variable’s declaration;
 
         ```
         %11 = OpTypeSampledImage %10
@@ -329,19 +329,16 @@ If declare a bindless texture handle as samplerXX type, it will be a `OpTypeSamp
         %18 = OpLoad %15 %17
         %19 = OpImageSampleImplicitLod %7 %14 %18
         ```
-    2). When calling `SPIRVToLLVM::transValueWithOpcode<OpLoad>()` to load the bindless texture handle, we need to do two things:
-    i). Load 64-bit image descriptor address, then convert it to an int pointer with correct address space;
+    2). When calling `SPIRVToLLVM::transValueWithOpcode<OpLoad>()` to load the bindless texture handle, we need to  load the imageDescPointer by the bindless handle;
+The above solution works for the simple cases, but in real implementation, we found if the texture is declared as an array, multi-dimensional array, or declared as a struct member or block member, it is hard to handle the accessChain instruction, especially when translate the type of a bindless texture to a 64-bit unsigned integer. To handle the aggregate data types, we provided a new solution in Spirv-Builder:
+1). Convert the OpTypeSampledImage typed variable to a uvec2 type variable;
+2). before the texture function is called, insert a bitcast opCode to convert the uvec2 type handle to a sampler type variable;
 
-    ii). Currently image descriptor, sampler descriptor and fmask descriptor are stored in a structure, we need to obtain the each descriptor after loading the image descriptor address, then insert all descriptors in the structure;
-
-After the above change, we can see the pipeline dumps for the above shader, the pass “LLPC translate SPIR-V binary to LLVM IR”  and the ISA code dump looks as following, the cases that declare bindless textures handle as sampler2D can run correctly.
-
-![](./DdnBindlessTexturePipelineDumpDeclSamplerType.PNG)
+The above solution can significantly simplify the implementation in LLPC, after this change, we don't need to convert the data types at At program link-time, we don't need to change the variable's type when calling SPIRVToLLVM::transVariable(), and we don't need to do any change to handle the accessChain instructions for the aggregate types, the bindless handle will be treated just as a uvec2 type variable, and handling the case that declare a bindless texture by a samplerXX type variable would be exactly same as that declare a bindless texutre by a uvec2 type.
 
 #### 2. Declare bindless texture handle as uvec2 type
-If declare a bindless texture as uniform uvec2 type, the solution would be much easier,  we don’t need to change the variable’s data type at program link-time or when `SPIRVToLLVM::transVariable()` is called, an `OpBitcast` instruction was added by SPIR-V builder to convert a 64-bit handle to a sampler, which need to handle specially for bindless texture. As the bindless handle is a native 64-bit data type, so the result of this instruction `%14 = OpLoad %11 %13` is a 64-bit texture handle, when translate the following instruction
-`%17 = OpBitcast %16 %14`, we need to do the same thing as above case(declared the handle by sampler2D):
-
+If declare a bindless texture as uniform uvec2 type, the solution would be much easier, an `OpBitcast` instruction was added by SPIR-V builder to convert a 64-bit handle to a sampler, which need to handle specially for bindless texture. As the bindless handle is a native 64-bit data type, so the result of this instruction `%14 = OpLoad %11 %13` is a 64-bit texture handle, when translate the following instruction
+`%17 = OpBitcast %16 %14`
 - Load 64-bit image descriptor address, then convert it to an int pointer with correct address space;
 - Obtain the each descriptor’s pointer after image descriptor address is loaded, then insert all descriptors in the structure;
 

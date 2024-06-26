@@ -29,8 +29,8 @@ void main()
 //
 //.
 // CHECK: attributes #[[ATTR0]] = { nounwind "denormal-fp-math-f32"="preserve-sign" }
-// CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind willreturn memory(read) }
-// CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind }
+// CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind }
+// CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind willreturn memory(read) }
 //.
 // CHECK: [[META1]] = !{i32 1}
 // CHECK: [[META6]] = !{i32 0}

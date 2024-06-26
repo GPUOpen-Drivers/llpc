@@ -240,6 +240,7 @@ Value *ShaderSystemValues::getEsGsOffsets() {
     auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
+    // TODO: We should only insert those offsets required by the specified input primitive.
     m_esGsOffsets = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 6));
     for (unsigned i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i) {
       auto esGsOffset =
@@ -320,8 +321,6 @@ std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
   assert(m_shaderStage == ShaderStage::Geometry);
   auto *emitCounterTy = Type::getInt32Ty(*m_context);
   if (m_emitCounterPtrs.empty()) {
-    // TODO: We should only insert those offsets required by the specified input primitive.
-
     // Setup GS emit vertex counter
     auto &dataLayout = m_entryPoint->getParent()->getDataLayout();
     auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
@@ -332,6 +331,21 @@ std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
     }
   }
   return std::make_pair(emitCounterTy, ArrayRef<Value *>(m_emitCounterPtrs));
+}
+
+// =====================================================================================================================
+// Get pointer to total emit counter (GS)
+Value *ShaderSystemValues::getTotalEmitCounterPtr() {
+  assert(m_shaderStage == ShaderStage::Geometry);
+  assert(m_pipelineState->getShaderModes()->getGeometryShaderMode().robustGsEmits); // Must enable robust GS emits
+  if (!m_totalEmitCounterPtr) {
+    // Setup GS total emit vertex counter
+    BuilderBase builder(&*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca());
+
+    m_totalEmitCounterPtr = builder.CreateAlloca(builder.getInt32Ty());
+    builder.CreateStore(builder.getInt32(0), m_totalEmitCounterPtr);
+  }
+  return m_totalEmitCounterPtr;
 }
 
 // =====================================================================================================================

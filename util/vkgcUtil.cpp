@@ -53,6 +53,14 @@ const char *VKAPI_CALL IUtil::GetEntryPointNameFromSpirvBinary(const BinaryData 
 }
 
 // =====================================================================================================================
+// Translate enum "ResourceMappingNodeType" to string
+//
+// @param type : Resource map node type
+const char *VKAPI_CALL IUtil::GetResourceMappingNodeTypeName(ResourceMappingNodeType type) {
+  return getResourceMappingNodeTypeName(type);
+}
+
+// =====================================================================================================================
 // Gets name string of the abbreviation for the specified shader stage
 //
 // @param shaderStage : Shader stage

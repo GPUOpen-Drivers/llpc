@@ -22,8 +22,8 @@ void main()
 ; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global [16 x i32] poison
 ; SHADERTEST: %{{[0-9]*}} = getelementptr [16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 %{{[0-9]*}}
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) %{{[0-9]*}}
-; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr inbounds ([16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 3)
-; SHADERTEST: %{{[0-9]*}} = load i32, ptr addrspace(3) getelementptr inbounds ([16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 4)
+; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{(inbounds )?}}([16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 3)
+; SHADERTEST: %{{[0-9]*}} = load i32, ptr addrspace(3) getelementptr {{(inbounds )?}}([16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 4)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

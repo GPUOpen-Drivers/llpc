@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -24,45 +24,34 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  LowerDebugPrintf.h
- * @brief LLPC header file : contains declaration of class lgc::LowerDebugPrintf.h
+ * @file  RuntimeContext.h
+ * @brief LLVMContext extension that stores a Runtime library module
  ***********************************************************************************************************************
  */
 #pragma once
-#include "SystemValues.h"
-#include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
-#include "lgc/state/PipelineShaders.h"
-#include "lgc/state/PipelineState.h"
-#include "lgc/state/TargetInfo.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/IR/Function.h"
+
+#include "llvm-dialects/Dialect/ContextExtension.h"
+#include <memory>
+
+namespace llvm {
+class Module;
+}
 
 namespace lgc {
 
-class DebugPrintfOp;
+// This extension can be attached to an LLVMContext and queried via the
+// RuntimeContext::get method inherited from the base class.
+//
+// Compiler drivers (like LLPC) are expected to set theModule to the Runtime
+// library, so that advanced blend pass can cross-module inline
+// functions implemented there.
 
-// =====================================================================================================================
-// Pass to lower debug.printf calls
-class LowerDebugPrintf : public llvm::PassInfoMixin<LowerDebugPrintf> {
-  struct ElfInfo {
-    llvm::StringRef formatString;  // Printf format string
-    llvm::SmallBitVector bit64Pos; // 64bit position records output variable 32bit/64bit condition.
-  };
-
+class GfxRuntimeContext : public llvm_dialects::ContextExtensionImpl<GfxRuntimeContext> {
 public:
-  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  static llvm::StringRef name() { return "Lower debug printf calls"; }
-
-private:
-  void visitDebugPrintf(DebugPrintfOp &op);
-  void getDwordValues(llvm::Value *val, llvm::SmallVectorImpl<llvm::Value *> &output,
-                      llvm::SmallBitVector &output64Bits, BuilderBase &builder);
-  void setupElfsPrintfStrings();
-  llvm::DenseMap<uint64_t, ElfInfo> m_elfInfos;
-  llvm::SmallVector<llvm::Instruction *> m_toErase;
-  llvm::Value *m_debugPrintfBuffer = nullptr;
-  PipelineState *m_pipelineState = nullptr;
+  explicit GfxRuntimeContext(llvm::LLVMContext &) {}
+  ~GfxRuntimeContext() = default;
+  static Key theKey;
+  std::unique_ptr<llvm::Module> theModule;
 };
 
 } // namespace lgc

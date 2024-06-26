@@ -92,6 +92,9 @@ public:
   // Get pointers to emit counters (GS)
   std::pair<llvm::Type *, llvm::ArrayRef<llvm::Value *>> getEmitCounterPtr();
 
+  // Get pointer to total emit counter (GS)
+  llvm::Value *getTotalEmitCounterPtr();
+
   // Get global internal table pointer as pointer to i8.
   llvm::Instruction *getInternalGlobalTablePtr();
 
@@ -141,6 +144,7 @@ private:
   llvm::Value *m_tessCoord = nullptr;                               // Tessellated coordinate (TES)
   llvm::Value *m_esGsOffsets = nullptr;                             // ES -> GS offsets (GS in)
   llvm::SmallVector<llvm::Value *, MaxGsStreams> m_emitCounterPtrs; // Pointers to emit counters (GS)
+  llvm::Value *m_totalEmitCounterPtr;                               // Pointer to total emit counter (GS)
 
   llvm::SmallVector<llvm::Value *, 8> m_descTablePtrs;       // Descriptor table pointers
   llvm::SmallVector<llvm::Value *, 8> m_shadowDescTablePtrs; // Shadow descriptor table pointers

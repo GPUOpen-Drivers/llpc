@@ -507,29 +507,20 @@ Value *BuilderImpl::CreateCosh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateTanh(Value *x, const Twine &instName) {
-  // sinh(x) / cosh(x)
-  // (e^x - e^(-x))/(e^x + e^(-x))
+  // tanh(x) = copysign(1-2/(e^-|2x|+1),x)
   // 1/log(2) = 1.442695
-  // e^x = 2^(x*(1/log(2))) = 2^(x*1.442695))
-  Value *divLog2 = CreateFMul(x, getRecipLog2(x->getType()));
-  Value *negDivLog2 = CreateFSub(ConstantFP::get(x->getType(), 0.0), divLog2);
-  Value *exp = CreateUnaryIntrinsic(Intrinsic::exp2, divLog2);
-  Value *expNeg = CreateUnaryIntrinsic(Intrinsic::exp2, negDivLog2);
-  Value *doubleSinh = CreateFSub(exp, expNeg);
-  Value *doubleCosh = CreateFAdd(exp, expNeg);
-  Value *result = fDivFast(doubleSinh, doubleCosh);
-
-  if (!getFastMathFlags().noInfs()) {
-    // NOTE: If the fast math flags might have INFs, we should check the special case when the input is +INF or -INF.
-    // According to the limit of tanh(x), we have following definitions:
-    //                  / 1.0, when x -> +INF
-    //   lim(tanh(x)) =
-    //                  \ -1.0, when x -> -INF
-    Value *one = ConstantFP::get(x->getType(), 1.0);
-    Value *isInf = CreateIsInf(x);
-    result = CreateSelect(isInf, CreateCopySign(one, x), result);
-  }
-
+  // e = 2^(1/log(2))
+  // e^-|2x| = 2^(-|2x|*(1/log(2)))
+  auto vTy = x->getType();
+  Value *result = CreateIntrinsic(Intrinsic::fabs, vTy, x);
+  result = CreateFNeg(result);
+  result = CreateFMul(ConstantFP::get(vTy, 2.0), result);
+  result = CreateFMul(getRecipLog2(vTy), result);
+  result = CreateUnaryIntrinsic(Intrinsic::exp2, result);
+  result = CreateFAdd(ConstantFP::get(vTy, 1.0), result);
+  result = fDivFast(ConstantFP::get(vTy, 2.0), result);
+  result = CreateFSub(ConstantFP::get(vTy, 1.0), result);
+  result = CreateCopySign(result, x);
   result->setName(instName);
   return result;
 }

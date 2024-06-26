@@ -126,11 +126,11 @@ protected:
 
 private:
   // Get the MsgPack map node for the specified API shader in the ".shaders" map
-  llvm::msgpack::MapDocNode getApiShaderNode(unsigned apiStage);
+  llvm::msgpack::MapDocNode getApiShaderNode(ShaderStageEnum apiStage);
 
   llvm::msgpack::Document *m_document;      // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
-  llvm::msgpack::MapDocNode m_apiShaderNodes[ShaderStage::NativeStageCount];
+  llvm::DenseMap<ShaderStageEnum, llvm::msgpack::MapDocNode> m_apiShaderNodes;
   // MsgPack map node for each API shader's node in
   //  ".shaders"
   llvm::msgpack::MapDocNode m_hwShaderNodes[unsigned(Util::Abi::HardwareStage::Count)];

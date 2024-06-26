@@ -30,10 +30,10 @@ void main()
 // SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
 // SHADERTEST-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(7) [[TMP0]], align 4
-// SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 8
+// SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(7) [[TMP0]], i32 8
 // SHADERTEST-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(7) [[TMP3]], align 4
 // SHADERTEST-NEXT:    [[TMP5:%.*]] = icmp eq i32 [[TMP2]], [[TMP4]]
-// SHADERTEST-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 12
+// SHADERTEST-NEXT:    [[TMP6:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(7) [[TMP0]], i32 12
 // SHADERTEST-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(7) [[TMP6]], align 4
 // SHADERTEST-NEXT:    [[TMP8:%.*]] = icmp ne i32 [[TMP2]], [[TMP7]]
 // SHADERTEST-NEXT:    [[TMP9:%.*]] = and i1 [[TMP8]], [[TMP5]]

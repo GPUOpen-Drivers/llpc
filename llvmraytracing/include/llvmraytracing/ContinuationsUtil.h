@@ -173,16 +173,6 @@ public:
   void writeMetadata(Function *F);
 };
 
-/// Return element type of a function argument resolving opaque pointers
-/// via !types metadata where appropriate.
-/// Returns nullptr for non-pointers.
-Type *getFuncArgPtrElementType(const Argument *Arg);
-
-/// Return element type of a function argument resolving opaque pointers
-/// via !types metadata where appropriate.
-/// Returns nullptr for non-pointers.
-Type *getFuncArgPtrElementType(const Function *F, int ArgNo);
-
 struct ContSetting {
   /// A hash value that is used as name.
   uint64_t NameHash;
@@ -271,10 +261,6 @@ private:
   static constexpr const char *MDFlagsName = "continuation.flags";
   // Marks an await as a waiting one with a wait mask.
   static constexpr const char *MDIsWaitAwaitName = "continuation.wait.await";
-
-  // Whether this is a load instruction that should translate to a last_use
-  // load.
-  static constexpr const char *MDIsLastUseName = "amdgpu.last.use";
 
   static std::optional<uint32_t> extractZExtI32Constant(MDNode *Node) {
     if (Node) {
@@ -593,13 +579,6 @@ public:
 
   static void removeIsWaitAwaitMetadata(CallInst &CI) {
     CI.setMetadata(ContHelper::MDIsWaitAwaitName, nullptr);
-  }
-
-  // Specifies that this is a load that marks a last use of the pointer it loads
-  // from.
-  static void setIsLastUseLoad(LoadInst &Load) {
-    Load.setMetadata(ContHelper::MDIsLastUseName,
-                     MDTuple::get(Load.getContext(), {}));
   }
 
   /// Returns true if a call to the given function should be rematerialized

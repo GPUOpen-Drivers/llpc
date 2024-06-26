@@ -249,11 +249,12 @@ Value *BuilderImpl::CreateIntegerDotProduct(Value *vector1, Value *vector2, Valu
 
 // =====================================================================================================================
 // Get whether the context we are building in supports ds_bpermute or v_bpermute across all lanes in the wave
-bool BuilderImpl::supportWaveWideBPermute() const {
+//
+// @param shaderStage : shader stage enum.
+bool BuilderImpl::supportWaveWideBPermute(ShaderStageEnum shaderStage) const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
-  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
-  auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage.value());
+  auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage);
   supportBPermute = supportBPermute || waveSize == 32;
   return supportBPermute;
 }
@@ -261,10 +262,7 @@ bool BuilderImpl::supportWaveWideBPermute() const {
 // =====================================================================================================================
 // Get whether the context we are building in supports permute lane 64 DPP operations.
 bool BuilderImpl::supportPermLane64Dpp() const {
-  auto gfxip = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
-  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
-  auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage.value());
-  return gfxip >= 11 && waveSize == 64;
+  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11;
 }
 
 // =====================================================================================================================

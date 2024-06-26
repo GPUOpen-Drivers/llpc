@@ -163,7 +163,7 @@ def LoadStridedBufferDescOp : LgcOp<"load.strided.buffer.desc", [Memory<[]>, Wil
 }
 
 def DebugPrintfOp : LgcOp<"debug.printf", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
-  let arguments = (ins BufferPointer:$buffer, ConstantPointer:$format, varargs:$args);
+  let arguments = (ins ImmutableStringAttr:$format, varargs:$args);
   let results = (outs);
 
   let summary = "print a formatted message";

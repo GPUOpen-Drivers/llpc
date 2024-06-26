@@ -72,6 +72,7 @@
 
 #pragma once
 
+#include "TypesMetadata.h"
 #include "compilerutils/CompilerUtils.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvmraytracing/ContinuationsUtil.h"
@@ -473,8 +474,4 @@ Function *lowerStructRetArgument(Function *Fn);
 /// Add necessary continuation transform passes for LGC.
 void addLgcContinuationTransform(ModulePassManager &MPM);
 
-/// LLVM parser callback which adds !types metadata during DXIL parsing
-void DXILValueTypeMetadataCallback(Value *V, unsigned TypeID,
-                                   GetTypeByIDTy GetTypeByID,
-                                   GetContainedTypeIDTy GetContainedTypeID);
 } // namespace llvm

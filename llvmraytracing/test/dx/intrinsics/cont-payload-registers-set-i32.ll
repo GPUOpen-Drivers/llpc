@@ -29,7 +29,7 @@ define void @main() {
 ; ALL-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; ALL-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; ALL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; ALL-NEXT:    store i32 42, ptr addrspace(20) getelementptr inbounds ([30 x i32], ptr addrspace(20) @REGISTERS, i32 0, i32 5), align 4
+; ALL-NEXT:    store i32 42, ptr addrspace(20) getelementptr {{(inbounds )?}}([30 x i32], ptr addrspace(20) @REGISTERS, i32 0, i32 5), align 4
 ; ALL-NEXT:    ret void
 ; ALL:       entry.split:
 ; ALL-NEXT:    unreachable
@@ -40,7 +40,7 @@ define void @main() {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 42, ptr addrspace(20) getelementptr inbounds ([30 x i32], ptr addrspace(20) @PAYLOAD, i32 0, i32 5), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 42, ptr addrspace(20) getelementptr {{(inbounds )?}}([30 x i32], ptr addrspace(20) @PAYLOAD, i32 0, i32 5), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
 ;
 entry:

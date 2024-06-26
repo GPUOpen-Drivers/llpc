@@ -118,9 +118,10 @@ private:
 
   Value *loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl);
 
-  void addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *srdStride, unsigned numChannels, unsigned offset,
-                          unsigned dfmt, unsigned nfmt, unsigned inputCompBytes, unsigned fetchCompBytes, bool isSigned,
-                          bool isPacked, bool fetchInByte, BuilderImpl &builderImpl, Value **ppFetch) const;
+  void addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *srdStride, Type *inputTy, unsigned numChannels,
+                          unsigned offset, unsigned dfmt, unsigned nfmt, unsigned inputCompBytes,
+                          unsigned fetchCompBytes, bool isSigned, bool isPacked, bool fetchInByte,
+                          BuilderImpl &builderImpl, Value **ppFetch) const;
 
   bool needPostShuffle(const VertexInputDescription *inputDesc, std::vector<Constant *> &shuffleMask) const;
 
@@ -715,8 +716,8 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
     m_instanceIndex = ShaderInputs::getInstanceIndex(builder, *m_lgcContext);
   }
 
-  // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
-  Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
+  Type *vbDescTy = nullptr;
+  { vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4); }
   if (!m_vertexBufTablePtr) {
     IRBuilderBase::InsertPointGuard ipg(builder);
     builder.SetInsertPointPastAllocas(inst->getFunction());
@@ -835,13 +836,16 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
   Intrinsic::ID instId = Intrinsic::amdgcn_struct_buffer_load_format;
-  if (m_useSoftwareVertexBufferDescriptors) {
-    instId = Intrinsic::amdgcn_raw_buffer_load_format;
-    auto srdStride = builder.CreateExtractElement(vbDesc, 3);
-    byteOffset = builder.CreateAdd(builder.CreateMul(vbIndex, srdStride), byteOffset);
+
+  {
+    if (m_useSoftwareVertexBufferDescriptors) {
+      instId = Intrinsic::amdgcn_raw_buffer_load_format;
+      auto srdStride = builder.CreateExtractElement(vbDesc, 3);
+      byteOffset = builder.CreateAdd(builder.CreateMul(vbIndex, srdStride), byteOffset);
+    }
+    // Replace buffer format
+    vbDesc = builder.CreateInsertElement(vbDesc, bufferFormat, 3);
   }
-  // Replace buffer format
-  vbDesc = builder.CreateInsertElement(vbDesc, bufferFormat, 3);
 
   SmallVector<Value *, 5> args;
   args.push_back(vbDesc);
@@ -849,7 +853,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
     args.push_back(vbIndex);
   unsigned offsetIdx = args.size();
   args.push_back(byteOffset);
-  args.push_back(builder.getInt32(0));
+  { args.push_back(builder.getInt32(0)); }
   args.push_back(builder.getInt32(0));
 
   if (disablePerCompFetch) {
@@ -1251,9 +1255,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   // After back-end optimization, intrinsics may be combined to fetch the whole vertex in generated ISA codes.
   // To make sure combination works, we need to keep tbuffer_load formats as same as possible when visit this function.
   // To avoid redundant extract and insert operation, we need to keep component bit width as same as input component.
-  addVertexFetchInst(vbDesc, vbIndex, srdStride, numChannels, description->offset, compFormatInfo->fetchDfmt,
-                     description->nfmt, inputCompBytes, fetchCompBytes, numFormatInfo->isSigned, isPacked, fetchInByte,
-                     builderImpl, &vertexFetch);
+  addVertexFetchInst(vbDesc, vbIndex, srdStride, inputCompTy, numChannels, description->offset,
+                     compFormatInfo->fetchDfmt, description->nfmt, inputCompBytes, fetchCompBytes,
+                     numFormatInfo->isSigned, isPacked, fetchInByte, builderImpl, &vertexFetch);
 
   // When do fetch in Byte, we need to emulate final results manually.
   postFetchEmulation(description, fetchInByte, inputCompBytes, numChannels, numFormatInfo, compFormatInfo, builderImpl,
@@ -1611,10 +1615,10 @@ void VertexFetchImpl::postFetchEmulation(const VertexInputDescription *descripti
 // @param fetchInByte: Do fetch in Byte if the vertex attribute offset and stride are not aligned.
 // @param builderImpl : BuilderImpl to use to insert vertex fetch instructions
 // @param [out] ppFetch : Destination of vertex fetch
-void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *srdStride, unsigned numChannels,
-                                         unsigned offset, unsigned dfmt, unsigned nfmt, unsigned inputCompBytes,
-                                         unsigned fetchCompBytes, bool isSigned, bool isPacked, bool fetchInByte,
-                                         BuilderImpl &builderImpl, Value **ppFetch) const {
+void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *srdStride, Type *inputTy,
+                                         unsigned numChannels, unsigned offset, unsigned dfmt, unsigned nfmt,
+                                         unsigned inputCompBytes, unsigned fetchCompBytes, bool isSigned, bool isPacked,
+                                         bool fetchInByte, BuilderImpl &builderImpl, Value **ppFetch) const {
   Intrinsic::ID instId = Intrinsic::amdgcn_struct_tbuffer_load;
   Value *instOffset = builderImpl.getInt32(0);
   if (m_useSoftwareVertexBufferDescriptors) {
@@ -1703,7 +1707,11 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *s
     if (inputCompBytes < compBytes)
       compVal = builderImpl.CreateTrunc(compVal, inputCompTy);
     else if (inputCompBytes > compBytes) {
-      if (isSigned)
+      if (inputTy->isFloatTy() && nfmt == BufNumFormatFloat) {
+        compVal = builderImpl.CreateBitCast(compVal, builderImpl.getHalfTy());
+        compVal = builderImpl.CreateFPExt(compVal, builderImpl.getFloatTy());
+        compVal = builderImpl.CreateBitCast(compVal, inputCompTy);
+      } else if (isSigned)
         compVal = builderImpl.CreateSExt(compVal, inputCompTy);
       else
         compVal = builderImpl.CreateZExt(compVal, inputCompTy);
@@ -1783,15 +1791,14 @@ std::pair<Value *, Value *> VertexFetchImpl::convertSrdToOffsetMode(Value *vbDes
   //   uint32  strideInBytes;
   // };
 
+  GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
   // Stride is from the third DWORD.
   auto srdStride = builder.CreateExtractElement(vbDesc, 3);
-
   SqBufRsrcWord3 sqBufRsrcWord3 = {};
   sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
   sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
   sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
   sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
-  GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
   if (gfxIp.major == 10) {
     sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
     sqBufRsrcWord3.gfx10.resourceLevel = 1;

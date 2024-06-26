@@ -41,6 +41,15 @@
     }                                                                                                                  \
   while (false)
 
+// Output error message
+#define LLPC_WARN(_msg)                                                                                                \
+  do                                                                                                                   \
+    if (Llpc::EnableErrs()) {                                                                                          \
+      llvm::outs() << "WARNING: " << _msg;                                                                             \
+      llvm::outs().flush();                                                                                            \
+    }                                                                                                                  \
+  while (false)
+
 // Output general message
 #define LLPC_OUTS(_msg)                                                                                                \
   do                                                                                                                   \

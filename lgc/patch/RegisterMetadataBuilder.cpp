@@ -129,9 +129,9 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     if (hwStageMask & (Util::Abi::HwShaderGs | Util::Abi::HwShaderVs))
       buildPaSpecificRegisters();
 
-    if (lastVertexProcessingStage != ShaderStage::Invalid && m_pipelineState->isUnlinked()) {
+    if (lastVertexProcessingStage && m_pipelineState->isUnlinked()) {
       // Fill ".preraster_output_semantic"
-      auto resUsage = m_pipelineState->getShaderResourceUsage(lastVertexProcessingStage);
+      auto resUsage = m_pipelineState->getShaderResourceUsage(lastVertexProcessingStage.value());
       auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
       auto &builtInOutputLocMap = resUsage->inOutUsage.builtInOutputLocMap;
       // Collect semantic info for generic input and builtIns {gl_ClipDistance, gl_CulDistance, gl_Layer,
@@ -200,6 +200,8 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
       lsVgprCompCnt = 3; // Enable all LS VGPRs (LS VGPR2 - VGPR5)
     else
       lsVgprCompCnt = 1; // Must enable relative vertex ID (LS VGPR2 and VGPR3)
+  } else {
+    llvm_unreachable("Not implemented!");
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::LsVgprCompCnt] = lsVgprCompCnt;
 
@@ -226,6 +228,7 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   const auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
   const auto &gsBuiltInUsage = gsResUsage->builtInUsage.gs;
   const auto &gsInOutUsage = gsResUsage->inOutUsage;
+  const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   const auto &calcFactor = gsInOutUsage.gs.calcFactor;
   const auto tesResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   const auto &tesBuiltInUsage = tesResUsage->builtInUsage.tes;
@@ -233,11 +236,12 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
 
   // ES_VGPR_COMP_CNT in SPI_SHADER_PGM_RSRC2_GS
   unsigned gsVgprCompCnt = 0;
-  if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
+  if ((calcFactor.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) ||
+      gsBuiltInUsage.invocationId)
     gsVgprCompCnt = 3; // Enable vtx4/vtx5 offset (GS VGPR3) or GS instance ID (GS VGPR4)
   else if (gsBuiltInUsage.primitiveIdIn)
     gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
-  else if (calcFactor.inputVertices > 2)
+  else if (calcFactor.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch)
     gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::GsVgprCompCnt] = gsVgprCompCnt;
 
@@ -257,7 +261,6 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   getHwShaderNode(Util::Abi::HardwareStage::Gs)[Util::Abi::HardwareStageMetadataKey::OffchipLdsEn] = hasTs;
 
   // VGT_GS_MAX_VERT_OUT
-  const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsMaxVertOut] = maxVertOut;
 
@@ -345,6 +348,13 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   // VGT_ESGS_RING_ITEMSIZE
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtEsgsRingItemsize] = calcFactor.esGsRingItemSize;
 
+  // VGT_LS_HS_CONFIG
+  if (geometryMode.inputPrimitive == InputPrimitives::Patch) {
+    assert(geometryMode.controlPoints > 0);
+    auto vgtLsHsConfig = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtLsHsConfig].getMap(true);
+    vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumInputCp] = geometryMode.controlPoints;
+  }
+
   // GE_MAX_OUTPUT_PER_SUBGROUP and VGT_GS_MAX_PRIMS_PER_SUBGROUP
   const unsigned maxPrimsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, MaxGsThreadsPerSubgroup);
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MaxVertsPerSubgroup] = maxPrimsPerSubgroup;
@@ -380,11 +390,12 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   unsigned gsVgprCompCnt = 0;
   if (m_gfxIp.major <= 11) {
     if (m_hasGs) {
-      if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
+      if ((calcFactor.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) ||
+          gsBuiltInUsage.invocationId)
         gsVgprCompCnt = 3; // Enable vtx4/vtx5 offset (GS VGPR3) or GS instance ID (GS VGPR4)
       else if (gsBuiltInUsage.primitiveIdIn)
         gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
-      else if (calcFactor.inputVertices > 2)
+      else if (calcFactor.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch)
         gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
     } else if (m_hasVs) {
       // NOTE: When GS is absent, only those VGPRs are required: vtx0/vtx1 offset, vtx2/vtx3 offset,
@@ -582,6 +593,13 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       // VGT_ESGS_RING_ITEMSIZE
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtEsgsRingItemsize] =
           (m_hasGs ? calcFactor.esGsRingItemSize : 1);
+    }
+
+    // VGT_LS_HS_CONFIG
+    if (geometryMode.inputPrimitive == InputPrimitives::Patch) {
+      assert(geometryMode.controlPoints > 0);
+      auto vgtLsHsConfig = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtLsHsConfig].getMap(true);
+      vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumInputCp] = geometryMode.controlPoints;
     }
 
     const auto nggControl = m_pipelineState->getNggControl();
@@ -1285,7 +1303,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
 
     // On 10.3+ all auxiliary position exports are optimized, not just the misc exports.
     if (m_gfxIp >= GfxIpVersion{10, 3})
-      paClClipCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutMiscSideBusEna] = true;
+      paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutMiscSideBusEna] = true;
   }
 
   // PA_CL_VTE_CNTL
@@ -1385,7 +1403,7 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
     ShaderStageEnum apiStage = ShaderStage::Vertex;
     if (m_hasGs || m_hasMesh) {
       apiStage = m_hasGs ? ShaderStage::Geometry : ShaderStage::Mesh;
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsStageEn] = GS_STAGE_ON;
+      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsStageEn] = true;
     } else if (m_hasTes) {
       apiStage = ShaderStage::TessEval;
     }

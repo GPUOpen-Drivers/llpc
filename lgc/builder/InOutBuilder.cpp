@@ -430,8 +430,8 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       if (isOutput) {
         // Keep all locations if the next stage of the output is fragment shader or is unspecified
         if (m_shaderStage != ShaderStage::Fragment) {
-          ShaderStageEnum nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
-          keepAllLocations = nextStage == ShaderStage::Fragment || nextStage == ShaderStage::Invalid;
+          auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
+          keepAllLocations = nextStage == ShaderStage::Fragment || !nextStage;
         }
       } else {
         // Keep all locations if it is the input of fragment shader

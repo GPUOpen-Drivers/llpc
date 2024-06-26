@@ -34,6 +34,8 @@
  */
 #pragma once
 
+#include "lgc/CommonDefs.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <stdint.h>
 
 namespace lgc {
@@ -622,8 +624,27 @@ typedef enum SPI_SHADER_EX_FORMAT {
 } SPI_SHADER_EX_FORMAT;
 
 // The names of API shader stages used in PAL metadata, in ShaderStageEnum order.
-static const char *const ApiStageNames[] = {".task",     ".vertex", ".hull",  ".domain",
-                                            ".geometry", ".mesh",   ".pixel", ".compute"};
+inline const char *shaderStageToApiName(ShaderStageEnum stage) {
+  switch (stage) {
+  case ShaderStage::Task:
+    return ".task";
+  case ShaderStage::Vertex:
+    return ".vertex";
+  case ShaderStage::TessControl:
+    return ".hull";
+  case ShaderStage::TessEval:
+    return ".domain";
+  case ShaderStage::Geometry:
+    return ".geometry";
+  case ShaderStage::Mesh:
+    return ".mesh";
+  case ShaderStage::Fragment:
+    return ".pixel";
+  case ShaderStage::Compute:
+    return ".compute";
+  }
+  llvm::report_fatal_error("No api name for this shader stage");
+}
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.
 static const char *const HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Count)] = {".hs", ".gs", ".vs",

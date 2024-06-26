@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "llpcContext.h"
-#include "GfxRuntimeContext.h"
 #include "LowerAdvancedBlend.h"
 #include "ProcessGfxRuntimeLibrary.h"
 #include "SPIRVInternal.h"
@@ -55,6 +54,7 @@
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/PassManager.h"
+#include "lgc/RuntimeContext.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -71,6 +71,10 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/InstSimplifyPass.h"
+#include "llvm/Transforms/Scalar/SROA.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #define DEBUG_TYPE "llpc-context"
@@ -241,6 +245,8 @@ void Context::ensureGpurtLibrary() {
 
   ShaderModuleData moduleData = {};
   moduleData.binCode = rtState->gpurtShaderLibrary;
+  if (moduleData.binCode.codeSize == 0)
+    report_fatal_error("No GPURT library available");
   moduleData.binType = BinaryType::Spirv;
   moduleData.usage.keepUnusedFunctions = true;
   moduleData.usage.rayQueryLibrary = true;
@@ -277,6 +283,18 @@ void Context::ensureGpurtLibrary() {
   lowerPassMgr->addPass(AlwaysInlinerPass());
   lowerPassMgr->addPass(SpirvLowerAccessChain());
   lowerPassMgr->addPass(SpirvLowerGlobal());
+
+  // Run some basic optimization to simplify the code. This should be more efficient than optimizing them after they are
+  // inlined into the caller.
+  FunctionPassManager fpm;
+  fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
+  fpm.addPass(InstSimplifyPass());
+  fpm.addPass(SimplifyCFGPass());
+  // DCE is particularly useful for removing dead instructions after continuation call, which may help reducing
+  // continuation stack size.
+  fpm.addPass(ADCEPass());
+  lowerPassMgr->addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
+
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
   lowerPassMgr->run(*gpurt);

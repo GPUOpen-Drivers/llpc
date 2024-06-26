@@ -110,6 +110,7 @@ public:
   template <spv::Op> SmallVector<Value *> transValueMultiWithOpcode(SPIRVValue *);
   template <spv::Op> SmallVector<Value *> transValueMultiWithOpcode(SPIRVValue *, Function *f, BasicBlock *bb);
   Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
+  Value *transLoadBindlessImage(SPIRVType *spvElementTy, Value *imgDescGpuAddress, bool bindlessTexture);
   Value *loadImageSampler(Type *elementTy, Value *base);
   Value *transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *elementTy = nullptr);
   Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
@@ -287,7 +288,6 @@ private:
   DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
   DenseMap<Function *, BlockPredecessorToCountInFunction> m_blockPredecessorToCount;
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
-  GlobalVariable *m_debugOutputBuffer;
 
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
   bool m_workaroundStorageImageFormats;

@@ -64,7 +64,6 @@ entryPoint = main
 ; SHADERTEST-NEXT:       .pa_cl_clip_cntl:
 ; SHADERTEST-NEXT:         .dx_linear_attr_clip_ena: true
 ; SHADERTEST-NEXT:         .rasterization_kill: false
-; SHADERTEST-NEXT:         .vs_out_misc_side_bus_ena: true
 ; SHADERTEST-NEXT:         .vte_vport_provoke_disable: false
 ; SHADERTEST-NEXT:       .pa_cl_vs_out_cntl:
 ; SHADERTEST-NEXT:         .clip_dist_ena_0: true
@@ -84,6 +83,7 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .cull_dist_ena_6: false
 ; SHADERTEST-NEXT:         .cull_dist_ena_7: false
 ; SHADERTEST-NEXT:         .vs_out_cc_dist0_vec_ena: true
+; SHADERTEST-NEXT:         .vs_out_misc_side_bus_ena: true
 ; SHADERTEST-NEXT:       .pa_cl_vte_cntl:
 ; SHADERTEST-NEXT:         .vtx_w0_fmt:     true
 ; SHADERTEST-NEXT:         .x_offset_ena:   true
@@ -193,7 +193,8 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .entry_point:    _amdgpu_ps_main
 ; SHADERTEST-NEXT:         .float_mode:     0xc0
 ; SHADERTEST-NEXT:         .ieee_mode:      false
-; SHADERTEST:         .mem_ordered:    true
+; SHADERTEST-NEXT:         .lds_size:       0
+; SHADERTEST-NEXT:         .mem_ordered:    true
 ; SHADERTEST-NEXT:         .scratch_en:     false
 ; SHADERTEST-NEXT:         .scratch_memory_size: 0
 ; SHADERTEST-NEXT:         .sgpr_count:     0x2
@@ -246,7 +247,8 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .entry_point:    _amdgpu_vs_main
 ; SHADERTEST-NEXT:         .float_mode:     0xc0
 ; SHADERTEST-NEXT:         .ieee_mode:      false
-; SHADERTEST:         .mem_ordered:    true
+; SHADERTEST-NEXT:         .lds_size:       0
+; SHADERTEST-NEXT:         .mem_ordered:    true
 ; SHADERTEST-NEXT:         .scratch_en:     false
 ; SHADERTEST-NEXT:         .scratch_memory_size: 0
 ; SHADERTEST-NEXT:         .sgpr_count:     0x3

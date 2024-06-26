@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in all
- *  copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in
+ *all copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,19 +22,28 @@
  *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
-/**
- ***********************************************************************************************************************
- * @file  GfxRuntimeContext.cpp
- * @brief LLVMContext extension that stores a GfxRuntime library module
- ***********************************************************************************************************************
- */
 
-#include "GfxRuntimeContext.h"
-#include "llvm/IR/Module.h"
+//===- TypesMetadata.h - Pointee type metadata for processing DXIL ---------==//
 
-using namespace llvm;
-using namespace lgc;
+#pragma once
 
-GfxRuntimeContext::Key GfxRuntimeContext::theKey;
+#include "llvm/Bitcode/BitcodeReader.h"
 
-GfxRuntimeContext::~GfxRuntimeContext() = default;
+namespace llvm {
+
+/// Return element type of a function argument resolving opaque pointers
+/// via !types metadata where appropriate.
+/// Returns nullptr for non-pointers.
+Type *getFuncArgPtrElementType(const Argument *Arg);
+
+/// Return element type of a function argument resolving opaque pointers
+/// via !types metadata where appropriate.
+/// Returns nullptr for non-pointers.
+Type *getFuncArgPtrElementType(const Function *F, int ArgNo);
+
+/// LLVM parser callback which adds !types metadata during DXIL parsing
+void DXILValueTypeMetadataCallback(Value *V, unsigned TypeID,
+                                   GetTypeByIDTy GetTypeByID,
+                                   GetContainedTypeIDTy GetContainedTypeID);
+
+} // namespace llvm

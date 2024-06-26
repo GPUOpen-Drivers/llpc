@@ -773,19 +773,16 @@ void LowerGLCompatibility::emulateDrawPixels() {
   auto vec2Type = FixedVectorType::get(floatType, 2);
   auto vec4Type = FixedVectorType::get(floatType, 4);
   auto ivec2Type = FixedVectorType::get(int32Type, 2);
-  auto ivec8Type = FixedVectorType::get(int32Type, 8);
   if (m_patchTexCoord == nullptr) {
     createPatchTexCoord();
   }
   Value *patchTexcoord = m_builder->CreateLoad(vec2Type, m_patchTexCoord);
   Value *texcoord = m_builder->CreateFPToUI(patchTexcoord, ivec2Type);
-  auto imageDesc = m_builder->CreateGetDescPtr(
+  auto imageDescPtr = m_builder->CreateGetDescPtr(
       lgc::ResourceNodeType::DescriptorResource, lgc::ResourceNodeType::DescriptorResource,
       PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource),
       Vkgc::InternalBinding::PixelOpInternalBinding);
-  auto descriptor = m_builder->CreateLoad(ivec8Type, imageDesc);
-  descriptor->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-  Value *texel = m_builder->CreateImageLoad(vec4Type, Dim2D, 0, descriptor, texcoord, nullptr);
+  Value *texel = m_builder->CreateImageLoad(vec4Type, Dim2D, 0, imageDescPtr, texcoord, nullptr);
 
   // Write Color
   if (buildInfo->glState.drawPixelsType == Vkgc::DrawPixelsTypeColor) {
@@ -868,7 +865,6 @@ void LowerGLCompatibility::emulateBitmap() {
   auto int32Type = m_builder->getInt32Ty();
   auto vec2Type = FixedVectorType::get(floatType, 2);
   auto ivec2Type = FixedVectorType::get(int32Type, 2);
-  auto ivec8Type = FixedVectorType::get(int32Type, 8);
   if (!m_patchTexCoord) {
     createPatchTexCoord();
   }
@@ -882,13 +878,11 @@ void LowerGLCompatibility::emulateBitmap() {
   }
   mask = m_builder->CreateShl(ConstantInt::get(ivec2Type, 1), mask);
   Value *texCoordSrc = m_builder->CreateLShr(constInt0x3, texcoord);
-  auto imageDesc = m_builder->CreateGetDescPtr(
+  auto imageDescPtr = m_builder->CreateGetDescPtr(
       lgc::ResourceNodeType::DescriptorResource, lgc::ResourceNodeType::DescriptorResource,
       PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource),
       Vkgc::InternalBinding::PixelOpInternalBinding);
-  auto descriptor = m_builder->CreateLoad(ivec8Type, imageDesc);
-  descriptor->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-  Value *texel = m_builder->CreateImageLoad(ivec2Type, Dim2D, 0, descriptor, texCoordSrc, nullptr);
+  Value *texel = m_builder->CreateImageLoad(ivec2Type, Dim2D, 0, imageDescPtr, texCoordSrc, nullptr);
   Value *val = m_builder->CreateAnd(mask, texel);
   val = m_builder->CreateExtractElement(val, ConstantInt::get(int32Type, 0));
   auto cmp = m_builder->CreateICmpEQ(val, ConstantInt::get(int32Type, 0));

@@ -123,7 +123,7 @@ PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManage
     if (func.isDeclaration())
       continue;
     auto stage = getShaderStage(&func);
-    if (!m_shaderStage || &func == pipelineShaders.getEntryPoint(m_shaderStage))
+    if (!stage || &func == pipelineShaders.getEntryPoint(stage.value()))
       continue;
     m_shaderStage = stage.value();
     m_entryPoint = &func;
@@ -461,6 +461,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     case InputPrimitives::TrianglesAdjacency:
       useAdjacency = true;
       inVertsPerPrim = 6;
+      break;
+    case InputPrimitives::Patch:
+      inVertsPerPrim = geometryMode.controlPoints;
       break;
     default:
       llvm_unreachable("Unexpected input primitive type!");
@@ -1640,7 +1643,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   auto &inOutUsage = resUsage->inOutUsage;
 
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  auto nextResUsage = nextStage != ShaderStage::Invalid ? m_pipelineState->getShaderResourceUsage(nextStage) : nullptr;
+  auto nextResUsage = nextStage ? m_pipelineState->getShaderResourceUsage(nextStage.value()) : nullptr;
 
   assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
   assert(inOutUsage.builtInOutputLocMap.empty());
@@ -1812,7 +1815,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       }
 
       builtInUsage.vs.primitiveShadingRate = false;
-    } else if (nextStage == ShaderStage::Invalid) {
+    } else if (!nextStage) {
       // VS only
       if (builtInUsage.vs.clipDistance > 0 || builtInUsage.vs.cullDistance > 0) {
         unsigned mapLoc = availOutMapLoc++;
@@ -1975,7 +1978,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end() &&
           inOutUsage.builtInOutputLocMap[BuiltInCullDistance] == InvalidValue)
         inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
-    } else if (nextStage == ShaderStage::Invalid) {
+    } else if (!nextStage) {
       // TCS only
       if (builtInUsage.tcs.position)
         inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
@@ -2033,7 +2036,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       // incorrectness of location assignment during builtin-to-generic mapping.
       const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
       if (prevStage == ShaderStage::TessControl) {
-        const auto &prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage)->builtInUsage.tcs;
+        const auto &prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage.value())->builtInUsage.tcs;
         clipDistanceCount = std::max(clipDistanceCount, prevBuiltInUsage.clipDistance);
       }
 
@@ -2047,7 +2050,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
       const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
       if (prevStage == ShaderStage::TessControl) {
-        const auto &prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage)->builtInUsage.tcs;
+        const auto &prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage.value())->builtInUsage.tcs;
         cullDistanceCount = std::max(cullDistanceCount, prevBuiltInUsage.clipDistance);
       }
 
@@ -2158,7 +2161,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       } else {
         builtInUsage.tes.viewportIndex = 0;
       }
-    } else if (nextStage == ShaderStage::Invalid) {
+    } else if (!nextStage) {
       // TES only
       if (builtInUsage.tes.clipDistance > 0 || builtInUsage.tes.cullDistance > 0) {
         unsigned mapLoc = availOutMapLoc++;
@@ -2282,7 +2285,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
         builtInOutLocs[BuiltInViewportIndex] = mapLoc;
       }
-    } else if (nextStage == ShaderStage::Invalid) {
+    } else if (!nextStage) {
       // GS only
       unsigned availOutMapLoc = inOutUsage.outputLocInfoMap.size(); // Reset available location
 
@@ -2368,7 +2371,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
         inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInCullDistance] = mapLoc;
       }
-    } else if (nextStage == ShaderStage::Invalid) {
+    } else if (!nextStage) {
       // Mesh shader only
       unsigned availExportLoc = inOutUsage.outputMapLocCount;
 
@@ -2416,7 +2419,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewportIndex];
         inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInViewportIndex] = mapLoc;
       }
-    } else if (nextStage == ShaderStage::Invalid) {
+    } else if (!nextStage) {
       // Mesh shader only
       unsigned availPerPrimitiveExportLoc = inOutUsage.perPrimitiveOutputMapLocCount;
 
@@ -2682,7 +2685,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
   auto preStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
   if (preStage == ShaderStage::TessControl || preStage == ShaderStage::Mesh) {
     if (!inputLocInfoMap.empty()) {
-      auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(preStage)->inOutUsage.outputLocInfoMap;
+      auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(preStage.value())->inOutUsage.outputLocInfoMap;
       for (auto &infoPair : outputLocInfoMap) {
         if (infoPair.second != InvalidValue) {
           inputLocInfoMap[infoPair.first] = InvalidValue;
@@ -2692,7 +2695,8 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
     }
     auto &perPatchInLocMap = inOutUsage.perPatchInputLocMap;
     if (!perPatchInLocMap.empty()) {
-      auto &perPatchOutLocMap = m_pipelineState->getShaderResourceUsage(preStage)->inOutUsage.perPatchOutputLocMap;
+      auto &perPatchOutLocMap =
+          m_pipelineState->getShaderResourceUsage(preStage.value())->inOutUsage.perPatchOutputLocMap;
       for (auto &locPair : perPatchOutLocMap) {
         if (locPair.second != InvalidValue) {
           perPatchInLocMap[locPair.first] = InvalidValue;
@@ -2756,10 +2760,10 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
 // =====================================================================================================================
 // Clear unused output from outputLocInfoMap, perPatchOutputLocMap, and perPrimitiveOutputLocMap
 void PatchResourceCollect::clearUnusedOutput() {
-  ShaderStageEnum nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+  auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
-  if (nextStage != ShaderStage::Invalid) {
+  if (nextStage) {
     // Collect the locations of TCS's imported outputs
     DenseSet<unsigned> importOutputLocs;
     if (m_shaderStage == ShaderStage::TessControl) {
@@ -2784,7 +2788,7 @@ void PatchResourceCollect::clearUnusedOutput() {
 
     // Do normal input/output matching
     SmallVector<InOutLocationInfo, 4> unusedLocInfos;
-    auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage);
+    auto nextResUsage = m_pipelineState->getShaderResourceUsage(nextStage.value());
     const auto &nextInLocInfoMap = nextResUsage->inOutUsage.inputLocInfoMap;
 
     for (auto &locInfoPair : outputLocInfoMap) {
@@ -2899,8 +2903,9 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
     // If we don't have to keep the locations and the next stage is valid, try to get location map of the outputs from
     // corresponding inputs of next stage.
     const bool keepLocation = m_shaderStage == ShaderStage::Geometry && !canChangeOutputLocationsForGs();
-    if (!keepLocation && nextStage != ShaderStage::Invalid) {
-      auto &nextStageInputLocInfoMap = m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
+    if (!keepLocation && nextStage) {
+      auto &nextStageInputLocInfoMap =
+          m_pipelineState->getShaderResourceUsage(nextStage.value())->inOutUsage.inputLocInfoMap;
       for (auto &locInfoPair : outputLocInfoMap) {
         const auto &locationInfo = locInfoPair.first;
         auto &newLocationInfo = locInfoPair.second;
@@ -3000,9 +3005,9 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
     assert(m_shaderStage == ShaderStage::TessControl);
 
     // If the next stage is valid, try to get location map of the outputs from corresponding inputs of next stage.
-    if (nextStage != ShaderStage::Invalid) {
+    if (nextStage) {
       auto &nextStagePerPatchInputLocInfoMap =
-          m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.perPatchInputLocMap;
+          m_pipelineState->getShaderResourceUsage(nextStage.value())->inOutUsage.perPatchInputLocMap;
       for (auto &locPair : perPatchOutputLocMap) {
         if (locPair.second != InvalidValue)
           continue; // Skip mapped locations
@@ -3046,9 +3051,9 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
     assert(m_shaderStage == ShaderStage::Mesh);
 
     // If the next stage is valid, try to get location map of the outputs from corresponding inputs of next stage.
-    if (nextStage != ShaderStage::Invalid) {
+    if (nextStage) {
       auto &nextStagePerPrimitiveInputLocMap =
-          m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.perPrimitiveInputLocMap;
+          m_pipelineState->getShaderResourceUsage(nextStage.value())->inOutUsage.perPrimitiveInputLocMap;
       for (auto &locPair : perPrimitiveOutputLocMap) {
         if (locPair.second != InvalidValue)
           continue; // Skip mapped locations
@@ -3096,7 +3101,7 @@ bool PatchResourceCollect::canChangeOutputLocationsForGs() {
     return true;
   if (m_pipelineState->getPalMetadata()->haveFsInputMappings())
     return true;
-  if (m_pipelineState->getNextShaderStage(ShaderStage::Geometry) != ShaderStage::Invalid)
+  if (m_pipelineState->getNextShaderStage(ShaderStage::Geometry))
     return true;
   return false;
 }
@@ -3157,8 +3162,8 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::Geometry);
   auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  assert(nextStage != ShaderStage::Invalid);
-  auto &nextStageInputLocInfoMap = m_pipelineState->getShaderResourceUsage(nextStage)->inOutUsage.inputLocInfoMap;
+  auto &nextStageInputLocInfoMap =
+      m_pipelineState->getShaderResourceUsage(nextStage.value())->inOutUsage.inputLocInfoMap;
 
   // Remove unused outputs and update the output map
   if (m_shaderStage != m_pipelineState->getLastVertexProcessingStage()) {
@@ -3707,7 +3712,7 @@ void PatchResourceCollect::clearUndefinedOutput() {
 
     for (auto call : candidateCalls) {
       // For unlinked case, we should keep the location info map unchanged.
-      if (m_pipelineState->getNextShaderStage(m_shaderStage) != ShaderStage::Invalid) {
+      if (m_pipelineState->getNextShaderStage(m_shaderStage)) {
         // Remove the output location info if it exists
         unsigned index = m_shaderStage == ShaderStage::Mesh ? 2 : 1;
         unsigned component = cast<ConstantInt>(call->getArgOperand(index))->getZExtValue();

@@ -998,13 +998,14 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
   auto emitMeshTasksBlock = checkEmitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".emitMeshTasks");
   auto endEmitMeshTasksBlock = emitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".endEmitMeshTasks");
 
+  SyncScope::ID agentScope = m_builder.getContext().getOrInsertSyncScopeID("agent");
   // Modify ".checkEmitMeshTasks" block
   {
     m_builder.SetInsertPoint(checkEmitMeshTasksBlock->getTerminator());
 
     if (m_accessTaskPayload) {
       // Make sure the task payload read/write access is completed
-      m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
+      m_builder.CreateFence(AtomicOrdering::Release, agentScope);
       createBarrier();
     }
 
@@ -1043,7 +1044,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
       valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
 
       m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                                AtomicOrdering::Monotonic, SyncScope::System);
+                                AtomicOrdering::Monotonic, agentScope);
     }
 
     //
@@ -2082,7 +2083,7 @@ void MeshTaskShader::exportVertex() {
   if (waAtmPrecedesPos) {
     // Before the first export call of vertex position data, add s_wait_vscnt 0 to make sure the completion of all
     // attributes being written to the attribute ring buffer
-    m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
+    m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
 
     doExport(ExportKind::Pos, posExports);
   }
@@ -2101,6 +2102,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
   const uint64_t numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
 
   Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
+  SyncScope::ID agentScope = m_builder.getContext().getOrInsertSyncScopeID("agent");
 
   //
   // Record numMeshThreads
@@ -2122,7 +2124,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
     valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
 
     m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                              AtomicOrdering::Monotonic, SyncScope::System);
+                              AtomicOrdering::Monotonic, agentScope);
   }
 
   //
@@ -2147,7 +2149,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
     valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
 
     m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                              AtomicOrdering::Monotonic, SyncScope::System);
+                              AtomicOrdering::Monotonic, agentScope);
   }
 }
 

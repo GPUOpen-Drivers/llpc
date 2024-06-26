@@ -64,6 +64,7 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/PassManager.h"
+#include "lgc/RuntimeContext.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallSet.h"
@@ -657,7 +658,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   std::vector<ResourceNodeData> imageSymbolInfo;
   std::vector<ResourceNodeData> atomicCounterSymbolInfo;
   std::vector<ResourceNodeData> defaultUniformSymbolInfo;
-  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule &&
+  if (shaderInfo->options.pipelineOptions.getGlState().buildResourcesDataForShaderModule &&
       moduleData.binType == BinaryType::Spirv) {
     buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
                                    storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
@@ -700,7 +701,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   pShaderModuleData->binCode.pCode = bufferWritePtr;
   bufferWritePtr += codeBuffer.size() * sizeof(unsigned);
 
-  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule &&
+  if (shaderInfo->options.pipelineOptions.getGlState().buildResourcesDataForShaderModule &&
       moduleData.binType == BinaryType::Spirv) {
     memcpy(bufferWritePtr, &resourceNodes, sizeof(ResourcesNodes));
     pResourcesNodes = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
@@ -763,6 +764,7 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   SPIRVWord varId = 0;
   BasicType basicType = BasicType::Unknown;
   symbolInfo->columnCount = 1;
+  symbolInfo->componentCount = 1;
 
   SPIRVWord builtIn = false;
   bool isBuiltIn = spvVar->hasDecorate(DecorationBuiltIn, 0, &builtIn);
@@ -784,6 +786,8 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   }
   if (varElemTy->getOpCode() == OpTypeMatrix) {
     symbolInfo->columnCount = varElemTy->getMatrixColumnCount();
+    if (varElemTy->getMatrixColumnType()->getOpCode() == OpTypeVector)
+      symbolInfo->componentCount = varElemTy->getMatrixColumnType()->getVectorComponentCount();
     varElemTy = varElemTy->getMatrixColumnType();
   }
   if (varElemTy->getOpCode() == OpTypeVector)
@@ -3378,37 +3382,39 @@ void Compiler::adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *r
   auto &shaderFunctionSection = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::ShaderFunctions].getMap(true);
 
   // Get the shader function
-  auto shaderFunctionName = shaderFunctionSection.begin()->first.getString();
-  auto &shaderFunction = shaderFunctionSection.begin()->second.getMap(true);
+  for (auto &funcSection : shaderFunctionSection) {
+    auto shaderFunctionName = funcSection.first.getString();
+    auto &shaderFunction = funcSection.second.getMap(true);
 
-  // 1. Add raytracing pipeline indirect pipeline metadata
-  // The metadata is needed for RGP to correctly show different subtype of shaders.
-  // Determine the shader subtype by name
-  auto subtype = "Unknown";
-  if (auto shaderStage = tryGetLgcRtShaderStageFromName(shaderFunctionName)) {
-    auto stage = shaderStage.value();
-    if (stage == lgc::rt::RayTracingShaderStage::RayGeneration)
-      subtype = "RayGeneration";
-    else if (stage == lgc::rt::RayTracingShaderStage::Miss)
-      subtype = "Miss";
-    else if (stage == lgc::rt::RayTracingShaderStage::AnyHit)
-      subtype = "AnyHit";
-    else if (stage == lgc::rt::RayTracingShaderStage::ClosestHit)
-      subtype = "ClosestHit";
-    else if (stage == lgc::rt::RayTracingShaderStage::Intersection)
-      subtype = "Intersection";
-    else if (stage == lgc::rt::RayTracingShaderStage::Callable)
-      subtype = "Callable";
-    else if (stage == lgc::rt::RayTracingShaderStage::Traversal)
-      subtype = "Traversal";
+    // 1. Add raytracing pipeline indirect pipeline metadata
+    // The metadata is needed for RGP to correctly show different subtype of shaders.
+    // Determine the shader subtype by name
+    auto subtype = "Unknown";
+    if (auto shaderStage = tryGetLgcRtShaderStageFromName(shaderFunctionName)) {
+      auto stage = shaderStage.value();
+      if (stage == lgc::rt::RayTracingShaderStage::RayGeneration)
+        subtype = "RayGeneration";
+      else if (stage == lgc::rt::RayTracingShaderStage::Miss)
+        subtype = "Miss";
+      else if (stage == lgc::rt::RayTracingShaderStage::AnyHit)
+        subtype = "AnyHit";
+      else if (stage == lgc::rt::RayTracingShaderStage::ClosestHit)
+        subtype = "ClosestHit";
+      else if (stage == lgc::rt::RayTracingShaderStage::Intersection)
+        subtype = "Intersection";
+      else if (stage == lgc::rt::RayTracingShaderStage::Callable)
+        subtype = "Callable";
+      else if (stage == lgc::rt::RayTracingShaderStage::Traversal)
+        subtype = "Traversal";
+    }
+    shaderFunction[".shader_subtype"] = subtype;
+
+    // 2. Apply the .internal_pipeline_hash to .api_shader_hash in .shader_functions section
+    // NOTE: this is needed for RGP to recognize different shader subtype
+    auto pipelineHash = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+    shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[0] = pipelineHash[0];
+    shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[1] = pipelineHash[1];
   }
-  shaderFunction[".shader_subtype"] = subtype;
-
-  // 2. Apply the .internal_pipeline_hash to .api_shader_hash in .shader_functions section
-  // NOTE: this is needed for RGP to recognize different shader subtype
-  auto pipelineHash = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-  shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[0] = pipelineHash[0];
-  shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[1] = pipelineHash[1];
 
   // Write modified metadata to the pipeline ELF
   ElfNote newMetaNote = metaNote;
@@ -3590,6 +3596,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
   auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
   auto pipelineOptions = pipelineContext->getPipelineOptions();
 
+  ShaderStage preStage = ShaderStageInvalid;
   // Build hash per shader stage
   for (ShaderStage stage : gfxShaderStages()) {
     if ((stageMask & getLgcShaderStageMask(stage)) == 0)
@@ -3619,10 +3626,21 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 
     // Add per stage hash code to fragmentHasher or nonFragmentHasher per shader stage
     auto shaderHashCode = MetroHash::compact64(&hash);
-    if (stage == ShaderStageFragment)
+    if (stage == ShaderStageFragment) {
       fragmentHasher.Update(shaderHashCode);
-    else
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+      if (moduleData && moduleData->usage.useBarycentric) {
+        // If fragment uses barycentrics, we still need to care about the previous stage, because the primitive type
+        // might be specified there.
+        if ((preStage != ShaderStageInvalid) && (preStage != ShaderStageVertex)) {
+          auto preShaderInfo = pipelineContext->getPipelineShaderInfo(preStage);
+          moduleData = reinterpret_cast<const ShaderModuleData *>(preShaderInfo->pModuleData);
+          fragmentHasher.Update(moduleData->cacheHash);
+        }
+      }
+    } else
       nonFragmentHasher.Update(shaderHashCode);
+    preStage = stage;
   }
 
   // Add additional pipeline state to final hasher

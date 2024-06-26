@@ -1,6 +1,7 @@
 ; Check lgc.rt.trace.ray dialect is being generated.
 
 ; BEGIN_SHADERTEST
+; REQUIRES: gpurt
 ; RUN: amdllpc --print-after=llpc-spirv-lower-translator -gfxip 10.3 -o /dev/null 2>&1 %s | FileCheck -check-prefixes=SHADERTEST %s
 ; SHADERTEST-LABEL: @main(
 ; SHADERTEST: call void (...) @lgc.rt.trace.ray(i64 %{{[0-9]+}}, i32 0, i32 %{{[0-9]+}}, i32 0, i32 0, i32 0, <3 x float> %{{[0-9]+}}, float %{{[0-9]+}}, <3 x float> %{{[0-9]+}}, float %{{[0-9]+}}, ptr addrspace(5) @RayPayloadKHR0, [1 x i32] [i32 16])

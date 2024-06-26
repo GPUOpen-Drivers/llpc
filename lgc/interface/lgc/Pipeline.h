@@ -625,7 +625,7 @@ struct TessellationMode {
 };
 
 // Kind of GS input primitives.
-enum class InputPrimitives : unsigned { Points, Lines, LinesAdjacency, Triangles, TrianglesAdjacency };
+enum class InputPrimitives : unsigned { Points, Lines, LinesAdjacency, Triangles, TrianglesAdjacency, Patch };
 
 // Kind of GS/mesh shader output primitives
 enum class OutputPrimitives : unsigned {
@@ -645,6 +645,7 @@ struct GeometryShaderMode {
   OutputPrimitives outputPrimitive; // Kind of output primitives
   unsigned invocations;             // Number of times to invoke shader for each input primitive
   unsigned outputVertices;          // Max number of vertices the shader will emit in one invocation
+  unsigned controlPoints;           // Number of control points when the input primitive is a patch
   unsigned robustGsEmits;           // robust buffer access
 };
 

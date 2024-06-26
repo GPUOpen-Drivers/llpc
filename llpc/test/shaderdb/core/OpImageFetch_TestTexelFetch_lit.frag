@@ -36,7 +36,7 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 1536, {{.*}}, i32 2, i32 2)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 128, {{.*}}, <2 x i32> <i32 7, i32 7>, i32 8)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 9, i32 1536, {{.*}}, <2 x i32> <i32 3, i32 3>)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 0, i32 1536, {{.*}}, i32 5)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 10, i32 1536, {{.*}}, i32 5)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.with.fmask.v4f32(i32 6, i32 128, {{.*}}, {{.*}}, <2 x i32> <i32 6, i32 6>, i32 4)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

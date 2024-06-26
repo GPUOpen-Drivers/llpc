@@ -31,6 +31,7 @@
 #pragma once
 
 #include "EnumIterator.h"
+#include "llvm/ADT/DenseMap.h"
 #include <array>
 #include <cstdint>
 
@@ -63,6 +64,34 @@ enum ShaderStage : unsigned {
 // TODO Temporary definition until ShaderStage is converted to a class enum.
 using ShaderStageEnum = ShaderStage::ShaderStage;
 
+/// All shader stages
+[[maybe_unused]] constexpr const std::array ShaderStages = {
+    ShaderStage::Compute,  ShaderStage::Fragment,    ShaderStage::Vertex,
+    ShaderStage::Geometry, ShaderStage::TessControl, ShaderStage::TessEval,
+    ShaderStage::Task,     ShaderStage::Mesh,        ShaderStage::CopyShader,
+};
+
+/// All graphics shader stages.
+/// These are in execution order.
+[[maybe_unused]] constexpr const std::array ShaderStagesGraphics = {
+    ShaderStage::Task,     ShaderStage::Vertex, ShaderStage::TessControl, ShaderStage::TessEval,
+    ShaderStage::Geometry, ShaderStage::Mesh,   ShaderStage::Fragment,
+};
+
+/// Graphics and compute shader stages.
+/// The graphics stages are in execution order.
+[[maybe_unused]] constexpr const std::array ShaderStagesNative = {
+    ShaderStage::Task,     ShaderStage::Vertex, ShaderStage::TessControl, ShaderStage::TessEval,
+    ShaderStage::Geometry, ShaderStage::Mesh,   ShaderStage::Fragment,    ShaderStage::Compute,
+};
+
+/// Graphics and compute shader stages and copy shader.
+/// The graphics stages are in execution order.
+[[maybe_unused]] constexpr const std::array ShaderStagesNativeCopy = {
+    ShaderStage::Task, ShaderStage::Vertex,   ShaderStage::TessControl, ShaderStage::TessEval,   ShaderStage::Geometry,
+    ShaderStage::Mesh, ShaderStage::Fragment, ShaderStage::Compute,     ShaderStage::CopyShader,
+};
+
 class ShaderStageMask {
 public:
   constexpr ShaderStageMask() {}
@@ -73,6 +102,11 @@ public:
   };
 
   constexpr explicit ShaderStageMask(std::initializer_list<ShaderStageEnum> stages) {
+    for (auto stage : stages)
+      *this |= ShaderStageMask(stage);
+  };
+
+  template <size_t N> constexpr explicit ShaderStageMask(const std::array<ShaderStageEnum, N> &stages) {
     for (auto stage : stages)
       *this |= ShaderStageMask(stage);
   };
@@ -98,6 +132,7 @@ public:
 
   constexpr bool contains(ShaderStageEnum stage) const;
   constexpr bool contains_any(std::initializer_list<ShaderStageEnum> stages) const;
+  template <size_t N> constexpr bool contains_any(const std::array<ShaderStageEnum, N> &stages) const;
   constexpr bool empty() const { return m_value == 0; }
 
   uint32_t m_value = 0;
@@ -130,6 +165,10 @@ constexpr bool ShaderStageMask::contains(ShaderStageEnum stage) const {
 }
 
 constexpr bool ShaderStageMask::contains_any(std::initializer_list<ShaderStageEnum> stages) const {
+  return (*this & ShaderStageMask(stages)).m_value != 0;
+}
+
+template <size_t N> constexpr bool ShaderStageMask::contains_any(const std::array<ShaderStageEnum, N> &stages) const {
   return (*this & ShaderStageMask(stages)).m_value != 0;
 }
 
@@ -201,5 +240,14 @@ enum class ResourceLayoutScheme : unsigned {
 namespace llvm {
 // Enable iteration over resource node type with `lgc::enumRange<ResourceNodeType>()`.
 LGC_DEFINE_DEFAULT_ITERABLE_ENUM(lgc::ResourceNodeType);
+
+template <> struct DenseMapInfo<lgc::ShaderStageEnum> {
+  using T = lgc::ShaderStageEnum;
+
+  static T getEmptyKey() { return static_cast<T>(DenseMapInfo<uint32_t>::getEmptyKey()); }
+  static T getTombstoneKey() { return static_cast<T>(DenseMapInfo<uint32_t>::getTombstoneKey()); }
+  static unsigned getHashValue(const T &Val) { return static_cast<unsigned>(Val); }
+  static bool isEqual(const T &LHS, const T &RHS) { return LHS == RHS; }
+};
 
 } // namespace llvm

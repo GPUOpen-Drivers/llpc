@@ -936,14 +936,15 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
-  dumpFile << "options.replaceSetWithResourceType = " << options->replaceSetWithResourceType << "\n";
-  dumpFile << "options.disableSampleMask = " << options->disableSampleMask << "\n";
-  dumpFile << "options.buildResourcesDataForShaderModule = " << options->buildResourcesDataForShaderModule << "\n";
-  dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
-  dumpFile << "options.enableCombinedTexture = " << options->enableCombinedTexture << "\n";
-  dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
-  dumpFile << "options.enableFragColor = " << options->enableFragColor << "\n";
-  dumpFile << "options.disableBaseVertex = " << options->disableBaseVertex << "\n";
+  dumpFile << "options.replaceSetWithResourceType = " << options->getGlState().replaceSetWithResourceType << "\n";
+  dumpFile << "options.disableSampleMask = " << options->getGlState().disableSampleMask << "\n";
+  dumpFile << "options.buildResourcesDataForShaderModule = " << options->getGlState().buildResourcesDataForShaderModule
+           << "\n";
+  dumpFile << "options.disableTruncCoordForGather = " << options->getGlState().disableTruncCoordForGather << "\n";
+  dumpFile << "options.enableCombinedTexture = " << options->getGlState().enableCombinedTexture << "\n";
+  dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->getGlState().vertex64BitsAttribSingleLoc << "\n";
+  dumpFile << "options.enableFragColor = " << options->getGlState().enableFragColor << "\n";
+  dumpFile << "options.disableBaseVertex = " << options->getGlState().disableBaseVertex << "\n";
   dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
   dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
 }
@@ -1043,6 +1044,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "dynamicTopology = " << pipelineInfo->dynamicTopology << "\n";
   dumpFile << "enableColorClampVs = " << pipelineInfo->glState.enableColorClampVs << "\n";
   dumpFile << "enableColorClampFs = " << pipelineInfo->glState.enableColorClampFs << "\n";
+  dumpFile << "enableFlatShade = " << pipelineInfo->glState.enableFlatShade << "\n";
 
   dumpFile << "originUpperLeft = " << pipelineInfo->getGlState().originUpperLeft << "\n";
   if (pipelineInfo->clientMetadataSize > 0) {
@@ -1570,6 +1572,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 
   hasher.Update(pipeline->glState.enableColorClampVs);
   hasher.Update(pipeline->glState.enableColorClampFs);
+  hasher.Update(pipeline->glState.enableFlatShade);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1873,7 +1876,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   }
   if (stage == UnlinkedStageFragment || stage == UnlinkedStageCount) {
     hasher->Update(options->enableInterpModePatch);
-    hasher->Update(options->disableSampleMask);
+    hasher->Update(options->getGlState().disableSampleMask);
   }
   hasher->Update(options->pageMigrationEnabled);
   hasher->Update(options->optimizationLevel);
@@ -1886,13 +1889,13 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->reverseThreadGroup);
   hasher->Update(options->internalRtShaders);
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
-  hasher->Update(options->replaceSetWithResourceType);
-  hasher->Update(options->buildResourcesDataForShaderModule);
-  hasher->Update(options->disableTruncCoordForGather);
-  hasher->Update(options->enableCombinedTexture);
-  hasher->Update(options->vertex64BitsAttribSingleLoc);
-  hasher->Update(options->enableFragColor);
-  hasher->Update(options->disableBaseVertex);
+  hasher->Update(options->getGlState().replaceSetWithResourceType);
+  hasher->Update(options->getGlState().buildResourcesDataForShaderModule);
+  hasher->Update(options->getGlState().disableTruncCoordForGather);
+  hasher->Update(options->getGlState().enableCombinedTexture);
+  hasher->Update(options->getGlState().vertex64BitsAttribSingleLoc);
+  hasher->Update(options->getGlState().enableFragColor);
+  hasher->Update(options->getGlState().disableBaseVertex);
   hasher->Update(options->enablePrimGeneratedQuery);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
 }
@@ -2191,12 +2194,18 @@ template <class OStream, class Elf>
 // @param reader : ELF object
 OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
   unsigned sectionCount = reader.getSectionCount();
+  bool sortSection = reader.getMap().size() == sectionCount;
   char formatBuf[256];
 
-  for (unsigned sortIdx = 0; sortIdx < sectionCount; ++sortIdx) {
+  for (unsigned idx = 0; idx < sectionCount; ++idx) {
     typename ElfReader<Elf>::SectionBuffer *section = nullptr;
-    unsigned secIdx = 0;
-    Result result = reader.getSectionDataBySortingIndex(sortIdx, &secIdx, &section);
+    Result result = Result::Success;
+    unsigned secIdx = idx;
+    if (sortSection) {
+      result = reader.getSectionDataBySortingIndex(idx, &secIdx, &section);
+    } else {
+      result = reader.getSectionDataBySectionIndex(idx, &section);
+    }
     assert(result == Result::Success);
     (void(result)); // unused
     if (strcmp(section->name, ShStrTabName) == 0 || strcmp(section->name, StrTabName) == 0 ||
@@ -2418,7 +2427,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
 
       while (startPos < section->secHead.sh_size) {
         if (symIdx < symbols.size())
-          endPos = static_cast<unsigned>(symbols[symIdx].value);
+          endPos = static_cast<unsigned>(std::min(symbols[symIdx].value, section->secHead.sh_size));
         else
           endPos = static_cast<unsigned>(section->secHead.sh_size);
 
@@ -2428,12 +2437,16 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
           out << "    " << symbols[symIdx].pSymName << " (offset = " << symbols[symIdx].value
               << "  size = " << symbols[symIdx].size;
 
-          MetroHash::Hash hash = {};
-          MetroHash64::Hash(
-              reinterpret_cast<const uint8_t *>(voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
-              symbols[symIdx].size, hash.bytes);
-          uint64_t hashCode64 = MetroHash::compact64(&hash);
-          snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+          if ((symbols[symIdx].value + symbols[symIdx].size) <= section->secHead.sh_size) {
+            MetroHash::Hash hash = {};
+            MetroHash64::Hash(reinterpret_cast<const uint8_t *>(
+                                  voidPtrInc(section->data, static_cast<size_t>(symbols[symIdx].value))),
+                              symbols[symIdx].size, hash.bytes);
+            uint64_t hashCode64 = MetroHash::compact64(&hash);
+            snprintf(formatBuf, sizeof(formatBuf), " hash = 0x%016" PRIX64 ")\n", hashCode64);
+          } else {
+            snprintf(formatBuf, sizeof(formatBuf), " hash = Unknown )\n");
+          }
           out << formatBuf;
         }
         ++symIdx;

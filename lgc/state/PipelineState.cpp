@@ -497,41 +497,43 @@ void PipelineState::readShaderStageMask(Module *module) {
 
 // =====================================================================================================================
 // Get the last vertex processing shader stage in this pipeline, or ShaderStage::Invalid if none.
-ShaderStageEnum PipelineState::getLastVertexProcessingStage() const {
-  if (m_stageMask.contains(ShaderStage::CopyShader))
-    return ShaderStage::CopyShader;
-  if (m_stageMask.contains(ShaderStage::Geometry))
-    return ShaderStage::Geometry;
-  if (m_stageMask.contains(ShaderStage::TessEval))
-    return ShaderStage::TessEval;
-  if (m_stageMask.contains(ShaderStage::Vertex))
-    return ShaderStage::Vertex;
-  return ShaderStage::Invalid;
+std::optional<ShaderStageEnum> PipelineState::getLastVertexProcessingStage() const {
+  for (auto stage : {ShaderStage::CopyShader, ShaderStage::Geometry, ShaderStage::TessEval, ShaderStage::Vertex}) {
+    if (m_stageMask.contains(stage))
+      return stage;
+  }
+  return std::nullopt;
 }
 
 // =====================================================================================================================
 // Gets the previous active shader stage in this pipeline
 //
 // @param shaderStage : Current shader stage
-ShaderStageEnum PipelineState::getPrevShaderStage(ShaderStageEnum shaderStage) const {
+std::optional<ShaderStageEnum> PipelineState::getPrevShaderStage(ShaderStageEnum shaderStage) const {
   if (shaderStage == ShaderStage::Compute)
-    return ShaderStage::Invalid;
+    return std::nullopt;
 
   if (shaderStage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
     shaderStage = ShaderStage::Geometry;
   }
 
-  assert(shaderStage < ShaderStage::GfxCount);
+  std::optional<ShaderStageEnum> prevStage;
 
-  ShaderStageEnum prevStage = ShaderStage::Invalid;
+  bool foundCurrent = false;
+  for (auto stage : llvm::reverse(ShaderStagesGraphics)) {
+    if (!foundCurrent) {
+      if (stage == shaderStage)
+        foundCurrent = true;
+      continue;
+    }
 
-  for (int stage = shaderStage - 1; stage >= 0; --stage) {
-    if (m_stageMask.contains(static_cast<ShaderStageEnum>(stage))) {
-      prevStage = static_cast<ShaderStageEnum>(stage);
+    if (m_stageMask.contains(stage)) {
+      prevStage = stage;
       break;
     }
   }
+  assert(foundCurrent);
 
   return prevStage;
 }
@@ -540,28 +542,34 @@ ShaderStageEnum PipelineState::getPrevShaderStage(ShaderStageEnum shaderStage) c
 // Gets the next active shader stage in this pipeline
 //
 // @param shaderStage : Current shader stage
-ShaderStageEnum PipelineState::getNextShaderStage(ShaderStageEnum shaderStage) const {
+std::optional<ShaderStageEnum> PipelineState::getNextShaderStage(ShaderStageEnum shaderStage) const {
   if (shaderStage == ShaderStage::Compute)
-    return ShaderStage::Invalid;
+    return std::nullopt;
 
   if (shaderStage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
     shaderStage = ShaderStage::Geometry;
   }
 
-  assert(shaderStage < ShaderStage::GfxCount);
-
-  ShaderStageEnum nextStage = ShaderStage::Invalid;
+  std::optional<ShaderStageEnum> nextStage;
   auto stageMask = m_stageMask;
   if (isPartPipeline())
     stageMask |= ShaderStageMask(ShaderStage::Fragment);
 
-  for (unsigned stage = shaderStage + 1; stage < ShaderStage::GfxCount; ++stage) {
-    if (stageMask.contains(static_cast<ShaderStageEnum>(stage))) {
-      nextStage = static_cast<ShaderStageEnum>(stage);
+  bool foundCurrent = false;
+  for (auto stage : ShaderStagesGraphics) {
+    if (!foundCurrent) {
+      if (stage == shaderStage)
+        foundCurrent = true;
+      continue;
+    }
+
+    if (stageMask.contains(stage)) {
+      nextStage = stage;
       break;
     }
   }
+  assert(foundCurrent);
 
   return nextStage;
 }
@@ -1434,8 +1442,8 @@ void PipelineState::buildAbiHwShaderMap() {
   } else {
     if (hasGs) {
       auto preGsStage = getPrevShaderStage(ShaderStage::Geometry);
-      if (preGsStage != ShaderStage::Invalid)
-        m_abiHwShaderMap[preGsStage] = Util::Abi::HwShaderGs;
+      if (preGsStage.has_value())
+        m_abiHwShaderMap[preGsStage.value()] = Util::Abi::HwShaderGs;
     }
     if (hasTcs) {
       m_abiHwShaderMap[ShaderStage::TessControl] = Util::Abi::HwShaderHs;
@@ -1444,16 +1452,16 @@ void PipelineState::buildAbiHwShaderMap() {
     }
 
     auto lastVertexProcessingStage = getLastVertexProcessingStage();
-    if (lastVertexProcessingStage != ShaderStage::Invalid) {
+    if (lastVertexProcessingStage.has_value()) {
       if (lastVertexProcessingStage == ShaderStage::CopyShader)
         lastVertexProcessingStage = ShaderStage::Geometry;
       if (isNggEnabled()) {
-        m_abiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderGs;
+        m_abiHwShaderMap[lastVertexProcessingStage.value()] = Util::Abi::HwShaderGs;
         m_abiPipelineType = hasTs ? Util::Abi::PipelineType::NggTess : Util::Abi::PipelineType::Ngg;
       } else {
-        m_abiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderVs;
+        m_abiHwShaderMap[lastVertexProcessingStage.value()] = Util::Abi::HwShaderVs;
         if (hasGs)
-          m_abiHwShaderMap[lastVertexProcessingStage] |= Util::Abi::HwShaderGs;
+          m_abiHwShaderMap[lastVertexProcessingStage.value()] |= Util::Abi::HwShaderGs;
 
         if (hasTs && hasGs)
           m_abiPipelineType = Util::Abi::PipelineType::GsTess;
@@ -1688,7 +1696,7 @@ bool PipelineState::enableSwXfb() {
   auto lastVertexStage = getLastVertexProcessingStage();
   lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
 
-  if (lastVertexStage == ShaderStage::Invalid) {
+  if (!lastVertexStage) {
     assert(isUnlinked()); // Unlinked fragment shader or part-pipeline
     return false;
   }
@@ -1933,16 +1941,16 @@ void PipelineState::initializeInOutPackState() {
     // We are assuming that if any of the vertex processing, then the vertex processing stages are complete.  For
     // example, if we see a vertex shader and geometry shader with no tessellation shaders, then we will assume we can
     // pack the vertex outputs and geometry inputs because no tessellation shader will be added later.
-    for (ShaderStageEnum stage : lgc::enumRange(ShaderStage::GfxCount)) {
+    for (auto stage : ShaderStagesGraphics) {
       if (!m_stageMask.contains(stage))
         continue;
       if (stage == ShaderStage::TessEval)
         continue;
-      ShaderStageEnum preStage = getPrevShaderStage(stage);
-      if (preStage == ShaderStage::Invalid)
+      auto preStage = getPrevShaderStage(stage);
+      if (!preStage)
         continue;
       m_inputPackState[stage] = true;
-      m_outputPackState[preStage] = true;
+      m_outputPackState[*preStage] = true;
     }
   }
 }
@@ -1952,12 +1960,12 @@ void PipelineState::initializeInOutPackState() {
 //
 // @param shaderStage : The given shader stage
 bool PipelineState::canPackInput(ShaderStageEnum shaderStage) {
-  ShaderStageEnum preStage = getPrevShaderStage(shaderStage);
+  auto preStage = getPrevShaderStage(shaderStage);
   // The input packable state of the current stage should match the output packable state of the previous stage, except
   // that the current stage has no previous and it is a null FS.
-  if (preStage != ShaderStage::Invalid &&
+  if (preStage &&
       !(shaderStage == ShaderStage::Fragment && getShaderResourceUsage(shaderStage)->inOutUsage.fs.isNullFs))
-    assert(m_inputPackState[shaderStage] == m_outputPackState[preStage]);
+    assert(m_inputPackState[shaderStage] == m_outputPackState[preStage.value()]);
   return m_inputPackState[shaderStage];
 }
 
@@ -1966,25 +1974,30 @@ bool PipelineState::canPackInput(ShaderStageEnum shaderStage) {
 //
 // @param shaderStage : The given shader stage
 bool PipelineState::canPackOutput(ShaderStageEnum shaderStage) {
-  ShaderStageEnum nextStage = getNextShaderStage(shaderStage);
+  auto nextStage = getNextShaderStage(shaderStage);
   // The output packable state of the current stage should match the input packable state of the next stage, except that
   // the current stage has no next stage or a null FS.
-  if (nextStage != ShaderStage::Invalid &&
-      !(nextStage == ShaderStage::Fragment && getShaderResourceUsage(nextStage)->inOutUsage.fs.isNullFs))
-    assert(m_outputPackState[shaderStage] == m_inputPackState[nextStage]);
+  if (nextStage && !(nextStage == ShaderStage::Fragment && getShaderResourceUsage(*nextStage)->inOutUsage.fs.isNullFs))
+    assert(m_outputPackState[shaderStage] == m_inputPackState[*nextStage]);
   return m_outputPackState[shaderStage];
 }
 
 // =====================================================================================================================
 // Get the count of vertices per primitive. For GS, the count is for output primitive.
 unsigned PipelineState::getVerticesPerPrimitive() {
-  if (hasShaderStage(ShaderStage::Geometry)) {
-    const auto &geometryMode = getShaderModes()->getGeometryShaderMode();
-    switch (geometryMode.outputPrimitive) {
+  if (hasShaderStage(ShaderStage::Geometry) || hasShaderStage(ShaderStage::Mesh)) {
+    OutputPrimitives outputPrimitive = OutputPrimitives::Points;
+    if (hasShaderStage(ShaderStage::Geometry))
+      outputPrimitive = getShaderModes()->getGeometryShaderMode().outputPrimitive;
+    else
+      outputPrimitive = getShaderModes()->getMeshShaderMode().outputPrimitive;
+    switch (outputPrimitive) {
     case OutputPrimitives::Points:
       return 1;
+    case OutputPrimitives::Lines:
     case OutputPrimitives::LineStrip:
       return 2;
+    case OutputPrimitives::Triangles:
     case OutputPrimitives::TriangleStrip:
       return 3;
     default:

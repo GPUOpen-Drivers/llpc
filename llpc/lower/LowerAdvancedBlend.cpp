@@ -29,13 +29,13 @@
  ***********************************************************************************************************************
  */
 #include "LowerAdvancedBlend.h"
-#include "GfxRuntimeContext.h"
 #include "SPIRVInternal.h"
 #include "compilerutils/CompilerUtils.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "vkgcDefs.h"
 #include "lgc/Builder.h"
+#include "lgc/RuntimeContext.h"
 
 #define DEBUG_TYPE "Lower-advanced-blend"
 
@@ -85,30 +85,23 @@ void LowerAdvancedBlend::processFsOutputs(Module &module) {
     if (global.getType()->getAddressSpace() == SPIRAS_Uniform && global.getName().ends_with(AdvancedBlendIsMsaaName))
       isMsaaUniform = &global;
   }
-  // Prepare arguments of AmdAdvancedBlend(inColor, imageDescMsLow, imageDescMsHigh, imageDescLow, imageDescHigh,
-  // fmaskDescLow, fmaskDescHigh, mode, isMsaa) from shaderLibrary
+  // Prepare arguments of AmdAdvancedBlend(inColor, imageDescMs, imageDesc, fmaskDesc, mode, isMsaa) from shaderLibrary
   m_builder->SetInsertPointPastAllocas(m_entryPoint);
 
   // Get the parameters and store them into the allocated parameter points
-  Type *descType = FixedVectorType::get(m_builder->getInt32Ty(), 8);
   unsigned bindings[2] = {m_binding, m_binding + 1};
-  Value *imageDescLow[2] = {};
-  Value *imageDescHigh[2] = {};
+  Value *imageDesc[2] = {};
   for (unsigned id = 0; id < 2; ++id) {
     unsigned descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
-    Value *imageDescPtr = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorResource,
-                                                      ResourceNodeType::DescriptorResource, descSet, bindings[id]);
-    Value *imageDesc = m_builder->CreateLoad(descType, imageDescPtr);
-    imageDescLow[id] = m_builder->CreateShuffleVector(imageDesc, ArrayRef<int>{0, 1, 2, 3});
-    imageDescHigh[id] = m_builder->CreateShuffleVector(imageDesc, ArrayRef<int>{4, 5, 6, 7});
+    imageDesc[id] = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorResource,
+                                                ResourceNodeType::DescriptorResource, descSet, bindings[id]);
+    imageDesc[id] = m_builder->CreatePtrToInt(imageDesc[id], m_builder->getInt64Ty());
   }
 
   unsigned descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
-  Value *fmaskDescPtr = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorFmask,
-                                                    ResourceNodeType::DescriptorFmask, descSet, m_binding);
-  Value *fmaskDesc = m_builder->CreateLoad(descType, fmaskDescPtr);
-  Value *fmaskDescLow = m_builder->CreateShuffleVector(fmaskDesc, ArrayRef<int>{0, 1, 2, 3});
-  Value *fmaskDescHigh = m_builder->CreateShuffleVector(fmaskDesc, ArrayRef<int>{4, 5, 6, 7});
+  Value *fmaskDesc = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorFmask, ResourceNodeType::DescriptorFmask,
+                                                 descSet, m_binding);
+  fmaskDesc = m_builder->CreatePtrToInt(fmaskDesc, m_builder->getInt64Ty());
 
   assert(modeUniform && isMsaaUniform);
   modeUniform = m_builder->CreateLoad(m_builder->getInt32Ty(), modeUniform);
@@ -132,8 +125,7 @@ void LowerAdvancedBlend::processFsOutputs(Module &module) {
 
       Value *blendColor = inliner
                               .inlineCall(*m_builder, advancedBlendFunc,
-                                          {srcVal, imageDescLow[0], imageDescHigh[0], imageDescLow[1], imageDescHigh[1],
-                                           fmaskDescLow, fmaskDescHigh, modeUniform, isMsaaUniform})
+                                          {srcVal, imageDesc[0], imageDesc[1], fmaskDesc, modeUniform, isMsaaUniform})
                               .returnValue;
 
       storeInst->setOperand(0, blendColor);

@@ -32,6 +32,7 @@
 
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Module.h"
 
 namespace lgc {
@@ -419,7 +420,7 @@ private:
   VertexCullInfoOffsets m_vertCullInfoOffsets;           // A collection of offsets within an item of vertex cull info
   StreamOutControlCbOffsets m_streamOutControlCbOffsets; // A collection of offsets within stream-out control buffer
 
-  llvm::IRBuilder<> m_builder; // LLVM IR builder
+  BuilderBase m_builder; // LLVM IR builder
 
   llvm::Constant *m_lds = nullptr; // Global variable to model primitive shader LDS
   PrimShaderLdsLayout m_ldsLayout; // Primitive shader LDS layout

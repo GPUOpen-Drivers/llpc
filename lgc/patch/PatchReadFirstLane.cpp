@@ -361,7 +361,12 @@ void ReadFirstLaneOptimizer::collectAssumeUniforms(BasicBlock *block,
 
   while (!candidates.empty()) {
     Instruction *candidate = candidates.pop_back_val();
-
+    if (auto intrinsic = dyn_cast<IntrinsicInst>(candidate)) {
+      // Don't lift readfirstlane that is manually added after permlane64 or permlanex16 in subgroupClusteredReduction
+      if (intrinsic->getIntrinsicID() == Intrinsic::amdgcn_permlane64 ||
+          intrinsic->getIntrinsicID() == Intrinsic::amdgcn_permlanex16)
+        continue;
+    }
     if (isAllUsersAssumedUniform(candidate))
       tryPropagate(candidate, false);
   }

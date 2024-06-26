@@ -62,14 +62,12 @@ public:
 
 private:
   void mapGlobalVariableToProxy(llvm::GlobalVariable *globalVar);
-  void mapInputToProxy(llvm::GlobalVariable *input);
-  void mapOutputToProxy(llvm::GlobalVariable *input);
+  void lowerInOut(llvm::GlobalVariable *globalVar);
+  void lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, llvm::Value *current,
+                              SmallVectorImpl<llvm::Value *> &indexStack);
 
-  llvm::ReturnInst *ensureUnifiedReturn();
+  void ensureUnifiedReturn();
 
-  void lowerInput();
-  void lowerOutput();
-  void lowerInOutInPlace();
   void lowerBufferBlock();
   void lowerTaskPayload();
   void lowerPushConsts();
@@ -105,30 +103,17 @@ private:
                          llvm::ArrayRef<llvm::Value *> indexOperands, unsigned maxLocOffset, llvm::Constant *outputMeta,
                          llvm::Value *locOffset, llvm::Value *vertexOrPrimitiveIdx);
 
-  void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst,
-                               GlobalVariable *gv, ArrayRef<Value *> indexOperands);
+  llvm::Value *interpolateInputElement(llvm::Type *returnTy, unsigned interpLoc, llvm::Value *interpInfo,
+                                       GlobalVariable *gv, ArrayRef<Value *> indexOperands);
 
   void buildApiXfbMap();
 
   void addCallInstForXfbOutput(const ShaderInOutMetadata &outputMeta, Value *outputValue, unsigned xfbBufferAdjust,
                                unsigned xfbOffsetAdjust, unsigned locOffset, lgc::InOutInfo outputInfo);
 
-  llvm::SmallVector<llvm::GlobalVariable *> m_globalsToErase;
-  std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap; // Proxy map for lowering inputs
-
-  // NOTE: Here we use list to store pairs of output proxy mappings. This is because we want output patching to be
-  // "ordered" (resulting LLVM IR for the patching always be consistent).
-  std::list<std::pair<llvm::Value *, llvm::AllocaInst *>> m_outputProxyMap; // Proxy list for lowering outputs
-
-  bool m_lowerInputInPlace;  // Whether to lower input inplace
-  bool m_lowerOutputInPlace; // Whether to lower output inplace
-
-  std::unordered_set<llvm::CallInst *> m_emitCalls;   // "Call" instructions to emit vertex (geometry shader)
-  std::unordered_set<llvm::LoadInst *> m_loadInsts;   // "Load" instructions to be removed
-  std::unordered_set<llvm::StoreInst *> m_storeInsts; // "Store" instructions to be removed
-  std::unordered_set<llvm::CallInst *> m_interpCalls; // "Call" instruction to do input interpolation
-                                                      // (fragment shader)
-  ShaderStage m_lastVertexProcessingStage;            // The last vertex processing stage
+  llvm::ReturnInst *m_unifiedReturn = nullptr;
+  std::unordered_set<llvm::CallInst *> m_emitCalls; // "Call" instructions to emit vertex (geometry shader)
+  ShaderStage m_lastVertexProcessingStage;          // The last vertex processing stage
   llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
       m_builtInXfbMap; // Map built-in to XFB output info specified by API interface
   llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>

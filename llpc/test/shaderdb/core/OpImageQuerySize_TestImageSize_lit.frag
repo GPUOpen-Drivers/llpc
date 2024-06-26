@@ -36,7 +36,7 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.i32(i32 0, i32 512, {{.*}}, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v2i32(i32 9, i32 512, {{.*}}, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v2i32(i32 6, i32 512, {{.*}}, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.query.size.i32(i32 0, i32 128, {{.*}}, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.image.query.size.i32(i32 10, i32 128, {{.*}}, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v3i32(i32 8, i32 128, {{.*}}, i32 0)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

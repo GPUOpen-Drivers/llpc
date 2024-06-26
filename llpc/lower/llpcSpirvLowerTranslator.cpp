@@ -101,7 +101,8 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
   for (const auto &range : descriptorRangeValues) {
     if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
       uint32_t rangeSet = range.set;
-      if (context->getPipelineContext()->getPipelineOptions()->replaceSetWithResourceType && range.set == 0) {
+      if (context->getPipelineContext()->getPipelineOptions()->getGlState().replaceSetWithResourceType &&
+          range.set == 0) {
         rangeSet = PipelineContext::getGlResourceNodeSetFromType(range.type);
       }
       convertingSamplers.push_back(

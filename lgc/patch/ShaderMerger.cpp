@@ -728,10 +728,12 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
   // GS VGPRs
+  const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+
   Value *esGsOffsets01 = vgprArgs[0];
 
   Value *esGsOffsets23 = PoisonValue::get(builder.getInt32Ty());
-  if (calcFactor.inputVertices > 2) {
+  if (calcFactor.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch) {
     // NOTE: ES to GS offset (vertex 2 and 3) is valid once the primitive type has more than 2 vertices.
     esGsOffsets23 = vgprArgs[1];
   }
@@ -740,7 +742,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *invocationId = vgprArgs[3];
 
   Value *esGsOffsets45 = PoisonValue::get(builder.getInt32Ty());
-  if (calcFactor.inputVertices > 4) {
+  if (calcFactor.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) {
     // NOTE: ES to GS offset (vertex 4 and 5) is valid once the primitive type has more than 4 vertices.
     esGsOffsets45 = vgprArgs[4];
   }

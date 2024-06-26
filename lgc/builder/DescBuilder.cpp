@@ -394,45 +394,47 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc, unsigned stride) {
   Value *descElem1 = CreateExtractElement(desc, 1);
 
   // Build normal buffer descriptor
-  // Dword 0
   Value *bufDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), 4));
-  bufDesc = CreateInsertElement(bufDesc, descElem0, uint64_t(0));
+  {
+    // Dword 0
+    bufDesc = CreateInsertElement(bufDesc, descElem0, uint64_t(0));
 
-  // Dword 1
-  SqBufRsrcWord1 sqBufRsrcWord1 = {};
-  sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
-  descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
-  if (stride) {
-    SqBufRsrcWord1 sqBufRsrcWord1Stride = {};
-    sqBufRsrcWord1Stride.bits.stride = stride;
-    descElem1 = CreateOr(descElem1, getInt32(sqBufRsrcWord1Stride.u32All));
+    // Dword 1
+    SqBufRsrcWord1 sqBufRsrcWord1 = {};
+    sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
+    descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
+    if (stride) {
+      SqBufRsrcWord1 sqBufRsrcWord1Stride = {};
+      sqBufRsrcWord1Stride.bits.stride = stride;
+      descElem1 = CreateOr(descElem1, getInt32(sqBufRsrcWord1Stride.u32All));
+    }
+    bufDesc = CreateInsertElement(bufDesc, descElem1, 1);
+
+    // Dword 2
+    SqBufRsrcWord2 sqBufRsrcWord2 = {};
+    sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
+    bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord2.u32All), 2);
+
+    // Dword 3
+    SqBufRsrcWord3 sqBufRsrcWord3 = {};
+    sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+    sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+    sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+    sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+    if (gfxIp.major == 10) {
+      sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
+      sqBufRsrcWord3.gfx10.resourceLevel = 1;
+      sqBufRsrcWord3.gfx10.oobSelect = stride ? 3 : 2;
+      assert(sqBufRsrcWord3.u32All == 0x21014FAC || sqBufRsrcWord3.u32All == 0x31014FAC);
+    } else if (gfxIp.major >= 11) {
+      sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
+      sqBufRsrcWord3.gfx11.oobSelect = stride ? 3 : 2;
+      assert(sqBufRsrcWord3.u32All == 0x20014FAC || sqBufRsrcWord3.u32All == 0x30014FAC);
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
+    bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
   }
-  bufDesc = CreateInsertElement(bufDesc, descElem1, 1);
-
-  // Dword 2
-  SqBufRsrcWord2 sqBufRsrcWord2 = {};
-  sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
-  bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord2.u32All), 2);
-
-  // Dword 3
-  SqBufRsrcWord3 sqBufRsrcWord3 = {};
-  sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
-  sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
-  sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
-  sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
-  if (gfxIp.major == 10) {
-    sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
-    sqBufRsrcWord3.gfx10.resourceLevel = 1;
-    sqBufRsrcWord3.gfx10.oobSelect = stride ? 3 : 2;
-    assert(sqBufRsrcWord3.u32All == 0x21014FAC || sqBufRsrcWord3.u32All == 0x31014FAC);
-  } else if (gfxIp.major >= 11) {
-    sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
-    sqBufRsrcWord3.gfx11.oobSelect = stride ? 3 : 2;
-    assert(sqBufRsrcWord3.u32All == 0x20014FAC || sqBufRsrcWord3.u32All == 0x30014FAC);
-  } else {
-    llvm_unreachable("Not implemented!");
-  }
-  bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);
 
   return bufDesc;
 }

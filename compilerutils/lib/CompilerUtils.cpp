@@ -41,6 +41,10 @@
 
 using namespace llvm;
 
+// Whether this is a load instruction that should translate to a last_use
+// load.
+static constexpr const char *MDIsLastUseName = "amdgpu.last.use";
+
 // =====================================================================================================================
 // Create an LLVM function call to the named function. The callee is built
 // automatically based on return type and its parameters.
@@ -148,6 +152,10 @@ void CompilerUtils::createUnreachable(llvm::IRBuilder<> &b) {
   oldCode->splice(oldCode->end(), bb, it, bb->end());
   oldCode->replaceSuccessorsPhiUsesWith(bb, oldCode);
   DeleteDeadBlock(oldCode);
+}
+
+void CompilerUtils::setIsLastUseLoad(llvm::LoadInst &Load) {
+  Load.setMetadata(MDIsLastUseName, MDTuple::get(Load.getContext(), {}));
 }
 
 namespace {

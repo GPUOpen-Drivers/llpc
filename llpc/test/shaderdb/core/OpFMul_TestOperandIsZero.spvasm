@@ -32,6 +32,8 @@
                OpDecorate %22 FPFastMathMode NotInf
                OpDecorate %32 FPFastMathMode NotInf
                OpDecorate %38 FPFastMathMode NotInf
+               OpDecorate %33 NoContraction
+               OpDecorate %39 NoContraction
        %void = OpTypeVoid
           %3 = OpTypeFunction %void
       %float = OpTypeFloat 32

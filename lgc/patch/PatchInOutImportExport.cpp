@@ -1082,6 +1082,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         Value *emitCounter = builder.CreateLoad(emitCounterTy, emitCounterPtr);
         emitCounter = builder.CreateAdd(emitCounter, builder.getInt32(1));
         builder.CreateStore(emitCounter, emitCounterPtr);
+
+        // Increment total emit vertex counter
+        if (m_pipelineState->getShaderModes()->getGeometryShaderMode().robustGsEmits) {
+          auto totalEmitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getTotalEmitCounterPtr();
+          Value *totalEmitCounter = builder.CreateLoad(builder.getInt32Ty(), totalEmitCounterPtr);
+          totalEmitCounter = builder.CreateAdd(totalEmitCounter, builder.getInt32(1));
+          builder.CreateStore(totalEmitCounter, totalEmitCounterPtr);
+        }
       }
     }
   }
@@ -1101,7 +1109,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
   // Whether this shader stage has to use "exp" instructions to export outputs
   const bool useExpInst = ((m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
                             m_shaderStage == ShaderStage::CopyShader) &&
-                           (nextStage == ShaderStage::Invalid || nextStage == ShaderStage::Fragment));
+                           (!nextStage || nextStage == ShaderStage::Fragment));
 
   BuilderBase builder(&retInst);
 
@@ -1329,7 +1337,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       }
 
       // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
-      assert(nextStage == ShaderStage::Invalid || nextStage == ShaderStage::Fragment);
+      assert(!nextStage || nextStage == ShaderStage::Fragment);
 
       bool hasClipCullExport = true;
       if (nextStage == ShaderStage::Fragment) {
@@ -1385,7 +1393,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       bool hasPrimitiveIdExport = false;
       if (nextStage == ShaderStage::Fragment) {
         hasPrimitiveIdExport = nextBuiltInUsage.primitiveId;
-      } else if (nextStage == ShaderStage::Invalid) {
+      } else if (!nextStage) {
         if (m_shaderStage == ShaderStage::CopyShader) {
           hasPrimitiveIdExport =
               m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.gs.primitiveId;
@@ -1466,7 +1474,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         bool hasViewportIndexExport = true;
         if (nextStage == ShaderStage::Fragment) {
           hasViewportIndexExport = nextBuiltInUsage.viewportIndex;
-        } else if (nextStage == ShaderStage::Invalid) {
+        } else if (!nextStage) {
           hasViewportIndexExport = false;
         }
 
@@ -1485,7 +1493,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         bool hasLayerExport = true;
         if (nextStage == ShaderStage::Fragment) {
           hasLayerExport = nextBuiltInUsage.layer;
-        } else if (nextStage == ShaderStage::Invalid) {
+        } else if (!nextStage) {
           hasLayerExport = false;
         }
 
@@ -1533,8 +1541,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
   } else if (m_shaderStage == ShaderStage::Geometry) {
     // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
     // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
-    SyncScope::ID scope =
-        m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
+    StringRef scopeName = m_pipelineState->isGsOnChip() ? "workgroup" : "agent";
+    SyncScope::ID scope = m_context->getOrInsertSyncScopeID(scopeName);
     builder.CreateFence(AtomicOrdering::Release, scope);
 
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
@@ -4001,6 +4009,18 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
 
     auto ringOffset = calcGsVsRingOffsetForOutput(location, compIdx, streamId, emitCounter, gsVsOffset, builder);
 
+    IRBuilder<>::InsertPointGuard guard(builder);
+
+    // Skip GS-VS ring write if the emit is invalid
+    const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+    if (geometryMode.robustGsEmits) {
+      auto totalEmitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getTotalEmitCounterPtr();
+      auto totalEmitCounter = builder.CreateLoad(builder.getInt32Ty(), totalEmitCounterPtr);
+      // validEmit = totalEmitCounter < outputVertices
+      auto validEmit = builder.CreateICmpULT(totalEmitCounter, builder.getInt32(geometryMode.outputVertices));
+      builder.CreateIf(validEmit, false);
+    }
+
     if (m_pipelineState->isGsOnChip()) {
       auto lds = Patch::getLdsVariable(m_pipelineState, m_entryPoint);
       Value *storePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ringOffset);
@@ -4048,7 +4068,6 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, un
                                                            BuilderBase &builder) {
   // ES -> GS ring is always on-chip on GFX10+
   // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
-
   assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
 
@@ -4071,12 +4090,37 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, un
 // @param builder : the builder to use
 Value *PatchInOutImportExport::calcEsGsRingOffsetForInput(unsigned location, unsigned compIdx, Value *vertexIdx,
                                                           BuilderBase &builder) {
-  auto esGsOffsets = m_pipelineSysValues.get(m_entryPoint)->getEsGsOffsets();
-
   // ES -> GS ring is always on-chip on GFX10+
-  Value *vertexOffset = builder.CreateExtractElement(esGsOffsets, vertexIdx);
+  assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
 
-  // ringOffset = vertexOffset[N] + (location * 4 + compIdx);
+  auto esGsOffsets = m_pipelineSysValues.get(m_entryPoint)->getEsGsOffsets();
+  const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+
+  Value *vertexOffset = nullptr;
+  if (geometryMode.inputPrimitive == InputPrimitives::Patch) {
+    assert(geometryMode.controlPoints > 0); // Must have control points
+
+    // NOTE: If the input primitive is a patch, the calculation of vertex offset is different from other input primitive
+    // types as follow:
+    //
+    //   vertexOffset = esGsOffset0 + vertexIdx * esGsRingItemSize
+    //
+    // The esGsOffset0 is the starting offset of control points for each patch with such HW layout:
+    //
+    // +-----------------+-----------------+-----+-------------------+
+    // | Control Point 0 | Control Point 1 | ... | Control Point N-1 |
+    // +-----------------+-----------------+-----+-------------------+
+    // |<-------------------------- Patch -------------------------->|
+    //
+    vertexOffset = builder.CreateMul(vertexIdx, builder.getInt32(calcFactor.esGsRingItemSize));
+    vertexOffset = builder.CreateAdd(builder.CreateExtractElement(esGsOffsets, static_cast<uint64_t>(0)), vertexOffset);
+  } else {
+    // vertexOffset = esGsOffsets[vertexIdx] (vertexIdx < 6)
+    vertexOffset = builder.CreateExtractElement(esGsOffsets, vertexIdx);
+  }
+
+  // ringOffset = vertexOffset + (location * 4 + compIdx);
   Value *ringOffset = builder.CreateAdd(vertexOffset, builder.getInt32(location * 4 + compIdx));
   return ringOffset;
 }
@@ -4620,7 +4664,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
   const bool useExpInst = ((m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
                             m_shaderStage == ShaderStage::CopyShader) &&
-                           (nextStage == ShaderStage::Invalid || nextStage == ShaderStage::Fragment));
+                           (!nextStage || nextStage == ShaderStage::Fragment));
   assert(useExpInst);
   (void(useExpInst)); // unused
 

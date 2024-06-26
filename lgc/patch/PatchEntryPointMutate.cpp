@@ -55,6 +55,7 @@
 
 #include "lgc/patch/PatchEntryPointMutate.h"
 #include "ShaderMerger.h"
+#include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
@@ -847,7 +848,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
     // Get stack address of pushed state and load it from continuation stack.
     unsigned stateSize = layout.getTypeStoreSize(state->getType());
     vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, ContinuationStackAlignment));
-    Value *newState = builder.CreateLoad(state->getType(), vsp, "cps.state");
+    auto *newState = builder.CreateLoad(state->getType(), vsp, "cps.state");
+    CompilerUtils::setIsLastUseLoad(*newState);
     state->replaceAllUsesWith(newState);
   }
   vsp = builder.CreatePtrToInt(vsp, builder.getInt32Ty());
@@ -1101,7 +1103,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
       // offsets to calculate numbers of written primitives/dwords and update the counters.  auto lastVertexStage =
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
       lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
-      getUserDataUsage(lastVertexStage)->usesStreamOutTable = true;
+      getUserDataUsage(lastVertexStage.value())->usesStreamOutTable = true;
     }
   }
 }

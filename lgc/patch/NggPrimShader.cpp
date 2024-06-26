@@ -4068,12 +4068,13 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
   const unsigned attribOffset = (location * 4) + component;
   auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
 
+  IRBuilder<>::InsertPointGuard guard(m_builder);
+
+  // Skip GS-VS ring write if the emit is invalid
   if (geometryMode.robustGsEmits) {
-    // skip the lds write by writing to a dummy offset.
-    // ldsOffset = (totalEmitVerts >= outputVertices) ? InvalidValue : ldsOffset
-    auto dummyOffset = m_builder.getInt32(0x80000000);
-    auto outOfRange = m_builder.CreateICmpUGE(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
-    ldsOffset = m_builder.CreateSelect(outOfRange, dummyOffset, ldsOffset);
+    // validEmit = totalEmitVerts < outputVertices
+    auto validEmit = m_builder.CreateICmpULT(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
+    m_builder.CreateIf(validEmit, false);
   }
 
   writeValueToLds(output, ldsOffset);
@@ -4246,7 +4247,7 @@ Function *NggPrimShader::createGsEmitHandler() {
       totalEmitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), totalEmitVertsPtr);
       // totalEmitVerts++
       totalEmitVerts = m_builder.CreateAdd(totalEmitVerts, m_builder.getInt32(1));
-      // outVerts = (totalEmitVerts >= outputVertices) ? 0 : outVerts
+      // outVerts = (totalEmitVerts > outputVertices) ? 0 : outVerts
       Value *outOfRange = m_builder.CreateICmpUGT(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
       outVerts = m_builder.CreateSelect(outOfRange, m_builder.getInt32(0), outVerts);
     }
@@ -6253,7 +6254,7 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
     // Before the first export call, add s_wait_vscnt 0 to make sure the completion of all attributes being written
     // to the attribute ring buffer
     m_builder.SetInsertPoint(exportCalls[0]);
-    m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
+    m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
   }
 
   // Remove calls

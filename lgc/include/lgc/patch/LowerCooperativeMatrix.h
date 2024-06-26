@@ -212,9 +212,8 @@ private:
   llvm::Value *createDotProductInt8Int32(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
                                          unsigned flags, bool isSat, const llvm::Twine &instName,
                                          llvm::Instruction *insertPos);
-  llvm::Value *createDotProductInt16Int16(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                          unsigned flags, bool isSat, const llvm::Twine &instName,
-                                          llvm::Instruction *insertPos);
+  llvm::Value *createDotProductInt(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator, unsigned flags,
+                                   bool isSat, const llvm::Twine &instName, llvm::Instruction *insertPos);
 
   llvm::Value *getLaneNumber(BuilderBase &builder);
 

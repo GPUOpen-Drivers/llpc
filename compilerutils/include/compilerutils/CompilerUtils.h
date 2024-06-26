@@ -70,6 +70,9 @@ llvm::Function *cloneFunctionHeader(llvm::Function &f, llvm::FunctionType *newTy
 // Add an unreachable at the current position and remove the rest of the basic block.
 void createUnreachable(llvm::IRBuilder<> &b);
 
+// Specifies a memory that is loaded is the last use.
+void setIsLastUseLoad(llvm::LoadInst &Load);
+
 struct CrossModuleInlinerResult {
   llvm::Value *returnValue;
   llvm::iterator_range<llvm::Function::iterator> newBBs;

@@ -59,7 +59,9 @@ public:
   //
   // @param value : The value to compare
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
+  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "") {
+    return createSubgroupAll(value, getShaderStage(GetInsertBlock()->getParent()).value(), instName);
+  }
 
   // Create a subgroup all equal.
   //
@@ -80,6 +82,9 @@ private:
   SubgroupBuilder() = delete;
   SubgroupBuilder(const SubgroupBuilder &) = delete;
   SubgroupBuilder &operator=(const SubgroupBuilder &) = delete;
+
+  // The subgroup operation with explicit shader stage as parameter.
+  llvm::Value *createSubgroupAll(llvm::Value *const value, ShaderStageEnum shaderStage, const llvm::Twine &instName);
 };
 
 } // namespace lgc
