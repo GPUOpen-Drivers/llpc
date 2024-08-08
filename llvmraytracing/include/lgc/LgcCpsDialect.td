@@ -39,7 +39,7 @@ class LgcCpsOp<string mnemonic_, list<Trait> traits_>
 def StackPointer : TgConstant<(PointerType 32)>, Type;
 
 // A pointer to a CPS function, combined with additional metadata
-def ContinuationReference : TgConstant<(I32)>, Type;
+def ContinuationReference : TgConstant<(or I32, I64)>, Type;
 
 // =====================================================================================================================
 def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
@@ -75,7 +75,7 @@ def AwaitOp : LgcCpsOp<"await", [NoUnwind, WillReturn]> {
 // =====================================================================================================================
 def AsContinuationReferenceOp : LgcCpsOp<"as.continuation.reference", [NoUnwind, WillReturn]> {
     let arguments = (ins PointerType:$fn);
-    let results = (outs (or ContinuationReference, I64):$ref);
+    let results = (outs ContinuationReference:$ref);
 
     let defaultBuilderHasExplicitResultType = true;
 

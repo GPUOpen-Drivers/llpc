@@ -99,17 +99,17 @@ public:
   constexpr explicit ShaderStageMask(ShaderStageEnum stage) {
     assert(static_cast<uint32_t>(stage) < 32 && "ShaderStage mask overflowed");
     m_value = 1U << static_cast<uint32_t>(stage);
-  };
+  }
 
   constexpr explicit ShaderStageMask(std::initializer_list<ShaderStageEnum> stages) {
     for (auto stage : stages)
       *this |= ShaderStageMask(stage);
-  };
+  }
 
   template <size_t N> constexpr explicit ShaderStageMask(const std::array<ShaderStageEnum, N> &stages) {
     for (auto stage : stages)
       *this |= ShaderStageMask(stage);
-  };
+  }
 
   constexpr static ShaderStageMask fromRaw(uint32_t mask) {
     ShaderStageMask result;

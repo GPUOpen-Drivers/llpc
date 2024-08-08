@@ -10,7 +10,7 @@
 
 ; SHADERTEST-LABEL: .fetchXfbOutput
 ; Write v4[31] = 4.0 -> LDS
-; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
+; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr {{i8|i32}}, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
 ; SHADERTEST-NEXT: store i32 1082130432, ptr addrspace(3) [[ldsPtr1]], align 4
 
 ; Write v3[31] = 3.0 -> LDS
@@ -27,7 +27,7 @@
 
 ; SHADERTEST-LABEL: .exportXfbOutput
 ; Read v4[31] <- LDS
-; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
+; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr {{i8|i32}}, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
 ; SHADERTEST-NEXT: [[v4:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr1]], align 4
 ; SHADERTEST-NEXT: [[offset1:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
 ; SHADERTEST-NEXT: [[offset2:%[0-9]*]] = or disjoint i32 [[offset1]], 508

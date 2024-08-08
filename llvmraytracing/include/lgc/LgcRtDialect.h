@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -55,26 +55,41 @@ enum class RayTracingShaderStage {
   Count
 };
 
+// These ray flags correspond to the equivalent flags in GLSL_EXT_ray_tracing
+enum class RayFlag {
+  None = 0x00,
+  ForceOpaque = 0x01,
+  ForceNonOpaque = 0x02,
+  AcceptFirstHitAndEndSearch = 0x04,
+  SkipClosestHitShader = 0x08,
+  CullBackFacingTriangles = 0x10,
+  CullFrontFacingTriangles = 0x20,
+  CullOpaque = 0x40,
+  CullNonOpaque = 0x80,
+  SkipTriangles = 0x100,
+  SkipProceduralPrimitives = 0x200,
+};
+
 // Set shader stage metadata on a LLVM function and erase it by setting
 // std::nullopt.
 // func can instead be a GlobalVariable, allowing a front-end to use a
 // GlobalVariable to represent a shader retrieved from the cache, and wants to
 // mark it with a shader stage.
-void setLgcRtShaderStage(llvm::GlobalObject *func,
-                         std::optional<RayTracingShaderStage> stage);
+void setLgcRtShaderStage(llvm::GlobalObject *func, std::optional<RayTracingShaderStage> stage);
 
 // Gets the shader stage from the specified LLVM function or std::nullopt
 // if no metadata is apparent.
 // func can instead be a GlobalVariable, allowing a front-end to use a
 // GlobalVariable to represent a shader retrieved from the cache, and wants to
 // mark it with a shader stage.
-std::optional<RayTracingShaderStage>
-getLgcRtShaderStage(const llvm::GlobalObject *func);
+std::optional<RayTracingShaderStage> getLgcRtShaderStage(const llvm::GlobalObject *func);
+
+// Get the name string of shader subtype for the specified shader stage.
+const char *getShaderSubtypeForRtShaderStage(RayTracingShaderStage stage);
 
 // Get the metadata IDs associated with the lgc.rt dialect, so the caller knows
 // which ones can be removed when the dialect is processed.
-void getLgcRtMetadataIds(llvm::LLVMContext &context,
-                         llvm::SmallVectorImpl<unsigned> &ids);
+void getLgcRtMetadataIds(llvm::LLVMContext &context, llvm::SmallVectorImpl<unsigned> &ids);
 
 // Get PAQ (payload access qualifier) metadata for a ray-tracing shader
 // function, or nullptr if none.

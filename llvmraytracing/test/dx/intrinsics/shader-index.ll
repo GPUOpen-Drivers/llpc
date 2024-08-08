@@ -8,15 +8,13 @@
 
 declare i32 @lgc.rt.shader.index()
 
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
+declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
-
-define i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hitKind) #0 !types !20 {
+define i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hitKind) #0 !pointeetys !20 {
   ret i1 true
 }
 
-define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !{%struct.DispatchSystemData poison} {
   ret void
 }
 
@@ -25,7 +23,7 @@ define void @main() !lgc.rt.shaderstage !24 {
 ; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META13:![0-9]+]] !lgc.cps [[META10:![0-9]+]] !continuation [[META14:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
-; CHECK-NEXT:    [[PAYLOAD_ALLOCA:%.*]] = alloca [30 x i32], align 4
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CHECK-NEXT:    store i32 0, ptr @debug_global, align 4
@@ -37,25 +35,25 @@ entry:
   ret void
 }
 
-define void @callable(%struct.Payload* %payload) !types !22 !lgc.rt.shaderstage !25 {
+define void @callable(%struct.Payload* %payload) !pointeetys !22 !lgc.rt.shaderstage !25 {
 ; CHECK-LABEL: define void @callable(
 ; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META15:![0-9]+]] !lgc.cps [[META16:![0-9]+]] !continuation [[META17:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
-; CHECK-NEXT:    [[PAYLOAD_ALLOCA:%.*]] = alloca [30 x i32], align 4
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [1 x i32], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
-; CHECK-NEXT:    store [1 x i32] [[PAYLOAD]], ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    store [1 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP0]], i32 0
-; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 [[TMP2]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
 ; CHECK-NEXT:    store i32 [[SHADER_INDEX]], ptr @debug_global, align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP0]], i32 0
 ; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP3]], align 4
-; CHECK-NEXT:    store i32 [[TMP4]], ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    store i32 [[TMP4]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = load [1 x i32], ptr [[PAYLOAD_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], [8 x i32] poison, [1 x i32] [[TMP6]]), !continuation.registercount [[META10]]
 ; CHECK-NEXT:    unreachable
 ;
@@ -76,13 +74,13 @@ entry:
 !4 = !{i32 8, i32 7}
 !6 = !{i32 0, i64 65536}
 !7 = !{i32 21}
-!8 = !{!"function", i32 poison, !9}
+!8 = !{%struct.DispatchSystemData poison}
 !9 = !{i32 0, %struct.DispatchSystemData poison}
 !10 = !{i1 ()* @callable, !"callable", null, null, !11}
 !11 = !{i32 8, i32 12}
-!20 = !{!"function", i1 poison, !21, float poison, i32 poison}
+!20 = !{%struct.DispatchSystemData poison}
 !21 = !{i32 0, %struct.DispatchSystemData poison}
-!22 = !{!"function", i1 poison, !23}
+!22 = !{%struct.Payload poison}
 !23 = !{i32 0, %struct.Payload poison}
 !24 = !{i32 0}
 !25 = !{i32 5}

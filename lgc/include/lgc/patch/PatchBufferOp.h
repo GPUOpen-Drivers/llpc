@@ -53,6 +53,8 @@ namespace lgc {
 class BufferAddrToPtrOp;
 class BufferDescToPtrOp;
 class StridedBufferDescToPtrOp;
+class BufferLoadDescToPtrOp;
+class StridedBufferLoadDescToPtrOp;
 class StridedBufferAddrAndStrideToPtrOp;
 class StridedIndexAddOp;
 class BufferLengthOp;
@@ -85,10 +87,12 @@ class BufferOpLowering {
 public:
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
-  BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::DivergenceInfo &divergenceInfo);
+  BufferOpLowering(CompilerUtils::TypeLowering &typeLowering, PipelineState &pipelineState,
+                   llvm::DivergenceInfo &divergenceInfo);
 #else
   // New version of the code (also handles unknown version, which we treat as latest)
-  BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::UniformityInfo &uniformityInfo);
+  BufferOpLowering(CompilerUtils::TypeLowering &typeLowering, PipelineState &pipelineState,
+                   llvm::UniformityInfo &uniformityInfo);
 #endif
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLowering> &builder);
@@ -102,6 +106,8 @@ private:
   void visitBufferAddrToPtr(BufferAddrToPtrOp &op);
   void visitBufferDescToPtr(BufferDescToPtrOp &descToPtr);
   void visitStridedBufferDescToPtr(StridedBufferDescToPtrOp &descToPtr);
+  void visitBufferLoadDescToPtr(BufferLoadDescToPtrOp &loadDescToPtr);
+  void visitStridedBufferLoadDescToPtr(StridedBufferLoadDescToPtrOp &loadDescToPtr);
   void visitStridedBufferAddrAndStrideToPtr(StridedBufferAddrAndStrideToPtrOp &addrAndStrideToPtr);
   void visitStridedIndexAdd(StridedIndexAddOp &indexAdd);
   void visitBufferLength(BufferLengthOp &length);
@@ -133,8 +139,10 @@ private:
   llvm::Value *createGlobalPointerAccess(llvm::Value *const bufferDesc, llvm::Value *const offset,
                                          llvm::Type *const type, llvm::Instruction &inst,
                                          const llvm::function_ref<llvm::Value *(llvm::Value *)> callback);
+  llvm::Value *createCompactDesc(llvm::Value *const buffAddress, llvm::Value *const stride);
+  llvm::Value *createLoadDesc(llvm::Value *buffAddress, bool forceRawView, bool isCompact);
 
-  TypeLowering &m_typeLowering;
+  CompilerUtils::TypeLowering &m_typeLowering;
   llvm::IRBuilder<> m_builder;
 
   PipelineState &m_pipelineState;

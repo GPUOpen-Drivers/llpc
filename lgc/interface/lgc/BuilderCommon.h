@@ -58,9 +58,7 @@ public:
   llvm::VectorType *getDescTy(ResourceNodeType descType);
 
   // Get the type of pointer to descriptor.
-  //
-  // @param descType : Descriptor type, one of the ResourceNodeType values
-  llvm::Type *getDescPtrTy(ResourceNodeType descType);
+  llvm::Type *getDescPtrTy();
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
   llvm::PointerType *getBufferDescTy();
@@ -88,6 +86,14 @@ public:
   llvm::CallInst *CreateNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                                   llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, const llvm::Twine &instName = "");
 
+  // Create an llvm.assume call to annotate the dereferenceable and alignment attributes of the pointer. We only insert
+  // the call if dereferenceable > 0 or align > 1.
+  //
+  // @param ptr : The pointer to be annotated.
+  // @param dereferenceable : the dereferenceable size (in bytes) of the pointer
+  // @param align : the alignment of the pointer.
+  llvm::CallInst *CreateAssumptionDereferenceableAndAlign(llvm::Value *ptr, unsigned dereferenceable, unsigned align);
+
   // Create code to build a vector out of a number of scalar elements of the same type.
   llvm::Value *CreateBuildVector(llvm::ArrayRef<llvm::Value *> elements, const llvm::Twine &instName = "");
 
@@ -98,7 +104,7 @@ public:
   // Create alloca for given input type.
   //
   // @param ty : pointer type.
-  llvm::Value *CreateAllocaAtFuncEntry(llvm::Type *ty);
+  llvm::Value *CreateAllocaAtFuncEntry(llvm::Type *ty, const llvm::Twine &allocaName = "");
 
   // Create a "debug break".
   //

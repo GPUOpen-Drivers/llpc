@@ -498,7 +498,8 @@ void PipelineState::readShaderStageMask(Module *module) {
 // =====================================================================================================================
 // Get the last vertex processing shader stage in this pipeline, or ShaderStage::Invalid if none.
 std::optional<ShaderStageEnum> PipelineState::getLastVertexProcessingStage() const {
-  for (auto stage : {ShaderStage::CopyShader, ShaderStage::Geometry, ShaderStage::TessEval, ShaderStage::Vertex}) {
+  for (auto stage : {ShaderStage::Mesh, ShaderStage::CopyShader, ShaderStage::Geometry, ShaderStage::TessEval,
+                     ShaderStage::Vertex}) {
     if (m_stageMask.contains(stage))
       return stage;
   }
@@ -837,17 +838,17 @@ void PipelineState::readUserDataNodes(Module *module) {
     nextNode->concreteType = getResourceTypeFromName(cast<MDString>(metadataNode->getOperand(0)));
     // Operand 1: matchType
     nextNode->abstractType =
-        static_cast<ResourceNodeType>(mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
+        static_cast<ResourceNodeType>(mdconst::extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
     // Operand 2: visibility
-    nextNode->visibility = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    nextNode->visibility = mdconst::extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
     // Operand 3: offsetInDwords
-    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+    nextNode->offsetInDwords = mdconst::extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
     // Operand 4: sizeInDwords
-    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+    nextNode->sizeInDwords = mdconst::extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
 
     if (nextNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       // Operand 5: number of nodes in inner table
-      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+      unsigned innerNodeCount = mdconst::extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
       // Go into inner table.
       assert(!endThisInnerTable);
       endThisInnerTable = endNextInnerTable;
@@ -859,14 +860,14 @@ void PipelineState::readUserDataNodes(Module *module) {
       if (nextNode->concreteType == ResourceNodeType::IndirectUserDataVaPtr ||
           nextNode->concreteType == ResourceNodeType::StreamOutTableVaPtr) {
         // Operand 5: Size of the indirect data in dwords
-        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        nextNode->indirectSizeInDwords = mdconst::extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
       } else {
         // Operand 5: set
-        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        nextNode->set = mdconst::extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
         // Operand 6: binding
-        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
+        nextNode->binding = mdconst::extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
         // Operand 7: stride
-        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(7))->getZExtValue();
+        nextNode->stride = mdconst::extract<ConstantInt>(metadataNode->getOperand(7))->getZExtValue();
         nextNode->immutableValue = nullptr;
         // Operand 8 onward: immutable descriptor constants
         constexpr unsigned ImmutableStartOperand = 8;
@@ -877,7 +878,7 @@ void PipelineState::readUserDataNodes(Module *module) {
           nextNode->immutableValue = m_immutableValueAllocs.back().get();
           for (unsigned i = 0; i != immutableSizeInDwords; ++i)
             m_immutableValueAllocs.back()[i] =
-                mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(ImmutableStartOperand + i))->getZExtValue();
+                mdconst::extract<ConstantInt>(metadataNode->getOperand(ImmutableStartOperand + i))->getZExtValue();
         }
       }
       // Move on to next node to write in table.
@@ -1702,6 +1703,22 @@ bool PipelineState::enableSwXfb() {
   }
 
   return enableXfb();
+}
+
+// =====================================================================================================================
+// Checks if we export vertex/primitive attributes by parameter export instruction.
+bool PipelineState::exportAttributeByExportInstruction() const {
+  const auto gfxIp = getTargetInfo().getGfxIpVersion();
+  switch (gfxIp.major) {
+  case 10:
+    return true; // Always use parameter export instruction
+  case 11:
+    return false; // Always use attribute-through-memory (ATM)
+  default:
+    llvm_unreachable("Unexpected GFX generation!");
+  }
+
+  return false;
 }
 
 // =====================================================================================================================

@@ -30,8 +30,11 @@
  */
 #pragma once
 
-#include "llpcSpirvLowerRayQuery.h"
+#include "SPIRVInternal.h"
+#include "compilerutils/CompilerUtils.h"
+#include "llpcSpirvLower.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/IR/PassManager.h"
 #include <set>
 
 namespace lgc::rt {
@@ -173,9 +176,22 @@ enum RayHitStatus : unsigned {
 constexpr unsigned SqttWellKnownTypeFunctionCallCompact = 0x11;
 constexpr unsigned SqttWellKnownTypeFunctionReturn = 0x10;
 
+// Corresponds to gl_RayFlags* in GLSL_EXT_ray_tracing.txt
+enum RayFlag : unsigned {
+  None = 0x0000,                       // gl_RayFlagsNoneEXT
+  ForceOpaque = 0x0001,                // gl_RayFlagsOpaqueEXT
+  ForceNonOpaque = 0x0002,             // gl_RayFlagsNoOpaqueEXT
+  AcceptFirstHitAndEndSearch = 0x0004, // gl_RayFlagsTerminateOnFirstHitEXT
+  SkipClosestHitShader = 0x0008,       // gl_RayFlagsSkipClosestHitShaderEXT
+  CullBackFacingTriangles = 0x0010,    // gl_RayFlagsCullBackFacingTrianglesEXT
+  CullFrontFacingTriangles = 0x0020,   // gl_RayFlagsCullFrontFacingTrianglesEXT
+  CullOpaque = 0x0040,                 // gl_RayFlagsCullOpaqueEXT
+  CullNonOpaque = 0x0080,              // gl_RayFlagsCullNoOpaqueEXT
+};
+
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering ray tracing.
-class SpirvLowerRayTracing : public SpirvLowerRayQuery {
+class SpirvLowerRayTracing : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerRayTracing> {
 public:
   SpirvLowerRayTracing();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
@@ -183,8 +199,13 @@ public:
   static llvm::StringRef name() { return "Lower SPIR-V RayTracing operations"; }
 
 private:
+  void eraseFunctionBlocks(llvm::Function *func);
+  llvm::Value *createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex);
+  llvm::Value *createLoadMatrixFromFunc(llvm::Value *matrixAddr, unsigned builtInId);
+  llvm::Function *getGpurtFunction(llvm::StringRef name);
   void createTraceParams(llvm::Function *func);
   void createRayGenEntryFunc();
+  unsigned generateTraceRayStaticId();
   void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Value *bufferDesc, llvm::Value *tableIndex,
                                  llvm::Instruction *insertPos);
   llvm::CallInst *createTraceRay();
@@ -279,6 +300,8 @@ private:
   llvm::Value *createLoadInstNodeAddr();
 
   lgc::rt::RayTracingShaderStage mapStageToLgcRtShaderStage(ShaderStage stage);
+  std::optional<CompilerUtils::CrossModuleInliner> m_crossModuleInliner;
+  unsigned m_spirvOpMetaKindId; // Metadata kind ID for "spirv.op"
 
   llvm::Value *m_traceParams[TraceParam::Count]; // Trace ray set parameters
   llvm::StringRef m_traceParamNames[TraceParam::Count];
@@ -292,6 +315,7 @@ private:
   llvm::Value *m_shaderRecordIndex = nullptr;                          // Variable sourced from entry function argument
   llvm::Instruction *m_insertPosPastInit = nullptr; // Insert position after initialization instructions (storing trace
                                                     // parameters, payload, callable data, etc.)
+  unsigned m_nextTraceRayId;                        // Next trace ray ID to be used for ray history
 };
 
 } // namespace Llpc

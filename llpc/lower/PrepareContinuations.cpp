@@ -57,9 +57,11 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
   SpirvLower::init(&module);
   const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
   ComputeShaderMode mode = {};
-  mode.workgroupSizeX = rtState->threadGroupSizeX;
-  mode.workgroupSizeY = rtState->threadGroupSizeY;
-  mode.workgroupSizeZ = rtState->threadGroupSizeZ;
+  // NOTE: For continuations, we only support flatten threadgroup (more precisely, numthreads(32, 1, 1)) so far.
+  assert(rtState->dispatchRaysThreadGroupSize == 32);
+  mode.workgroupSizeX = rtState->dispatchRaysThreadGroupSize;
+  mode.workgroupSizeY = 1;
+  mode.workgroupSizeZ = 1;
   mode.noLocalInvocationIdInCalls = true;
   Pipeline::setComputeShaderMode(module, mode);
   module.getOrInsertNamedMetadata(ContHelper::MDLgcCpsModuleName);

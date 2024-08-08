@@ -18,6 +18,5 @@ RWTexture2D<float4> gOutput : register(u0);
 
   TraceRay(myAccelerationStructure, 0, 0, 0, 0, 0, myRay, payload);
 
-  gOutput[DispatchRaysIndex().xy] =
-      float4(payload.v1, payload.v2, payload.v3, 0.);
+  gOutput[DispatchRaysIndex().xy] = float4(payload.v1, payload.v2, payload.v3, 0.);
 }

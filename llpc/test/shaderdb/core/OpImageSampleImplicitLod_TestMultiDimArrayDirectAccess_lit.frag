@@ -14,11 +14,11 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, i32 1, <2 x float> <float 1.000000e+00, float 1.000000e+00>)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 512, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, i32 1, <2 x float> <float 1.000000e+00, float 1.000000e+00>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0, {{.*}}, {{.*}}, i32 1, <2 x float> <float 1.000000e+00, float 1.000000e+00>)
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512, {{.*}}, {{.*}}, i32 1, <2 x float> <float 1.000000e+00, float 1.000000e+00>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST-LABEL: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}

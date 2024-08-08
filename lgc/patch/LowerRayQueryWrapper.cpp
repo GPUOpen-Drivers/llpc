@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -23,27 +23,20 @@
  *
  **********************************************************************************************************************/
 
-//===- TypesMetadata.h - Pointee type metadata for processing DXIL ---------==//
+// LowerRayQueryWrapper.cpp : LGC pass that is a wrapper around LowerRayQuery, which lowers rayQuery ops by
+// inlining GPURT functions.
 
-#pragma once
+#include "LowerRayQueryWrapper.h"
+#include "lgc/state/PipelineState.h"
 
-#include "llvm/Bitcode/BitcodeReader.h"
+using namespace lgc;
+using namespace lgc::rt;
+using namespace llvm;
 
-namespace llvm {
-
-/// Return element type of a function argument resolving opaque pointers
-/// via !types metadata where appropriate.
-/// Returns nullptr for non-pointers.
-Type *getFuncArgPtrElementType(const Argument *Arg);
-
-/// Return element type of a function argument resolving opaque pointers
-/// via !types metadata where appropriate.
-/// Returns nullptr for non-pointers.
-Type *getFuncArgPtrElementType(const Function *F, int ArgNo);
-
-/// LLVM parser callback which adds !types metadata during DXIL parsing
-void DXILValueTypeMetadataCallback(Value *V, unsigned TypeID,
-                                   GetTypeByIDTy GetTypeByID,
-                                   GetContainedTypeIDTy GetContainedTypeID);
-
-} // namespace llvm
+// =====================================================================================================================
+// Run the pass.
+PreservedAnalyses LowerRayQueryWrapper::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  m_staticFlags = pipelineState->getOptions().rtStaticPipelineFlags;
+  return LowerRayQuery::run(module, analysisManager);
+}

@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -36,14 +36,11 @@
 // New PM registration
 llvm::PassPluginLibraryInfo getRaytracingPluginPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "Raytracing", LLVM_VERSION_STRING,
-          [](llvm::PassBuilder &PB) {
-            llvm::ContHelper::RegisterPasses(PB, true);
-          }};
+          [](llvm::PassBuilder &PB) { llvm::ContHelper::RegisterPasses(PB, true); }};
 }
 
 #ifndef LLVM_RAYTRACINGPLUGIN_LINK_INTO_TOOLS
-extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
-llvmGetPassPluginInfo() {
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
   return getRaytracingPluginPluginInfo();
 }
 #endif

@@ -53,6 +53,45 @@ def GetReturnValueOp : LgcIlCpsOp<"getReturnValue", [NoUnwind, WillReturn]> {
   }];
 }
 
+def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
+  let arguments = (ins I64:$shaderAddr, I32:$csp, I64:$returnAddr, varargs:$tail);
+  let results = (outs);
+
+  let summary =
+    "represents the jump to another shader";
+
+  let description = [{
+    Describes the jump to another shader. The arguments are:
+
+      - shaderAddr, the shader the current shader should jump to
+      - csp, the continuation stack pointer. Whatever is passed here, is going to be
+        overridden by the compiler.
+      - returnAddr, the return address the called shader should jump back to, e. g. the
+        resume function.
+      - tail, a set of arguments like the system data or hit attributes.
+  }];
+}
+
+def WaitContinueOp : LgcIlCpsOp<"waitContinue", [NoReturn]> {
+  let arguments = (ins I64:$shaderAddr, I64:$waitMask, I32:$csp, I64:$returnAddr, varargs:$tail);
+  let results = (outs);
+
+  let summary =
+    "represents the jump to another shader with a wait mask";
+
+  let description = [{
+    Describes the jump to another shader. The arguments are:
+
+      - shaderAddr, the shader the current shader should jump to
+      - waitMask, the bitmask all lanes have to wait for.
+      - csp, the continuation stack pointer. Whatever is passed here, is going to be
+        overridden by the compiler.
+      - returnAddr, the return address the called shader should jump back to, e. g. the
+        resume function.
+      - tail, a set of arguments like the system data or hit attributes.
+  }];
+}
+
 def ReturnOp : LgcIlCpsOp<"return", [NoReturn]> {
   let arguments = (ins value:$returnAddr, varargs:$args);
   let results = (outs);

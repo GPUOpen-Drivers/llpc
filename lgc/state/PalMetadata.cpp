@@ -242,6 +242,7 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
             mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PosZFloatEna ||
             mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::SampleCoverageEna ||
             mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::NumInterps ||
+            mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::ParamGen ||
             mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::NumPrimInterp ||
             mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::PsW32En ||
             mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::DynamicHs ||
@@ -483,6 +484,12 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   pipelineHashNode[1] = options.hash[1];
   if (options.resourceHash != 0)
     m_pipelineNode[Util::Abi::PipelineMetadataKey::ResourceHash] = options.resourceHash;
+
+  // Set usesCps if applicable.
+  bool usesCps = options.rtIndirectMode == RayTracingIndirectMode::ContinuationsContinufy ||
+                 options.rtIndirectMode == RayTracingIndirectMode::Continuations;
+  if (usesCps)
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::UsesCps] = true;
 
   // The rest of this function is used only for whole pipeline PAL metadata or an ELF link.
   if (!isWholePipeline)

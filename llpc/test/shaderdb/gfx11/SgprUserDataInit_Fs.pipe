@@ -168,6 +168,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .kill_enable:    false
 ; CHECK-NEXT:         .mask_export_enable: false
 ; CHECK-NEXT:         .pre_shader_depth_coverage_enable: 0
+; CHECK-NEXT:         .primitive_ordered_pixel_shader: false
 ; CHECK-NEXT:         .stencil_test_val_export_enable: 0
 ; CHECK-NEXT:         .z_export_enable: 0
 ; CHECK-NEXT:         .z_order:        0x1
@@ -359,7 +360,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .user_data_reg_map:
 ; CHECK-NEXT:           - 0x10000000
 ; CHECK-NEXT:           - 0x12
-; CHECK-NEXT:           - 0x10000023
+; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff

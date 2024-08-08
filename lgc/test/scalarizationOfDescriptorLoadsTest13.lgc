@@ -22,11 +22,13 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP5:%.*]] = insertelement <2 x i32> [[TMP3]], i32 [[TMP4]], i64 0
 ; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
 ; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(4)
+; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP7]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP7]], i32 -1) ]
 ; CHECK-NEXT:    [[I1:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i32 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @lgc.load.user.data__i32(i32 0)
 ; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <2 x i32> [[TMP1]], i32 [[TMP8]], i64 0
 ; CHECK-NEXT:    [[TMP10:%.*]] = bitcast <2 x i32> [[TMP9]] to i64
 ; CHECK-NEXT:    [[TMP11:%.*]] = inttoptr i64 [[TMP10]] to ptr addrspace(4)
+; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP11]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP11]], i32 -1) ]
 ; CHECK-NEXT:    [[I2:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP11]], i32 32
 ; CHECK-NEXT:    [[I3:%.*]] = mul i32 [[I]], 48
 ; CHECK-NEXT:    [[I4:%.*]] = sext i32 [[I3]] to i64
@@ -38,18 +40,18 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[I6:%.*]] = mul i32 [[PHI_IND]], 48
 ; CHECK-NEXT:    [[I7:%.*]] = sext i32 [[I6]] to i64
 ; CHECK-NEXT:    [[I8]] = getelementptr i8, ptr addrspace(4) [[I2]], i64 [[I7]]
-; CHECK-NEXT:    [[PHI_LOAD:%.*]] = load <8 x i32>, ptr addrspace(4) [[PHI_LOAD1]], align 32, !invariant.load [[META10:![0-9]+]]
-; CHECK-NEXT:    [[TMP20:%.*]] = load <4 x i32>, ptr addrspace(4) [[I8]], align 16, !invariant.load [[META10]]
+; CHECK-NEXT:    [[PHI_LOAD:%.*]] = load <8 x i32>, ptr addrspace(4) [[PHI_LOAD1]], align 4, !invariant.load [[META10:![0-9]+]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load <4 x i32>, ptr addrspace(4) [[I8]], align 4, !invariant.load [[META10]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.v8i32(i32 0, <8 x i32> [[PHI_LOAD]])
 ; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 [[TMP12]], i32 [[I6]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32(i32 [[TMP13]], <8 x i32> [[PHI_LOAD]])
 ; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP13]], i32 [[I6]])
 ; CHECK-NEXT:    [[TMP16:%.*]] = sext i32 [[TMP15]] to i64
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(4) [[I2]], i64 [[TMP16]]
-; CHECK-NEXT:    [[TMP18:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP17]], align 16, !invariant.load [[META10]]
+; CHECK-NEXT:    [[TMP18:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP17]], align 4, !invariant.load [[META10]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP14]], <4 x i32> [[TMP18]], i1 false, i32 0, i32 0)
 ; CHECK-NEXT:    [[I11:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP13]], <4 x float> [[TMP19]])
-; CHECK-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[I11]]) #[[ATTR5:[0-9]+]]
+; CHECK-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[I11]]) #[[ATTR6:[0-9]+]]
 ; CHECK-NEXT:    [[IND]] = add i32 [[PHI_IND]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = icmp ne i32 [[IND]], 1000
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[EXIT:%.*]]
@@ -90,10 +92,6 @@ declare ptr addrspace(4) @lgc.create.get.desc.ptr.p4(...) local_unnamed_addr #1
 
 ; Function Attrs: nounwind memory(none)
 declare i32 @lgc.create.get.desc.stride__i32(...) local_unnamed_addr #1
-
-declare spir_func void @"spirv.NonUniform.s[s[p4,i32,i32,i32],s[p4,i32,i32]]"({ { ptr addrspace(4), i32, i32, i32 }, { ptr addrspace(4), i32, i32 } }) local_unnamed_addr
-
-declare spir_func void @"spirv.NonUniform.s[a3v8i32,s[v4i32,i32]]"({ [3 x <8 x i32>], { <4 x i32>, i32 } }) local_unnamed_addr
 
 ; Function Attrs: nounwind willreturn memory(read)
 declare <4 x float> @lgc.create.image.sample.v4f32(...) local_unnamed_addr #2

@@ -69,7 +69,7 @@ define void @unify_jumps({i32} %state, i32 %arg, ptr %table) !lgc.cps !0 !lgc.sh
 ; CHECK-NEXT:    [[TMP40:%.*]] = icmp ne i32 [[TMP39]], 0
 ; CHECK-NEXT:    [[TMP41:%.*]] = select i1 [[TMP40]], i32 [[TMP39]], i32 [[TMP37]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP41]], i1 true)
-; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP26]], i32 [[TMP42]])
+; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP26]], i32 [[TMP42]])
 ; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i32 [[TMP26]], [[TMP43]]
 ; CHECK-NEXT:    [[TMP45:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP44]])
 ; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP43]])
@@ -188,7 +188,7 @@ define void @unify_jump_ret({i32} %state, i32 %arg, ptr %table) !lgc.cps !0 !lgc
 ; CHECK-NEXT:    [[TMP35:%.*]] = icmp ne i32 [[TMP34]], 0
 ; CHECK-NEXT:    [[TMP36:%.*]] = select i1 [[TMP35]], i32 [[TMP34]], i32 [[TMP32]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP36]], i1 true)
-; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP21]], i32 [[TMP37]])
+; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP21]], i32 [[TMP37]])
 ; CHECK-NEXT:    [[TMP39:%.*]] = icmp eq i32 [[TMP21]], [[TMP38]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP39]])
 ; CHECK-NEXT:    [[TMP41:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP38]])

@@ -3117,8 +3117,10 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
     return;
   }
 
-  if (m_gfxIp.major >= 11 && !m_hasGs) // For GS, vertex attribute exports are in copy shader
-    processVertexAttribExport(m_esHandlers.main);
+  if (!m_pipelineState->exportAttributeByExportInstruction()) {
+    if (!m_hasGs) // For GS, ATM is done in copy shader
+      exportVertexAttributeThroughMemory(m_esHandlers.main);
+  }
 
   Value *esGsOffset = nullptr;
   if (m_hasGs) {
@@ -3162,16 +3164,9 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 
   SmallVector<Value *, 32> esArgs;
 
-  // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
-  // attributes through memory
-  if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
-    const auto attribCount =
-        m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)
-            ->inOutUsage.expCount;
-    if (attribCount > 0) {
-      esArgs.push_back(m_nggInputs.attribRingBase);
-      esArgs.push_back(m_nggInputs.threadIdInSubgroup);
-    }
+  if (!m_pipelineState->exportAttributeByExportInstruction()) {
+    if (!m_hasGs) // For GS, ATM is in copy shader
+      appendAttributeThroughMemoryArguments(esArgs);
   }
 
   // Set up user data SGPRs
@@ -3361,17 +3356,8 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
 
   SmallVector<Value *, 32> partEsArgs;
 
-  // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
-  // attributes through memory
-  if (m_gfxIp.major >= 11 && deferredVertexExport) {
-    const auto attribCount =
-        m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)
-            ->inOutUsage.expCount;
-    if (attribCount > 0) {
-      partEsArgs.push_back(m_nggInputs.attribRingBase);
-      partEsArgs.push_back(m_nggInputs.threadIdInSubgroup);
-    }
-  }
+  if (!m_pipelineState->exportAttributeByExportInstruction() && deferredVertexExport)
+    appendAttributeThroughMemoryArguments(partEsArgs);
 
   if (deferredVertexExport)
     partEsArgs.push_back(position); // Setup vertex position data as the additional argument
@@ -3421,7 +3407,8 @@ void NggPrimShader::splitEs() {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
       expFuncs.push_back(&func);
     else if (m_gfxIp.major >= 11) {
-      if (func.getName().starts_with(lgcName::NggAttribExport) || func.getName().starts_with(lgcName::NggXfbExport))
+      if (func.getName().starts_with(lgcName::NggAttributeThroughMemory) ||
+          func.getName().starts_with(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     }
   }
@@ -3592,8 +3579,8 @@ void NggPrimShader::splitEs() {
     }
   }
 
-  if (m_gfxIp.major >= 11)
-    processVertexAttribExport(esVertexExporter);
+  if (!m_pipelineState->exportAttributeByExportInstruction())
+    exportVertexAttributeThroughMemory(esVertexExporter);
 
   // Remove original ES since it is no longer needed
   assert(m_esHandlers.main->use_empty());
@@ -3851,13 +3838,8 @@ void NggPrimShader::runCopyShader(ArrayRef<Argument *> args) {
   SmallVector<Value *, 32> copyShaderArgs;
 
   if (m_gfxIp.major >= 11) {
-    // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
-    // attributes through memory
-    const auto attribCount = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.expCount;
-    if (attribCount > 0) {
-      copyShaderArgs.push_back(m_nggInputs.attribRingBase);
-      copyShaderArgs.push_back(m_nggInputs.threadIdInSubgroup);
-    }
+    if (!m_pipelineState->exportAttributeByExportInstruction())
+      appendAttributeThroughMemoryArguments(copyShaderArgs);
 
     // Global table
     auto userData = args[NumSpecialSgprInputs];
@@ -3876,8 +3858,8 @@ void NggPrimShader::runCopyShader(ArrayRef<Argument *> args) {
 // =====================================================================================================================
 // Mutates copy shader to handle the reading GS outputs from GS-VS ring.
 void NggPrimShader::mutateCopyShader() {
-  if (m_gfxIp.major >= 11)
-    processVertexAttribExport(m_gsHandlers.copyShader);
+  if (!m_pipelineState->exportAttributeByExportInstruction())
+    exportVertexAttributeThroughMemory(m_gsHandlers.copyShader);
 
   IRBuilder<>::InsertPointGuard guard(m_builder);
 
@@ -6104,14 +6086,15 @@ Value *NggPrimShader::ballot(Value *value) {
 }
 
 // =====================================================================================================================
-// Processes vertex attribute export calls in the target function. We mutate the argument list of the target function
+// Export vertex attribute through memory (ATM) by handing the calls. We mutate the argument list of the target function
 // by adding two additional arguments (one is attribute ring base and the other is relative vertex index in subgroup).
 // Also, we expand all export calls by replacing it with real instructions that do vertex attribute exporting through
 // memory.
 //
 // @param [in/out] target : Target function to process vertex attribute export
-void NggPrimShader::processVertexAttribExport(Function *&target) {
-  assert(m_gfxIp.major >= 11); // For GFX11+
+void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
+  assert(m_gfxIp.major >= 11);                                    // For GFX11+
+  assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
 
   ShaderStageEnum shaderStage =
       m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
@@ -6156,7 +6139,7 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
   SmallVector<CallInst *, 8> removedCalls;
 
   for (auto &func : target->getParent()->functions()) {
-    if (func.getName().starts_with(lgcName::NggAttribExport)) {
+    if (func.getName().starts_with(lgcName::NggAttributeThroughMemory)) {
       for (auto user : func.users()) {
         CallInst *const call = dyn_cast<CallInst>(user);
         assert(call);
@@ -6262,6 +6245,28 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
+}
+
+// =====================================================================================================================
+// Append additional arguments to the argument list for attribute-through-memory (ATM) of the specified shader stage.
+// Currently, two arguments are required to do attribute-through-memory: (1) the attribute ring base; (2) relative
+// vertex index in NGG subgroup.
+//
+// @param [in/out] args : The arguments that will be appended to
+void NggPrimShader::appendAttributeThroughMemoryArguments(SmallVectorImpl<llvm::Value *> &args) {
+  assert(m_gfxIp.major >= 11);                                    // For GFX11+
+  assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
+
+  const auto attribCount =
+      m_pipelineState
+          ->getShaderResourceUsage(m_hasGs ? ShaderStage::Geometry
+                                           : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex))
+          ->inOutUsage.expCount;
+  if (attribCount == 0)
+    return; // No attributes
+
+  args.push_back(m_nggInputs.attribRingBase);
+  args.push_back(m_nggInputs.threadIdInSubgroup);
 }
 
 // =====================================================================================================================
@@ -7198,7 +7203,8 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
         expFuncs.push_back(&func);
     } else {
       if ((func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) ||
-          func.getName().starts_with(lgcName::NggAttribExport) || func.getName().starts_with(lgcName::NggXfbExport))
+          func.getName().starts_with(lgcName::NggAttributeThroughMemory) ||
+          func.getName().starts_with(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     }
   }
@@ -7215,7 +7221,9 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   Function *xfbFetcher = target;
   if (dontClone) {
-    processVertexAttribExport(target);
+    if (!m_pipelineState->exportAttributeByExportInstruction())
+      exportVertexAttributeThroughMemory(target);
+
     xfbFetcher = addFunctionArgs(target, xfbReturnTy, {}, {}, 0);
 
     // Original target function is no longer needed
@@ -7425,16 +7433,9 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   // If we don't clone the target function, we are going to run it and handle vertex attribute through memory here.
   if (dontClone) {
-    // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
-    // attributes through memory
-    if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
-      const auto attribCount =
-          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)
-              ->inOutUsage.expCount;
-      if (attribCount > 0) {
-        xfbFetcherArgs.push_back(m_nggInputs.attribRingBase);
-        xfbFetcherArgs.push_back(m_nggInputs.threadIdInSubgroup);
-      }
+    if (!m_pipelineState->exportAttributeByExportInstruction()) {
+      if (!m_hasGs) // For GS, ATM is done in copy shader
+        appendAttributeThroughMemoryArguments(xfbFetcherArgs);
     }
   }
 

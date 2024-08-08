@@ -51,6 +51,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .kill_enable:    false
 ; CHECK-NEXT:         .mask_export_enable: false
 ; CHECK-NEXT:         .pre_shader_depth_coverage_enable: 0
+; CHECK-NEXT:         .primitive_ordered_pixel_shader: false
 ; CHECK-NEXT:         .stencil_test_val_export_enable: 0
 ; CHECK-NEXT:         .z_export_enable: 0
 ; CHECK-NEXT:         .z_order:        0x1

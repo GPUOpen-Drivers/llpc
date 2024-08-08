@@ -80,6 +80,31 @@ CallInst *BuilderCommon::CreateNamedCall(StringRef funcName, Type *retTy, ArrayR
   return CompilerUtils::createNamedCall(*this, funcName, retTy, args, attribs, instName);
 }
 
+// Create an llvm.assume call to annotate the dereferenceable and alignment attributes of the pointer. We only insert
+// the call if dereferenceable > 0 or align > 1.
+//
+// @param ptr : The pointer to be annotated.
+// @param dereferenceable : the dereferenceable size (in bytes) of the pointer
+// @param align : the alignment of the pointer.
+CallInst *BuilderCommon::CreateAssumptionDereferenceableAndAlign(Value *ptr, unsigned dereferenceable, unsigned align) {
+  SmallVector<OperandBundleDef> Ops;
+  if (align > 1) {
+    OperandBundleDefT<Value *> alignOpB("align", std::vector<Value *>{ptr, getInt32(align)});
+    Ops.push_back(alignOpB);
+  }
+
+  if (dereferenceable > 0) {
+    OperandBundleDefT<Value *> dereferenceableOpB("dereferenceable",
+                                                  std::vector<Value *>{ptr, getInt32(dereferenceable)});
+    Ops.push_back(dereferenceableOpB);
+  }
+
+  if (Ops.empty())
+    return nullptr;
+
+  return CreateAssumption(getTrue(), Ops);
+}
+
 // =====================================================================================================================
 // Emits a amdgcn.reloc.constant intrinsic that represents a relocatable i32 value with the given symbol name
 //

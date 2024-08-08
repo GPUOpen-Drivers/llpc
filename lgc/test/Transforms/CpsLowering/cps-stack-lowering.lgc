@@ -69,7 +69,7 @@ define void @test.0({} %unused) !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} {
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp ne i32 [[TMP42]], 0
 ; CHECK-NEXT:    [[TMP44:%.*]] = select i1 [[TMP43]], i32 [[TMP42]], i32 [[TMP40]]
 ; CHECK-NEXT:    [[TMP45:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP44]], i1 true)
-; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP29]], i32 [[TMP45]])
+; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP29]], i32 [[TMP45]])
 ; CHECK-NEXT:    [[TMP47:%.*]] = icmp eq i32 [[TMP29]], [[TMP46]]
 ; CHECK-NEXT:    [[TMP48:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP47]])
 ; CHECK-NEXT:    [[TMP49:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP46]])
@@ -171,7 +171,7 @@ define void @test.1({} %no_state, ptr addrspace(32) %p2, i32 %q1) !lgc.cps !{i32
 ; CHECK-NEXT:    [[TMP34:%.*]] = icmp ne i32 [[TMP33]], 0
 ; CHECK-NEXT:    [[TMP35:%.*]] = select i1 [[TMP34]], i32 [[TMP33]], i32 [[TMP31]]
 ; CHECK-NEXT:    [[TMP36:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP35]], i1 true)
-; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP20]], i32 [[TMP36]])
+; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP20]], i32 [[TMP36]])
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i32 [[TMP20]], [[TMP37]]
 ; CHECK-NEXT:    [[TMP39:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP38]])
 ; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP37]])
@@ -269,7 +269,7 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ; CHECK-NEXT:    [[TMP37:%.*]] = icmp ne i32 [[TMP36]], 0
 ; CHECK-NEXT:    [[TMP38:%.*]] = select i1 [[TMP37]], i32 [[TMP36]], i32 [[TMP34]]
 ; CHECK-NEXT:    [[TMP39:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP38]], i1 true)
-; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP23]], i32 [[TMP39]])
+; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP23]], i32 [[TMP39]])
 ; CHECK-NEXT:    [[TMP41:%.*]] = icmp eq i32 [[TMP23]], [[TMP40]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP41]])
 ; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP40]])
@@ -392,7 +392,7 @@ define void @test.gep({} %unused) !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} {
 ; CHECK-NEXT:    [[TMP52:%.*]] = icmp ne i32 [[TMP51]], 0
 ; CHECK-NEXT:    [[TMP53:%.*]] = select i1 [[TMP52]], i32 [[TMP51]], i32 [[TMP49]]
 ; CHECK-NEXT:    [[TMP54:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP53]], i1 true)
-; CHECK-NEXT:    [[TMP55:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP38]], i32 [[TMP54]])
+; CHECK-NEXT:    [[TMP55:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP38]], i32 [[TMP54]])
 ; CHECK-NEXT:    [[TMP56:%.*]] = icmp eq i32 [[TMP38]], [[TMP55]]
 ; CHECK-NEXT:    [[TMP57:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP56]])
 ; CHECK-NEXT:    [[TMP58:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP55]])
@@ -509,7 +509,7 @@ define void @test.nested.gep({} %unused) !lgc.cps !{i32 1} !lgc.shaderstage !{i3
 ; CHECK-NEXT:    [[TMP40:%.*]] = icmp ne i32 [[TMP39]], 0
 ; CHECK-NEXT:    [[TMP41:%.*]] = select i1 [[TMP40]], i32 [[TMP39]], i32 [[TMP37]]
 ; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP41]], i1 true)
-; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP26]], i32 [[TMP42]])
+; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP26]], i32 [[TMP42]])
 ; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i32 [[TMP26]], [[TMP43]]
 ; CHECK-NEXT:    [[TMP45:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP44]])
 ; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP43]])
@@ -607,7 +607,7 @@ define void @test.i64.reference({} %no_state, ptr addrspace(32) %p2, i32 %q1) !l
 ; CHECK-NEXT:    [[TMP34:%.*]] = icmp ne i32 [[TMP33]], 0
 ; CHECK-NEXT:    [[TMP35:%.*]] = select i1 [[TMP34]], i32 [[TMP33]], i32 [[TMP31]]
 ; CHECK-NEXT:    [[TMP36:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP35]], i1 true)
-; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP20]], i32 [[TMP36]])
+; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP20]], i32 [[TMP36]])
 ; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i32 [[TMP20]], [[TMP37]]
 ; CHECK-NEXT:    [[TMP39:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP38]])
 ; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP37]])

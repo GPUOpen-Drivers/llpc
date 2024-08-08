@@ -73,6 +73,7 @@ LLPC_LOOP_PASS("lgc-patch-loop-metadata", PatchLoopMetadata)
 LLPC_FUNCTION_PASS("lgc-patch-buffer-op", PatchBufferOp)
 LLPC_MODULE_PASS("lgc-patch-workarounds", PatchWorkarounds)
 LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
+LLPC_FUNCTION_PASS("lgc-patch-mul-dx9-zero", PatchMulDx9Zero)
 LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
 LLPC_MODULE_PASS("lgc-patch-tcs-passthrough-shader", TcsPassthroughShader)
 LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
@@ -84,6 +85,7 @@ LLPC_MODULE_PASS("lgc-lower-desc", LowerDesc)
 LLPC_FUNCTION_PASS("lgc-combine-cooperative-matrix", CombineCooperativeMatrix)
 LLPC_MODULE_PASS("lgc-lower-cooperative-matrix", LowerCooperativeMatrix)
 LLPC_MODULE_PASS("lgc-lower-gpurt", LowerGpuRt)
+LLPC_MODULE_PASS("lgc-lower-rayquery", LowerRayQueryWrapper)
 
 #undef LLPC_PASS
 #undef LLPC_LOOP_PASS

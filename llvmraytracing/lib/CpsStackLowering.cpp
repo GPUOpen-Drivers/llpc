@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -25,23 +25,23 @@
 
 #include "llvmraytracing/CpsStackLowering.h"
 #include "compilerutils/CompilerUtils.h"
-#include "lgc/LgcCpsDialect.h"
-#include "lgc/LgcRtDialect.h"
-#include "llvm-dialects/Dialect/Builder.h"
-#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 
+using namespace CompilerUtils;
 using namespace llvm;
 using namespace lgc::cps;
 
 LLVM_DIALECTS_VISITOR_PAYLOAD_PROJECT_FIELD(CpsStackLowering, TypeLower)
 
-SmallVector<Type *>
-CpsStackLowering::convertStackPtrToI32(TypeLowering &TypeLower, Type *Ty) {
+SmallVector<Type *> CpsStackLowering::convertStackPtrToI32(TypeLowering &TypeLower, Type *Ty) {
   SmallVector<Type *> Types;
 
   if (auto *PtrTy = dyn_cast<PointerType>(Ty)) {
@@ -63,9 +63,7 @@ CpsStackLowering::convertStackPtrToI32(TypeLowering &TypeLower, Type *Ty) {
 //                     stack pointer. TODO Remove this argument. This function
 //                     should be responsible for adding the alloca.
 // @return: The new function, if Function was mutated, or the Function argument.
-Function *CpsStackLowering::lowerCpsStackOps(Function *Func,
-                                             Function *GetGlobalMemBase,
-                                             bool RequiresIncomingCsp,
+Function *CpsStackLowering::lowerCpsStackOps(Function *Func, Function *GetGlobalMemBase, bool RequiresIncomingCsp,
                                              llvm::Value *CspStorage) {
   Mod = Func->getParent();
   StackSizeInBytes = 0;
@@ -75,8 +73,8 @@ Function *CpsStackLowering::lowerCpsStackOps(Function *Func,
   else
     Func = addOrInitCsp(Func, GetGlobalMemBase, RequiresIncomingCsp);
 
-  TypeLower.addRule(std::bind(&CpsStackLowering::convertStackPtrToI32, this,
-                              std::placeholders::_1, std::placeholders::_2));
+  TypeLower.addRule(
+      std::bind(&CpsStackLowering::convertStackPtrToI32, this, std::placeholders::_1, std::placeholders::_2));
   if (lgc::cps::isCpsFunction(*Func))
     Func = TypeLower.lowerFunctionArguments(*Func);
 
@@ -93,12 +91,12 @@ Function *CpsStackLowering::lowerCpsStackOps(Function *Func,
                                   .add(&CpsStackLowering::visitBitCastInst)
                                   .add(&CpsStackLowering::visitLoad)
                                   .add(&CpsStackLowering::visitStore)
+                                  .add(&CpsStackLowering::visitContinue)
+                                  .add(&CpsStackLowering::visitWaitContinue)
                                   .build();
   Visitor.visit(*this, *Func);
   TypeLower.finishPhis();
   TypeLower.finishCleanup();
-
-  visitContinueCalls(Func);
 
   CpsStackAlloca = nullptr;
 
@@ -124,21 +122,18 @@ void CpsStackLowering::visitGetElementPtr(GetElementPtrInst &GEP) {
   APInt ConstantOffset{BitWidth, 0};
   MapVector<Value *, APInt> VariableOffsets;
 
-  [[maybe_unused]] bool Success =
-      GEP.collectOffset(DL, BitWidth, VariableOffsets, ConstantOffset);
+  [[maybe_unused]] bool Success = GEP.collectOffset(DL, BitWidth, VariableOffsets, ConstantOffset);
   assert(Success && "CpsStackLowering::visitGetElementPtr: GEP.collectOffset "
                     "did not succeed!");
 
   if (ConstantOffset.getSExtValue() != 0)
-    AddChain = Builder.CreateAdd(
-        AddChain, Builder.getInt32(ConstantOffset.getSExtValue()));
+    AddChain = Builder.CreateAdd(AddChain, Builder.getInt32(ConstantOffset.getSExtValue()));
 
   for (const auto &[Index, Scaling] : VariableOffsets) {
     Value *ScaledVal = Index;
 
     if (Scaling.getSExtValue() != 1)
-      ScaledVal = Builder.CreateMul(ScaledVal,
-                                    Builder.getInt32(Scaling.getSExtValue()));
+      ScaledVal = Builder.CreateMul(ScaledVal, Builder.getInt32(Scaling.getSExtValue()));
 
     AddChain = Builder.CreateAdd(AddChain, ScaledVal);
   }
@@ -159,8 +154,7 @@ void CpsStackLowering::visitLoad(LoadInst &Load) {
   IRBuilder<> Builder(&Load);
   Values[0] = getRealMemoryAddress(Builder, Values[0]);
 
-  Values[0] = Builder.CreateBitCast(
-      Values[0], Load.getType()->getPointerTo(getLoweredCpsStackAddrSpace()));
+  Values[0] = Builder.CreateBitCast(Values[0], Load.getType()->getPointerTo(getLoweredCpsStackAddrSpace()));
 
   Load.replaceUsesOfWith(Load.getPointerOperand(), Values[0]);
 }
@@ -178,58 +172,28 @@ void CpsStackLowering::visitStore(llvm::StoreInst &Store) {
   IRBuilder<> Builder(&Store);
   Values[0] = getRealMemoryAddress(Builder, Values[0]);
 
-  Values[0] = Builder.CreateBitCast(
-      Values[0], Store.getValueOperand()->getType()->getPointerTo(
-                     getLoweredCpsStackAddrSpace()));
+  Values[0] =
+      Builder.CreateBitCast(Values[0], Store.getValueOperand()->getType()->getPointerTo(getLoweredCpsStackAddrSpace()));
 
   Store.replaceUsesOfWith(Store.getPointerOperand(), Values[0]);
 }
 
 // =====================================================================================================================
-// Add stack pointer to continue calls
+// Add stack pointer to a lgc.ilcps.continue call
 //
-// @param Func: the function where stack pointers should be added to continue
-//              calls
-void CpsStackLowering::visitContinueCalls(llvm::Function *Func) {
-  llvm::forEachTerminator(
-      Func, {Instruction::Unreachable, Instruction::Ret},
-      [&](Instruction &Terminator) {
-        auto *BB = Terminator.getParent();
-        if (&Terminator != &*BB->begin()) {
-          auto Before = --Terminator.getIterator();
-          if (auto *CInst = dyn_cast<CallInst>(Before)) {
-            if (auto *Func = CInst->getCalledFunction()) {
-              auto Name = Func->getName();
-              if (Name.starts_with("continuation.continue") ||
-                  Name.starts_with("continuation.waitContinue"))
-                visitContinueCall(*CInst);
-            }
-          }
-        }
-      });
+// @param Continue: the instruction
+void CpsStackLowering::visitContinue(lgc::ilcps::ContinueOp &Continue) {
+  IRBuilder<> Builder(&Continue);
+  Continue.setCsp(loadCsp(Builder));
 }
 
 // =====================================================================================================================
-// Add stack pointer to continue call
+// Add stack pointer to a lgc.ilcps.waitContinue call
 //
-// @param CInst: the continue call
-void CpsStackLowering::visitContinueCall(llvm::CallInst &CInst) {
-  auto *Func = CInst.getCalledFunction();
-  auto Name = Func->getName();
-  SmallVector<Value *> NewCallArgs{CInst.args()};
-  IRBuilder<> Builder(&CInst);
-
-  // If the function does not use the stack, pass-through the CSP argument.
-  Value *Csp = Builder.CreateLoad(Builder.getInt32Ty(), CpsStackAlloca);
-
-  bool IsWaitContinue = Name.contains("waitContinue");
-  const size_t CspInsertIndex = IsWaitContinue ? 2 : 1;
-  NewCallArgs.insert(NewCallArgs.begin() + CspInsertIndex, Csp);
-
-  auto *NewCall = Builder.CreateCall(Func, NewCallArgs);
-  CInst.replaceAllUsesWith(NewCall);
-  NewCall->copyMetadata(CInst);
-  CInst.eraseFromParent();
+// @param WaitContinue: the instruction
+void CpsStackLowering::visitWaitContinue(lgc::ilcps::WaitContinueOp &WaitContinue) {
+  IRBuilder<> Builder(&WaitContinue);
+  WaitContinue.setCsp(loadCsp(Builder));
 }
 
 // =====================================================================================================================
@@ -262,13 +226,11 @@ void CpsStackLowering::visitIntToPtrInst(llvm::IntToPtrInst &Int2Ptr) {
 // @param BC: the instruction
 void CpsStackLowering::visitBitCastInst(llvm::BitCastInst &BC) {
   Type *SrcTy = BC.getOperand(0)->getType();
-  if (!SrcTy->isPointerTy() ||
-      cast<PointerType>(SrcTy)->getAddressSpace() != lgc::cps::stackAddrSpace)
+  if (!SrcTy->isPointerTy() || cast<PointerType>(SrcTy)->getAddressSpace() != lgc::cps::stackAddrSpace)
     return;
 
   Type *DstTy = BC.getType();
-  if (!DstTy->isPointerTy() ||
-      cast<PointerType>(DstTy)->getAddressSpace() != lgc::cps::stackAddrSpace)
+  if (!DstTy->isPointerTy() || cast<PointerType>(DstTy)->getAddressSpace() != lgc::cps::stackAddrSpace)
     return;
 
   auto Values = TypeLower.getValue(BC.getOperand(0));
@@ -282,8 +244,7 @@ void CpsStackLowering::visitBitCastInst(llvm::BitCastInst &BC) {
 void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
   IRBuilder<> Builder(&AllocOp);
 
-  Value *VSP =
-      Builder.CreateLoad(CpsStackAlloca->getAllocatedType(), CpsStackAlloca);
+  Value *VSP = loadCsp(Builder);
 
   Value *Size = AllocOp.getSize();
   int AlignedSize = cast<ConstantInt>(Size)->getSExtValue();
@@ -305,8 +266,7 @@ void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
 void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
   IRBuilder<> Builder(&FreeOp);
 
-  Value *VSP =
-      Builder.CreateLoad(CpsStackAlloca->getAllocatedType(), CpsStackAlloca);
+  Value *VSP = loadCsp(Builder);
 
   Value *Size = FreeOp.getSize();
   int AlignedSize = cast<ConstantInt>(Size)->getSExtValue();
@@ -326,8 +286,7 @@ void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
 void CpsStackLowering::visitCpsPeek(lgc::cps::PeekOp &PeekOp) {
   IRBuilder<> Builder(&PeekOp);
 
-  auto *Ptr =
-      Builder.CreateLoad(CpsStackAlloca->getAllocatedType(), CpsStackAlloca);
+  auto *Ptr = loadCsp(Builder);
   auto *Size = PeekOp.getSize();
 
   int ImmSize = cast<ConstantInt>(Size)->getSExtValue();
@@ -360,9 +319,7 @@ void CpsStackLowering::visitSetVsp(lgc::cps::SetVspOp &SetVsp) {
 // @param GetVsp: the instruction
 void CpsStackLowering::visitGetVsp(lgc::cps::GetVspOp &GetVsp) {
   IRBuilder<> B(&GetVsp);
-
-  auto *Ptr = B.CreateLoad(CpsStackAlloca->getAllocatedType(), CpsStackAlloca);
-  TypeLower.replaceInstruction(&GetVsp, {Ptr});
+  TypeLower.replaceInstruction(&GetVsp, {loadCsp(B)});
 }
 
 // =====================================================================================================================
@@ -374,12 +331,10 @@ void CpsStackLowering::visitGetVsp(lgc::cps::GetVspOp &GetVsp) {
 // @param Offset: The offset to the base address, given as integer with bitwidth
 // <= 32.
 //
-Value *CpsStackLowering::getRealMemoryAddress(IRBuilder<> &Builder,
-                                              Value *Offset) {
+Value *CpsStackLowering::getRealMemoryAddress(IRBuilder<> &Builder, Value *Offset) {
   // Since we are using at most 32-bit offsets, assert that we don't put in any
   // offset larger 32 bit.
-  assert(Offset->getType()->isIntegerTy() &&
-         Offset->getType()->getIntegerBitWidth() <= 32);
+  assert(Offset->getType()->isIntegerTy() && Offset->getType()->getIntegerBitWidth() <= 32);
 
   // Create a byte-addressed GEP the global memory address + offset or just the
   // offset. Note: Don't currently return a inttoptr because the translator
@@ -389,8 +344,7 @@ Value *CpsStackLowering::getRealMemoryAddress(IRBuilder<> &Builder,
 
   Type *I8 = Builder.getInt8Ty();
   if (isa<ConstantPointerNull>(BasePointer)) {
-    GepBase = Builder.CreateIntToPtr(
-        Offset, I8->getPointerTo(getLoweredCpsStackAddrSpace()));
+    GepBase = Builder.CreateIntToPtr(Offset, I8->getPointerTo(getLoweredCpsStackAddrSpace()));
     GepIndex = Builder.getInt32(0);
   }
 
@@ -404,9 +358,7 @@ Value *CpsStackLowering::getRealMemoryAddress(IRBuilder<> &Builder,
 // @param GetGlobalMemBase: Get the base address for the stack.
 //                          `nullptr` if there is no base address and the csp
 //                          can be converted with ptrtoint.
-Function *CpsStackLowering::addOrInitCsp(Function *F,
-                                         Function *GetGlobalMemBase,
-                                         bool RequiresIncomingCsp) {
+Function *CpsStackLowering::addOrInitCsp(Function *F, Function *GetGlobalMemBase, bool RequiresIncomingCsp) {
   CompilerUtils::CrossModuleInliner CrossInliner;
   auto &GpurtContext = lgc::GpurtContext::get(Mod->getContext());
   auto &GpurtLibrary = GpurtContext.theModule ? *GpurtContext.theModule : *Mod;
@@ -424,8 +376,7 @@ Function *CpsStackLowering::addOrInitCsp(Function *F,
     const size_t CspArgIndex = lgc::cps::isCpsFunction(*F) ? 1 : 0;
     NewArgTys.insert(NewArgTys.begin() + CspArgIndex, Builder.getInt32Ty());
 
-    Function *NewFunc = CompilerUtils::mutateFunctionArguments(
-        *F, F->getReturnType(), NewArgTys, F->getAttributes());
+    Function *NewFunc = CompilerUtils::mutateFunctionArguments(*F, F->getReturnType(), NewArgTys, F->getAttributes());
 
     Argument *CspArg = NewFunc->getArg(CspArgIndex);
     CspArg->setName("cspInit");
@@ -443,14 +394,11 @@ Function *CpsStackLowering::addOrInitCsp(Function *F,
     F->eraseFromParent();
 
     F = NewFunc;
-  } else if (lgc::rt::getLgcRtShaderStage(F) !=
-             lgc::rt::RayTracingShaderStage::KernelEntry) {
+  } else if (lgc::rt::getLgcRtShaderStage(F) != lgc::rt::RayTracingShaderStage::KernelEntry) {
     // Init csp through intrinsic
-    auto *InitFun =
-        GpurtLibrary.getFunction(ContDriverFunc::GetContinuationStackAddrName);
+    auto *InitFun = GpurtLibrary.getFunction(ContDriverFunc::GetContinuationStackAddrName);
     assert(InitFun && "_cont_GetContinuationStackAddr not found.");
-    assert(InitFun->arg_size() == 0 &&
-           InitFun->getReturnType()->isIntegerTy(32));
+    assert(InitFun->arg_size() == 0 && InitFun->getReturnType()->isIntegerTy(32));
 
     Initializer = CrossInliner.inlineCall(Builder, InitFun).returnValue;
   }
@@ -461,10 +409,13 @@ Function *CpsStackLowering::addOrInitCsp(Function *F,
   // Get the global memory base address.
   if (GetGlobalMemBase) {
     auto *Base = CrossInliner.inlineCall(Builder, GetGlobalMemBase).returnValue;
-    auto *CspTy =
-        Builder.getInt8Ty()->getPointerTo(getLoweredCpsStackAddrSpace());
+    auto *CspTy = Builder.getInt8Ty()->getPointerTo(getLoweredCpsStackAddrSpace());
     setRealBasePointer(Builder.CreateIntToPtr(Base, CspTy));
   }
 
   return F;
+}
+
+Value *CpsStackLowering::loadCsp(IRBuilder<> &Builder) {
+  return Builder.CreateLoad(CpsStackAlloca->getAllocatedType(), CpsStackAlloca);
 }

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 
@@ -49,21 +50,28 @@ public:
   using iterator = llvm::pointee_iterator<ArrayRef<std::unique_ptr<Module>>::iterator>;
 
   // Access the Modules in the ModuleBunch, without erasing/removing/replacing them.
-  iterator begin() const { return iterator(Modules.begin()); }
-  iterator end() const { return iterator(Modules.end()); }
+  iterator begin() const {
+    assert(isNormalized());
+    return iterator(Modules.begin());
+  }
+  iterator end() const {
+    assert(isNormalized());
+    return iterator(Modules.end());
+  }
   size_t size() const { return end() - begin(); }
   bool empty() const { return size() == 0; }
 
   // Access the array of Modules in the ModuleBunch, directly accessing the unique_ptrs
   // for erasing/removing/replacing them.
   // After doing that, call renormalize() to remove any holes.
-  MutableArrayRef<std::unique_ptr<Module>> getMutableModules() {
-    assert(isNormalized());
-    return Modules;
-  }
+  MutableArrayRef<std::unique_ptr<Module>> getMutableModules() { return Modules; }
 
   // Add Module to ModuleBunch, taking ownership. Invalidates modules() iterator.
   void addModule(std::unique_ptr<Module> module);
+
+  // Remove Module from ModuleBunch, returning ownership to the caller.
+  // Returns empty unique_ptr if Module not found.
+  std::unique_ptr<Module> removeModule(const Module *moduleToRemove);
 
   // Renormalize ModuleBunch's array of Modules after manipulation by user.
   // Invalidates modules() iterator.
@@ -102,6 +110,12 @@ inline raw_ostream &operator<<(raw_ostream &O, const ModuleBunch &MB) {
   MB.print(O, nullptr);
   return O;
 }
+
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 503109
+template <> inline void printIRUnitNameForStackTrace<ModuleBunch>(raw_ostream &OS, const ModuleBunch &IR) {
+  OS << "Anonymous ModuleBunch \"";
+}
+#endif
 
 extern template class PassManager<ModuleBunch>;
 extern template class AnalysisManager<ModuleBunch>;

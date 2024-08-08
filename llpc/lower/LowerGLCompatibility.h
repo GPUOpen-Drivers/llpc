@@ -33,7 +33,9 @@
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcDialect.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 namespace Llpc {
 
@@ -67,6 +69,7 @@ private:
   bool needEmulateTwoSideLighting();
   bool needEmulateBitmap();
   bool needLowerFragColor();
+  bool needEmulateSmoothStipple();
   MDTuple *createInOutMd(const ShaderInOutMetadata &md);
   MDTuple *createBuiltInInOutMd(lgc::BuiltInKind builtIn);
   void createClipDistance();
@@ -82,6 +85,8 @@ private:
   void emulateDrawPixels();
   void emulateTwoSideLighting();
   void emulateBitmap();
+  void emulateSmoothStipple();
+  void patchAlphaScaling(Value *val, Type *valTy, Constant *metaVal, Value *alphaScaleVal);
   void lowerClipVertex();
   void lowerColor(llvm::User *color);
   void lowerFrontColor();

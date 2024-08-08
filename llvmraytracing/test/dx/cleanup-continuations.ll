@@ -7,6 +7,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %await_with_ret_value.Frame = type { i64 }
 %simple_await.Frame = type { i64 }
 %simple_await_entry.Frame = type { }
+%phi_of_cont_state.Frame = type { i32, i32 }
 
 declare %continuation.token* @async_fun()
 declare i32 @lgc.ilcps.getReturnValue__i32() #0
@@ -21,7 +22,7 @@ define { i8*, %continuation.token* } @simple_await(i64 %dummyRet, i8* %0) !conti
 ; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    store i64 -1, ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await.resume.0)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
 AllocaSpillBB:
@@ -43,7 +44,7 @@ define internal { i8*, %continuation.token* } @simple_await.resume.0(i8* noalias
 ; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr addrspace(32) [[DOTRELOAD_ADDR]], align 4
 ; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i64 poison, i64 undef), !continuation.registercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[DOTRELOAD]], i32 poison, i64 poison, i64 undef), !continuation.registercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
 entryresume.0:
@@ -62,7 +63,7 @@ define { i8*, %continuation.token* } @simple_await_entry(i64 %dummyRet, i8* %0) 
 ; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
 ; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await_entry.resume.0)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
 AllocaSpillBB:
@@ -101,7 +102,7 @@ define { i8*, %continuation.token* } @await_with_ret_value(i64 %dummyRet, i8* %0
 ; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    store i64 -1, ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @await_with_ret_value.resume.0)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP1]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP1]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
   %FramePtr = bitcast i8* %0 to %await_with_ret_value.Frame*
@@ -121,7 +122,7 @@ define internal { i8*, %continuation.token* } @await_with_ret_value.resume.0(i8*
 ; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
 ; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr addrspace(32) [[DOTRELOAD_ADDR]], align 4
 ; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i64 poison, i32 [[RES1]], i64 undef), !continuation.registercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[DOTRELOAD]], i32 poison, i64 poison, i32 [[RES1]], i64 undef), !continuation.registercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
   %FramePtr = bitcast i8* %0 to %await_with_ret_value.Frame*
@@ -130,6 +131,86 @@ define internal { i8*, %continuation.token* } @await_with_ret_value.resume.0(i8*
   %.reload = load i64, i64* %.reload.addr, align 4
   %res = call i32 @lgc.ilcps.getReturnValue__i32()
   call void (i64, ...) @lgc.ilcps.return(i64 %.reload, i32 %res, i64 undef), !continuation.registercount !4
+  unreachable
+}
+
+; unreachables in their own block added by switch case statements should be ignored
+define { i8*, %continuation.token* } @switch_case_unreachable(i64 %dummyRet, i8* %0) !continuation !6 !continuation.registercount !4 {
+; CHECK-LABEL: define void @switch_case_unreachable(
+; CHECK-SAME: i64 [[DUMMYRET:%.*]]) !continuation [[META7:![0-9]+]] !continuation.registercount [[META2]] !continuation.stacksize [[META3]] !continuation.state [[META3]] {
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]] to ptr addrspace(32)
+; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(32) [[FRAMEPTR]], i32 0, i32 0
+; CHECK-NEXT:    store i64 -1, ptr addrspace(32) [[DOTSPILL_ADDR]], align 4
+; CHECK-NEXT:    [[VAL:%.*]] = urem i64 [[DUMMYRET]], 2
+; CHECK-NEXT:    switch i64 [[VAL]], label [[UNREACHABLE:%.*]] [
+; CHECK-NEXT:      i64 0, label [[A:%.*]]
+; CHECK-NEXT:      i64 1, label [[B:%.*]]
+; CHECK-NEXT:    ]
+; CHECK:       unreachable:
+; CHECK-NEXT:    unreachable
+; CHECK:       b:
+; CHECK-NEXT:    br label [[A]]
+; CHECK:       a:
+; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
+; CHECK-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[DUMMYRET]], i32 poison, i64 poison, i32 5, i64 undef), !continuation.registercount [[META2]]
+; CHECK-NEXT:    unreachable
+;
+  %FramePtr = bitcast i8* %0 to %await_with_ret_value.Frame*
+  %.spill.addr = getelementptr inbounds %await_with_ret_value.Frame, %await_with_ret_value.Frame* %FramePtr, i32 0, i32 0
+  store i64 -1, i64* %.spill.addr, align 4
+  %val = urem i64 %dummyRet, 2
+  switch i64 %val, label %unreachable [
+  i64 0, label %a
+  i64 1, label %b
+  ]
+
+unreachable:
+  unreachable
+
+b:
+  br label %a
+
+a:
+  call void (i64, ...) @lgc.ilcps.return(i64 %dummyRet, i32 5, i64 undef), !continuation.registercount !4
+  unreachable
+}
+
+; Check that phis on the continuation state compile
+define { i8*, %continuation.token* } @phi_of_cont_state(i64 %dummyRet, ptr %FramePtr) !continuation !7 !continuation.registercount !4 {
+; CHECK-LABEL: define void @phi_of_cont_state(
+; CHECK-SAME: i64 [[DUMMYRET:%.*]]) !continuation [[META8:![0-9]+]] !continuation.registercount [[META2]] !continuation.stacksize [[META3]] !continuation.state [[META3]] {
+; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CHECK-NEXT:    [[COND:%.*]] = trunc i64 [[DUMMYRET]] to i1
+; CHECK-NEXT:    br i1 [[COND]], label [[LA:%.*]], label [[LB:%.*]]
+; CHECK:       la:
+; CHECK-NEXT:    [[A:%.*]] = getelementptr inbounds [[PHI_OF_CONT_STATE_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
+; CHECK-NEXT:    br label [[END:%.*]]
+; CHECK:       lb:
+; CHECK-NEXT:    [[B:%.*]] = getelementptr inbounds [[PHI_OF_CONT_STATE_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
+; CHECK-NEXT:    br label [[END]]
+; CHECK:       end:
+; CHECK-NEXT:    [[C:%.*]] = phi ptr addrspace(32) [ [[A]], [[LA]] ], [ [[B]], [[LB]] ]
+; CHECK-NEXT:    store i64 -1, ptr addrspace(32) [[C]], align 4
+; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
+; CHECK-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[DUMMYRET]], i32 poison, i64 poison, i32 5, i64 undef), !continuation.registercount [[META2]]
+; CHECK-NEXT:    unreachable
+;
+  %cond = trunc i64 %dummyRet to i1
+  br i1 %cond, label %la, label %lb
+
+la:
+  %a = getelementptr inbounds %phi_of_cont_state.Frame, ptr %FramePtr, i32 0, i32 0
+  br label %end
+
+lb:
+  %b = getelementptr inbounds %phi_of_cont_state.Frame, ptr %FramePtr, i32 0, i32 1
+  br label %end
+
+end:
+  %c = phi ptr [ %a, %la ], [ %b, %lb ]
+  store i64 -1, ptr %c, align 4
+  call void (i64, ...) @lgc.ilcps.return(i64 %dummyRet, i32 5, i64 undef), !continuation.registercount !4
   unreachable
 }
 
@@ -143,12 +224,15 @@ attributes #0 = { nounwind }
 !3 = !{{ i8*, %continuation.token* } (i8*)* @simple_await_entry}
 !4 = !{i32 0}
 !5 = !{i32 21}
+!6 = !{{ i8*, %continuation.token* } (i8*)* @switch_case_unreachable}
+!7 = !{{ i8*, %continuation.token* } (i8*)* @phi_of_cont_state}
 ;.
 ; CHECK: attributes #[[ATTR0:[0-9]+]] = { nounwind }
-; CHECK: attributes #[[ATTR1:[0-9]+]] = { noreturn }
-; CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: readwrite) }
-; CHECK: attributes #[[ATTR3:[0-9]+]] = { nounwind willreturn }
+; CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: readwrite) }
+; CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind willreturn }
+; CHECK: attributes #[[ATTR3:[0-9]+]] = { noreturn }
 ; CHECK: attributes #[[ATTR4:[0-9]+]] = { nounwind willreturn memory(inaccessiblemem: read) }
+; CHECK: attributes #[[ATTR5:[0-9]+]] = { noreturn nounwind }
 ;.
 ; CHECK: [[META0:![0-9]+]] = !{i32 21}
 ; CHECK: [[META1]] = !{ptr @simple_await}
@@ -157,4 +241,6 @@ attributes #0 = { nounwind }
 ; CHECK: [[META4]] = !{ptr @simple_await_entry}
 ; CHECK: [[META5]] = !{}
 ; CHECK: [[META6]] = !{ptr @await_with_ret_value}
+; CHECK: [[META7]] = !{ptr @switch_case_unreachable}
+; CHECK: [[META8]] = !{ptr @phi_of_cont_state}
 ;.

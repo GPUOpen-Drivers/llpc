@@ -285,14 +285,14 @@ private:
 public:
   // Create a buffer descriptor.
   llvm::Value *CreateBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                const llvm::Twine &instName = "") {
-    return createBufferDesc(descSet, binding, descIndex, flags, 0);
+                                bool convertFatPointer, const llvm::Twine &instName = "") {
+    return createBufferDesc(descSet, binding, descIndex, flags, 0, convertFatPointer);
   }
 
   // Create a strided buffer descriptor.
   llvm::Value *CreateStridedBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
                                        unsigned stride, const llvm::Twine &instName = "") {
-    return createBufferDesc(descSet, binding, descIndex, flags, stride);
+    return createBufferDesc(descSet, binding, descIndex, flags, stride, true);
   }
 
   // Create a get of the stride (in bytes) of a descriptor.
@@ -305,9 +305,6 @@ public:
 
   // Create a load of the push constants pointer.
   llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
-
-  // Calculate a buffer descriptor for an inline buffer
-  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr, unsigned stride);
 
   // Check whether vertex buffer descriptors are in a descriptor array binding instead of the VertexBufferTable.
   bool useVertexBufferDescArray();
@@ -331,7 +328,7 @@ private:
 
   // Create a buffer descriptor.
   llvm::Value *createBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                unsigned stride, const llvm::Twine &instName = "");
+                                unsigned stride, bool convertFatPointer, const llvm::Twine &instName = "");
   // -------------------------------------------------------------------------------------------------------------------
   // Image operations
 

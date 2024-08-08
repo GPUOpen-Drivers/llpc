@@ -273,6 +273,12 @@ template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModeStencilRefLessBackAMD, {CapabilityStencilExportEXT});
   ADD_VEC_INIT(ExecutionModeRequireFullQuadsKHR, {CapabilityQuadControlKHR});
   ADD_VEC_INIT(ExecutionModeQuadDerivativesKHR, {CapabilityQuadControlKHR});
+  ADD_VEC_INIT(ExecutionModePixelInterlockOrderedEXT, {CapabilityFragmentShaderPixelInterlockEXT});
+  ADD_VEC_INIT(ExecutionModePixelInterlockUnorderedEXT, {CapabilityFragmentShaderPixelInterlockEXT});
+  ADD_VEC_INIT(ExecutionModeSampleInterlockOrderedEXT, {CapabilityFragmentShaderSampleInterlockEXT});
+  ADD_VEC_INIT(ExecutionModeSampleInterlockUnorderedEXT, {CapabilityFragmentShaderSampleInterlockEXT});
+  ADD_VEC_INIT(ExecutionModeShadingRateInterlockOrderedEXT, {CapabilityFragmentShaderShadingRateInterlockEXT});
+  ADD_VEC_INIT(ExecutionModeShadingRateInterlockUnorderedEXT, {CapabilityFragmentShaderShadingRateInterlockEXT});
 }
 
 template <> inline void SPIRVMap<SPIRVMemoryModelKind, SPIRVCapVec>::init() {

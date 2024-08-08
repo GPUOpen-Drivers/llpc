@@ -2,29 +2,35 @@
 ; RUN: opt --verify-each -passes='lower-raytracing-pipeline,lint' -S %s --lint-abort-on-error | FileCheck %s
 
 %struct.DispatchSystemData = type { i32 }
+%struct.SystemData = type { %struct.DispatchSystemData }
 %struct.HitData = type { float, i32 }
+%struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 
-declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
-declare !types !13 i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hitKind)
+declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !13 i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hitKind)
+declare !pointeetys !15 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
 
 define void @main() !lgc.rt.shaderstage !10 {
 ; CHECK-LABEL: define %struct.DispatchSystemData @main(
-; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META6:![0-9]+]] {
+; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META6:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [30 x i32], align 4
+; CHECK-NEXT:    store [30 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 123, ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]]), !continuation.registercount [[META0]]
+; CHECK-NEXT:    [[TMP2:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], [8 x i32] poison, [30 x i32] [[TMP2]]), !continuation.registercount [[META0]]
 ; CHECK-NEXT:    unreachable
 ;
 entry:
   ret void
 }
 
-define void @_cont_ShaderStart(%struct.DispatchSystemData* %data) !types !11 {
+define void @_cont_ShaderStart(%struct.DispatchSystemData* %data) !pointeetys !11 {
 ; CHECK-LABEL: define void @_cont_ShaderStart(
-; CHECK-SAME: ptr [[DATA:%.*]]) !types [[META7:![0-9]+]] {
+; CHECK-SAME: ptr [[DATA:%.*]]) !pointeetys [[META3:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = getelementptr [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 0
 ; CHECK-NEXT:    store i32 123, ptr [[TMP0]], align 4
@@ -44,16 +50,17 @@ entry:
 !5 = !{i32 0}
 !6 = !{i32 0, i64 65536}
 !7 = !{i32 21}
-!8 = !{!"function", i32 poison, !9}
+!8 = !{%struct.DispatchSystemData poison}
 !9 = !{i32 0, %struct.DispatchSystemData poison}
 !10 = !{i32 1}
-!11 = !{!"function", !"void", !9}
+!11 = !{%struct.DispatchSystemData poison}
 !12 = !{i32 0, %struct.DispatchSystemData poison}
-!13 = !{!"function", <3 x i32> poison, !12}
+!13 = !{%struct.DispatchSystemData poison}
+!14 = !{i32 0, %struct.SystemData poison}
+!15 = !{%struct.SystemData poison}
 ;.
 ; CHECK: [[META0]] = !{i32 30}
-; CHECK: [[META4:![0-9]+]] = !{i32 0, %struct.DispatchSystemData poison}
+; CHECK: [[META3]] = !{%struct.DispatchSystemData poison}
 ; CHECK: [[META5]] = !{i32 1}
 ; CHECK: [[META6]] = !{ptr @main}
-; CHECK: [[META7]] = !{!"function", !"void", [[META4]]}
 ;.

@@ -34,6 +34,11 @@
 #include "llvm/IR/PassManager.h"
 #include <map>
 
+namespace llvm {
+class CallInst;
+class Value;
+} // namespace llvm
+
 namespace lgc {
 
 class BuilderImpl;

@@ -142,6 +142,12 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeRequireFullQuadsKHR, "RequireFullQuadsKHR");
   add(ExecutionModeFPFastMathDefault, "FPFastMathDefault");
   add(ExecutionModeMaximallyReconvergesKHR, "MaximallyReconvergesKHR");
+  add(ExecutionModePixelInterlockOrderedEXT, "PixelInterlockOrderedEXT");
+  add(ExecutionModePixelInterlockUnorderedEXT, "PixelInterlockUnorderedEXT");
+  add(ExecutionModeSampleInterlockOrderedEXT, "SampleInterlockOrderedEXT");
+  add(ExecutionModeSampleInterlockUnorderedEXT, "SampleInterlockUnorderedEXT");
+  add(ExecutionModeShadingRateInterlockOrderedEXT, "ShadingRateInterlockOrderedEXT");
+  add(ExecutionModeShadingRateInterlockUnorderedEXT, "ShadingRateInterlockUnorderedEXT");
 }
 SPIRV_DEF_NAMEMAP(ExecutionMode, SPIRVExecutionModeNameMap)
 
@@ -510,6 +516,9 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityGroupNonUniformRotateKHR, "GroupNonUniformRotateKHR");
   add(CapabilityQuadControlKHR, "QuadControlKHR");
   add(CapabilityFloatControls2, "FloatControls2");
+  add(CapabilityFragmentShaderSampleInterlockEXT, "FragmentShaderSampleInterlockEXT");
+  add(CapabilityFragmentShaderShadingRateInterlockEXT, "FragmentShaderShadingRateInterlockEXT");
+  add(CapabilityFragmentShaderPixelInterlockEXT, "FragmentShaderPixelInterlockEXT");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 

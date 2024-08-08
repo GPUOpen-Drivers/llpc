@@ -29,6 +29,7 @@
 #include "lgc/ModuleBunch.h"
 #include "llvm/IR/PassManagerImpl.h"
 #include "llvm/IR/PrintPasses.h"
+#include "llvm/Support/FormatVariadic.h"
 
 namespace llvm {
 
@@ -43,6 +44,16 @@ using namespace llvm;
 // Add Module to ModuleBunch, taking ownership.
 void ModuleBunch::addModule(std::unique_ptr<Module> module) {
   Modules.push_back(std::move(module));
+}
+
+// Remove Module from ModuleBunch, returning ownership to the caller.
+// Returns empty unique_ptr if Module not found.
+std::unique_ptr<Module> ModuleBunch::removeModule(const Module *moduleToRemove) {
+  for (std::unique_ptr<Module> &module : Modules) {
+    if (module && &*module == moduleToRemove)
+      return std::move(module);
+  }
+  return nullptr;
 }
 
 // Renormalize ModuleBunch's array of Modules after manipulation by user.
@@ -296,16 +307,6 @@ std::optional<std::vector<PassBuilder::PipelineElement>> MbPassBuilder::parsePip
 }
 
 // Copied from PassBuilder.cpp.
-static std::optional<int> parseRepeatPassName(StringRef Name) {
-  if (!Name.consume_front("repeat<") || !Name.consume_back(">"))
-    return std::nullopt;
-  int Count;
-  if (Name.getAsInteger(0, Count) || Count <= 0)
-    return std::nullopt;
-  return Count;
-}
-
-// Copied from PassBuilder.cpp.
 /// Tests whether registered callbacks will accept a given pass name.
 ///
 /// When parsing a pipeline text, the type of the outermost pipeline may be
@@ -339,9 +340,6 @@ template <typename CallbacksT> static bool isModuleBunchPassName(StringRef Name,
   if (Name == "coro-cond")
     return true;
 
-  // Explicitly handle custom-parsed pass names.
-  if (parseRepeatPassName(Name))
-    return true;
   return callbacksAcceptPassName<ModuleBunchPassManager>(Name, Callbacks);
 }
 
@@ -392,13 +390,6 @@ Error MbPassBuilder::parseModuleBunchPass(ModuleBunchPassManager &MBPM, const Pi
       if (auto Err = parseModuleBunchPassPipeline(NestedMBPM, InnerPipeline))
         return Err;
       MBPM.addPass(std::move(NestedMBPM));
-      return Error::success();
-    }
-    if (auto Count = parseRepeatPassName(Name)) {
-      ModuleBunchPassManager NestedMBPM;
-      if (auto Err = parseModuleBunchPassPipeline(NestedMBPM, InnerPipeline))
-        return Err;
-      MBPM.addPass(createRepeatedPass(*Count, std::move(NestedMBPM)));
       return Error::success();
     }
     // TODO:

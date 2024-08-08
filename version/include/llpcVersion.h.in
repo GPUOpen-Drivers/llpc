@@ -37,6 +37,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     74.0 | Replace LlpcRaytracingMode::None with LlpcRaytracingMode::Auto. Now LLPC can choose continuations mode|
+//  |          | automatically. Add isCps to RayTracingPipelineBuildOut to notify client continuations mode is chosen. |
+//  |     73.2 | Add imageSampleDrefReturnsRgba to ShaderOptions                                                       |
 //  |     73.0 | Add all the ogl specific pipeline options in a new structure GLState                                  |
 //  |     72.4 | Add enableFlatShade to GraphicsPipelineBuildInfo.                                                     |
 //  |     72.3 | Add enableColorClampVs and enableColorClampFs to GraphicsPipelineBuildInfo.                           |
@@ -183,10 +186,10 @@
 #pragma once
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 72
+#define LLPC_INTERFACE_MAJOR_VERSION 74
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

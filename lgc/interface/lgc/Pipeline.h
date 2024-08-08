@@ -196,6 +196,8 @@ union Options {
     bool forceFragColorDummyExport;                // Force dummy export is added to fragment shader color export.
     unsigned reserved22;
     bool dynamicTopology; // Whether primitive topology is dynamic.
+    bool reserved23;
+    bool forceUserDataSpill; // Whether to force all user data to be spilled (Currently only for RT).
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -312,6 +314,8 @@ union ShaderOptions {
     InvariantLoadsOption aggressiveInvariantLoads;
 
     bool reserved;
+    /// Let dmask bits be fully enabled when call 'image.sample.c', for depth compare mode swizzling workaround.
+    bool imageSampleDrefReturnsRgba;
   };
 };
 static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));
@@ -675,6 +679,7 @@ struct FragmentShaderMode {
   unsigned postDepthCoverage;
   unsigned earlyAndLatFragmentTests;
   unsigned innerCoverage;
+  unsigned enablePops;
   unsigned waveOpsExcludeHelperLanes;
   unsigned noReciprocalFragCoordW;
   ConservativeDepth conservativeDepth;

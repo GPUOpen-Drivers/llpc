@@ -156,6 +156,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchInvariantLoads.cpp
     patch/PatchLlvmIrInclusion.cpp
     patch/PatchLoadScalarizer.cpp
+    patch/PatchMulDx9Zero.cpp
     patch/PatchLoopMetadata.cpp
     patch/PatchNullFragShader.cpp
     patch/PatchPeepholeOpt.cpp
@@ -175,6 +176,7 @@ target_sources(LLVMlgc PRIVATE
     patch/CombineCooperativeMatrix.cpp
     patch/LowerCooperativeMatrix.cpp
     patch/LowerGpuRt.cpp
+    patch/LowerRayQueryWrapper.cpp
 )
 
 # lgc/state

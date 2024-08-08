@@ -12,8 +12,10 @@ function(set_compiler_options PROJECT_NAME)
 endfunction()
 
 add_llvm_library(LLVMCompilerUtils
+  lib/ArgPromotion.cpp
   lib/CompilerUtils.cpp
   lib/TypeLowering.cpp
+  lib/TypesMetadata.cpp
 
   DEPENDS
   intrinsics_gen

@@ -4,8 +4,7 @@
 declare i32 @_AmdGetRtip()
 
 %struct.DispatchSystemData = type { i32 }
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
-declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 @debug_global = external global i32
 
@@ -26,5 +25,4 @@ entry:
 
 !0 = !{i32 2}
 !1 = !{i32 0}
-!8 = !{!"function", i32 poison, !9}
-!9 = !{i32 0, %struct.DispatchSystemData poison}
+!8 = !{%struct.DispatchSystemData poison}

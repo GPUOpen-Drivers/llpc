@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -32,6 +32,7 @@
 
 #include "compilerutils/TypeLowering.h"
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
@@ -54,38 +55,29 @@ constexpr unsigned ContinuationStackAlignment = 4;
 
 class CpsStackLowering {
 public:
-  CpsStackLowering(llvm::LLVMContext &Context,
-                   unsigned LoweredCpsStackAddrSpace)
+  CpsStackLowering(llvm::LLVMContext &Context, unsigned LoweredCpsStackAddrSpace)
       : TypeLower(Context), LoweredCpsStackAddrSpace{LoweredCpsStackAddrSpace} {
-    BasePointer = llvm::ConstantPointerNull::get(llvm::PointerType::get(
-        llvm::Type::getInt8Ty(Context), LoweredCpsStackAddrSpace));
+    BasePointer = llvm::ConstantPointerNull::get(
+        llvm::PointerType::get(llvm::Type::getInt8Ty(Context), LoweredCpsStackAddrSpace));
   }
-  llvm::Function *lowerCpsStackOps(llvm::Function *Func,
-                                   llvm::Function *GetGlobalMemBase,
-                                   bool RequiresIncomingCsp,
+  llvm::Function *lowerCpsStackOps(llvm::Function *Func, llvm::Function *GetGlobalMemBase, bool RequiresIncomingCsp,
                                    llvm::Value *CspStorage = nullptr);
 
   // Get continuation stack size (in bytes).
   unsigned getStackSizeInBytes() { return StackSizeInBytes; }
 
-  inline unsigned getLoweredCpsStackAddrSpace() const {
-    return LoweredCpsStackAddrSpace;
-  }
+  inline unsigned getLoweredCpsStackAddrSpace() const { return LoweredCpsStackAddrSpace; }
 
-  inline unsigned
-  getLoweredCpsStackPointerSize(const llvm::DataLayout &Layout) {
+  inline unsigned getLoweredCpsStackPointerSize(const llvm::DataLayout &Layout) {
     return Layout.getPointerSize(LoweredCpsStackAddrSpace);
   }
 
-  static unsigned getContinuationStackAlignment() {
-    return ContinuationStackAlignment;
-  }
+  static unsigned getContinuationStackAlignment() { return ContinuationStackAlignment; }
 
-  TypeLowering TypeLower;
+  CompilerUtils::TypeLowering TypeLower;
 
 private:
-  llvm::SmallVector<llvm::Type *> convertStackPtrToI32(TypeLowering &,
-                                                       llvm::Type *);
+  llvm::SmallVector<llvm::Type *> convertStackPtrToI32(CompilerUtils::TypeLowering &, llvm::Type *);
   void visitCpsAlloc(lgc::cps::AllocOp &);
   void visitCpsFree(lgc::cps::FreeOp &);
   void visitCpsPeek(lgc::cps::PeekOp &);
@@ -97,12 +89,10 @@ private:
   void visitBitCastInst(llvm::BitCastInst &);
   void visitLoad(llvm::LoadInst &);
   void visitStore(llvm::StoreInst &);
+  void visitContinue(lgc::ilcps::ContinueOp &);
+  void visitWaitContinue(lgc::ilcps::WaitContinueOp &);
   llvm::Value *getRealMemoryAddress(llvm::IRBuilder<> &, llvm::Value *);
-  llvm::Function *addOrInitCsp(llvm::Function *F,
-                               llvm::Function *GetGlobalMemBase,
-                               bool RequiresIncomingCsp);
-  void visitContinueCalls(llvm::Function *);
-  void visitContinueCall(llvm::CallInst &);
+  llvm::Function *addOrInitCsp(llvm::Function *F, llvm::Function *GetGlobalMemBase, bool RequiresIncomingCsp);
 
   // Register a base pointer in the CpsStackLowering.
   // This is used to set the base address when using a stack residing in global
@@ -112,9 +102,9 @@ private:
   // corresponding CSP as offset for the source / dest addresses. In case
   // @setRealBasePointer never was called, this just creates a pointer out of an
   // offset.
-  void setRealBasePointer(llvm::Value *BasePointer) {
-    this->BasePointer = BasePointer;
-  }
+  void setRealBasePointer(llvm::Value *BasePointer) { this->BasePointer = BasePointer; }
+
+  llvm::Value *loadCsp(llvm::IRBuilder<> &Builder);
 
   llvm::Module *Mod;
   llvm::AllocaInst *CpsStackAlloca = nullptr;

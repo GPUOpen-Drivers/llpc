@@ -3,14 +3,15 @@
 ; CHECK: ERROR: Did not find function '' requested by _AmdGetFuncAddr
 
 %struct.DispatchSystemData = type { i32 }
+%struct.TraversalData = type { }
 
 declare i64 @_AmdGetFuncAddr()
 
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
+declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !11 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
-define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !8 {
   ret void
 }
 
@@ -31,5 +32,7 @@ entry:
 !5 = !{i32 0}
 !6 = !{i32 0, i64 65536}
 !7 = !{i32 21}
-!8 = !{!"function", i32 poison, !9}
+!8 = !{%struct.DispatchSystemData poison}
 !9 = !{i32 0, %struct.DispatchSystemData poison}
+!10 = !{i32 0, %struct.TraversalData poison}
+!11 = !{%struct.TraversalData poison}

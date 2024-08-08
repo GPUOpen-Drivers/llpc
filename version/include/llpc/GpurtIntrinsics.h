@@ -63,7 +63,6 @@
 #endif
 
 #define CONTINUATIONS_LGC_STACK_LOWERING 1
-#define CONTINUATIONS_USE_DUMMY_RET_ADDR 1
 
 //=====================================================================================================================
 // Continuation intrinsics

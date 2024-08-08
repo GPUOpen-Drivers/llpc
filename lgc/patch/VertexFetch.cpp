@@ -641,7 +641,7 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
     builder.setShaderStage(ShaderStage::Vertex);
     builder.SetInsertPointPastAllocas(vertexFetches[0]->getFunction());
     auto desc = builder.CreateBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding, builder.getInt32(0),
-                                         Builder::BufferFlagAddress);
+                                         Builder::BufferFlagAddress, false);
 
     auto descPtr = builder.CreateIntToPtr(desc, builder.getPtrTy(ADDR_SPACE_CONST));
 
@@ -1460,15 +1460,15 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
         IRBuilder<>::InsertPointGuard guard(builder);
         builder.SetInsertPointPastAllocas(builder.GetInsertBlock()->getParent());
         auto descPtr = builderImpl.CreateBufferDesc(InternalDescriptorSetId, CurrentAttributeBufferBinding,
-                                                    builderImpl.getInt32(0), lgc::Builder::BufferFlagAddress);
+                                                    builderImpl.getInt32(0), lgc::Builder::BufferFlagAddress, false);
         // Create descriptor by a 64-bits pointer
-        m_curAttribBufferDescr = builderImpl.buildInlineBufferDesc(descPtr, 0);
+        m_curAttribBufferDescr = builderImpl.buildBufferCompactDesc(descPtr, 0);
       }
       vtxDesc = m_curAttribBufferDescr;
     } else {
       // Create descriptor for vertex buffer
       vtxDesc = builderImpl.CreateBufferDesc(InternalDescriptorSetId, GenericVertexFetchShaderBinding,
-                                             builderImpl.getInt32(binding), lgc::Builder::BufferFlagNonConst);
+                                             builderImpl.getInt32(binding), lgc::Builder::BufferFlagNonConst, false);
     }
 
     return vtxDesc;

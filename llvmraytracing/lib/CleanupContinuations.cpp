@@ -12,8 +12,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -57,12 +57,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "compilerutils/CompilerUtils.h"
-#include "lgc/LgcCpsDialect.h"
-#include "lgc/LgcIlCpsDialect.h"
-#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -81,8 +81,7 @@ using namespace lgc;
 /// Returns a map (origin BB, (call that created the continuation token, resume
 /// function)).
 static DenseMap<BasicBlock *, std::pair<CallInst *, Value *>>
-findTokenOrigin(BasicBlock *BB, Value *V,
-                SmallVectorImpl<Instruction *> &ToRemove) {
+findTokenOrigin(BasicBlock *BB, Value *V, SmallVectorImpl<Instruction *> &ToRemove) {
   DenseMap<BasicBlock *, std::pair<CallInst *, Value *>> Result;
   Value *Call = nullptr;
   Value *ResumeFun = nullptr;
@@ -122,23 +121,17 @@ findTokenOrigin(BasicBlock *BB, Value *V,
     ToRemove.push_back(CallPhi);
     ToRemove.push_back(ResumeFunPhi);
 
-    for (auto CallEntry :
-         llvm::zip(CallPhi->blocks(), CallPhi->incoming_values())) {
+    for (auto CallEntry : llvm::zip(CallPhi->blocks(), CallPhi->incoming_values())) {
       auto *PhiBB = std::get<0>(CallEntry);
       auto *ResumeFunEntry = ResumeFunPhi->getIncomingValueForBlock(PhiBB);
       assert(ResumeFunEntry && "Need a resume fun for each call");
-      assert(isa<Constant>(ResumeFunEntry) &&
-             "Resume function should be a constant function");
+      assert(isa<Constant>(ResumeFunEntry) && "Resume function should be a constant function");
 
-      assert(isa<CallInst>(std::get<1>(CallEntry)) &&
-             "Phi should come from a call");
-      Result.insert(std::make_pair(
-          PhiBB, std::make_pair(cast<CallInst>(std::get<1>(CallEntry)),
-                                ResumeFunEntry)));
+      assert(isa<CallInst>(std::get<1>(CallEntry)) && "Phi should come from a call");
+      Result.insert(std::make_pair(PhiBB, std::make_pair(cast<CallInst>(std::get<1>(CallEntry)), ResumeFunEntry)));
     }
   } else {
-    assert(isa<Constant>(ResumeFun) &&
-           "Resume function should be a constant function");
+    assert(isa<Constant>(ResumeFun) && "Resume function should be a constant function");
     assert(isa<CallInst>(Call) && "Call should be a CallInst");
     auto *CallI = cast<CallInst>(Call);
     Result.insert(std::make_pair(BB, std::make_pair(CallI, ResumeFun)));
@@ -174,27 +167,21 @@ void CleanupContinuationsPass::analyzeContinuation(Function &F, MDNode *MD) {
 
   // Without malloc call, we check later if the continuation state is used
   if (Data.MallocCall) {
-    Data.ContStateBytes =
-        cast<ConstantInt>(Data.MallocCall->getArgOperand(0))->getSExtValue();
+    Data.ContStateBytes = cast<ConstantInt>(Data.MallocCall->getArgOperand(0))->getSExtValue();
   }
   if (Data.ContStateBytes > MaxContStateBytes)
     MaxContStateBytes = Data.ContStateBytes;
 }
 
-void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
-                                              bool IsStart,
-                                              ContinuationData &CpsInfo) {
+void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc, bool IsStart, ContinuationData &CpsInfo) {
 
-  Builder->SetInsertPoint(
-      &*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+  Builder->SetInsertPoint(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
   Value *CpsStack = nullptr;
   if (IsStart) {
-    CpsStack = Builder->create<cps::AllocOp>(
-        Builder->getInt32(CpsInfo.ContStateBytes));
+    CpsStack = Builder->create<cps::AllocOp>(Builder->getInt32(CpsInfo.ContStateBytes));
     CpsStack->setName("cont.state.stack.segment");
   } else {
-    CpsStack =
-        Builder->create<cps::PeekOp>(Builder->getInt32(CpsInfo.ContStateBytes));
+    CpsStack = Builder->create<cps::PeekOp>(Builder->getInt32(CpsInfo.ContStateBytes));
   }
 
   SmallVector<Instruction *> ToBeRemoved;
@@ -205,11 +192,9 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
     I->eraseFromParent();
 }
 
-static void updateCpsFunctionArgs(Function *OldFunc, Function *NewFunc,
-                                  const SmallVector<Value *> &AllArgValues) {
+static void updateCpsFunctionArgs(Function *OldFunc, Function *NewFunc, const SmallVector<Value *> &AllArgValues) {
   // Set arg names for new function
-  for (unsigned Idx = 0; Idx != NewFunc->getFunctionType()->params().size();
-       ++Idx) {
+  for (unsigned Idx = 0; Idx != NewFunc->getFunctionType()->params().size(); ++Idx) {
     Argument *Arg = NewFunc->getArg(Idx);
     Value *OldVal = AllArgValues[Idx];
     if (OldVal) {
@@ -219,10 +204,8 @@ static void updateCpsFunctionArgs(Function *OldFunc, Function *NewFunc,
   }
 }
 
-static void buildCpsArgInfos(Function *F, bool IsStart,
-                             SmallVector<Type *> &AllArgTypes,
-                             SmallVector<Value *> &AllArgValues,
-                             SmallVector<AttributeSet> &ParamAttrs,
+static void buildCpsArgInfos(Function *F, bool IsStart, SmallVector<Type *> &AllArgTypes,
+                             SmallVector<Value *> &AllArgValues, SmallVector<AttributeSet> &ParamAttrs,
                              SmallVector<Instruction *> &InstsToRemove) {
 
   auto &Context = F->getContext();
@@ -232,8 +215,7 @@ static void buildCpsArgInfos(Function *F, bool IsStart,
     assert(F->arg_size() >= 1 && "Entry function has at least one argument");
     // Use all arguments except the last (pre-allocated buffer for the
     // coroutine passes) for the continuation start
-    for (auto Arg = F->arg_begin(), ArgEnd = F->arg_end() - 1; Arg != ArgEnd;
-         Arg++) {
+    for (auto Arg = F->arg_begin(), ArgEnd = F->arg_end() - 1; Arg != ArgEnd; Arg++) {
       AllArgTypes.push_back(Arg->getType());
       AllArgValues.push_back(Arg);
       ParamAttrs.push_back(FAttrs.getParamAttrs(ArgNo));
@@ -263,9 +245,9 @@ static void buildCpsArgInfos(Function *F, bool IsStart,
 
 /// Find the continuation state pointer, either returned by the malloc or
 /// given as an argument
-Value *CleanupContinuationsPass::getContinuationFramePtr(
-    Function *F, bool IsStart, const ContinuationData &ContinuationInfo,
-    SmallVector<Instruction *> *InstsToRemove) {
+Value *CleanupContinuationsPass::getContinuationFramePtr(Function *F, bool IsStart,
+                                                         const ContinuationData &ContinuationInfo,
+                                                         SmallVector<Instruction *> *InstsToRemove) {
   if (!ContinuationInfo.MallocCall)
     return IsStart ? F->getArg(F->arg_size() - 1) : F->getArg(0);
 
@@ -275,8 +257,7 @@ Value *CleanupContinuationsPass::getContinuationFramePtr(
     return ContinuationInfo.MallocCall;
   }
   // Look for the load of the allocated pointer
-  Instruction *Load =
-      cast<Instruction>(F->getArg(0)->getUniqueUndroppableUser());
+  Instruction *Load = cast<Instruction>(F->getArg(0)->getUniqueUndroppableUser());
   if (InstsToRemove)
     InstsToRemove->push_back(Load); // Load needs to be eliminated
   return Load;
@@ -284,8 +265,7 @@ Value *CleanupContinuationsPass::getContinuationFramePtr(
 
 /// Remove call to continuation.free() in F, ContFree is the pointer to
 /// declaration of continuation.free().
-void CleanupContinuationsPass::removeContFreeCall(Function *F,
-                                                  Function *ContFree) {
+void CleanupContinuationsPass::removeContFreeCall(Function *F, Function *ContFree) {
   for (auto *User : make_early_inc_range(ContFree->users())) {
     if (auto *Call = dyn_cast<CallInst>(User)) {
       if (Call->getFunction() == F) {
@@ -300,8 +280,7 @@ void CleanupContinuationsPass::removeContFreeCall(Function *F,
 /// Note: we skip the cps.free() insertion before calls to
 /// @lgc.ilcps.return. Because this is not useful any more as it means the
 /// thread termination.
-void CleanupContinuationsPass::freeCpsStack(Function *F,
-                                            ContinuationData &CpsInfo) {
+void CleanupContinuationsPass::freeCpsStack(Function *F, ContinuationData &CpsInfo) {
   struct VisitState {
     ContinuationData &CpsInfo;
     llvm_dialects::Builder *Builder;
@@ -312,10 +291,9 @@ void CleanupContinuationsPass::freeCpsStack(Function *F,
       llvm_dialects::VisitorBuilder<VisitState>()
           .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
           .add<cps::JumpOp>([](auto &State, auto &Jump) {
-            if (Jump.getFunction() == State.F) {
+            if (Jump.getFunction() == State.F && State.CpsInfo.ContStateBytes) {
               State.Builder->SetInsertPoint(&Jump);
-              State.Builder->template create<cps::FreeOp>(
-                  State.Builder->getInt32(State.CpsInfo.ContStateBytes));
+              State.Builder->template create<cps::FreeOp>(State.Builder->getInt32(State.CpsInfo.ContStateBytes));
             }
           })
           .build();
@@ -331,8 +309,7 @@ void CleanupContinuationsPass::processContinuations() {
   //    start part.
   // 3. Edit resume signature to add the state/rcr/shader-indxe/returnvalues.
   for (auto &FuncData : ToProcess) {
-    LLVM_DEBUG(dbgs() << "Processing function: " << FuncData.first->getName()
-                      << "\n");
+    LLVM_DEBUG(dbgs() << "Processing function: " << FuncData.first->getName() << "\n");
     for (auto *F : FuncData.second.Functions) {
       // Set same linkage as for start function
       if (F != FuncData.first)
@@ -342,8 +319,7 @@ void CleanupContinuationsPass::processContinuations() {
       if (F->empty())
         continue;
 
-      LLVM_DEBUG(dbgs() << "Processing function part: " << F->getName()
-                        << "\n");
+      LLVM_DEBUG(dbgs() << "Processing function part: " << F->getName() << "\n");
 
       // If this is the continuation start
       bool IsStart = F == FuncData.first;
@@ -358,8 +334,7 @@ void CleanupContinuationsPass::processContinuations() {
       SmallVector<AttributeSet> ParamAttrs;
       SmallVector<Instruction *> InstsToRemove;
 
-      buildCpsArgInfos(F, IsStart, AllArgTypes, AllArgValues, ParamAttrs,
-                       InstsToRemove);
+      buildCpsArgInfos(F, IsStart, AllArgTypes, AllArgValues, ParamAttrs, InstsToRemove);
 
       if (ContFree)
         removeContFreeCall(F, ContFree);
@@ -368,10 +343,8 @@ void CleanupContinuationsPass::processContinuations() {
       if (FuncData.second.MD)
         F->eraseMetadata(FuncData.second.MD->getMetadataID());
       auto &Context = F->getContext();
-      auto *NewFuncTy =
-          FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);
-      Function *NewFunc =
-          CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
+      auto *NewFuncTy = FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);
+      Function *NewFunc = CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
       NewFunc->takeName(F);
       FuncData.second.NewFunctions.push_back(NewFunc);
 
@@ -394,7 +367,7 @@ void CleanupContinuationsPass::processContinuations() {
           // We should only possibly have 'lgc.ilcps.return' or
           // 'lgc.cps.jump' call before unreachable.
           auto *Call = cast<CallInst>(--I->getIterator());
-          if (auto *ContRet = dyn_cast<lgc::ilcps::ReturnOp>(Call)) {
+          if (isa<lgc::ilcps::ReturnOp>(Call)) {
             Builder->SetInsertPoint(Call);
             Builder->CreateRetVoid();
             Call->eraseFromParent();
@@ -442,11 +415,9 @@ void CleanupContinuationsPass::processContinuations() {
 ///                                 i32 %cr2, ...)
 ///
 /// Also handles cases where the token and resume function are behind a phi.
-void CleanupContinuationsPass::handleContinue(ContinuationData &Data,
-                                              Instruction *Ret) {
+void CleanupContinuationsPass::handleContinue(ContinuationData &Data, Instruction *Ret) {
   // Find the function call that generates the token
-  LLVM_DEBUG(dbgs() << "Converting ret to continue: " << *Ret
-                    << "\nArgument: " << *Ret->getOperand(0) << "\n");
+  LLVM_DEBUG(dbgs() << "Converting ret to continue: " << *Ret << "\nArgument: " << *Ret->getOperand(0) << "\n");
   auto *BB = Ret->getParent();
   SmallVector<Instruction *> ToRemove;
   ToRemove.push_back(Ret);
@@ -456,8 +427,7 @@ void CleanupContinuationsPass::handleContinue(ContinuationData &Data,
     I->eraseFromParent();
 
   for (auto &Entry : Calls) {
-    LLVM_DEBUG(dbgs() << "Handling call: " << *Entry.second.first
-                      << " with resume function " << Entry.second.second
+    LLVM_DEBUG(dbgs() << "Handling call: " << *Entry.second.first << " with resume function " << Entry.second.second
                       << "\n");
     auto *Call = Entry.second.first;
     auto *ResumeFun = Entry.second.second;
@@ -465,15 +435,12 @@ void CleanupContinuationsPass::handleContinue(ContinuationData &Data,
   }
 
   if (BB->empty()) {
-    assert(BB->hasNPredecessorsOrMore(0) &&
-           "Handled all continues but the block still has predecessors left");
+    assert(BB->hasNPredecessorsOrMore(0) && "Handled all continues but the block still has predecessors left");
     BB->eraseFromParent();
   }
 }
 
-void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data,
-                                                    CallInst *Call,
-                                                    Value *ResumeFun) {
+void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun) {
   Builder->SetInsertPoint(Call);
 
   SmallVector<Value *> TailArgs;
@@ -487,8 +454,7 @@ void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data,
       ++SkipCount;
     }
 
-    auto *ResumeCR = Builder->create<cps::AsContinuationReferenceOp>(
-        ContinuationReferenceType, ResumeFun);
+    auto *ResumeCR = Builder->create<cps::AsContinuationReferenceOp>(ContinuationReferenceType, ResumeFun);
 
     TailArgs.push_back(ResumeCR);
   } else {
@@ -498,8 +464,7 @@ void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data,
   // Skip continuation.reference, levels and potentially the wait mask.
   TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), SkipCount)));
   auto *CR = Call->getArgOperand(0);
-  Value *Level =
-      Call->getArgOperand(ContHelper::isWaitAwaitCall(*Call) ? 2 : 1);
+  Value *Level = Call->getArgOperand(ContHelper::isWaitAwaitCall(*Call) ? 2 : 1);
   unsigned LevelImm = cast<ConstantInt>(Level)->getZExtValue();
 
   // TODO: Continuation state are passed through stack for now.
@@ -550,17 +515,14 @@ void CleanupContinuationsPass::lowerIntrinsicCall(Module &Mod) {
 
     // Signature of cps function: { state, rcr, shader-index, system-data}
     auto *SystemDataArg = Caller->getArg(CpsArgIdxSystemData);
-    assert(SystemDataArg->getType()->isStructTy() &&
-           "SystemData should be struct type");
-    auto *AllocaInsertPt =
-        &*Caller->getEntryBlock().getFirstNonPHIOrDbgOrAlloca();
+    assert(SystemDataArg->getType()->isStructTy() && "SystemData should be struct type");
+    auto *AllocaInsertPt = &*Caller->getEntryBlock().getFirstNonPHIOrDbgOrAlloca();
     Builder->SetInsertPoint(AllocaInsertPt);
     auto *SystemData = Builder->CreateAlloca(SystemDataArg->getType());
     Builder->CreateStore(SystemDataArg, SystemData);
     for (auto *Call : IntrinsicCalls)
-      replaceIntrinsicCall(*Builder, SystemDataArg->getType(), SystemData,
-                           *Stage, Call, GpurtLibrary ? GpurtLibrary : &Mod,
-                           CrossInliner);
+      replaceIntrinsicCall(*Builder, SystemDataArg->getType(), SystemData, *Stage, Call,
+                           GpurtLibrary ? GpurtLibrary : &Mod, CrossInliner);
   }
 }
 
@@ -576,8 +538,7 @@ void CleanupContinuationsPass::lowerGetResumePoint(Module &Mod) {
       auto JumpCall = findDominatedContinueCall(GetResumeCall);
       assert(JumpCall && "Should find a dominated call to lgc.cps.jump");
       // For wait calls, skip the wait mask.
-      uint32_t SkipCount =
-          ContHelper::isWaitAwaitCall(*(JumpCall.value())) ? 1 : 0;
+      uint32_t SkipCount = ContHelper::isWaitAwaitCall(*(JumpCall.value())) ? 1 : 0;
 
       lgc::cps::JumpOp *Jump = cast<cps::JumpOp>(*JumpCall);
       Value *ResumeFn = *(Jump->getTail().begin() + SkipCount);
@@ -592,13 +553,10 @@ void CleanupContinuationsPass::lowerGetResumePoint(Module &Mod) {
   }
 }
 
-llvm::PreservedAnalyses
-CleanupContinuationsPass::run(llvm::Module &Mod,
-                              llvm::ModuleAnalysisManager &AnalysisManager) {
+llvm::PreservedAnalyses CleanupContinuationsPass::run(llvm::Module &Mod, llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the lgc-cleanup-continuations pass\n");
   AnalysisManager.getResult<DialectContextAnalysis>(Mod);
-  auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod)
-                  .getManager();
+  auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod).getManager();
 
   ToProcess.clear();
   MaxContStateBytes = 0;

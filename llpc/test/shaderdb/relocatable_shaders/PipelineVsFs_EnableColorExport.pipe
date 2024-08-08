@@ -74,7 +74,7 @@ attribute[0].offset = 0
 ; SHADERTEST-LABEL: @lgc.shader.VS.main(
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = call <2 x float> @lgc.input.import.generic__v2f32(i1 false, i32 0, i32 0, i32 0, i32 poison)
-; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v2f32(i32 0, i32 0, <2 x float> [[TMP0]]) #[[ATTR1:[0-9]+]]
+; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v2f32(i32 0, i32 0, <2 x float> [[TMP0]]) #[[ATTR2:[0-9]+]]
 ; SHADERTEST-NEXT:    ret void
 ;
 ;
@@ -85,38 +85,28 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = bitcast i64 [[TMP0]] to <2 x i32>
 ; SHADERTEST-NEXT:    [[TMP2:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = bitcast i64 [[TMP2]] to <2 x i32>
-; SHADERTEST-NEXT:    [[INTERPPERSPCENTER:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR5:[0-9]+]]
+; SHADERTEST-NEXT:    [[INTERPPERSPCENTER:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspCenter.v2f32.i32(i32 268435457) #[[ATTR4:[0-9]+]]
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = call <2 x float> (...) @lgc.input.import.interpolated__v2f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPCENTER]])
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = call i32 @lgc.load.user.data__i32(i32 44)
 ; SHADERTEST-NEXT:    [[TMP6:%.*]] = insertelement <2 x i32> [[TMP3]], i32 [[TMP5]], i64 0
 ; SHADERTEST-NEXT:    [[TMP7:%.*]] = bitcast <2 x i32> [[TMP6]] to i64
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = inttoptr i64 [[TMP7]] to ptr addrspace(4)
+; SHADERTEST-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP8]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP8]], i32 -1) ]
 ; SHADERTEST-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP8]], i32 0
 ; SHADERTEST-NEXT:    [[TMP10:%.*]] = call i32 @lgc.load.user.data__i32(i32 44)
 ; SHADERTEST-NEXT:    [[TMP11:%.*]] = insertelement <2 x i32> [[TMP1]], i32 [[TMP10]], i64 0
 ; SHADERTEST-NEXT:    [[TMP12:%.*]] = bitcast <2 x i32> [[TMP11]] to i64
 ; SHADERTEST-NEXT:    [[TMP13:%.*]] = inttoptr i64 [[TMP12]] to ptr addrspace(4)
+; SHADERTEST-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP13]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP13]], i32 -1) ]
 ; SHADERTEST-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP13]], i32 0
 ; SHADERTEST-NEXT:    [[TMP15:%.*]] = fptosi <2 x float> [[TMP4]] to <2 x i32>
 ; SHADERTEST-NEXT:    [[TMP16:%.*]] = sitofp <2 x i32> [[TMP15]] to <2 x float>
-; SHADERTEST-NEXT:    [[TMP17:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP14]], align 32, !invariant.load !11
-; SHADERTEST-NEXT:    [[TMP18:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP9]], align 16, !invariant.load !11
+; SHADERTEST-NEXT:    [[TMP17:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP14]], align 4, !invariant.load !11
+; SHADERTEST-NEXT:    [[TMP18:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP9]], align 4, !invariant.load !11
 ; SHADERTEST-NEXT:    [[TMP19:%.*]] = extractelement <2 x float> [[TMP16]], i64 0
 ; SHADERTEST-NEXT:    [[TMP20:%.*]] = extractelement <2 x float> [[TMP16]], i64 1
-; SHADERTEST-NEXT:    [[TMP21:%.*]] = extractelement <4 x i32> [[TMP18]], i64 0
-; SHADERTEST-NEXT:    [[TMP22:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[TMP21]])
-; SHADERTEST-NEXT:    [[TMP23:%.*]] = insertelement <4 x i32> poison, i32 [[TMP22]], i64 0
-; SHADERTEST-NEXT:    [[TMP24:%.*]] = extractelement <4 x i32> [[TMP18]], i64 1
-; SHADERTEST-NEXT:    [[TMP25:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[TMP24]])
-; SHADERTEST-NEXT:    [[TMP26:%.*]] = insertelement <4 x i32> [[TMP23]], i32 [[TMP25]], i64 1
-; SHADERTEST-NEXT:    [[TMP27:%.*]] = extractelement <4 x i32> [[TMP18]], i64 2
-; SHADERTEST-NEXT:    [[TMP28:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[TMP27]])
-; SHADERTEST-NEXT:    [[TMP29:%.*]] = insertelement <4 x i32> [[TMP26]], i32 [[TMP28]], i64 2
-; SHADERTEST-NEXT:    [[TMP30:%.*]] = extractelement <4 x i32> [[TMP18]], i64 3
-; SHADERTEST-NEXT:    [[TMP31:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[TMP30]])
-; SHADERTEST-NEXT:    [[TMP32:%.*]] = insertelement <4 x i32> [[TMP29]], i32 [[TMP31]], i64 3
-; SHADERTEST-NEXT:    [[TMP33:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[TMP19]], float [[TMP20]], <8 x i32> [[TMP17]], <4 x i32> [[TMP32]], i1 false, i32 0, i32 0)
-; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[TMP33]]) #[[ATTR6:[0-9]+]]
+; SHADERTEST-NEXT:    [[TMP21:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[TMP19]], float [[TMP20]], <8 x i32> [[TMP17]], <4 x i32> [[TMP18]], i1 false, i32 0, i32 0)
+; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[TMP21]]) #[[ATTR5:[0-9]+]]
 ; SHADERTEST-NEXT:    ret void
 ;
 ;
@@ -126,7 +116,7 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = extractelement <4 x float> [[TMP0]], i64 1
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = extractelement <4 x float> [[TMP0]], i64 2
 ; SHADERTEST-NEXT:    [[TMP6:%.*]] = extractelement <4 x float> [[TMP0]], i64 3
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float [[TMP3]], float [[TMP4]], float [[TMP5]], float [[TMP6]], i1 immarg true, i1 immarg true) #[[ATTR1]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.f32(i32 0, i32 15, float [[TMP3]], float [[TMP4]], float [[TMP5]], float [[TMP6]], i1 true, i1 true)
 ; SHADERTEST-NEXT:    call void @llvm.amdgcn.endpgm()
 ; SHADERTEST-NEXT:    unreachable
 ;

@@ -110,7 +110,7 @@ static unsigned TraceParamsTySize[] = {
 };
 
 // =====================================================================================================================
-SpirvLowerRayTracing::SpirvLowerRayTracing() : SpirvLowerRayQuery(false) {
+SpirvLowerRayTracing::SpirvLowerRayTracing() : m_nextTraceRayId(0) {
 }
 
 // =====================================================================================================================
@@ -1759,6 +1759,7 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
+  setLgcRtShaderStage(m_entryPoint, getLgcRtShaderStage(m_shaderStage));
 
   Instruction *insertPos = &*(newFunc->begin()->getFirstNonPHIOrDbgOrAlloca());
   m_builder->SetInsertPoint(insertPos);
@@ -3056,6 +3057,111 @@ llvm::Function *SpirvLowerRayTracing::createImplFunc(CallInst &inst, ArrayRef<Va
 lgc::rt::RayTracingShaderStage SpirvLowerRayTracing::mapStageToLgcRtShaderStage(ShaderStage stage) {
   assert((stage >= ShaderStageRayTracingRayGen) && (stage <= ShaderStageRayTracingCallable));
   return static_cast<lgc::rt::RayTracingShaderStage>(stage - ShaderStageRayTracingRayGen);
+}
+
+// =====================================================================================================================
+// Generate a static ID for current Trace Ray call
+//
+unsigned SpirvLowerRayTracing::generateTraceRayStaticId() {
+  Util::MetroHash64 hasher;
+  hasher.Update(m_nextTraceRayId++);
+  hasher.Update(m_module->getName().bytes_begin(), m_module->getName().size());
+
+  MetroHash::Hash hash = {};
+  hasher.Finalize(hash.bytes);
+
+  return MetroHash::compact32(&hash);
+}
+
+// =====================================================================================================================
+// Erase BasicBlocks from the Function
+//
+// @param func : Function
+void SpirvLowerRayTracing::eraseFunctionBlocks(Function *func) {
+  for (auto blockIt = func->begin(), blockEnd = func->end(); blockIt != blockEnd;) {
+    BasicBlock *basicBlock = &*blockIt++;
+    basicBlock->dropAllReferences();
+    basicBlock->eraseFromParent();
+  }
+}
+
+// =====================================================================================================================
+// Call GpuRt Library Func to load a 3x4 matrix from given address at the current insert point
+//
+// @param instanceNodeAddr : instanceNode address, which type is i64
+Value *SpirvLowerRayTracing::createLoadMatrixFromFunc(Value *instanceNodeAddr, unsigned builtInId) {
+  auto floatx3Ty = FixedVectorType::get(m_builder->getFloatTy(), 3);
+  auto matrixTy = ArrayType::get(floatx3Ty, 4);
+
+  Value *instandeNodeAddrPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt64Ty());
+  m_builder->CreateStore(instanceNodeAddr, instandeNodeAddrPtr);
+
+  StringRef getMatrixFunc;
+  if (builtInId == BuiltInObjectToWorldKHR) {
+    getMatrixFunc =
+        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM);
+  } else {
+    getMatrixFunc =
+        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM);
+  }
+
+  Value *matrixRow[4] = {
+      PoisonValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
+  };
+
+  for (unsigned i = 0; i < 3; ++i) {
+    Value *row = m_builder->getInt32(i);
+    for (unsigned j = 0; j < 4; ++j) {
+      Value *col = m_builder->getInt32(j);
+
+      Value *colPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt32Ty());
+      Value *rowPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt32Ty());
+      m_builder->CreateStore(col, colPtr);
+      m_builder->CreateStore(row, rowPtr);
+
+      auto cmiMatrixResult = m_crossModuleInliner.value().inlineCall(*m_builder, getGpurtFunction(getMatrixFunc),
+                                                                     {instandeNodeAddrPtr, rowPtr, colPtr});
+      matrixRow[j] = m_builder->CreateInsertElement(matrixRow[j], cmiMatrixResult.returnValue, uint64_t(i));
+    }
+  }
+
+  Value *matrix = PoisonValue::get(matrixTy);
+  matrix = m_builder->CreateInsertValue(matrix, matrixRow[0], 0);
+  matrix = m_builder->CreateInsertValue(matrix, matrixRow[1], 1);
+  matrix = m_builder->CreateInsertValue(matrix, matrixRow[2], 2);
+  matrix = m_builder->CreateInsertValue(matrix, matrixRow[3], 3);
+  return matrix;
+}
+
+// =====================================================================================================================
+// Looks up an exported function in the GPURT module
+Function *SpirvLowerRayTracing::getGpurtFunction(StringRef name) {
+  auto &gpurtContext = lgc::GpurtContext::get(*m_context);
+  Function *fn = gpurtContext.theModule->getFunction(name);
+  assert(fn);
+  return fn;
+}
+
+// =====================================================================================================================
+// Create instructions to load instance index/id given the 64-bit instance node address at the current insert point
+// Note: HLSL has just the opposite naming of index/ID compares to SPIR-V.
+// So "isIndex = true" means we use InstanceId(InstanceIndex for GPURT) for vulkan,
+// and "isIndex = false" means we use InstanceIndex(InstanceId for GPURT) for vulkan,
+// @param instNodeAddr : 64-bit instance node address, in <2 x i32>
+Value *SpirvLowerRayTracing::createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex) {
+  Value *instanceIdPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt64Ty());
+  m_builder->CreateStore(instNodeAddr, instanceIdPtr);
+
+  StringRef getterName = isIndex
+                             ? m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX)
+                             : m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
+
+  auto cmiResult = m_crossModuleInliner.value().inlineCall(*m_builder, getGpurtFunction(getterName), {instanceIdPtr});
+
+  return cmiResult.returnValue;
 }
 
 } // namespace Llpc

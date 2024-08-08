@@ -89,14 +89,20 @@ VectorType *BuilderCommon::getDescTy(ResourceNodeType descType) {
 // Get the type of pointer to descriptor.
 //
 // @param descType : Descriptor type, one of the ResourceNodeType values
-Type *BuilderCommon::getDescPtrTy(ResourceNodeType descType) {
-  return getDescTy(descType)->getPointerTo(ADDR_SPACE_CONST);
+Type *BuilderCommon::getDescPtrTy() {
+  return getPtrTy(ADDR_SPACE_CONST);
 }
 
 // ====================================================================================================================
 // Get address space of constant memory.
 unsigned Builder::getAddrSpaceConst() {
   return ADDR_SPACE_CONST;
+}
+
+// ====================================================================================================================
+// Get address space of global memory.
+unsigned Builder::getAddrSpaceGlobal() {
+  return ADDR_SPACE_GLOBAL;
 }
 
 // ====================================================================================================================
@@ -211,10 +217,10 @@ Constant *BuilderCommon::getFpConstant(Type *ty, APFloat value) {
 // Create alloca for given input type.
 //
 // @param ty : pointer type.
-Value *BuilderCommon::CreateAllocaAtFuncEntry(Type *ty) {
+Value *BuilderCommon::CreateAllocaAtFuncEntry(Type *ty, const Twine &allocaName) {
   IRBuilderBase::InsertPointGuard ipg(*this);
   SetInsertPointPastAllocas(GetInsertBlock()->getParent());
-  return CreateAlloca(ty);
+  return CreateAlloca(ty, GetInsertBlock()->getModule()->getDataLayout().getAllocaAddrSpace(), nullptr, allocaName);
 }
 
 // =====================================================================================================================

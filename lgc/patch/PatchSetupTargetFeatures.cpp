@@ -131,7 +131,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       // sgpr needs to be preloaded for COMPUTE_PGM_RSRC2.tg_size_en (Work-Group Info).
       // This is needed for LDS spilling.
       for (unsigned i = 0, e = func->arg_size(); i != e; ++i) {
-        if (func->getArg(i)->getName().equals("MultiDispatchInfo")) {
+        if (func->getArg(i)->getName() == "MultiDispatchInfo") {
           builder.addAttribute("amdgpu-work-group-info-arg-no", std::to_string(i));
         }
       }

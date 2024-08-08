@@ -1004,7 +1004,9 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
 
   // Dmask.
   unsigned dmask = 15;
-  if (address[ImageAddressIdxZCompare])
+  bool imageSampleDrefReturnsRgba =
+      getPipelineState()->getShaderOptions(ShaderStage::Fragment).imageSampleDrefReturnsRgba;
+  if (!imageSampleDrefReturnsRgba && address[ImageAddressIdxZCompare])
     dmask = 1;
   else if (!isSample) {
     dmask = 1;
@@ -1111,12 +1113,10 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
 
   if (samplerDesc->getType()->isVectorTy()) {
     const unsigned samplerDescArgIndex = imageDescArgIndex + 1;
-    if (flags & ImageFlagNonUniformSampler) {
+    if (flags & ImageFlagNonUniformSampler)
       nonUniformArgIndexes.push_back(samplerDescArgIndex);
-    } else {
-      // TODO: Re-add the condition once backend fix the waterfall loop bug.
+    else if (flags & ImageFlagEnforceReadFirstLaneSampler)
       enforceReadFirstLane(imageOp, samplerDescArgIndex);
-    }
   }
 
   if (!nonUniformArgIndexes.empty())
@@ -2009,7 +2009,8 @@ Value *BuilderImpl::transformImageDesc(Value *imageDesc, bool mustLoad, bool isT
 
   // Explicitly load the descriptor from the descriptor pointer
   Type *descType = FixedVectorType::get(getInt32Ty(), isTexelBuffer ? 4 : 8);
-  Value *desc = CreateLoad(descType, imageDesc);
+  // Use smaller alignment for better load speculation.
+  Value *desc = CreateAlignedLoad(descType, imageDesc, Align(4));
   cast<Instruction>(desc)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
   return desc;
 }
@@ -2026,7 +2027,8 @@ Value *BuilderImpl::transformSamplerDesc(Value *samplerDesc) {
 
   // Explicitly load the descriptor from the descriptor pointer
   Type *descType = FixedVectorType::get(getInt32Ty(), 4);
-  Value *desc = CreateLoad(descType, samplerDesc);
+  // Use smaller alignment for better load speculation.
+  Value *desc = CreateAlignedLoad(descType, samplerDesc, Align(4));
   cast<Instruction>(desc)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
   return desc;
 }

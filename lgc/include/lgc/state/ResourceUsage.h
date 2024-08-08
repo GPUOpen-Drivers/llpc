@@ -330,6 +330,9 @@ struct ResourceUsage {
         unsigned baryCoord : 1;                // Whether gl_BaryCoordKHR is used
         unsigned baryCoordNoPerspKHR : 1;      // Whether gl_BaryCoordNoPerspKHR is used, distinction from
                                                // gl_BaryCoordNoPersp
+        unsigned primType : 1;                 // Whether primTy is used, for OGL special FS emulation usage.
+        unsigned primCoord : 1;                // Whether primCoord is used, for OGL internal FS emulation usage.
+        unsigned lineStipple : 1;              // Whether lineStipple is used, for OGL internal FS emulation usage.
         // Output
         unsigned fragDepth : 1;      // Whether gl_FragDepth is used
         unsigned sampleMask : 1;     // Whether gl_SampleMask[] is used
@@ -459,13 +462,10 @@ struct ResourceUsage {
     } gs;
 
     struct {
-      // Map from built-in output IDs to their export slots (to fragment shader): <builtIn, exportSlot>
-      std::map<BuiltInKind, unsigned> vertexBuiltInExportSlots;
-      std::map<BuiltInKind, unsigned> primitiveBuiltInExportSlots;
-
-      // Export count for generic outputs (excluding those special outputs to which the built-ins are mapped)
-      unsigned vertexGenericOutputExportCount = 0;
-      unsigned primitiveGenericOutputExportCount = 0;
+      // Map from output locations to their number of components: <location, <numComponents, forBuiltIn>> (including
+      // those special outputs to which built-ins are mapped)
+      std::map<unsigned, std::pair<unsigned, BuiltInKind>> vertexOutputComponents;
+      std::map<unsigned, std::pair<unsigned, BuiltInKind>> primitiveOutputComponents;
     } mesh;
 
     struct {
@@ -590,9 +590,10 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewId;        // View ID
-        unsigned primMask;      // Primitive mask
-        unsigned compositeData; // CompositeData
+        unsigned viewId;          // View ID
+        unsigned primMask;        // Primitive mask
+        unsigned collisionWaveId; // POPS collision wave ID (pre-GFX11)
+        unsigned compositeData;   // CompositeData
 
         // Perspective interpolation (I/J)
         struct {
@@ -608,6 +609,8 @@ struct InterfaceData {
           unsigned center;   // Center
           unsigned centroid; // Centroid
         } linearInterp;
+
+        unsigned lineStipple; // Line Stipple Tex Ena (f32)
 
         // FragCoord
         struct {

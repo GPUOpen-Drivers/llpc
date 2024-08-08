@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -31,10 +31,10 @@
 
 #pragma once
 
-#include "lgc/LgcCpsDialect.h"
-#include "lgc/LgcRtDialect.h"
 #include "llpc/GpurtEnums.h"
 #include "llpc/GpurtVersion.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/OpMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -106,6 +106,7 @@ struct GpuRtIntrinsicEntry {
 extern const llvm_dialects::OpMap<GpuRtIntrinsicEntry> LgcRtGpuRtMap;
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, DXILShaderKind);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &, lgc::rt::RayTracingShaderStage);
 
 enum class AnyHitExitKind {
   None, // not an AnyHit shader
@@ -116,62 +117,6 @@ enum class AnyHitExitKind {
 
 // The address space used for the continuation stack.
 enum class ContStackAddrspace : uint32_t { Scratch = 21, Global = 22 };
-
-// Metadata associated with a register buffer.
-struct RegisterBufferMD {
-  /// Number of registers to use.
-  uint32_t RegisterCount;
-  /// Address space for the memory part of the buffer.
-  uint32_t Addrspace;
-};
-
-// Helper class to abstract over function argument types.
-// Derives types from custom metadata when available, allowing pointer
-// element types to be derives even with opaque pointers.
-class ContArgTy {
-private:
-  Type *ArgTy;
-  Type *ElemTy;
-
-public:
-  ContArgTy() : ArgTy(nullptr), ElemTy(nullptr) {}
-  ContArgTy(Type *Arg, Type *Elem) : ArgTy(Arg), ElemTy(Elem) {}
-  ContArgTy(Type *Arg);
-
-  static ContArgTy get(const Function *F, const Argument *Arg);
-  static ContArgTy get(const Function *F, const unsigned ArgNo);
-  static ContArgTy get(const Metadata *MD, LLVMContext &Context);
-
-  Type *asType(LLVMContext &Context);
-  Type *getPointerElementType() const;
-
-  bool isPointerTy() const;
-  bool isVoidTy() const;
-  Metadata *getTypeMetadata(LLVMContext &Context);
-
-  bool operator==(const ContArgTy &RHS) const {
-    return (ArgTy == RHS.ArgTy) && (ElemTy == RHS.ElemTy);
-  }
-};
-
-// Helper class to abstract over function types.
-// Uses ContArgTy to derive types from and encode types to custom metadata.
-class ContFuncTy {
-public:
-  ContFuncTy() {}
-  ContFuncTy(ContArgTy Return) : ReturnTy(Return) {}
-  ContFuncTy(ContArgTy Return, ArrayRef<ContArgTy> Args)
-      : ReturnTy(Return), ArgTys(Args) {}
-
-  ContArgTy ReturnTy;
-  SmallVector<ContArgTy> ArgTys;
-
-  static ContFuncTy get(const Function *F);
-  static ContFuncTy get(const Metadata *MD, LLVMContext &Context);
-
-  FunctionType *asFunctionType(LLVMContext &Context);
-  void writeMetadata(Function *F);
-};
 
 struct ContSetting {
   /// A hash value that is used as name.
@@ -201,15 +146,13 @@ private:
   //
   // The number of registers entering a function (if used as function
   // metadata), or leaving a function (if used on a continue statement).
-  static constexpr const char *MDRegisterCountName =
-      "continuation.registercount";
+  static constexpr const char *MDRegisterCountName = "continuation.registercount";
   // The number of registers returned by a TraceRay or CallShader call,
   // annotated to the outgoing continue call. For resume functions, we scan
   // continue calls referencing the resume function, and use their returned
   // register count annotation as incoming register count for the resume
   // function.
-  static constexpr const char *MDReturnedRegisterCountName =
-      "continuation.returnedRegistercount";
+  static constexpr const char *MDReturnedRegisterCountName = "continuation.returnedRegistercount";
 
   // Module-scope *payload* register count metadata
   // Payload registers are registers used to pass data between RT stages.
@@ -232,14 +175,12 @@ private:
   // For intersection, it is not used, because early-compiled intersection
   // shaders can be used in pipelines with large payload types unknown when
   // compiling the intersection shader.
-  static constexpr const char *MDPreservedPayloadRegisterCountName =
-      "continuation.preservedPayloadRegisterCount";
+  static constexpr const char *MDPreservedPayloadRegisterCountName = "continuation.preservedPayloadRegisterCount";
   // [in] MaxPayloadRegisterCount
   // The maximum allowed number of payload registers to be used for payload and
   // other inter-stage date (e.g. attributes). If state does not fit into this
   // limit, we spill to the continuation stack.
-  static constexpr const char *MDMaxPayloadRegisterCountName =
-      "continuation.maxPayloadRegisterCount";
+  static constexpr const char *MDMaxPayloadRegisterCountName = "continuation.maxPayloadRegisterCount";
   // [out] MaxUsedPayloadRegisterCount
   // The maximum number of payload registers written or read by any
   // shader in the module. This excludes intersection shaders, which
@@ -247,12 +188,10 @@ private:
   // This can be used to populate PreservedPayloadRegisterCount when compiling
   // the driver module in case all modules of the pipeline are known and
   // have already been processed.
-  static constexpr const char *MDMaxUsedPayloadRegisterCountName =
-      "continuation.maxUsedPayloadRegisterCount";
+  static constexpr const char *MDMaxUsedPayloadRegisterCountName = "continuation.maxUsedPayloadRegisterCount";
   // The address space used to store the continuations stack.
   // The possible values for this metadata are the values of ContStackAddrspace.
-  static constexpr const char *MDStackAddrspaceName =
-      "continuation.stackAddrspace";
+  static constexpr const char *MDStackAddrspaceName = "continuation.stackAddrspace";
   // The raytracing ip level that is available on the target architecture.
   // This is exposed to gpurt code via the GetRtip intrinsic.
   static constexpr const char *MDRtipName = "continuation.rtip";
@@ -264,8 +203,7 @@ private:
 
   static std::optional<uint32_t> extractZExtI32Constant(MDNode *Node) {
     if (Node) {
-      uint64_t Result =
-          mdconst::extract<ConstantInt>(Node->getOperand(0))->getZExtValue();
+      uint64_t Result = mdconst::extract<ConstantInt>(Node->getOperand(0))->getZExtValue();
       assert(Result <= std::numeric_limits<uint32_t>::max());
       return Result;
     }
@@ -274,18 +212,15 @@ private:
 
   static MDNode *getI32MDConstant(LLVMContext &Context, uint32_t Value) {
     IntegerType *Int32Ty = Type::getInt32Ty(Context);
-    MDNode *Result = MDTuple::get(
-        Context, {ConstantAsMetadata::get(ConstantInt::get(Int32Ty, Value))});
+    MDNode *Result = MDTuple::get(Context, {ConstantAsMetadata::get(ConstantInt::get(Int32Ty, Value))});
     assert(Result && "Failed to create metadata node!");
-    assert(extractZExtI32Constant(Result) == Value &&
-           "Failed to extract value from node!");
+    assert(extractZExtI32Constant(Result) == Value && "Failed to extract value from node!");
     return Result;
   }
 
   static Type *getPayloadTypeFromMetadata(const MDNode *Node) {
     auto *MDTup = cast<MDTuple>(Node);
-    if (auto *ExtractedConstant =
-            mdconst::extract<Constant>(MDTup->getOperand(0))) {
+    if (auto *ExtractedConstant = mdconst::extract<Constant>(MDTup->getOperand(0))) {
       return ExtractedConstant->getType();
     }
 
@@ -298,18 +233,12 @@ public:
   static constexpr const char *MDStackSizeName = "continuation.stacksize";
   static constexpr const char *MDStateName = "continuation.state";
   static constexpr const char *MDContinuationName = "continuation";
-  static constexpr const char *MDTypesName = "types";
-  static constexpr const char *MDTypesFunctionName = "function";
-  static constexpr const char *MDTypesVoidName = "void";
   static constexpr const char *MDContPayloadTyName = "cont.payload.type";
   static constexpr const char *MDLgcCpsModuleName = "lgc.cps.module";
   static constexpr const char *MDGpurtSettingsName = "gpurt.settings";
+  static constexpr const char *MDWaitMaskName = "waitmask";
 
-  // Global variable names
-  static constexpr const char *GlobalPayloadName = "PAYLOAD";
-  static constexpr const char *GlobalRegistersName = "REGISTERS";
-  static constexpr ContStackAddrspace DefaultStackAddrspace =
-      ContStackAddrspace::Scratch;
+  static constexpr ContStackAddrspace DefaultStackAddrspace = ContStackAddrspace::Scratch;
 
   static void RegisterPasses(llvm::PassBuilder &PB, bool NeedDialectContext);
 
@@ -318,8 +247,7 @@ public:
 
   // Registers the DXIL-specific Continuation pipeline to a LLVM Module Pass
   // manager.
-  static void addDxilContinuationPasses(llvm::ModulePassManager &MPM,
-                                        llvm::Module *GpurtLibrary = nullptr);
+  static void addDxilContinuationPasses(llvm::ModulePassManager &MPM, llvm::Module *GpurtLibrary = nullptr);
 
   // Registers the DXIL-specific pipeline for the driver library module to a
   // LLVM Module Pass manager. These passes preprocess the driver library into a
@@ -328,8 +256,7 @@ public:
   static void addDxilGpurtLibraryPasses(llvm::ModulePassManager &MPM);
 
   // Get gpurt settings from metadata.
-  static void getGpurtSettings(const Module &M,
-                               SmallVectorImpl<ContSetting> &Settings) {
+  static void getGpurtSettings(const Module &M, SmallVectorImpl<ContSetting> &Settings) {
     auto *MD = M.getNamedMetadata(MDGpurtSettingsName);
     if (!MD)
       return;
@@ -354,137 +281,91 @@ public:
     IntegerType *Int64Ty = Type::getInt64Ty(Context);
     // Stored as {bitwidth, value, bitwidth, value, ...}
     for (auto &Setting : Settings) {
-      Vals.push_back(
-          ConstantAsMetadata::get(ConstantInt::get(Int64Ty, Setting.NameHash)));
-      Vals.push_back(
-          ConstantAsMetadata::get(ConstantInt::get(Int64Ty, Setting.Value)));
+      Vals.push_back(ConstantAsMetadata::get(ConstantInt::get(Int64Ty, Setting.NameHash)));
+      Vals.push_back(ConstantAsMetadata::get(ConstantInt::get(Int64Ty, Setting.Value)));
     }
     MD->addOperand(MDTuple::get(Context, Vals));
   }
 
-  // Set metadata specifying the number of outgoing payload registers.
-  static void setOutgoingRegisterCount(Instruction *I, uint32_t RegisterCount) {
-    I->setMetadata(MDRegisterCountName,
-                   getI32MDConstant(I->getContext(), RegisterCount));
-  }
-
-  // Get the number of outgoing payload registers if set.
-  static std::optional<uint32_t>
-  tryGetOutgoingRegisterCount(const Instruction *I) {
-    return extractZExtI32Constant(I->getMetadata(MDRegisterCountName));
-  }
-
-  // Set metadata specifying the number of incoming payload registers.
-  static void setIncomingRegisterCount(Function *F, uint32_t RegisterCount) {
-    F->setMetadata(MDRegisterCountName,
-                   getI32MDConstant(F->getContext(), RegisterCount));
-  }
-
-  // Get the number of incoming payload registers if set.
-  static std::optional<uint32_t>
-  tryGetIncomingRegisterCount(const Function *F) {
-    return extractZExtI32Constant(F->getMetadata(MDRegisterCountName));
-  }
-
-  // Set metadata specifying the number of payload registers returned by a
-  // TraceRay or CallShader. See MDReturnedRegisterCountName for details.
-  static void setReturnedRegisterCount(Instruction *I, uint32_t RegisterCount) {
-    I->setMetadata(MDReturnedRegisterCountName,
-                   getI32MDConstant(I->getContext(), RegisterCount));
-  }
-
-  // Get the number of payload registers returned by a TraceRay or CallShader
-  // from metadata if set. See MDReturnedRegisterCountName for details.
-  static std::optional<uint32_t>
-  tryGetReturnedRegisterCount(const Instruction *I) {
-    return extractZExtI32Constant(I->getMetadata(MDReturnedRegisterCountName));
-  }
-
-  // If there is module-level metadata node, return its value. Otherwise, return
-  // std::nullopt.
-  static std::optional<uint32_t>
-  tryGetPreservedPayloadRegisterCount(const Module &M) {
-    auto *MD = M.getNamedMetadata(MDPreservedPayloadRegisterCountName);
-    if (!MD)
-      return {};
-    return extractZExtI32Constant(MD->getOperand(0));
+#define NUMERIC_METADATA_HELPER(SCOPE, NAME, MD_NAME)                                                                  \
+  class NAME final {                                                                                                   \
+  public:                                                                                                              \
+    static void setValue(SCOPE *S, uint32_t Val) { S->setMetadata(MD_NAME, getI32MDConstant(S->getContext(), Val)); }  \
+    static std::optional<uint32_t> tryGetValue(const SCOPE *S) {                                                       \
+      return extractZExtI32Constant(S->getMetadata(MD_NAME));                                                          \
+    }                                                                                                                  \
+    static void reset(SCOPE *S) { S->setMetadata(MD_NAME, nullptr); }                                                  \
+    static void inc(SCOPE *S, uint32_t Value) {                                                                        \
+      auto ExistingSize = tryGetValue(S).value_or(0);                                                                  \
+      S->setMetadata(MD_NAME, getI32MDConstant(S->getContext(), ExistingSize + Value));                                \
+    }                                                                                                                  \
   };
 
-  static void
-  setPreservedPayloadRegisterCount(Module &M,
-                                   uint32_t PreservedPayloadRegisterCount) {
-    auto *MD = M.getOrInsertNamedMetadata(MDPreservedPayloadRegisterCountName);
-    assert(MD && "Failed to create metadata node!");
-    MD->clearOperands();
-    MD->addOperand(
-        getI32MDConstant(M.getContext(), PreservedPayloadRegisterCount));
+  // Handle the number of outgoing payload registers.
+  NUMERIC_METADATA_HELPER(Instruction, OutgoingRegisterCount, MDRegisterCountName)
+
+  // Handle the number of incoming payload registers.
+  NUMERIC_METADATA_HELPER(Function, IncomingRegisterCount, MDRegisterCountName)
+
+  // Handle the number of payload registers returned by a TraceRay or CallShader. See MDReturnedRegisterCountName for
+  // details.
+  NUMERIC_METADATA_HELPER(Instruction, ReturnedRegisterCount, MDReturnedRegisterCountName)
+
+  // Handle the continuation state byte count metadata.
+  NUMERIC_METADATA_HELPER(Function, ContinuationStateByteCount, MDStateName)
+
+  // Handle the continuation stack size metadata.
+  NUMERIC_METADATA_HELPER(Function, StackSize, MDStackSizeName)
+
+#undef NUMERIC_METADATA_HELPER
+
+  static std::optional<uint32_t> tryGetIncomingRegisterCount(const Function *F) {
+    return IncomingRegisterCount::tryGetValue(F);
   }
+
+  static std::optional<uint32_t> tryGetStackSize(const Function *F) { return StackSize::tryGetValue(F); }
+
+  static std::optional<uint32_t> tryGetOutgoingRegisterCount(const Instruction *I) {
+    return OutgoingRegisterCount::tryGetValue(I);
+  }
+
+// A compile-time directive to generate helper classes for accessing module-wide metadata.
+// TODO: Remove the generic, non-class scope helper functions once they are not required anymore.
+#define MODULE_METADATA_HELPER(NAME, MD_NAME)                                                                          \
+  class NAME final {                                                                                                   \
+  public:                                                                                                              \
+    static std::optional<uint32_t> tryGetValue(const Module *M) {                                                      \
+      auto *MD = M->getNamedMetadata(MD_NAME);                                                                         \
+      if (!MD)                                                                                                         \
+        return {};                                                                                                     \
+      return extractZExtI32Constant(MD->getOperand(0));                                                                \
+    }                                                                                                                  \
+    static void setValue(Module *M, uint32_t Value) {                                                                  \
+      auto *MD = M->getOrInsertNamedMetadata(MD_NAME);                                                                 \
+      assert(MD && "Failed to create metadata node!");                                                                 \
+      MD->clearOperands();                                                                                             \
+      MD->addOperand(getI32MDConstant(M->getContext(), Value));                                                        \
+    }                                                                                                                  \
+  };                                                                                                                   \
+  static std::optional<uint32_t> tryGet##NAME(const Module &M) { return NAME::tryGetValue(&M); }                       \
+  static void set##NAME(Module &M, uint32_t Value) { NAME::setValue(&M, Value); }
+
+  MODULE_METADATA_HELPER(PreservedPayloadRegisterCount, MDPreservedPayloadRegisterCountName)
+  MODULE_METADATA_HELPER(MaxUsedPayloadRegisterCount, MDMaxUsedPayloadRegisterCountName)
+  MODULE_METADATA_HELPER(MaxPayloadRegisterCount, MDMaxPayloadRegisterCountName)
+  MODULE_METADATA_HELPER(Rtip, MDRtipName)
+  MODULE_METADATA_HELPER(Flags, MDFlagsName)
+
+#undef MODULE_METADATA_HELPER
 
   // Old alias until clients are migrated to setPreservedPayloadRegisterCount:
-  static void
-  setMinPayloadRegisterCount(Module &M,
-                             uint32_t PreservedPayloadRegisterCount) {
-    setPreservedPayloadRegisterCount(M, PreservedPayloadRegisterCount);
-  }
-
-  // If there is module-level metadata specifying the maximum number
-  // of payload registers, return that value. Otherwise, return std::nullopt.
-  static std::optional<uint32_t>
-  tryGetMaxUsedPayloadRegisterCount(const Module &M) {
-    auto *MD = M.getNamedMetadata(MDMaxUsedPayloadRegisterCountName);
-    if (!MD)
-      return {};
-    return extractZExtI32Constant(MD->getOperand(0));
-  };
-
-  static void
-  setMaxUsedPayloadRegisterCount(Module &M,
-                                 uint32_t MaxUsedPayloadRegisterCount) {
-    auto *MD = M.getOrInsertNamedMetadata(MDMaxUsedPayloadRegisterCountName);
-    assert(MD && "Failed to create metadata node!");
-    MD->clearOperands();
-    MD->addOperand(
-        getI32MDConstant(M.getContext(), MaxUsedPayloadRegisterCount));
-  }
-
-  static std::optional<uint32_t>
-  tryGetMaxPayloadRegisterCount(const Module &M) {
-    auto *MD = M.getNamedMetadata(MDMaxPayloadRegisterCountName);
-    if (!MD)
-      return {};
-    return extractZExtI32Constant(MD->getOperand(0));
-  };
-
-  static void setMaxPayloadRegisterCount(Module &M,
-                                         uint32_t MaxPayloadRegisterCount) {
-    auto *MD = M.getOrInsertNamedMetadata(MDMaxPayloadRegisterCountName);
-    assert(MD && "Failed to create metadata node!");
-    MD->clearOperands();
-    MD->addOperand(getI32MDConstant(M.getContext(), MaxPayloadRegisterCount));
-  }
-
-  static void setStackSize(Function *F, uint32_t StackSize) {
-    F->setMetadata(MDStackSizeName,
-                   getI32MDConstant(F->getContext(), StackSize));
-  }
-
-  // If the function already has stacksize metadata, add the given value.
-  // Otherwise, assume an existing value of zero, and set the pass value.
-  static void addStackSize(Function *F, uint32_t AddedStackSize) {
-    auto ExistingSize = tryGetStackSize(F).value_or(0);
-    F->setMetadata(
-        MDStackSizeName,
-        getI32MDConstant(F->getContext(), ExistingSize + AddedStackSize));
-  }
-
-  static std::optional<uint32_t> tryGetStackSize(const Function *F) {
-    return extractZExtI32Constant(F->getMetadata(MDStackSizeName));
+  static void setMinPayloadRegisterCount(Module &M, uint32_t PreservedPayloadRegisterCount) {
+    PreservedPayloadRegisterCount::setValue(&M, PreservedPayloadRegisterCount);
   }
 
   // If there is module-level metadata specifying the stack addrspace,
   // return that value. Otherwise, return std::nullopt.
-  static std::optional<ContStackAddrspace>
-  tryGetStackAddrspace(const Module &M) {
+  static std::optional<ContStackAddrspace> tryGetStackAddrspace(const Module &M) {
     auto *MD = M.getNamedMetadata(MDStackAddrspaceName);
     if (!MD)
       return {};
@@ -500,114 +381,72 @@ public:
   static void setStackAddrspace(Module &M, ContStackAddrspace StackAddrspace) {
     auto *MD = M.getOrInsertNamedMetadata(MDStackAddrspaceName);
     MD->clearOperands();
-    MD->addOperand(getI32MDConstant(M.getContext(),
-                                    static_cast<uint32_t>(StackAddrspace)));
-  }
-
-  static std::optional<uint32_t> tryGetRtip(const Module &M) {
-    auto *MD = M.getNamedMetadata(MDRtipName);
-    if (!MD)
-      return {};
-    return extractZExtI32Constant(MD->getOperand(0));
-  };
-
-  static void setRtip(Module &M, uint32_t RtipLevel) {
-    auto *MD = M.getOrInsertNamedMetadata(MDRtipName);
-    MD->clearOperands();
-    MD->addOperand(getI32MDConstant(M.getContext(), RtipLevel));
-  }
-
-  static std::optional<uint32_t> tryGetFlags(const Module &M) {
-    auto *MD = M.getNamedMetadata(MDFlagsName);
-    if (!MD)
-      return {};
-    return extractZExtI32Constant(MD->getOperand(0));
-  };
-
-  static void setFlags(Module &M, uint32_t Flags) {
-    auto *MD = M.getOrInsertNamedMetadata(MDFlagsName);
-    MD->clearOperands();
-    MD->addOperand(getI32MDConstant(M.getContext(), Flags));
-  }
-
-  static void setContinuationStateByteCount(Function &F, uint32_t ByteCount) {
-    F.setMetadata(MDStateName, getI32MDConstant(F.getContext(), ByteCount));
-  }
-
-  static std::optional<uint32_t>
-  tryGetContinuationStateByteCount(const Function &F) {
-    return extractZExtI32Constant(F.getMetadata(MDStateName));
+    MD->addOperand(getI32MDConstant(M.getContext(), static_cast<uint32_t>(StackAddrspace)));
   }
 
   static Type *getPayloadTypeFromMetadata(const Function &Func) {
     if (MDNode *Node = Func.getMetadata(MDContPayloadTyName))
       return getPayloadTypeFromMetadata(Node);
 
-    report_fatal_error(Twine(MDContPayloadTyName) +
-                       " metadata not found on function " + Func.getName() +
-                       "!");
+    report_fatal_error(Twine(MDContPayloadTyName) + " metadata not found on function " + Func.getName() + "!");
   }
 
   static Type *getPayloadTypeFromMetadata(const CallInst &CI) {
     if (MDNode *Node = CI.getMetadata(MDContPayloadTyName))
       return getPayloadTypeFromMetadata(Node);
 
-    report_fatal_error(Twine(MDContPayloadTyName) +
-                       " metadata not found on CallInst!");
+    report_fatal_error(Twine(MDContPayloadTyName) + " metadata not found on CallInst!");
   }
 
   static void setPayloadTypeMetadata(Instruction *I, Type *T) {
     I->setMetadata(ContHelper::MDContPayloadTyName,
-                   MDNode::get(I->getContext(),
-                               {ConstantAsMetadata::get(PoisonValue::get(T))}));
+                   MDNode::get(I->getContext(), {ConstantAsMetadata::get(PoisonValue::get(T))}));
   }
 
-  static bool isLgcCpsModule(Module &Mod) {
-    return Mod.getNamedMetadata(MDLgcCpsModuleName) != nullptr;
+  static std::optional<int32_t> tryGetWaitMask(const CallInst &CI) {
+    return extractZExtI32Constant(CI.getMetadata(MDWaitMaskName));
   }
+
+  static void setWaitMask(CallInst &CI, int32_t WaitMask) {
+    CI.setMetadata(MDWaitMaskName, getI32MDConstant(CI.getContext(), WaitMask));
+  }
+
+  static void removeWaitMask(CallInst &CI) { CI.setMetadata(MDWaitMaskName, nullptr); }
+
+  static bool isLgcCpsModule(Module &Mod) { return Mod.getNamedMetadata(MDLgcCpsModuleName) != nullptr; }
 
   // Specifies that an awaited call should wait on a wait mask.
   static void setIsWaitAwaitCall(CallInst &CI) {
-    CI.setMetadata(ContHelper::MDIsWaitAwaitName,
-                   MDTuple::get(CI.getContext(), {}));
+    CI.setMetadata(ContHelper::MDIsWaitAwaitName, MDTuple::get(CI.getContext(), {}));
   }
 
   // Queries whether an awaited call should wait on a wait mask.
-  static bool isWaitAwaitCall(const CallInst &CI) {
-    return CI.getMetadata(MDIsWaitAwaitName) != nullptr;
-  }
+  static bool isWaitAwaitCall(const CallInst &CI) { return CI.getMetadata(MDIsWaitAwaitName) != nullptr; }
 
-  static void removeIsWaitAwaitMetadata(CallInst &CI) {
-    CI.setMetadata(ContHelper::MDIsWaitAwaitName, nullptr);
-  }
+  static void removeIsWaitAwaitMetadata(CallInst &CI) { CI.setMetadata(ContHelper::MDIsWaitAwaitName, nullptr); }
 
   /// Returns true if a call to the given function should be rematerialized
   /// in a shader of the specified kind.
   ///
   /// If no shader kind is specified, return false.
-  static bool isRematerializableLgcRtOp(
-      CallInst &CInst,
-      std::optional<lgc::rt::RayTracingShaderStage> Kind = std::nullopt);
+  static bool isRematerializableLgcRtOp(CallInst &CInst,
+                                        std::optional<lgc::rt::RayTracingShaderStage> Kind = std::nullopt);
 
-  static bool isLegacyEntryFunction(Function *Func) {
-    return Func->hasMetadata(MDEntryName);
-  }
+  static bool isLegacyEntryFunction(Function *Func) { return Func->hasMetadata(MDEntryName); }
 
   // Given a list of types, get a type that makes the list of types
   // occupy a specific number of dwords including it.
-  static Type *getPaddingType(const DataLayout &DL, LLVMContext &Context,
-                              ArrayRef<Type *> Types, unsigned TargetNumDwords);
+  static Type *getPaddingType(const DataLayout &DL, LLVMContext &Context, ArrayRef<Type *> Types,
+                              unsigned TargetNumDwords);
 
   // Given a list of types, add a type to the list that makes the list of types
   // occupy a specific number of dwords.
-  static void addPaddingType(const DataLayout &DL, LLVMContext &Context,
-                             SmallVectorImpl<Type *> &Types,
+  static void addPaddingType(const DataLayout &DL, LLVMContext &Context, SmallVectorImpl<Type *> &Types,
                              unsigned TargetNumDwords);
 
   // Given a list of values, add a value to the list that makes the list of
   // values occupy a specific number of dwords.
-  static void addPaddingValue(const DataLayout &DL, LLVMContext &Context,
-                              SmallVectorImpl<Value *> &Values,
+  static void addPaddingValue(const DataLayout &DL, LLVMContext &Context, SmallVectorImpl<Value *> &Values,
                               unsigned TargetNumDwords);
 
   // Returns whether the given flag is enabled in the given GpuRt module,
@@ -617,12 +456,23 @@ public:
 
   // Handles _AmdGetSetting_* intrinsics.
   static void handleGetSetting(Function &F, ArrayRef<ContSetting> Settings);
+
+  // Handles _AmdGetFuncAddr* intrinsics.
+  static void handleGetFuncAddr(Function &F, llvm_dialects::Builder &Builder);
+
+  // Handles _AmdValueI32Count intrinsics.
+  static void handleValueI32Count(Function &F, IRBuilder<> &Builder);
+
+  // Handles _AmdValueGetI32 intrinsics.
+  static void handleValueGetI32(Function &F, IRBuilder<> &Builder);
+
+  // Handles _AmdValueSetI32 intrinsics.
+  static void handleValueSetI32(Function &F, IRBuilder<> &Builder);
 };
 
 class ShaderStageHelper final {
 public:
-  static DXILShaderKind
-  rtShaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
+  static DXILShaderKind rtShaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
     switch (Stage) {
     case lgc::rt::RayTracingShaderStage::RayGeneration:
       return DXILShaderKind::RayGeneration;
@@ -648,8 +498,7 @@ public:
     }
   }
 
-  static std::optional<lgc::rt::RayTracingShaderStage>
-  dxilShaderKindToRtShaderStage(DXILShaderKind Kind) {
+  static std::optional<lgc::rt::RayTracingShaderStage> dxilShaderKindToRtShaderStage(DXILShaderKind Kind) {
     switch (Kind) {
     case DXILShaderKind::RayGeneration:
       return lgc::rt::RayTracingShaderStage::RayGeneration;
@@ -677,7 +526,6 @@ DRIVER_FUNC_NAME(SetTriangleHitAttributes)
 DRIVER_FUNC_NAME(GetCandidateState)
 DRIVER_FUNC_NAME(GetCommittedState)
 DRIVER_FUNC_NAME(GetContinuationStackAddr)
-DRIVER_FUNC_NAME(SetupRayGen)
 DRIVER_FUNC_NAME(ExitRayGen)
 DRIVER_FUNC_NAME(IsEndSearch)
 DRIVER_FUNC_NAME(GetLocalRootIndex)
@@ -699,19 +547,6 @@ DRIVER_FUNC_NAME(ShaderStart)
 
 /// Free-standing helpers.
 
-// Helper to visit all calls of a function.
-// Expected type for Callback:
-//  void(CallInst &)
-template <typename CallbackTy>
-void forEachCall(Function &F, CallbackTy Callback) {
-  static_assert(std::is_invocable_v<CallbackTy, CallInst &>);
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser()))
-      if (CInst->isCallee(&Use))
-        Callback(*CInst);
-  }
-}
-
 // Replace all calls to a given function with some value.
 // Removes the original call.
 void replaceCallsToFunction(llvm::Function &F, llvm::Value &Replacement);
@@ -723,8 +558,7 @@ void moveFunctionBody(Function &OldFunc, Function &NewFunc);
 
 // From a specific lgc.rt call operation, try to find information about the
 // corresponding GPURT implementation.
-std::optional<GpuRtIntrinsicEntry>
-findIntrImplEntryByIntrinsicCall(CallInst *Call);
+std::optional<GpuRtIntrinsicEntry> findIntrImplEntryByIntrinsicCall(CallInst *Call);
 
 // Collect and remove unused function declarations.
 // @OnlyIntrinsics is used to differentiate whether all function declarations
@@ -735,20 +569,6 @@ findIntrImplEntryByIntrinsicCall(CallInst *Call);
 // during DXILContPostProcess, so we cannot remove all unused declarations right
 // at the end of LowerRaytracingPipeline.
 bool removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics = true);
-
-// For each basic block in Func, find the terminator. If it is contained in
-// TerminatorOpcodes, then apply the callback on the terminator.
-template <typename CallbackTy, typename = std::enable_if<std::is_invocable_v<
-                                   CallbackTy, llvm::Instruction &>>>
-void forEachTerminator(Function *Func, ArrayRef<unsigned> TerminatorOpcodes,
-                       CallbackTy Callback) {
-  for (auto &BB : *Func) {
-    auto *Terminator = BB.getTerminator();
-    if (llvm::find(TerminatorOpcodes, Terminator->getOpcode()) !=
-        TerminatorOpcodes.end())
-      Callback(*Terminator);
-  }
-}
 
 // Do store-to-load forwarding for memory access to continuation stack.  This is
 // helpful to mitigate the issue that coroutine passes in some cases still load

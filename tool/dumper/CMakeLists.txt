@@ -75,4 +75,5 @@ if(ICD_BUILD_LLPC)
     target_compile_definitions(dumper PRIVATE ICD_BUILD_LLPC)
 endif()
 target_link_libraries(dumper PUBLIC dumper_base)
+target_compile_definitions(dumper PRIVATE NOMINMAX)
 

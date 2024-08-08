@@ -49,7 +49,8 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelin
                                      const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                                      MetroHash::Hash *cacheHash, unsigned indirectStageMask)
     : PipelineContext(gfxIP, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_representativeShaderInfo(),
-      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""), m_callableDataMaxSize(0) {
+      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""), m_callableDataMaxSize(0),
+      m_rayFlagsKnownBits(std::nullopt) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   gpurtShaderLibrary = &pipelineInfo->shaderTraceRay;
@@ -147,6 +148,29 @@ llvm::Type *RayTracingContext::getCallableDataType(lgc::Builder *builder) {
 // @param builder : LGC builder
 unsigned RayTracingContext::getAttributeDataSize() {
   return divideCeil(m_rtLibSummary.maxHitAttributeSize, 4);
+}
+
+// =====================================================================================================================
+// Check whether the pipeline is compiled in continuations mode
+bool RayTracingContext::isContinuationsMode() const {
+  bool isContinuations = false;
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 74
+  if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
+    // Client require continuations mode explicitly.
+    isContinuations = true;
+  }
+#else
+  // Continuations mode is only enabled for indirect mode.
+  if (getIndirectStageMask() != 0) {
+    if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Auto) {
+    } else if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
+      // Client require continuations mode explicitly.
+      isContinuations = true;
+    }
+  }
+#endif
+  return isContinuations;
 }
 
 // =====================================================================================================================
@@ -278,7 +302,7 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 68
   if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continufy)
     options.rtIndirectMode = lgc::RayTracingIndirectMode::ContinuationsContinufy;
-  else if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations)
+  else if (isContinuationsMode())
     options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
 
   options.cpsFlags = m_pipelineInfo->cpsFlags;

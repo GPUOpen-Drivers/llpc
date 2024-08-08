@@ -4,13 +4,13 @@
 %struct.DispatchSystemData = type { i32 }
 
 declare i64 @_AmdGetFuncAddrMyFunc()
-declare i32 @_AmdGetFuncAddrMyFunc2()
 
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
+%struct.TraversalData = type { }
 
-declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !12 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
-define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !8 {
   ret void
 }
 
@@ -19,31 +19,21 @@ define { i64, i32 } @main() !lgc.rt.shaderstage !10 {
 ; CHECK-SAME: (i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.entry [[META11:![0-9]+]] !continuation.registercount [[META5]] !continuation [[META12:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @MyFunc)
-; CHECK-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @MyFunc2)
 ; CHECK-NEXT:    [[V0:%.*]] = insertvalue { i64, i32 } undef, i64 [[TMP1]], 0
-; CHECK-NEXT:    [[V1:%.*]] = insertvalue { i64, i32 } undef, i32 [[TMP2]], 1
 ; CHECK-NEXT:    ret void
 ;
 entry:
   %val = call i64 @_AmdGetFuncAddrMyFunc()
-  %val2 = call i32 @_AmdGetFuncAddrMyFunc2()
   %v0 = insertvalue { i64, i32 } undef, i64 %val, 0
-  %v1 = insertvalue { i64, i32 } undef, i32 %val2, 1
-  ret { i64, i32 } %v1
+  ret { i64, i32 } %v0
 }
 
 define i32 @MyFunc() {
 ; CHECK-LABEL: define i32 @MyFunc() {
-; CHECK-NEXT:    ret i32 5
-;
-  ret i32 5
-}
-
-define i32 @MyFunc2() {
-; CHECK-LABEL: define i32 @MyFunc2() {
 ; CHECK-NEXT:    ret i32 5
 ;
   ret i32 5
@@ -60,6 +50,9 @@ define i32 @MyFunc2() {
 !5 = !{i32 0}
 !6 = !{i32 0, i64 65536}
 !7 = !{i32 21}
-!8 = !{!"function", i32 poison, !9}
+!8 = !{%struct.DispatchSystemData poison}
 !9 = !{i32 0, %struct.DispatchSystemData poison}
 !10 = !{i32 0}
+!11 = !{i32 0, %struct.TraversalData poison}
+!12 = !{%struct.TraversalData poison}
+

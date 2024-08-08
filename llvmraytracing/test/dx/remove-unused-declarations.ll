@@ -1,5 +1,5 @@
 ; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint' -S %s --lint-abort-on-error | FileCheck -check-prefix=LOWERRAYTRACINGPIPELINE-DECL %s
-; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint' -S %s --lint-abort-on-error | FileCheck -check-prefix=DXILCONTPOSTPROCESS-DECL %s
+; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,dxil-cont-post-process,lint' -S %s --lint-abort-on-error | FileCheck -check-prefix=DXILCONTPOSTPROCESS-DECL %s
 
 target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
@@ -11,18 +11,18 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare i64 @_cont_GetTraversalAddr() #4
 declare i32 @_cont_GetContinuationStackAddr() #4
-declare !types !31 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.DispatchSystemData*) #4
-declare !types !32 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %struct.BuiltInTriangleIntersectionAttributes) #4
+declare !pointeetys !31 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.DispatchSystemData*) #4
+declare !pointeetys !32 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %struct.BuiltInTriangleIntersectionAttributes) #4
 declare %struct.DispatchSystemData @_cont_Traversal(%struct.TraversalData) #4
-declare %struct.DispatchSystemData @_cont_SetupRayGen() #4
-declare !types !33 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData*) #4
-declare !types !34 %struct.HitData @_cont_GetCommittedState(%struct.DispatchSystemData*) #4
+declare !pointeetys !33 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData*) #4
+declare !pointeetys !34 %struct.HitData @_cont_GetCommittedState(%struct.DispatchSystemData*) #4
+declare !pointeetys !53 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
-define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #4 !types !37 {
+define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #4 !pointeetys !37 {
   ret i32 5
 }
 
-define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float) #4 !types !38 {
+define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float) #4 !pointeetys !38 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
@@ -32,21 +32,21 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64, i32, i32, i3
 }
 
 ; Function Attrs: nounwind readnone
-declare !types !40 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData* nocapture readnone %data) #2
-declare !types !40 <3 x i32> @_cont_DispatchRaysDimensions3(%struct.DispatchSystemData* nocapture readnone %data) #2
-declare !types !41 <3 x float> @_cont_WorldRayOrigin3(%struct.DispatchSystemData* nocapture readnone %data) #2
-declare !types !41 <3 x float> @_cont_WorldRayDirection3(%struct.DispatchSystemData* nocapture readnone %data) #2
-declare !types !42 float @_cont_RayTMin(%struct.DispatchSystemData* nocapture readnone %data) #2
-declare !types !43 float @_cont_RayTCurrent(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #1
-declare !types !51 i32 @_cont_RayFlags(%struct.DispatchSystemData* nocapture readnone %data) #2
-declare !types !52 i32 @_cont_InstanceIndex(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !52 i32 @_cont_InstanceID(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !52 i32 @_cont_PrimitiveIndex(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !46 <3 x float> @_cont_ObjectRayOrigin3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !46 <3 x float> @_cont_ObjectRayDirection3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !47 [4 x <3 x float>] @_cont_ObjectToWorld4x3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !47 [4 x <3 x float>] @_cont_WorldToObject4x3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
-declare !types !45 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !40 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData* nocapture readnone %data) #2
+declare !pointeetys !40 <3 x i32> @_cont_DispatchRaysDimensions3(%struct.DispatchSystemData* nocapture readnone %data) #2
+declare !pointeetys !41 <3 x float> @_cont_WorldRayOrigin3(%struct.DispatchSystemData* nocapture readnone %data) #2
+declare !pointeetys !41 <3 x float> @_cont_WorldRayDirection3(%struct.DispatchSystemData* nocapture readnone %data) #2
+declare !pointeetys !42 float @_cont_RayTMin(%struct.DispatchSystemData* nocapture readnone %data) #2
+declare !pointeetys !43 float @_cont_RayTCurrent(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #1
+declare !pointeetys !51 i32 @_cont_RayFlags(%struct.DispatchSystemData* nocapture readnone %data) #2
+declare !pointeetys !52 i32 @_cont_InstanceIndex(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !52 i32 @_cont_InstanceID(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !52 i32 @_cont_PrimitiveIndex(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !46 <3 x float> @_cont_ObjectRayOrigin3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !46 <3 x float> @_cont_ObjectRayDirection3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !47 [4 x <3 x float>] @_cont_ObjectToWorld4x3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !47 [4 x <3 x float>] @_cont_WorldToObject4x3(%struct.DispatchSystemData* nocapture readnone %data, %struct.HitData*) #2
+declare !pointeetys !45 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone %data, %struct.HitData*) #2
 
 %dx.types.Handle = type { i8* }
 %struct.RaytracingAccelerationStructure = type { i32 }
@@ -58,7 +58,7 @@ declare !types !45 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone %da
 @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A" = external constant %dx.types.Handle, align 4
 
 ; Function Attrs: nounwind
-define void @ClosestHit(%struct.RayPayload*, %struct.BuiltInTriangleIntersectionAttributes*) #0 !types !48 {
+define void @ClosestHit(%struct.RayPayload*, %struct.BuiltInTriangleIntersectionAttributes*) #0 !pointeetys !48 {
   %a = call i32 @dx.op.dispatchRaysIndex.i32(i32 145, i8 0)  ; DispatchRaysIndex(col)
   %b = call i32 @dx.op.dispatchRaysDimensions.i32(i32 146, i8 0)  ; DispatchRaysDimensions(col)
   %c = call float @dx.op.worldRayOrigin.f32(i32 147, i8 0)  ; WorldRayOrigin(col)
@@ -157,25 +157,26 @@ attributes #4 = { "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-
 !22 = !{i32 0}
 !29 = !{void (%struct.RayPayload*, %struct.BuiltInTriangleIntersectionAttributes*)* @ClosestHit, !"ClosestHit", null, null, !30}
 !30 = !{i32 8, i32 10, i32 5, !22}
-!31 = !{!"function", %struct.BuiltInTriangleIntersectionAttributes poison, !39}
-!32 = !{!"function", !"void", !36, %struct.BuiltInTriangleIntersectionAttributes poison}
-!33 = !{!"function", %struct.HitData poison, !35}
-!34 = !{!"function", %struct.HitData poison, !39}
+!31 = !{%struct.DispatchSystemData poison}
+!32 = !{%struct.SystemData poison}
+!33 = !{%struct.AnyHitTraversalData poison}
+!34 = !{%struct.DispatchSystemData poison}
 !35 = !{i32 0, %struct.AnyHitTraversalData poison}
 !36 = !{i32 0, %struct.SystemData poison}
-!37 = !{!"function", i32 poison, !39}
-!38 = !{!"function", !"void", !39, i64 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison}
+!37 = !{%struct.DispatchSystemData poison}
+!38 = !{%struct.DispatchSystemData poison}
 !39 = !{i32 0, %struct.DispatchSystemData poison}
-!40 = !{!"function", <3 x i32> poison, !39}
-!41 = !{!"function", <3 x float> poison, !39}
-!42 = !{!"function", float poison, !39}
-!43 = !{!"function", float poison, !39, !44}
+!40 = !{%struct.DispatchSystemData poison}
+!41 = !{%struct.DispatchSystemData poison}
+!42 = !{%struct.DispatchSystemData poison}
+!43 = !{null, %struct.DispatchSystemData poison, %struct.HitData poison}
 !44 = !{i32 0, %struct.HitData poison}
-!45 = !{!"function", i32 poison, !36, !44}
-!46 = !{!"function", <3 x float> poison, !39, !44}
-!47 = !{!"function", [4 x <3 x float>] poison, !39, !44}
-!48 = !{!"function", !"void", !49, !50}
+!45 = !{null, %struct.SystemData poison, %struct.HitData poison}
+!46 = !{null, %struct.DispatchSystemData poison, %struct.HitData poison}
+!47 = !{null, %struct.DispatchSystemData poison, %struct.HitData poison}
+!48 = !{null, %struct.RayPayload poison, %struct.BuiltInTriangleIntersectionAttributes poison}
 !49 = !{i32 0, %struct.RayPayload poison}
 !50 = !{i32 0, %struct.BuiltInTriangleIntersectionAttributes poison}
-!51 = !{!"function", i32 poison, !39}
-!52 = !{!"function", i32 poison, !39, !44}
+!51 = !{%struct.DispatchSystemData poison}
+!52 = !{null, %struct.DispatchSystemData poison, %struct.HitData poison}
+!53 = !{%struct.AnyHitTraversalData poison}

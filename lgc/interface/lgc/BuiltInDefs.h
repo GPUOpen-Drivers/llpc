@@ -133,4 +133,7 @@ BUILTIN(GsWaveId, BuiltInInternalBase + 10, N, G, i32)
 BUILTIN(UnswizzledLocalInvocationId, BuiltInInternalBase + 11, N, C, i32)
 BUILTIN(UnswizzledLocalInvocationIndex, BuiltInInternalBase + 12, N, C, i32)
 
-BUILTIN(EdgeFlag, BuiltInInternalBase + 18, V, V, i32) // EdgeFlag output
+BUILTIN(EdgeFlag, BuiltInInternalBase + 18, V, V, i32)    // EdgeFlag output
+BUILTIN(PrimType, BuiltInInternalBase + 20, N, P, i32)    // Prim Type input
+BUILTIN(PrimCoord, BuiltInInternalBase + 21, N, P, v2f32) // Prim Coord input
+BUILTIN(LineStipple, BuiltInInternalBase + 22, N, P, f32) // Line Stipple input

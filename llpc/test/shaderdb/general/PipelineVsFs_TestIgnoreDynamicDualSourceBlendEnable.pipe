@@ -2,9 +2,9 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 0
-; SHADERTEST-NEXT: call void @llvm.amdgcn.exp.f32(i32 immarg 1
-; SHADERTEST-NEXT: call void @llvm.amdgcn.exp.f32(i32 immarg 2
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 0
+; SHADERTEST-NEXT: call void @llvm.amdgcn.exp.f32(i32 1
+; SHADERTEST-NEXT: call void @llvm.amdgcn.exp.f32(i32 2
 ; END_SHADERTEST
 
 [VsGlsl]

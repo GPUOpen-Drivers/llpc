@@ -165,6 +165,8 @@ PreservedAnalyses PatchEntryPointMutate::run(Module &module, ModuleAnalysisManag
 
   processGroupMemcpy(module);
   processDriverTableLoad(module);
+  processPops(module);
+
   return PreservedAnalyses::none();
 }
 
@@ -504,6 +506,204 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
     // Create the copy instructions.
     builder.SetInsertPoint(copyBlock->getTerminator());
     copyFunc(dwordTy, dwordCopySize);
+  }
+}
+
+// =====================================================================================================================
+// Process PopsBeginCriticalSectionOp and PopsEndCriticalSectionOp.
+//
+// @param module : LLVM module
+void PatchEntryPointMutate::processPops(llvm::Module &module) {
+  SmallVector<CallInst *> callsToRemove;
+
+  struct Payload {
+    SmallVectorImpl<CallInst *> &callsToRemove;
+    PatchEntryPointMutate *self;
+  };
+
+  Payload payload = {callsToRemove, this};
+  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<PopsBeginInterlockOp>([](auto &payload, auto &op) {
+                              payload.self->lowerPopsBeginInterlock(op);
+                              payload.callsToRemove.push_back(&op);
+                            })
+                            .add<PopsEndInterlockOp>([](auto &payload, auto &op) {
+                              payload.self->lowerPopsEndInterlock(op);
+                              payload.callsToRemove.push_back(&op);
+                            })
+                            .build();
+  visitor.visit(payload, module);
+
+  for (auto call : payload.callsToRemove)
+    call->eraseFromParent();
+}
+
+// =====================================================================================================================
+// Lower PopsBeginInterlockOp.
+//
+// @param popsBeginInterlockOp : Call instruction op to begin a POPS critical section
+void PatchEntryPointMutate::lowerPopsBeginInterlock(PopsBeginInterlockOp &popsBeginInterlockOp) {
+  Function *entryPoint = popsBeginInterlockOp.getFunction();
+  assert(getShaderStage(entryPoint) == ShaderStage::Fragment); // Must be FS
+
+  BuilderBase builder(&popsBeginInterlockOp);
+
+  //
+  // The processing is something like this:
+  //
+  // Pre-GFX11:
+  // The layout of collision wave ID is as follow:
+  //
+  // +------------+-----------+---------------------------+-----------------+
+  // | Overlapped | Packer ID | Newest Overlapped Wave ID | Current Wave ID |
+  // | [31]       | [29:28]   | [25:16]                   | [9:0]           |
+  // +------------+-----------+---------------------------+-----------------+
+  //
+  //   POPS_BEGIN_INTERLOCK() {
+  //     isOverlapped = collisionWaveId[31]
+  //     if (isOverlapped) {
+  //       packerId = collisionWaveId[29:28]
+  //       s_setreg(HW_REG_POPS_PACKER, (packerId << 1) & 0x1))
+  //
+  //       currentWaveId = collisionWaveId[9:0]
+  //       waveIdRemapOffset = -(currentWaveId + 1) = ~currentWaveId
+  //
+  //       newestOverlappedWaveId = collisionWaveId[25:16]
+  //       newestOverlappedWaveId += waveIdRemapOffset
+  //
+  //       Load srcPopsExitingWaveId
+  //       srcPopsExitingWaveId += waveIdRemapOffset
+  //       while (srcPopsExitingWaveId <= newestOverlappedWaveId) {
+  //         s_sleep(0xFFFF)
+  //         Reload srcPopsExitingWaveId
+  //         srcPopsExitingWaveId += waveIdRemapOffset
+  //       }
+  //     }
+  //   }
+  //
+  // GFX11+:
+  //   POPS_BEGIN_INTERLOCK() {
+  //     s_wait_event(EXPORT_READY)
+  //   }
+  //
+  auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  if (gfxIp.major >= 11) {
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_wait_event_export_ready, {});
+    return;
+  }
+
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
+  auto collisionWaveId = getFunctionArgument(entryPoint, entryArgIdxs.collisionWaveId);
+
+  auto checkOverlapBlock = builder.GetInsertBlock();
+  auto processOverlapBlock = checkOverlapBlock->splitBasicBlock(&popsBeginInterlockOp, ".processOverlap");
+  auto waveWaitingHeaderBlock = processOverlapBlock->splitBasicBlock(&popsBeginInterlockOp, ".waveWaitingHeader");
+  auto waveWaitingBodyBlock = waveWaitingHeaderBlock->splitBasicBlock(&popsBeginInterlockOp, ".waveWaitingBody");
+  auto endProcessOverlapBlock = waveWaitingBodyBlock->splitBasicBlock(&popsBeginInterlockOp, ".endProcessOverlap");
+
+  // Modify ".checkOverlap" block
+  {
+    builder.SetInsertPoint(checkOverlapBlock->getTerminator());
+
+    auto isOverlapped = builder.CreateAnd(builder.CreateLShr(collisionWaveId, 31), 0x1);
+    isOverlapped = builder.CreateTrunc(isOverlapped, builder.getInt1Ty());
+    builder.CreateCondBr(isOverlapped, processOverlapBlock, endProcessOverlapBlock);
+
+    checkOverlapBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Construct ".processOverlap" block
+  Value *waveIdRemapOffset = nullptr;
+  Value *newestOverlappedWaveId = nullptr;
+  {
+    builder.SetInsertPoint(processOverlapBlock->getTerminator());
+
+    auto packerId = builder.CreateAnd(builder.CreateLShr(collisionWaveId, 28), 0x3);
+    // POPS_PACKER: [0] Enable; [2:1] Packer ID
+    auto hwReg = [=](unsigned hwRegId, unsigned offset, unsigned size) {
+      // The HW register of s_setreg has this layout:
+      //   [5:0] ID of HW register; [10:6] Offset; [15:11] Size
+      return ((hwRegId) | (offset << 6) | ((size - 1) << 11));
+    };
+    static const unsigned HwRegPopsPacker = 25;
+    auto popsPacker = builder.CreateOr(builder.CreateShl(packerId, 1), 0x1);
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_setreg,
+                            {builder.getInt32(hwReg(HwRegPopsPacker, 0, 3)), popsPacker});
+
+    // waveIdRemapOffset = -(currentWaveId + 1) = ~currentWaveId
+    auto currentWaveId = builder.CreateAnd(collisionWaveId, 0x3FF);
+    waveIdRemapOffset = builder.CreateNot(currentWaveId);
+
+    // newestOverlappedWaveId += waveIdRemapOffset
+    newestOverlappedWaveId = builder.CreateAnd(builder.CreateLShr(collisionWaveId, 16), 0x3FF);
+    newestOverlappedWaveId = builder.CreateAdd(newestOverlappedWaveId, waveIdRemapOffset);
+  }
+
+  // Construct ".waveWaitingHeader" block
+  {
+    builder.SetInsertPoint(waveWaitingHeaderBlock->getTerminator());
+
+    Value *popsExitingWaveId =
+        builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_pops_exiting_wave_id, {});
+    popsExitingWaveId = builder.CreateAdd(popsExitingWaveId, waveIdRemapOffset);
+
+    Value *needToWait = builder.CreateICmpULE(popsExitingWaveId, newestOverlappedWaveId);
+    builder.CreateCondBr(needToWait, waveWaitingBodyBlock, endProcessOverlapBlock);
+
+    waveWaitingHeaderBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Construct ".waveWaitingBody" block
+  {
+    builder.SetInsertPoint(waveWaitingBodyBlock->getTerminator());
+
+    static const unsigned WaitTime = 0xFFFF;
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_sleep, {}, builder.getInt32(WaitTime));
+
+    builder.CreateBr(waveWaitingHeaderBlock);
+
+    waveWaitingBodyBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Currently, nothing to do to construct ".endProcessOverlap" block
+}
+
+// =====================================================================================================================
+// Lower PopsEndInterlockOp.
+//
+// @param popsEndInterlockOp : Call instruction op to end a POPS critical section
+void PatchEntryPointMutate::lowerPopsEndInterlock(PopsEndInterlockOp &popsEndInterlockOp) {
+  Function *entryPoint = popsEndInterlockOp.getFunction();
+  assert(getShaderStage(entryPoint) == ShaderStage::Fragment); // Must be FS
+
+  BuilderBase builder(&popsEndInterlockOp);
+
+  //
+  // The processing is something like this:
+  //
+  // Pre-GFX11:
+  //   POPS_END_INTERLOCK() {
+  //     s_wait_vscnt null, 0x0
+  //     s_sendmsg(MSG_ORDERED_PS_DONE)
+  //   }
+  //
+  // GFX11+:
+  //   POPS_END_INTERLOCK() {
+  //     s_wait_vscnt null, 0x0
+  //   }
+  //
+
+  // Add s_wait_vscnt null, 0x0 to make sure the completion of all writes
+  SyncScope::ID syncScope = builder.getContext().getOrInsertSyncScopeID("agent");
+  builder.CreateFence(AtomicOrdering::Release, syncScope);
+
+  auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  if (gfxIp.major < 11) {
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
+    auto primMask = getFunctionArgument(entryPoint, entryArgIdxs.primMask);
+
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {builder.getInt32(OrderedPsDone), primMask});
   }
 }
 
@@ -1482,6 +1682,8 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
     spiPsInputAddr.bits.frontFaceEna = builtInUsage.frontFacing;
     spiPsInputAddr.bits.ancillaryEna = builtInUsage.sampleId;
     spiPsInputAddr.bits.ancillaryEna |= builtInUsage.shadingRate;
+    spiPsInputAddr.bits.ancillaryEna |= builtInUsage.primType;
+    spiPsInputAddr.bits.lineStippleTexEna |= builtInUsage.lineStipple;
     spiPsInputAddr.bits.sampleCoverageEna = builtInUsage.sampleMaskIn;
 
     builder.addAttribute("InitialPSInputAddr", std::to_string(spiPsInputAddr.u32All));
@@ -2010,6 +2212,13 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
   for (const auto &userDataArg : userDataArgs)
     userDataEnd += userDataArg.argDwordSize;
   assert(userDataEnd < userDataAvailable && "too many system value user data args");
+
+  if (m_pipelineState->getOptions().forceUserDataSpill) {
+    // Force all user data to be spilled; should only be used by indirect RT.
+    assert(m_pipelineState->getOptions().rtIndirectMode != RayTracingIndirectMode::NotIndirect);
+    spill = true;
+    userDataAvailable = userDataEnd;
+  }
 
   if (m_computeWithCalls) {
     // In compute with calls, the user data layout must be the same across all shaders and therefore cannot depend

@@ -5,13 +5,14 @@
 %struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 %struct.HitData = type { float, i32 }
 %struct.Payload = type { i32 }
-
+%struct.TraversalData = type { i32 }
 declare i32 @_AmdGetShaderKind()
 
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
-declare !types !3 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
-declare !types !5 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.DispatchSystemData*)
-declare !types !6 i32 @_cont_HitKind(%struct.DispatchSystemData*, %struct.HitData*)
+declare !pointeetys !3 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !5 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.DispatchSystemData*)
+declare !pointeetys !6 i32 @_cont_HitKind(%struct.DispatchSystemData*, %struct.HitData*)
+
+declare !pointeetys !18 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
 ; Check that GetShaderKind calls in non-shaders, like left-over intrinsics, are ignored.
 define float @_cont_RayTCurrent() {
@@ -26,24 +27,27 @@ define float @_cont_RayTCurrent() {
 }
 
 ; Note: DXILShaderKind::Miss has value 11
-define void @MyMiss(%struct.Payload* %payload) !types !1 !lgc.rt.shaderstage !16 {
+define void @MyMiss(%struct.Payload* %payload) !pointeetys !1 !lgc.rt.shaderstage !16 {
 ; CHECK-LABEL: define %struct.DispatchSystemData @MyMiss
-; CHECK-SAME: (i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META12:![0-9]+]] !continuation.registercount [[META5:![0-9]+]] !continuation [[META13:![0-9]+]] {
+; CHECK-SAME: (i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META12:![0-9]+]] !continuation.registercount [[META5:![0-9]+]] !continuation [[META13:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [7 x i32], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
+; CHECK-NEXT:    store [1 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 [[TMP5]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP3]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; CHECK-NEXT:    store i32 11, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[TMP8]], ptr addrspace(20) @PAYLOAD, align 4
+; CHECK-NEXT:    store i32 [[TMP8]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]]), !continuation.registercount [[META5]]
+; CHECK-NEXT:    [[TMP10:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], [8 x i32] poison, [1 x i32] [[TMP10]]), !continuation.registercount [[META5]]
 ; CHECK-NEXT:    unreachable
 ;
   %1 = call i32 @_AmdGetShaderKind()
@@ -54,12 +58,12 @@ define void @MyMiss(%struct.Payload* %payload) !types !1 !lgc.rt.shaderstage !16
 
 !dx.entryPoints = !{!12, !13}
 
-!1 = !{!"function", !"void", !2}
+!1 = !{%struct.Payload poison}
 !2 = !{i32 0, %struct.Payload poison}
-!3 = !{!"function", i32 poison, !4}
+!3 = !{%struct.DispatchSystemData poison}
 !4 = !{i32 0, %struct.DispatchSystemData poison}
-!5 = !{!"function", %struct.BuiltInTriangleIntersectionAttributes poison, !4}
-!6 = !{!"function", i32 poison, !4, !7}
+!5 = !{%struct.DispatchSystemData poison}
+!6 = !{null, %struct.DispatchSystemData poison, %struct.HitData poison}
 !7 = !{i32 0, %struct.HitData poison}
 !12 = !{null, !"", null, null, null}
 !13 = !{void (%struct.Payload*)* @MyMiss, !"MyMiss", null, null, !14}
@@ -67,3 +71,5 @@ define void @MyMiss(%struct.Payload* %payload) !types !1 !lgc.rt.shaderstage !16
 !14 = !{i32 8, i32 11, i32 6, i32 4, i32 5, !15}
 !15 = !{i32 0}
 !16 = !{i32 4}
+!17 = !{i32 0, %struct.TraversalData poison}
+!18 = !{%struct.TraversalData poison}

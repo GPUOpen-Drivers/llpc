@@ -31,7 +31,7 @@
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
 #include "compilerutils/CompilerUtils.h"
-#include "continuations/ContinuationsUtil.h"
+#include "compilerutils/TypesMetadata.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcGraphicsContext.h"
@@ -515,7 +515,7 @@ void SpirvLowerGlobal::lowerInOut(llvm::GlobalVariable *globalVar) {
       ty = m_builder->getInt64Ty();
     MDNode *metaNode = globalVar->getMetadata(gSPIRVMD::InOut);
     assert(metaNode);
-    auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+    auto meta = mdconst::extract<Constant>(metaNode->getOperand(0));
 
     m_builder->SetInsertPointPastAllocas(m_entryPoint);
     Value *proxy = m_builder->CreateAlloca(ty, dataLayout.getAllocaAddrSpace(), nullptr,
@@ -581,12 +581,8 @@ void SpirvLowerGlobal::lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, l
     Instruction *inst = cast<Instruction>(user);
 
     if (auto *gep = dyn_cast<GetElementPtrInst>(inst)) {
-      // We currently expect that GEPs are only used on the global variable directly, with the global variable's type.
-      // The SpirvLowerAccessChain pass ensures this.
-      //
       // TODO: As LLVM is moving away from GEPs towards ptradds, we need a better solution, probably by adding our
       //       own "structured GEP" operation.
-      assert(current == globalVar && gep->getSourceElementType() == globalVar->getValueType());
       assert(cast<ConstantInt>(gep->idx_begin()[0])->isNullValue());
 
       for (unsigned i = 1, e = gep->getNumIndices(); i < e; ++i)
@@ -608,7 +604,7 @@ void SpirvLowerGlobal::lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, l
 
       MDNode *metaNode = globalVar->getMetadata(gSPIRVMD::InOut);
       assert(metaNode);
-      auto inOutMetaVal = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+      auto inOutMetaVal = mdconst::extract<Constant>(metaNode->getOperand(0));
 
       auto indexOperands = ArrayRef(indexStack);
 
@@ -1480,7 +1476,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     MDNode *blockMetaNode = global.getMetadata(gSPIRVMD::Block);
     if (blockMetaNode) {
       ShaderBlockMetadata blockMeta = {};
-      auto blockMetaNodeVal = mdconst::dyn_extract<Constant>(blockMetaNode->getOperand(0));
+      auto blockMetaNodeVal = mdconst::extract<Constant>(blockMetaNode->getOperand(0));
       if (auto meta = dyn_cast<ConstantInt>(blockMetaNodeVal)) {
         blockMeta.U64All = meta->getZExtValue();
       } else if (auto metaStruct = dyn_cast<ConstantStruct>(blockMetaNodeVal)) {
@@ -1497,8 +1493,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     MDNode *const resMetaNode = global.getMetadata(gSPIRVMD::Resource);
     assert(resMetaNode);
 
-    const unsigned descSet = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
-    const unsigned binding = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
+    const unsigned descSet = mdconst::extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
+    const unsigned binding = mdconst::extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
 
     // AtomicCounter is emulated following same impl of SSBO, only qualifier 'offset' will be used in its
     // MD now. Using a new MD kind to detect it. AtomicCounter's type should be uint, not a structure.
@@ -1507,7 +1503,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     ShaderBlockMetadata atomicCounterMeta = {};
     if (atomicCounterMD) {
       atomicCounterMeta.U64All =
-          cast<ConstantInt>(mdconst::dyn_extract<Constant>(atomicCounterMD->getOperand(0)))->getZExtValue();
+          cast<ConstantInt>(mdconst::extract<Constant>(atomicCounterMD->getOperand(0)))->getZExtValue();
     }
 
     convertUsersOfConstantsToInstructions(&global);
@@ -1698,8 +1694,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
 
                 MDNode *const resMetaNode1 = globals[nextGlobalIdx]->getMetadata(gSPIRVMD::Resource);
                 assert(resMetaNode);
-                descSets[1] = mdconst::dyn_extract<ConstantInt>(resMetaNode1->getOperand(0))->getZExtValue();
-                bindings[1] = mdconst::dyn_extract<ConstantInt>(resMetaNode1->getOperand(1))->getZExtValue();
+                descSets[1] = mdconst::extract<ConstantInt>(resMetaNode1->getOperand(0))->getZExtValue();
+                bindings[1] = mdconst::extract<ConstantInt>(resMetaNode1->getOperand(1))->getZExtValue();
 
                 if (!nextGlobalIdx) {
                   std::swap(descSets[0], descSets[1]);
@@ -1827,7 +1823,7 @@ void SpirvLowerGlobal::lowerAliasedVal() {
       auto meta = global.getMetadata(gSPIRVMD::Lds);
       if (!meta)
         return;
-      const unsigned aliased = mdconst::dyn_extract<ConstantInt>(meta->getOperand(0))->getZExtValue();
+      const unsigned aliased = mdconst::extract<ConstantInt>(meta->getOperand(0))->getZExtValue();
       if (aliased) {
         unsigned inBits = static_cast<unsigned>(m_module->getDataLayout().getTypeSizeInBits(global.getValueType()));
         if (inBits > maxInBits) {
@@ -1971,9 +1967,9 @@ void SpirvLowerGlobal::lowerUniformConstants() {
 
     for (auto &eachFunc : globalUsers) {
       MDNode *metaNode = global.getMetadata(gSPIRVMD::UniformConstant);
-      auto uniformConstantsSet = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
-      auto uniformConstantsBinding = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
-      auto uniformConstantsOffset = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
+      auto uniformConstantsSet = mdconst::extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
+      auto uniformConstantsBinding = mdconst::extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
+      auto uniformConstantsOffset = mdconst::extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
 
       m_builder->SetInsertPointPastAllocas(eachFunc.first);
       Value *bufferDesc = m_builder->create<lgc::LoadBufferDescOp>(
@@ -2011,7 +2007,7 @@ Value *SpirvLowerGlobal::interpolateInputElement(Type *returnTy, unsigned interp
 
   MDNode *metaNode = gv->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
-  auto inputMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+  auto inputMeta = mdconst::extract<Constant>(metaNode->getOperand(0));
 
   auto hasAllConstantIndices = [](ArrayRef<Value *> &indexOperands) {
     // if indexOperands is empty then add_of will return TRUE.
@@ -2186,7 +2182,7 @@ void SpirvLowerGlobal::handleVolatileInput(GlobalVariable *input, Value *proxy) 
   MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
   assert(metaNode);
 
-  auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+  auto meta = mdconst::extract<Constant>(metaNode->getOperand(0));
 
   ShaderInOutMetadata inOutMeta = {};
   inOutMeta.U64All[0] = cast<ConstantInt>(meta->getOperand(0))->getZExtValue();
@@ -2320,19 +2316,22 @@ void SpirvLowerGlobal::changeRtFunctionSignature() {
   }
 
   if (rayTracingContext->isContinuationsMode()) {
-    SmallVector<ContArgTy> contArgTys;
+    SmallVector<TypedArgTy> contArgTys;
 
-    auto var = m_shaderStage == ShaderStageRayTracingCallable ? incomingCallableDataVar : incomingPayloadVar;
-    auto payloadTy = var ? var->getValueType() : StructType::get(*m_context);
-    if (!isa<StructType>(payloadTy))
-      payloadTy = StructType::get(*m_context, {payloadTy}, false);
-    contArgTys.push_back(ContArgTy(pointerTy, payloadTy));
-    if ((m_shaderStage == ShaderStageRayTracingAnyHit) || (m_shaderStage == ShaderStageRayTracingClosestHit)) {
-      auto type = ArrayType::get(m_builder->getInt32Ty(), rayTracingContext->getAttributeDataSize());
-      contArgTys.push_back(ContArgTy(pointerTy, type));
+    // We don't have hit attribute in argument for IS in continuations mode.
+    if (m_shaderStage != ShaderStageRayTracingIntersect) {
+      auto var = m_shaderStage == ShaderStageRayTracingCallable ? incomingCallableDataVar : incomingPayloadVar;
+      auto payloadTy = var ? var->getValueType() : StructType::get(*m_context);
+      if (!isa<StructType>(payloadTy))
+        payloadTy = StructType::get(*m_context, {payloadTy}, false);
+      contArgTys.push_back(TypedArgTy(pointerTy, payloadTy));
+      if ((m_shaderStage == ShaderStageRayTracingAnyHit) || (m_shaderStage == ShaderStageRayTracingClosestHit)) {
+        auto type = ArrayType::get(m_builder->getInt32Ty(), rayTracingContext->getAttributeDataSize());
+        contArgTys.push_back(TypedArgTy(pointerTy, type));
+      }
     }
 
-    ContFuncTy contFuncTy(m_builder->getVoidTy(), contArgTys);
+    TypedFuncTy contFuncTy(m_builder->getVoidTy(), contArgTys);
     contFuncTy.writeMetadata(newFunc);
   }
 

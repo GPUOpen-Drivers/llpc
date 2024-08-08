@@ -120,38 +120,4 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
   }
 
   ShaderModuleHelper::cleanOptimizedSpirv(&optimizedSpirvBin);
-
-  // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we tell LGC that it is the
-  // shader entry-point, and mark other functions as internal and always_inline.
-  //
-  // TODO: We should rationalize this code as follows:
-  //   1. Add code to the spir-v reader to add the entrypoint name as metadata;
-  //   2. change this code here to detect that, instead of DLLExport;
-  //   3. remove the code we added to the spir-v reader to detect the required entrypoint and mark it as DLLExport;
-  //   4. remove the required entrypoint name and execution model args that we added to the spir-v reader API, to
-  //      make it closer to the upstream Khronos copy of that code.
-  for (auto &func : *module) {
-    if (func.empty())
-      continue;
-
-    if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass) {
-      // A ray-tracing shader stage does not count as an LGC shader stage, as they are all linked into
-      // a compute shader or compute library. For those, remove the dllexport, and leave as external.
-      if (entryStage > ShaderStageCompute) {
-        func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
-        func.setLinkage(GlobalValue::ExternalLinkage);
-        if (auto rtStage = getLgcRtShaderStage(entryStage))
-          lgc::rt::setLgcRtShaderStage(&func, rtStage);
-        continue;
-      }
-
-      lgc::Pipeline::markShaderEntryPoint(&func, getLgcShaderStage(entryStage));
-      continue;
-    }
-    // Not shader entry-point.
-    func.setLinkage(GlobalValue::InternalLinkage);
-    if (func.hasFnAttribute(Attribute::NoInline))
-      func.removeFnAttr(Attribute::NoInline);
-    func.addFnAttr(Attribute::AlwaysInline);
-  }
 }

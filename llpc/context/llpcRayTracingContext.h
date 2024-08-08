@@ -32,6 +32,7 @@
 
 #include "llpcPipelineContext.h"
 #include "lgc/RayTracingLibrarySummary.h"
+#include "llvm/Support/KnownBits.h"
 #include <set>
 
 namespace lgc {
@@ -116,9 +117,18 @@ public:
   bool hasPipelineLibrary() { return m_pipelineInfo->hasPipelineLibrary; }
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
-  Vkgc::LlpcRaytracingMode getRaytracingMode() { return m_pipelineInfo->mode; }
-  bool isContinuationsMode() { return getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations; }
+  Vkgc::LlpcRaytracingMode getRaytracingMode() const { return m_pipelineInfo->mode; }
+  bool isContinuationsMode() const;
   unsigned getCpsFlag() { return m_pipelineInfo->cpsFlags; }
+  void updateRayFlagsKnownBits(const llvm::KnownBits &knownBits) {
+    if (m_rayFlagsKnownBits.has_value()) {
+      m_rayFlagsKnownBits = m_rayFlagsKnownBits->intersectWith(knownBits);
+    } else {
+      m_rayFlagsKnownBits = knownBits;
+    }
+  }
+
+  llvm::KnownBits getRayFlagsKnownBits() const { return m_rayFlagsKnownBits.value_or(llvm::KnownBits()); }
 
 protected:
   // Give the pipeline options to the middle-end, and/or hash them.
@@ -142,6 +152,7 @@ private:
   unsigned m_callableDataMaxSize;                     // Callable maximum size
   std::set<unsigned, std::less<unsigned>> m_builtIns; // Collected raytracing
   lgc::RayTracingLibrarySummary m_rtLibSummary = {};
+  std::optional<llvm::KnownBits> m_rayFlagsKnownBits;
 };
 
 } // namespace Llpc

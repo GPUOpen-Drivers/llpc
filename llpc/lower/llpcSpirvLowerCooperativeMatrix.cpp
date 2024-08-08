@@ -37,6 +37,7 @@
 #include "lgc/BuilderCommon.h"
 #include "lgc/LgcDialect.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-cooperative-matrix"
 

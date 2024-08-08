@@ -41,6 +41,7 @@
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -271,7 +272,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
         builder.getTrue()                                   // vm
     };
 
-    exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.compr.v2f16", builder.getVoidTy(), args, {});
+    exportCall = builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp_compr, args);
   } else {
     Value *args[] = {
         builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
@@ -284,7 +285,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
         builder.getTrue()                                   // vm
     };
 
-    exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.f32", builder.getVoidTy(), args, {});
+    exportCall = builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
   }
 
   return exportCall;
@@ -446,6 +447,21 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
   BuilderBase builder(module.getContext());
   builder.SetInsertPoint(retInst);
 
+  for (auto &inst : instructions(fragEntryPoint)) {
+    unsigned addrSpace = 0;
+    if (auto store = dyn_cast<StoreInst>(&inst))
+      addrSpace = store->getPointerAddressSpace();
+    else if (auto atomicRmw = dyn_cast<AtomicRMWInst>(&inst))
+      addrSpace = atomicRmw->getPointerAddressSpace();
+    else if (auto atomicXchg = dyn_cast<AtomicCmpXchgInst>(&inst))
+      addrSpace = atomicXchg->getPointerAddressSpace();
+
+    if (addrSpace == ADDR_SPACE_GLOBAL) {
+      m_resUsage->resourceWrite = true;
+      break;
+    }
+  }
+
   collectExportInfoForBuiltinOutput(fragEntryPoint, builder);
   collectExportInfoForGenericOutputs(fragEntryPoint, builder);
 
@@ -458,9 +474,11 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
   // Just according to the dualSourceBlendEnable flag.
   Value *dynamicIsDualSource = builder.getInt32(0);
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-    dynamicIsDualSource = ShaderInputs::getSpecialUserData(UserDataMapping::CompositeData, builder);
-    dynamicIsDualSource = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
-                                                  {dynamicIsDualSource, builder.getInt32(7), builder.getInt32(1)});
+    if (m_pipelineState->isUnlinked() || m_pipelineState->getColorExportState().dualSourceBlendDynamicEnable) {
+      dynamicIsDualSource = ShaderInputs::getSpecialUserData(UserDataMapping::CompositeData, builder);
+      dynamicIsDualSource = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                                    {dynamicIsDualSource, builder.getInt32(7), builder.getInt32(1)});
+    }
   }
 
   bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
@@ -470,7 +488,8 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
   }
 
   FragColorExport fragColorExport(m_pipelineState->getLgcContext());
-  bool dummyExport = m_resUsage->builtInUsage.fs.discard || m_pipelineState->getOptions().forceFragColorDummyExport;
+  bool dummyExport = m_resUsage->builtInUsage.fs.discard || m_pipelineState->getOptions().forceFragColorDummyExport ||
+                     m_pipelineState->getShaderModes()->getFragmentShaderMode().enablePops;
   FragColorExport::Key key = FragColorExport::computeKey(m_info, m_pipelineState);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
                                              builder, dynamicIsDualSource, key);
@@ -840,7 +859,7 @@ Value *FragColorExport::dualSourceSwizzle(unsigned waveSize, BuilderBase &builde
       builder.getFalse(),                                 // done
       builder.getTrue()                                   // vm
   };
-  builder.CreateNamedCall("llvm.amdgcn.exp.f32", builder.getVoidTy(), args0, {});
+  builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args0);
 
   Value *args1[] = {
       builder.getInt32(EXP_TARGET_DUAL_SRC_1),            // tgt
@@ -852,7 +871,7 @@ Value *FragColorExport::dualSourceSwizzle(unsigned waveSize, BuilderBase &builde
       builder.getFalse(),                                 // done
       builder.getTrue()                                   // vm
   };
-  return builder.CreateNamedCall("llvm.amdgcn.exp.f32", builder.getVoidTy(), args1, {});
+  return builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args1);
 }
 
 // =====================================================================================================================

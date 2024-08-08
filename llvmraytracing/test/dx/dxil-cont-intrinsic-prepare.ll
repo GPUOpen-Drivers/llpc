@@ -13,23 +13,7 @@ define i32 @_cont_GetContinuationStackAddr() #0 {
 }
 
 ; Function Attrs: nounwind
-define void @_cont_SetupRayGen(%struct.DispatchSystemData* noalias nocapture sret(%struct.DispatchSystemData) %agg.result) #1 !types !0 {
-  %1 = getelementptr inbounds %struct.DispatchSystemData, %struct.DispatchSystemData* %agg.result, i32 0, i32 0
-  store i32 2, i32* %1, align 4
-  %l = load i32, i32* %1, align 4
-  %c = icmp eq i32 %l, 3
-  br i1 %c, label %complete, label %end
-
-complete:                                         ; preds = %0
-  call void @_AmdComplete() #3
-  br label %end
-
-end:                                              ; preds = %complete, %0
-  ret void
-}
-
-; Function Attrs: nounwind
-define void @_cont_TraceRay(%struct.DispatchSystemData* noalias nocapture sret(%struct.DispatchSystemData) %agg.result, %struct.DispatchSystemData* nocapture readonly %data, i64 %accelStruct, i32 %rayFlags, i32 %instanceInclusioMask, i32 %rayContributionToHitGroupIndex, i32 %multiplierForGeometryContributionToShaderIndex, i32 %missShaderIndex, float %originX, float %originY, float %originZ, float %tMin, float %dirX, float %dirY, float %dirZ, float %tMax) #1 !types !2 {
+define void @_cont_TraceRay(%struct.DispatchSystemData* noalias nocapture sret(%struct.DispatchSystemData) %agg.result, %struct.DispatchSystemData* nocapture readonly %data, i64 %accelStruct, i32 %rayFlags, i32 %instanceInclusioMask, i32 %rayContributionToHitGroupIndex, i32 %multiplierForGeometryContributionToShaderIndex, i32 %missShaderIndex, float %originX, float %originY, float %originZ, float %tMin, float %dirX, float %dirY, float %dirZ, float %tMax) #1 !pointeetys !2 {
   %1 = alloca %struct.TraversalData, align 4
   %2 = alloca %struct.DispatchSystemData, align 4
   %3 = getelementptr inbounds %struct.DispatchSystemData, %struct.DispatchSystemData* %data, i32 0, i32 0
@@ -50,7 +34,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* noalias nocapture sret(%
   ret void
 }
 
-declare !types !3 void @"\01?_AmdAwait@@YA?AUDispatchSystemData@@UTraversalData@@@Z"(%struct.DispatchSystemData* sret(%struct.DispatchSystemData), i64, %struct.TraversalData*) #2
+declare !pointeetys !3 void @"\01?_AmdAwait@@YA?AUDispatchSystemData@@UTraversalData@@@Z"(%struct.DispatchSystemData* sret(%struct.DispatchSystemData), i64, %struct.TraversalData*) #2
 
 ; Function Attrs: nounwind
 declare i64 @_AmdGetResumePointAddr() #3
@@ -59,10 +43,10 @@ declare i64 @_AmdGetResumePointAddr() #3
 declare void @_AmdComplete() #3
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare !types !5 void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #4
+declare !pointeetys !5 void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #4
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare !types !5 void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #4
+declare !pointeetys !5 void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #4
 
 attributes #0 = { nounwind memory(none) "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-realign-stack" "stack-protector-buffer-size"="0" "unsafe-fp-math"="false" "use-soft-float"="false" }
 attributes #1 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "no-realign-stack" "stack-protector-buffer-size"="0" "unsafe-fp-math"="false" "use-soft-float"="false" }
@@ -70,43 +54,27 @@ attributes #2 = { "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-
 attributes #3 = { nounwind }
 attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
 
-!0 = !{!"function", !"void", !1}
+!0 = !{%struct.DispatchSystemData poison}
 !1 = !{i32 0, %struct.DispatchSystemData poison}
-!2 = !{!"function", !"void", !1, !1, i64 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison}
-!3 = !{!"function", !"void", !1, i64 poison, !4}
+!2 = !{null, %struct.DispatchSystemData poison, %struct.DispatchSystemData poison}
+!3 = !{null, %struct.DispatchSystemData poison, null, %struct.TraversalData poison}
 !4 = !{i32 0, %struct.TraversalData poison}
-!5 = !{!"function", !"void", i64 poison, !6}
+!5 = !{i8 poison}
 !6 = !{i32 0, i8 poison}
 ; CHECK-LABEL: define i32 @_cont_GetContinuationStackAddr(
 ; CHECK-SAME: ) #[[ATTR0:[0-9]+]] {
 ; CHECK-NEXT:    ret i32 1
 ;
 ;
-; CHECK-LABEL: define %struct.DispatchSystemData @_cont_SetupRayGen(
-; CHECK-SAME: ) #[[ATTR1:[0-9]+]] {
-; CHECK-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP1]], i32 0, i32 0
-; CHECK-NEXT:    store i32 2, ptr [[TMP2]], align 4
-; CHECK-NEXT:    [[L:%.*]] = load i32, ptr [[TMP2]], align 4
-; CHECK-NEXT:    [[C:%.*]] = icmp eq i32 [[L]], 3
-; CHECK-NEXT:    br i1 [[C]], label [[COMPLETE:%.*]], label [[END:%.*]]
-; CHECK:       complete:
-; CHECK-NEXT:    call void @_AmdComplete() #[[ATTR5:[0-9]+]]
-; CHECK-NEXT:    br label [[END]]
-; CHECK:       end:
-; CHECK-NEXT:    [[TMP3:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP1]], align 4
-; CHECK-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]]
-;
-;
 ; CHECK-LABEL: define %struct.DispatchSystemData @_cont_TraceRay(
-; CHECK-SAME: ptr nocapture readonly [[DATA:%.*]], i64 [[ACCELSTRUCT:%.*]], i32 [[RAYFLAGS:%.*]], i32 [[INSTANCEINCLUSIOMASK:%.*]], i32 [[RAYCONTRIBUTIONTOHITGROUPINDEX:%.*]], i32 [[MULTIPLIERFORGEOMETRYCONTRIBUTIONTOSHADERINDEX:%.*]], i32 [[MISSSHADERINDEX:%.*]], float [[ORIGINX:%.*]], float [[ORIGINY:%.*]], float [[ORIGINZ:%.*]], float [[TMIN:%.*]], float [[DIRX:%.*]], float [[DIRY:%.*]], float [[DIRZ:%.*]], float [[TMAX:%.*]]) #[[ATTR1]] !types [[META0:![0-9]+]] {
+; CHECK-SAME: ptr nocapture readonly [[DATA:%.*]], i64 [[ACCELSTRUCT:%.*]], i32 [[RAYFLAGS:%.*]], i32 [[INSTANCEINCLUSIOMASK:%.*]], i32 [[RAYCONTRIBUTIONTOHITGROUPINDEX:%.*]], i32 [[MULTIPLIERFORGEOMETRYCONTRIBUTIONTOSHADERINDEX:%.*]], i32 [[MISSSHADERINDEX:%.*]], float [[ORIGINX:%.*]], float [[ORIGINY:%.*]], float [[ORIGINZ:%.*]], float [[TMIN:%.*]], float [[DIRX:%.*]], float [[DIRY:%.*]], float [[DIRZ:%.*]], float [[TMAX:%.*]]) #[[ATTR1:[0-9]+]] !pointeetys [[META0:![0-9]+]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_TRAVERSALDATA:%.*]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[DATA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = bitcast ptr [[TMP1]] to ptr
-; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 12, ptr [[TMP6]]) #[[ATTR5]]
+; CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 12, ptr [[TMP6]]) #[[ATTR5:[0-9]+]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_TRAVERSALDATA]], ptr [[TMP1]], i32 0, i32 0, i32 0, i32 0
 ; CHECK-NEXT:    store i32 [[TMP5]], ptr [[TMP7]], align 4
 ; CHECK-NEXT:    [[ADDR:%.*]] = call i64 @_AmdGetResumePointAddr() #[[ATTR5]]

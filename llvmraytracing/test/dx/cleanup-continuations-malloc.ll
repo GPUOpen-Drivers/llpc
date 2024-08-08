@@ -18,7 +18,7 @@ define <4 x i32> @simple_await(i64 %dummyRet, <4 x i32> %arg) !continuation.regi
 ; CHECK-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CHECK-NEXT:    store i64 [[DUMMYRET]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await.resume.0)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CHECK-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
@@ -36,7 +36,7 @@ define void @simple_await_entry(i64 %dummyRet, <4 x i32> %arg, <4 x i32> addrspa
 ; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await_entry.resume.0)
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CHECK-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1

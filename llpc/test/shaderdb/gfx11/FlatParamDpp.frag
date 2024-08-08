@@ -5,7 +5,7 @@
 //
 // CHECK-LABEL: {{^}}// LLPC pipeline patching results
 // CHECK:       call void @llvm.amdgcn.kill(i1 false)
-// CHECK:       [[P0:%.*]] = call float @llvm.amdgcn.lds.param.load(i32 immarg 2, i32 immarg 2, i32 %PrimMask)
+// CHECK:       [[P0:%.*]] = call float @llvm.amdgcn.lds.param.load(i32 2, i32 2, i32 %PrimMask)
 // CHECK:       [[P1:%.*]] = bitcast float [[P0]] to i32
 // CHECK:       [[P2:%.*]] = call i32 @llvm.amdgcn.mov.dpp.i32(i32 [[P1]], i32 0, i32 15, i32 15, i1 true)
 // CHECK:       [[P3:%.*]] = call i32 @llvm.amdgcn.strict.wqm.i32(i32 [[P2]])

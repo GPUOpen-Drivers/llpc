@@ -129,7 +129,6 @@ private:
 // The caller has to handle the erasure afterwards.
 void replaceAllPointerUses(llvm::IRBuilder<> *builder, llvm::Value *oldPointerValue, llvm::Value *newPointerValue,
                            llvm::SmallVectorImpl<llvm::Instruction *> &toBeRemoved);
-
 } // namespace CompilerUtils
 
 namespace llvm {
@@ -140,6 +139,31 @@ namespace llvm {
 // TODO: Remove this as soon as all internal users of opaque pointers have been
 //       fixed.
 PointerType *getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace);
+
+/// Free-standing helpers.
+
+// Helper to visit all calls of a function.
+// Expected type for Callback:
+//  void(CallInst &)
+template <typename CallbackTy> void forEachCall(Function &F, CallbackTy Callback) {
+  static_assert(std::is_invocable_v<CallbackTy, CallInst &>);
+  for (auto &Use : make_early_inc_range(F.uses())) {
+    if (auto *CInst = dyn_cast<CallInst>(Use.getUser()))
+      if (CInst->isCallee(&Use))
+        Callback(*CInst);
+  }
+}
+
+// For each basic block in Func, find the terminator. If it is contained in
+// TerminatorOpcodes, then apply the callback on the terminator.
+template <typename CallbackTy, typename = std::enable_if<std::is_invocable_v<CallbackTy, llvm::Instruction &>>>
+void forEachTerminator(Function *Func, ArrayRef<unsigned> TerminatorOpcodes, CallbackTy Callback) {
+  for (auto &BB : *Func) {
+    auto *Terminator = BB.getTerminator();
+    if (llvm::find(TerminatorOpcodes, Terminator->getOpcode()) != TerminatorOpcodes.end())
+      Callback(*Terminator);
+  }
+}
 
 } // namespace llvm
 

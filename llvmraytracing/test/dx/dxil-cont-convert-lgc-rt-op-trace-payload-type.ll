@@ -21,8 +21,8 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 
 ; Function Attrs: nounwind
-declare !types !39 void @dx.op.traceRay.struct.RayPayload(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.RayPayload*) #0
-declare !types !49 void @dx.op.traceRay.struct.RayPayload2(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.RayPayload2*) #0
+declare !pointeetys !39 void @dx.op.traceRay.struct.RayPayload(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.RayPayload*) #0
+declare !pointeetys !49 void @dx.op.traceRay.struct.RayPayload2(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.RayPayload2*) #0
 
 ; Function Attrs: nounwind readnone
 declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.ResourceProperties) #1
@@ -31,14 +31,14 @@ declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.
 declare %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32, %dx.types.Handle) #2
 
 ; Function Attrs: nounwind
-declare !types !40 void @dx.op.callShader.struct.TheirParams(i32, i32, %struct.TheirParams*) #0
-declare !types !41 void @dx.op.callShader.struct.TheirParams2(i32, i32, %struct.TheirParams2*) #0
+declare !pointeetys !40 void @dx.op.callShader.struct.TheirParams(i32, i32, %struct.TheirParams*) #0
+declare !pointeetys !41 void @dx.op.callShader.struct.TheirParams2(i32, i32, %struct.TheirParams2*) #0
 
 declare float @dx.op.rayTCurrent.f32(i32) #1
 declare float @dx.op.rayTMin.f32(i32) #2
 declare i32 @dx.op.hitKind.i32(i32) #2
 declare i32 @dx.op.instanceID.i32(i32) #2
-declare !types !42 i1 @dx.op.reportHit.struct.BuiltInTriangleIntersectionAttributes(i32, float, i32, %struct.BuiltInTriangleIntersectionAttributes*) #5
+declare !pointeetys !42 i1 @dx.op.reportHit.struct.BuiltInTriangleIntersectionAttributes(i32, float, i32, %struct.BuiltInTriangleIntersectionAttributes*) #5
 
 define void @main() {
 ; PAYLOADTYPE-LABEL: define void @main
@@ -89,7 +89,7 @@ define void @mainTrace() {
   ret void
 }
 
-define void @called(%struct.MyParams* %arg) !types !38 {
+define void @called(%struct.MyParams* %arg) !pointeetys !38 {
 ; PAYLOADTYPE3-LABEL: define void @called
 ; PAYLOADTYPE3:    call void (...) @lgc.rt.call.callable.shader(i32 2, %struct.TheirParams2* %{{.*}}, i32 260), !cont.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
 ; PAYLOADTYPE3: ![[call_callable_shader_payload_type]] = !{%struct.TheirParams2 poison}
@@ -144,15 +144,15 @@ attributes #2 = { nounwind readonly }
 !35 = !{i32 8, i32 12}
 !36 = !{void ()* @mainTrace, !"mainTrace", null, null, !37}
 !37 = !{i32 8, i32 7}
-!38 = !{!"function", !"void", !43}
-!39 = !{!"function", !"void", i32 poison, %dx.types.Handle poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, !44}
-!40 = !{!"function", !"void", i32 poison, i32 poison, !45}
-!41 = !{!"function", !"void", i32 poison, i32 poison, !46}
-!42 = !{!"function", !"void", i32 poison, float poison, i32 poison, !47}
+!38 = !{%struct.MyParams poison}
+!39 = !{%struct.RayPayload poison}
+!40 = !{%struct.TheirParams poison}
+!41 = !{%struct.TheirParams2 poison}
+!42 = !{%struct.BuiltInTriangleIntersectionAttributes poison}
 !43 = !{i32 0, %struct.MyParams poison}
 !44 = !{i32 0, %struct.RayPayload poison}
 !45 = !{i32 0, %struct.TheirParams poison}
 !46 = !{i32 0, %struct.TheirParams2 poison}
 !47 = !{i32 0, %struct.BuiltInTriangleIntersectionAttributes poison}
 !48 = !{i32 0, %struct.RayPayload2 poison}
-!49 = !{!"function", !"void", i32 poison, %dx.types.Handle poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, !48}
+!49 = !{%struct.RayPayload2 poison}

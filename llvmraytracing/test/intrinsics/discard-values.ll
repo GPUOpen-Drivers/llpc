@@ -8,9 +8,7 @@ declare float @_AmdGetUninitializedF32()
 declare i32 @_AmdGetUninitializedI32()
 declare %struct.AnyHitData @_AmdGetUninitializedStruct()
 
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
-
-declare !types !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 define float @discard_f32() {
 ; CHECK-LABEL: define float @discard_f32() {
@@ -58,5 +56,4 @@ entry:
 !7 = !{i32 0}
 !8 = !{i32 0, i64 65536}
 !9 = !{i32 21}
-!10 = !{!"function", i32 poison, !11}
-!11 = !{i32 0, %struct.DispatchSystemData poison}
+!10 = !{%struct.DispatchSystemData poison}

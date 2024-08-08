@@ -133,13 +133,18 @@ void RegisterMetadataBuilder::buildPalMetadata() {
       // Fill ".preraster_output_semantic"
       auto resUsage = m_pipelineState->getShaderResourceUsage(lastVertexProcessingStage.value());
       auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
+      auto &perPrimitiveOutputLocMap = resUsage->inOutUsage.perPrimitiveOutputLocMap;
       auto &builtInOutputLocMap = resUsage->inOutUsage.builtInOutputLocMap;
-      // Collect semantic info for generic input and builtIns {gl_ClipDistance, gl_CulDistance, gl_Layer,
-      // gl_ViewportIndex} that exports via generic output as well.
-      if (!outputLocInfoMap.empty() || !builtInOutputLocMap.empty()) {
+      auto &perPrimitiveBuiltInOutputLocMap = resUsage->inOutUsage.perPrimitiveBuiltInOutputLocMap;
+
+      // Collect semantic info for generic input and builtIns {ClipDistance, CulDistance, Layer,
+      // ViewportIndex, PrimitiveId} that exports via generic output as well.
+      if (!outputLocInfoMap.empty() || !perPrimitiveOutputLocMap.empty() || !builtInOutputLocMap.empty() ||
+          !perPrimitiveBuiltInOutputLocMap.empty()) {
         auto preRasterOutputSemanticNode =
             getPipelineNode()[Util::Abi::PipelineMetadataKey::PrerasterOutputSemantic].getArray(true);
         unsigned elemIdx = 0;
+
         for (auto locInfoPair : outputLocInfoMap) {
           auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
           preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
@@ -149,9 +154,29 @@ void RegisterMetadataBuilder::buildPalMetadata() {
           ++elemIdx;
         }
 
+        for (auto locInfoPair : perPrimitiveOutputLocMap) {
+          auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
+          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
+              MaxBuiltInSemantic + locInfoPair.first;
+          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locInfoPair.second;
+          ++elemIdx;
+        }
+
         for (auto locPair : builtInOutputLocMap) {
           if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
-              locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+              locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex ||
+              locPair.first == BuiltInPrimitiveId) {
+            assert(locPair.first < MaxBuiltInSemantic);
+            auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
+            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
+            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locPair.second;
+            ++elemIdx;
+          }
+        }
+
+        for (auto locPair : perPrimitiveBuiltInOutputLocMap) {
+          if (locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex ||
+              locPair.first == BuiltInPrimitiveId) {
             assert(locPair.first < MaxBuiltInSemantic);
             auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
             preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
@@ -750,10 +775,18 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsLoadProvokingVtx] = true;
   }
 
+  // PA_SC_SHADER_CONTROL
+  if (m_gfxIp.major < 11 && m_pipelineState->getShaderModes()->getFragmentShaderMode().enablePops) {
+    auto paScShaderControl =
+        getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PaScShaderControl].getMap(true);
+    paScShaderControl[Util::Abi::PaScShaderControlMetadataKey::LoadCollisionWaveid] = true;
+  }
+
   // PA_SC_MODE_CNTL_1
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsIterSample] =
       m_pipelineState->getShaderResourceUsage(shaderStage)->builtInUsage.fs.runAtSampleRate > 0;
 
+  bool allowRez = shaderOptions.allowReZ;
   // DB_SHADER_CONTROL
   ZOrder zOrder = LATE_Z;
   bool execOnHeirFail = false;
@@ -764,7 +797,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   else if (resUsage->resourceWrite) {
     zOrder = LATE_Z;
     execOnHeirFail = true;
-  } else if (shaderOptions.allowReZ)
+  } else if (allowRez)
     zOrder = EARLY_Z_THEN_RE_Z;
   else
     zOrder = EARLY_Z_THEN_LATE_Z;
@@ -788,6 +821,8 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       fragmentMode.earlyFragmentTests && resUsage->resourceWrite;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ExecOnHierFail] = execOnHeirFail;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ConservativeZExport] = conservativeZExport;
+  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::PrimitiveOrderedPixelShader] =
+      static_cast<bool>(fragmentMode.enablePops);
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::PreShaderDepthCoverageEnable] = fragmentMode.postDepthCoverage;
 
   // SPI_PS_INPUT_CNTL_0..31
@@ -806,10 +841,16 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   constexpr unsigned PassThroughMode = (1 << 5);
 
   unsigned pointCoordLoc = InvalidValue;
+  unsigned primCoordLoc = InvalidValue;
   auto builtInInputLocMapIt = resUsage->inOutUsage.builtInInputLocMap.find(BuiltInPointCoord);
   if (builtInInputLocMapIt != resUsage->inOutUsage.builtInInputLocMap.end()) {
     // Get generic input corresponding to gl_PointCoord (to set the field PT_SPRITE_TEX)
     pointCoordLoc = builtInInputLocMapIt->second;
+  }
+
+  auto builtInInputLocMapIte = resUsage->inOutUsage.builtInInputLocMap.find(BuiltInPrimCoord);
+  if (builtInInputLocMapIte != resUsage->inOutUsage.builtInInputLocMap.end()) {
+    primCoordLoc = builtInInputLocMapIte->second;
   }
 
   msgpack::ArrayDocNode spiPsInputCnt =
@@ -862,6 +903,9 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       spiPsInputCntlInfo.offset = UseDefaultVal;
     }
 
+    if (primCoordLoc == i) {
+      spiPsInputCntlInfo.offset = UseDefaultVal;
+    }
     // NOTE: Set SPI_PS_INPUT_CNTL_* here, but the register can still be changed later,
     // when it becomes known that gl_ViewportIndex is not used and fields OFFSET and FLAT_SHADE
     // can be amended.
@@ -890,6 +934,12 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::NumPrimInterp] = numPrimInterp;
   const auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
   spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::PsW32En] = (waveSize == 32);
+  // .param_gen
+  if (primCoordLoc != InvalidValue) {
+    // Not included in num_interps, but won't influence other defined inputs.
+    spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::ParamGen] = true;
+    spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::NumInterps] = numInterp - 1;
+  }
 
   // SPI_INTERP_CONTROL_0
   if (pointCoordLoc != InvalidValue) {
@@ -918,10 +968,11 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
   // Fill .ps_input_semantic for partial pipeline
   if (m_pipelineState->isUnlinked()) {
-    // Collect semantic info for generic input and builtIns {gl_ClipDistance, gl_CulDistance, gl_Layer,
-    // gl_ViewportIndex} that exports via generic output as well.
+    // Collect semantic info for generic input and builtIns {ClipDistance, CulDistance, Layer,
+    // ViewportIndex, PrimitiveId} that exports via generic output as well.
     auto &inputLocInfoMap = resUsage->inOutUsage.inputLocInfoMap;
     auto &builtInInputLocMap = resUsage->inOutUsage.builtInInputLocMap;
+
     if (!inputLocInfoMap.empty() || !builtInInputLocMap.empty()) {
       auto psInputSemanticNode = getPipelineNode()[Util::Abi::PipelineMetadataKey::PsInputSemantic].getArray(true);
       unsigned elemIdx = 0;
@@ -934,7 +985,8 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
       for (auto locPair : builtInInputLocMap) {
         if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
-            locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+            locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex ||
+            locPair.first == BuiltInPrimitiveId) {
           assert(locPair.first < MaxBuiltInSemantic);
           auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
           psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] = locPair.first;

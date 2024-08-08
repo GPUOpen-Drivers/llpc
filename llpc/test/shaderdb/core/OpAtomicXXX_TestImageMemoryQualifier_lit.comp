@@ -16,9 +16,9 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 1, i32 0, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, <2 x i32> <i32 5, i32 5>, i32 9)
-; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 1, i32 0, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, <2 x i32> <i32 5, i32 5>, i32 9)
-; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 1, i32 0, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, <2 x i32> <i32 5, i32 5>, i32 9)
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 1, i32 512, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, <2 x i32> <i32 5, i32 5>, i32 9)
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 1, i32 513, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, <2 x i32> <i32 5, i32 5>, i32 9)
+; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 1, i32 515, i32 0, ptr addrspace(4) %{{[-0-9A-Za0z_.]+}}, <2 x i32> <i32 5, i32 5>, i32 9)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.add.2d.i32.i16(i32 9, i16 5, i16 5, <8 x i32> %{{.*}}, i32 0, i32 0)

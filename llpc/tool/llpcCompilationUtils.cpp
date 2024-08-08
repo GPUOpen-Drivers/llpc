@@ -179,6 +179,10 @@ static void disassembleSpirv(unsigned binSize, const void *code, const llvm::Twi
   LLPC_OUTS("\nSPIR-V disassembly for " << header << ":\n");
   spvDisassembleSpirv(binSize, code, textSize, spvText.data());
   LLPC_OUTS(spvText.data() << "\n");
+
+  // Flush to ensure the SPIR-V is written out before we attempt to parse it. This is helpful when debugging
+  // SPIRVReader crashes.
+  llvm::outs().flush();
 }
 
 // =====================================================================================================================

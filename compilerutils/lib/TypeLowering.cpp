@@ -28,6 +28,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 
+using namespace CompilerUtils;
 using namespace llvm;
 
 namespace {

@@ -421,6 +421,10 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
     return getWithSamePointeeType(ptrTy, newAS);
   };
 
+#ifndef NDEBUG
+  DenseSet<Value *> PhiElems;
+#endif
+
   while (!worklist.empty()) {
     Use *ptrUse = worklist.pop_back_val();
     Value *ptr = cast<Value>(ptrUse);
@@ -501,8 +505,42 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
       }
       break;
     }
+    case Instruction::PHI: {
+      auto *oldType = inst->getType();
+      if (oldType->isPointerTy()) {
+#ifndef NDEBUG
+        // Check that all inputs to the phi are handled
+        if (!PhiElems.erase(ptr)) {
+          // Was not in the map, so add the other elements
+          for (auto &incoming : cast<PHINode>(inst)->incoming_values()) {
+            if (incoming.get() != ptr) {
+              PhiElems.insert(incoming.get());
+            }
+          }
+        }
+#endif
+
+        Type *newType = getMutatedPtrTy(oldType);
+        // No further processing if the type has the correct pointer type
+        if (newType == oldType)
+          continue;
+
+        inst->mutateType(newType);
+      }
+      break;
+    }
     }
 
     worklist.append(usesRange.begin(), usesRange.end());
   }
+
+#ifndef NDEBUG
+  if (!PhiElems.empty()) {
+    errs() << "Unhandled inputs to phi: ";
+    for (auto *phi : PhiElems) {
+      phi->dump();
+    }
+  }
+  assert(PhiElems.empty() && "All phi inputs need to be handled, otherwise we end in an inconsistent state");
+#endif
 }

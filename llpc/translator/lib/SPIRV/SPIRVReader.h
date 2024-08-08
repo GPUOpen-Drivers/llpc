@@ -73,9 +73,29 @@ class SPIRVLoopMerge;
 class SPIRVToLLVMDbgTran;
 
 enum class LayoutMode : uint8_t {
-  Native = 0,   ///< Using native LLVM layout rule
-  Explicit = 1, ///< Using layout decorations(like offset) from SPIRV
-  Std430 = 2,   ///< Using std430 layout rule
+  None = 0,     ///< SSA value -- has no memory layout
+  Native = 1,   ///< Using native LLVM rules for in-memory layout
+  Explicit = 2, ///< Using layout decorations(like offset) from SPIRV
+  Std430 = 3,   ///< Using std430 layout rule
+};
+
+// Describe what parts of image/sampler descriptors are present.
+enum ImageComponent {
+  ImageComponentImage = 0x1,
+  ImageComponentFMask = 0x2,
+  ImageComponentSampler = 0x4,
+};
+
+// Holds indices into a struct describing an image/sampler (pointer) value.
+struct ImageTypeIndices {
+  unsigned imagePointer = ~0;
+  unsigned imageStride = ~0;
+  unsigned imagePlaneStride = ~0;
+  unsigned fmaskPointer = ~0;
+  unsigned fmaskStride = ~0;
+  unsigned samplerPointer = ~0;
+  unsigned samplerStride = ~0;
+  unsigned convertingSamplerIdx = ~0;
 };
 
 class SPIRVToLLVM {
@@ -90,11 +110,15 @@ public:
 
   void updateDebugLoc(SPIRVValue *bv, Function *f);
 
-  Type *transType(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true, bool parentIsPointer = false,
-                  LayoutMode layout = LayoutMode::Native);
+  unsigned getImageTypeComponents(SPIRVType *t) const;
+  ImageTypeIndices getImageTypeIndices(unsigned imageComponents) const;
+  Type *getImageTy(unsigned imageComponents) const;
+
+  Type *transType(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true,
+                  LayoutMode layout = LayoutMode::None);
   template <spv::Op>
-  Type *transTypeWithOpcode(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                            LayoutMode layout);
+  Type *transTypeWithOpcode(SPIRVType *bt, unsigned matrixStride, bool columnMajor, LayoutMode layout);
+  Type *transTypeArray(SPIRVType *bt, unsigned matrixStride, bool columnMajor, LayoutMode layout);
   std::vector<Type *> transTypeVector(const std::vector<SPIRVType *> &);
   bool translate(ExecutionModel entryExecModel, const char *entryName);
   bool transAddressingModel();
@@ -111,11 +135,8 @@ public:
   template <spv::Op> SmallVector<Value *> transValueMultiWithOpcode(SPIRVValue *, Function *f, BasicBlock *bb);
   Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
   Value *transLoadBindlessImage(SPIRVType *spvElementTy, Value *imgDescGpuAddress, bool bindlessTexture);
-  Value *loadImageSampler(Type *elementTy, Value *base);
   Value *transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *elementTy = nullptr);
-  Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
-                                 lgc::ResourceNodeType searchType);
-  Value *indexDescPtr(Type *elementTy, Value *base, Value *index);
+  Value *indexDescPtr(SPIRVType *spvElementTy, Value *base, Value *index);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
   bool transDecoration(SPIRVValue *, ArrayRef<Value *>);
@@ -135,7 +156,7 @@ public:
   Value *transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb);
   Instruction *transBuiltinFromInst(const std::string &funcName, SPIRVInstruction *bi, BasicBlock *bb);
   Instruction *transSPIRVBuiltinFromInst(SPIRVInstruction *bi, BasicBlock *bb);
-  Instruction *transBarrierFence(SPIRVInstruction *bi, BasicBlock *bb);
+  void transBarrierFence(SPIRVInstruction *bi, BasicBlock *bb);
   Value *transString(const SPIRVString *spvValue);
   Value *transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func, BasicBlock *bb);
   Value *transVariableNonImage(SPIRVValue *const spvValue);
@@ -143,14 +164,14 @@ public:
   Value *transArrayLength(SPIRVValue *const spvValue);
   // Struct used to pass information in and out of getImageDesc.
   struct ExtractedImageInfo {
-    BasicBlock *bb;
-    const SPIRVTypeImageDescriptor *desc;
-    unsigned dim;          // lgc::Builder dimension
-    unsigned flags;        // lgc::Builder image call flags
-    Value *imageDesc;      // Image descriptor (first plane if multi-plane)
-    Value *imageDescArray; // Array of image descriptors for multi-plane
-    Value *fmaskDesc;
-    Value *samplerDesc;
+    const SPIRVTypeImageDescriptor *desc = nullptr;
+    unsigned dim = ~0;  // lgc::Builder dimension
+    unsigned flags = 0; // lgc::Builder image call flags
+    Value *imagePointer = nullptr;
+    Value *imagePlaneStride = nullptr;
+    Value *fmaskPointer = nullptr;
+    Value *samplerPointer = nullptr;
+    Value *convertingSamplerIdx = nullptr;
   };
 
   // Load image and/or sampler descriptors, and get information from the image
@@ -218,6 +239,7 @@ public:
 
   // Create !lgc.xfb.state metadata
   void createXfbMetadata(bool hasXfbOuts);
+  bool isRayQueryCommittedIntersection(SPIRVValue *bv);
 
 private:
   class SPIRVTypeContext {
@@ -226,11 +248,10 @@ private:
     uint8_t m_predicates;
 
   public:
-    SPIRVTypeContext(SPIRVType *type, uint32_t matrixStride, bool columnMajor, bool isParentPointer, LayoutMode layout)
+    SPIRVTypeContext(SPIRVType *type, uint32_t matrixStride, bool columnMajor, LayoutMode layout)
         : m_typeId(type->getId()), m_matrixStride(matrixStride), m_predicates(0) {
       m_predicates |= uint8_t(columnMajor);
-      m_predicates |= uint8_t(isParentPointer << 1);
-      m_predicates |= uint8_t((uint8_t)layout << 2);
+      m_predicates |= uint8_t((uint8_t)layout << 1);
     }
 
     // Tuple representation to make it easily hashable.
@@ -239,8 +260,7 @@ private:
   };
 
   typedef DenseMap<SPIRVTypeContext::TupleType, Type *> SPIRVToLLVMFullTypeMap;
-  typedef DenseMap<SPIRVType *, Type *> SPIRVToLLVMTypeMap;
-  typedef compilerutils::LoweringPointerTupleMap<SPIRVValue *, Value *, true> SPIRVToLLVMValueMap;
+  typedef CompilerUtils::LoweringPointerTupleMap<SPIRVValue *, Value *, true> SPIRVToLLVMValueMap;
   typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
   typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
@@ -266,7 +286,6 @@ private:
   SPIRVFunction *m_entryTarget;
   const SPIRVSpecConstMap &m_specConstMap;
   llvm::ArrayRef<ConvertingSampler> m_convertingSamplers;
-  SPIRVToLLVMTypeMap m_typeMap;
   SPIRVToLLVMFullTypeMap m_fullTypeMap;
   SPIRVToLLVMFullTypeMap m_imageTypeMap; // Map to store struct/array with sampler type
   SPIRVToLLVMValueMap m_valueMap;
@@ -334,12 +353,7 @@ private:
   lgc::Builder *getBuilder() const { return m_builder; }
 
   // Perform type translation for uncached types. Used in `transType`. Returns the new LLVM type.
-  Type *transTypeImpl(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer, LayoutMode layout);
-
-  Type *mapType(SPIRVType *bt, Type *t) {
-    m_typeMap[bt] = t;
-    return t;
-  }
+  Type *transTypeImpl(SPIRVType *bt, unsigned matrixStride, bool columnMajor, LayoutMode layout);
 
   Type *getPointeeType(SPIRVValue *v, LayoutMode layout = LayoutMode::Native);
 
@@ -368,10 +382,7 @@ private:
 
   Type *getPadType(unsigned bytes) { return ArrayType::get(getBuilder()->getInt8Ty(), bytes); }
 
-  Type *recordTypeWithPad(Type *const t, bool isMatrixRow = false) {
-    m_typesWithPadMap[t] = isMatrixRow;
-    return t;
-  }
+  void recordTypeWithPad(Type *const t, bool isMatrixRow = false) { m_typesWithPadMap[t] = isMatrixRow; }
 
   bool isTypeWithPad(Type *const t) const { return m_typesWithPadMap.count(t) > 0; }
 
@@ -431,16 +442,13 @@ private:
   template <class Source, class Func> bool foreachFuncCtlMask(Source, Func);
   llvm::GlobalValue::LinkageTypes transLinkageType(const SPIRVValue *v);
 
-  Instruction *transBarrier(BasicBlock *bb, SPIRVWord execScope, SPIRVWord memSema, SPIRVWord memScope);
-
-  Instruction *transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope);
+  void transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope);
   void truncConstantIndex(std::vector<Value *> &indices, BasicBlock *bb);
 
   Value *ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
                                              const std::function<Value *(Value *)> &createImageOp);
 
-  Function *createLibraryEntryFunc();
-
+  bool hasSpirvType(SPIRVType *spvTy, spv::Op ty);
   Value *createTraceRayDialectOp(SPIRVValue *const spvValue);
 
   // ========================================================================================================================

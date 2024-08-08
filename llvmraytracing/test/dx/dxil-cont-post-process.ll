@@ -11,31 +11,6 @@ declare void @_AmdComplete() #0
 declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-; Function Attrs: nounwind
-define %struct.DispatchSystemData @_cont_SetupRayGen() {
-; CHECK-LABEL: define %struct.DispatchSystemData @_cont_SetupRayGen() {
-; CHECK-NEXT:    [[DATA:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] undef, i32 0, 0
-; CHECK-NEXT:    [[C:%.*]] = load i1, ptr @debug_global, align 1
-; CHECK-NEXT:    br i1 [[C]], label [[COMPLETE:%.*]], label [[END:%.*]]
-; CHECK:       complete:
-; CHECK-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] poison
-; CHECK:       complete.split:
-; CHECK-NEXT:    br label [[END]]
-; CHECK:       end:
-; CHECK-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[DATA]]
-;
-  %data = insertvalue %struct.DispatchSystemData undef, i32 0, 0
-  %c = load i1, ptr @debug_global, align 1
-  br i1 %c, label %complete, label %end
-
-complete:                                         ; preds = %0
-  call void @_AmdComplete() #3
-  br label %end
-
-end:                                              ; preds = %complete, %0
-  ret %struct.DispatchSystemData %data
-}
-
 define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !5 !continuation.entry !0 !continuation !3 {
 ; CHECK-LABEL: define void @RayGen(
 ; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[DUMMYRETADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] {

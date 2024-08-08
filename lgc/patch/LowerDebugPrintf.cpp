@@ -88,10 +88,9 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   for (auto func : printfFuncs) {
     // Create printbuffer Descriptor at the beginning of the function which contains DebugPrintf dialect ops
     builder.SetInsertPointPastAllocas(func);
-    m_debugPrintfBuffer = hasPrintfDesc
-                              ? m_debugPrintfBuffer = builder.create<BufferDescToPtrOp>(builder.CreateBufferDesc(
-                                    InternalDescriptorSetId, PrintfBufferBindingId, builder.getInt32(0), 2))
-                              : nullptr;
+    m_debugPrintfBuffer = hasPrintfDesc ? builder.CreateBufferDesc(InternalDescriptorSetId, PrintfBufferBindingId,
+                                                                   builder.getInt32(0), 2, true)
+                                        : nullptr;
 
     lowerDebugfPrintOpVisitor.visit(*this, *func);
   }

@@ -1,0 +1,193 @@
+; Check that traversal module is not compiled when compiling a pipeline library even it calls TraceRay
+
+; RUN: amdllpc -gfxip 11.0 -o - -emit-lgc %s | FileCheck -check-prefixes=CHECK %s
+
+; CHECK-NOT: call <4 x i32> @llvm.amdgcn.image.bvh.intersect.ray.
+
+[Version]
+version = 70
+
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(location = 0) rayPayloadEXT vec3 g_ray;
+
+void main()
+{
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff,
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              /* origin */ vec3(0, 0, 0), /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 0);
+}
+
+[rgenInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 16128
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 8
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBufferCompact
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 2
+userDataNode[0].next[0].set = 0x0000005D
+userDataNode[0].next[0].binding = 17
+userDataNode[0].next[0].strideInDwords = 0
+userDataNode[0].next[1].type = DescriptorConstBuffer
+userDataNode[0].next[1].offsetInDwords = 2
+userDataNode[0].next[1].sizeInDwords = 4
+userDataNode[0].next[1].set = 0x0000005D
+userDataNode[0].next[1].binding = 0
+userDataNode[0].next[1].strideInDwords = 0
+userDataNode[0].next[2].type = DescriptorBuffer
+userDataNode[0].next[2].offsetInDwords = 6
+userDataNode[0].next[2].sizeInDwords = 4
+userDataNode[0].next[2].set = 0x0000005D
+userDataNode[0].next[2].binding = 1
+userDataNode[0].next[2].strideInDwords = 0
+userDataNode[1].visibility = 2
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 3
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 16128
+userDataNode[2].type = DescriptorTableVaPtr
+userDataNode[2].offsetInDwords = 7
+userDataNode[2].sizeInDwords = 1
+userDataNode[2].next[0].type = DescriptorImage
+userDataNode[2].next[0].offsetInDwords = 0
+userDataNode[2].next[0].sizeInDwords = 8
+userDataNode[2].next[0].set = 0x00000000
+userDataNode[2].next[0].binding = 0
+userDataNode[2].next[0].strideInDwords = 0
+userDataNode[2].next[1].type = DescriptorConstBuffer
+userDataNode[2].next[1].offsetInDwords = 8
+userDataNode[2].next[1].sizeInDwords = 4
+userDataNode[2].next[1].set = 0x00000000
+userDataNode[2].next[1].binding = 1
+userDataNode[2].next[1].strideInDwords = 0
+
+[RayTracingPipelineState]
+deviceIndex = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.resourceLayoutScheme = Compact
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 0
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 1
+options.extendedRobustness.nullDescriptor = 0
+options.optimizeTessFactor = 1
+options.optimizationLevel = 2
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.enableImplicitInvariantExports = 1
+options.internalRtShaders = 0
+options.forceNonUniformResourceIndexStageMask = 0
+options.replaceSetWithResourceType = 0
+options.disableSampleMask = 0
+options.buildResourcesDataForShaderModule = 0
+options.disableTruncCoordForGather = 1
+options.enableCombinedTexture = 0
+options.vertex64BitsAttribSingleLoc = 0
+options.enableFragColor = 0
+options.disableBaseVertex = 0
+options.enablePrimGeneratedQuery = 0
+options.disablePerCompFetch = 0
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+groups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[1].generalShader = 3
+groups[1].closestHitShader = -1
+groups[1].anyHitShader = -1
+groups[1].intersectionShader = -1
+groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR
+groups[2].generalShader = -1
+groups[2].closestHitShader = 2
+groups[2].anyHitShader = 1
+groups[2].intersectionShader = -1
+maxRecursionDepth = 1
+indirectStageMask = 4294967295
+libraryMode = 2
+mode = 1
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2172650495
+rtState.nodeStrideShift = 7
+rtState.staticPipelineFlags = 512
+rtState.triCompressMode = 3
+rtState.pipelineFlags = 8192
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.boxSortHeuristicMode = 5
+rtState.counterMode = 0
+rtState.counterMask = 0
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.outerTileSize = 4
+rtState.dispatchDimSwizzleMode = 0
+rtState.exportConfig.indirectCallingConvention = 1
+rtState.exportConfig.indirectCalleeSavedRegs.raygen = 2
+rtState.exportConfig.indirectCalleeSavedRegs.miss = 40
+rtState.exportConfig.indirectCalleeSavedRegs.closestHit = 50
+rtState.exportConfig.indirectCalleeSavedRegs.anyHit = 75
+rtState.exportConfig.indirectCalleeSavedRegs.intersection = 75
+rtState.exportConfig.indirectCalleeSavedRegs.callable = 28
+rtState.exportConfig.indirectCalleeSavedRegs.traceRays = 28
+rtState.exportConfig.enableUniformNoReturn = 1
+rtState.exportConfig.enableTraceRayArgsInLds = 0
+rtState.exportConfig.readsDispatchRaysIndex = 0
+rtState.exportConfig.enableDynamicLaunch = 0
+rtState.exportConfig.emitRaytracingShaderDataToken = 0
+rtState.enableRayQueryCsSwizzle = 0
+rtState.enableDispatchRaysInnerSwizzle = 1
+rtState.enableDispatchRaysOuterSwizzle = 1
+rtState.forceInvalidAccelStruct = 0
+rtState.enableRayTracingCounters = 0
+rtState.enableRayTracingHwTraversalStack = 1
+rtState.enableOptimalLdsStackSizeForIndirect = 1
+rtState.enableOptimalLdsStackSizeForUnified = 1
+rtState.maxRayLength = 0
+rtState.enablePickClosestLaneResultForAbortRays = 0
+rtState.traceRayWaveDensityThreshold[8] = 1
+rtState.traceRayWaveDensityThreshold[10] = 1
+rtState.traceRayWaveDensityThreshold[11] = 1
+rtState.traceRayWaveDensityThreshold[12] = 1
+rtState.gpurtFeatureFlags = 0
+rtState.gpurtFuncTable.pFunc[0] = TraceRay2_0
+rtState.gpurtFuncTable.pFunc[1] = TraceRayInline2_0
+rtState.gpurtFuncTable.pFunc[2] = TraceRayUsingHitToken2_0
+rtState.gpurtFuncTable.pFunc[3] = RayQueryProceed2_0
+rtState.gpurtFuncTable.pFunc[4] = GetInstanceIndex
+rtState.gpurtFuncTable.pFunc[5] = GetInstanceID
+rtState.gpurtFuncTable.pFunc[6] = GetObjectToWorldTransform
+rtState.gpurtFuncTable.pFunc[7] = GetWorldToObjectTransform
+rtState.gpurtFuncTable.pFunc[8] = GetRayQuery64BitInstanceNodePtr
+rtState.gpurtFuncTable.pFunc[9] = TraceLongRayAMD2_0
+rtState.gpurtFuncTable.pFunc[10] = LongRayQueryProceedAMD2_0
+rtState.gpurtFuncTable.pFunc[11] = FetchTrianglePositionFromNodePointer
+rtState.gpurtFuncTable.pFunc[12] = FetchTrianglePositionFromRayQuery
+rtState.rtIpVersion = 2.0
+rtState.gpurtOverride = 0
+rtState.rtIpOverride = 0
+payloadSizeMaxInLib = 0
+attributeSizeMaxInLib = 0
+hasPipelineLibrary = 0
+pipelineLibStageMask = 0

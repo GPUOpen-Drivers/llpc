@@ -63,9 +63,10 @@ if(ICD_BUILD_LLPC)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
     if (NOT WIN32)
         # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
-        #
-        # Don't turn this on on Windows, because the required "cross compile" setup doesn't work in the internal CMake
-        # setup on Windows.
+#if _WIN32
+        # Don't enable this on Windows, because the required "cross compile" setup doesn't work
+        # in the internal CMake setup on Windows.
+#endif
         set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
     endif()
 
@@ -168,6 +169,7 @@ if(ICD_BUILD_LLPC)
     endif()
 endif()
 
+#if _WIN32
 if(WIN32)
     target_compile_definitions(llpcinternal PRIVATE
         NOMINMAX    # windows.h defines min/max which conflicts with the use of std::min / max
@@ -175,6 +177,7 @@ if(WIN32)
         _UNICODE
     )
 endif()
+#endif
 
 target_include_directories(llpcinternal
     PUBLIC
@@ -192,9 +195,11 @@ target_include_directories(llpcinternal
         ${LLVM_INCLUDE_DIRS}
 )
 
+#if _WIN32
 if(WIN32)
     target_compile_definitions(llpcinternal PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 endif()
+#endif
 
 if(ICD_BUILD_LLPC)
 # llpc/context
@@ -217,7 +222,6 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerInstMetaRemove.cpp
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
-        lower/llpcSpirvLowerRayQuery.cpp
         lower/LowerPostInline.cpp
         lower/llpcSpirvLowerRayTracing.cpp
         lower/llpcSpirvLowerTerminator.cpp
@@ -279,8 +283,10 @@ if(ICD_BUILD_LLPC)
 
 if(UNIX)
     set(BUILD_OS lnx)
+#if _WIN32
 elseif(WIN32)
     set(BUILD_OS win)
+#endif
 endif()
 
 endif()

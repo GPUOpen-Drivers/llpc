@@ -578,6 +578,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   shaderOptions.debugMode = shaderInfo.options.debugMode;
   shaderOptions.allowReZ = shaderInfo.options.allowReZ;
   shaderOptions.forceLateZ = shaderInfo.options.forceLateZ;
+  shaderOptions.imageSampleDrefReturnsRgba = shaderInfo.options.imageSampleDrefReturnsRgba;
 
   shaderOptions.vgprLimit = shaderInfo.options.vgprLimit;
 

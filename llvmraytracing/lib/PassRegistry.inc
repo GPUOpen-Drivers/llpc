@@ -44,22 +44,21 @@
 #define CONT_MODULE_ANALYSIS(NAME, CREATE_PASS)
 #endif
 
-CONT_MODULE_ANALYSIS("dialect-context-analysis",
-                     DialectContextAnalysis(NeedDialectContext))
+CONT_MODULE_ANALYSIS("dialect-context-analysis", DialectContextAnalysis(NeedDialectContext))
 
-CONT_MODULE_PASS("legacy-cleanup-continuations",
-                 LegacyCleanupContinuationsPass())
+CONT_MODULE_PASS("legacy-cleanup-continuations", LegacyCleanupContinuationsPass())
 CONT_MODULE_PASS("dxil-cleanup-continuations", DXILCleanupContinuationsPass())
 CONT_MODULE_PASS("cleanup-continuations", CleanupContinuationsPass())
+CONT_MODULE_PASS("continuations-stats-report", ContinuationsStatsReportPass())
 CONT_MODULE_PASS("lower-raytracing-pipeline", LowerRaytracingPipelinePass())
+CONT_MODULE_PASS("lgc-cps-jump-inliner", LgcCpsJumpInlinerPass())
 CONT_MODULE_PASS("dxil-cont-intrinsic-prepare", DXILContIntrinsicPreparePass())
-CONT_MODULE_PASS("dxil-cont-lgc-rt-op-converter",
-                 DXILContLgcRtOpConverterPass())
+CONT_MODULE_PASS("dxil-cont-lgc-rt-op-converter", DXILContLgcRtOpConverterPass())
 CONT_MODULE_PASS("dxil-cont-post-process", DXILContPostProcessPass())
+CONT_MODULE_PASS("continuations-lint", ContinuationsLintPass())
 CONT_MODULE_PASS("dxil-cont-post-hook", DXILContPostHookPass())
 CONT_MODULE_PASS("dxil-cont-pre-hook", DXILContPreHookPass())
 CONT_MODULE_PASS("lower-await", LowerAwaitPass())
-CONT_MODULE_PASS("register-buffer", RegisterBufferPass())
 CONT_MODULE_PASS("remove-types-metadata", RemoveTypesMetadataPass())
 
 CONT_CGSCC_PASS("dxil-coro-split", DXILCoroSplitPass())

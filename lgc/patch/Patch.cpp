@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/Patch.h"
+#include "LowerRayQueryWrapper.h"
 #include "PatchNullFragShader.h"
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcContext.h"
@@ -55,6 +56,7 @@
 #include "lgc/patch/PatchLlvmIrInclusion.h"
 #include "lgc/patch/PatchLoadScalarizer.h"
 #include "lgc/patch/PatchLoopMetadata.h"
+#include "lgc/patch/PatchMulDx9Zero.h"
 #include "lgc/patch/PatchPeepholeOpt.h"
 #include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "lgc/patch/PatchReadFirstLane.h"
@@ -139,6 +141,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
 
+  if (pipelineState->getOptions().useGpurt) {
+    passMgr.addPass(LowerRayQueryWrapper());
+  }
   const auto indirectMode = pipelineState->getOptions().rtIndirectMode;
   if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy ||
       indirectMode == RayTracingIndirectMode::Continuations) {
@@ -180,7 +185,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   }
 
   passMgr.addPass(IPSCCPPass());
-
   passMgr.addPass(createModuleToFunctionPassAdaptor(CombineCooperativeMatrix()));
   // Lower the cooperative matrix
   passMgr.addPass(LowerCooperativeMatrix());
@@ -429,6 +433,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   scalarizerOptions.ScalarizeMinBits = 32;
   fpm.addPass(ScalarizerPass(scalarizerOptions));
 #endif
+  fpm.addPass(PatchMulDx9Zero());
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());
@@ -508,17 +513,19 @@ Constant *Patch::getLdsVariable(PipelineState *pipelineState, Function *func, bo
   const unsigned ldsSize = staticLdsSize + rtLdsSize;
 
   // See if module already has LDS variable.
+  GlobalVariable *lds = nullptr;
   auto oldLds = func->getParent()->getNamedValue(ldsName);
-  if (oldLds)
-    return cast<GlobalVariable>(oldLds);
-
-  // Else create LDS variable for this function.
-  // LDS type: [ldsSize * i32], address space 3
   const auto i32Ty = Type::getInt32Ty(*context);
-  const auto ldsTy = ArrayType::get(i32Ty, ldsSize);
-  auto lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, Twine(ldsName), nullptr,
-                                GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);
-  lds->setAlignment(MaybeAlign(sizeof(unsigned)));
+  if (oldLds) {
+    lds = cast<GlobalVariable>(oldLds);
+  } else {
+    // Else create LDS variable for this function.
+    // LDS type: [ldsSize * i32], address space 3
+    const auto ldsTy = ArrayType::get(i32Ty, ldsSize);
+    lds = new GlobalVariable(*module, ldsTy, false, GlobalValue::ExternalLinkage, nullptr, Twine(ldsName), nullptr,
+                             GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);
+    lds->setAlignment(MaybeAlign(sizeof(unsigned)));
+  }
 
   if (rtStack) {
     auto *offset = Constant::getIntegerValue(i32Ty, APInt(32, staticLdsSize));

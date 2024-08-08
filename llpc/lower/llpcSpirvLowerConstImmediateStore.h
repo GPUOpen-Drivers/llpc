@@ -36,6 +36,7 @@
 namespace llvm {
 class AllocaInst;
 class StoreInst;
+class Value;
 } // namespace llvm
 
 namespace Llpc {

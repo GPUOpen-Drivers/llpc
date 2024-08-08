@@ -1,0 +1,30 @@
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc --print-after=lgc-lower-gpurt %gfxip 2>&1 %s | FileCheck -check-prefix=SHADERTEST %s
+; Check whether ray flags are replaced by known values
+; SHADERTEST: %{{.*}} = xor i32 -171, -1
+; SHADERTEST: %{{.*}} = or i32 %{{.*}}, 170
+*/
+// END_SHADERTEST
+
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  vec3 color;
+};
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(location = 0) rayPayloadEXT RayPayload g_ray;
+
+void main() {
+  vec3 origin;
+  origin.x = gl_LaunchIDEXT.x;
+  origin.y = gl_LaunchIDEXT.y;
+  origin.z = 0;
+
+  traceRayEXT(g_bvh, /* ray flags */ 0xAA, /* cull mask */ 0xff, 
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              origin.xyz, /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 0);
+}

@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -337,10 +337,8 @@ enum class PAQShaderStage {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, PAQShaderStage);
 
 // List of all valid PAQShaderStage values
-constexpr std::array<PAQShaderStage,
-                     static_cast<std::size_t>(PAQShaderStage::Count)>
-    PAQShaderStages = {PAQShaderStage::Caller, PAQShaderStage::AnyHit,
-                       PAQShaderStage::ClosestHit, PAQShaderStage::Miss};
+constexpr std::array<PAQShaderStage, static_cast<std::size_t>(PAQShaderStage::Count)> PAQShaderStages = {
+    PAQShaderStage::Caller, PAQShaderStage::AnyHit, PAQShaderStage::ClosestHit, PAQShaderStage::Miss};
 
 // Prints enum value in lower case (as in HLSL)
 enum class PAQAccessKind { Read = 0, Write, NumKinds };
@@ -356,8 +354,7 @@ public:
     return AccessMask & getBitmask(Stage, AccessKind);
   }
 
-  constexpr PAQAccessMask &set(PAQShaderStage Stage, PAQAccessKind AccessKind,
-                               bool Value = true) {
+  constexpr PAQAccessMask &set(PAQShaderStage Stage, PAQAccessKind AccessKind, bool Value = true) {
     if (Value) {
       AccessMask |= getBitmask(Stage, AccessKind);
     } else {
@@ -366,25 +363,20 @@ public:
     return *this;
   }
 
-  bool operator==(const PAQAccessMask &RHS) const {
-    return AccessMask == RHS.AccessMask;
-  }
+  bool operator==(const PAQAccessMask &RHS) const { return AccessMask == RHS.AccessMask; }
 
   bool operator!=(const PAQAccessMask &RHS) const { return !(*this == RHS); }
 
   // Prints HLSL-like qualifier string as in "write(..) : read(..)"
   // If AccessKind is set, only prints the part corresponding to that kind.
-  void print(llvm::raw_ostream &,
-             std::optional<PAQAccessKind> AccessKind = {}) const;
+  void print(llvm::raw_ostream &, std::optional<PAQAccessKind> AccessKind = {}) const;
 
   bool empty() const { return AccessMask == 0u; }
 
 private:
   // Offset of the bit corresponding to (Stage, AccessKind) in AccessMask
-  static constexpr uint32_t getBitmask(PAQShaderStage Stage,
-                                       PAQAccessKind AccessKind) {
-    uint32_t Offset = static_cast<uint32_t>(Stage) *
-                          static_cast<uint32_t>(PAQAccessKind::NumKinds) +
+  static constexpr uint32_t getBitmask(PAQShaderStage Stage, PAQAccessKind AccessKind) {
+    uint32_t Offset = static_cast<uint32_t>(Stage) * static_cast<uint32_t>(PAQAccessKind::NumKinds) +
                       static_cast<uint32_t>(AccessKind);
     return 1u << Offset;
   }
@@ -392,13 +384,11 @@ private:
   uint32_t AccessMask = 0u;
 
   static_assert(sizeof(AccessMask) * CHAR_BIT >=
-                    static_cast<uint32_t>(PAQShaderStage::Count) *
-                        static_cast<uint32_t>(PAQAccessKind::NumKinds),
+                    static_cast<uint32_t>(PAQShaderStage::Count) * static_cast<uint32_t>(PAQAccessKind::NumKinds),
                 "Increase width of AccessMask!");
 };
 
-inline raw_ostream &operator<<(raw_ostream &Stream,
-                               const PAQAccessMask &AccessMask) {
+inline raw_ostream &operator<<(raw_ostream &Stream, const PAQAccessMask &AccessMask) {
   AccessMask.print(Stream);
   return Stream;
 }
@@ -428,19 +418,18 @@ enum class PAQLifetimeClass : uint32_t {
   Count
 };
 
-constexpr std::array<PAQLifetimeClass,
-                     static_cast<std::size_t>(PAQLifetimeClass::Count)>
-    PAQLifetimeClasses = {PAQLifetimeClass::Caller_To_Caller,
-                          PAQLifetimeClass::AnyHit_To_Caller,
-                          PAQLifetimeClass::Caller_To_ClosestHitAndMiss,
-                          PAQLifetimeClass::Caller_To_ClosestHit,
-                          PAQLifetimeClass::AnyHit_To_ClosestHitAndMiss,
-                          PAQLifetimeClass::AnyHit_To_ClosestHit,
-                          PAQLifetimeClass::Caller_To_AnyHit,
-                          PAQLifetimeClass::AnyHit_To_AnyHit,
-                          PAQLifetimeClass::ClosestHitAndMiss_To_Caller,
-                          PAQLifetimeClass::ClosestHit_To_Caller,
-                          PAQLifetimeClass::Miss_To_Caller};
+constexpr std::array<PAQLifetimeClass, static_cast<std::size_t>(PAQLifetimeClass::Count)> PAQLifetimeClasses = {
+    PAQLifetimeClass::Caller_To_Caller,
+    PAQLifetimeClass::AnyHit_To_Caller,
+    PAQLifetimeClass::Caller_To_ClosestHitAndMiss,
+    PAQLifetimeClass::Caller_To_ClosestHit,
+    PAQLifetimeClass::AnyHit_To_ClosestHitAndMiss,
+    PAQLifetimeClass::AnyHit_To_ClosestHit,
+    PAQLifetimeClass::Caller_To_AnyHit,
+    PAQLifetimeClass::AnyHit_To_AnyHit,
+    PAQLifetimeClass::ClosestHitAndMiss_To_Caller,
+    PAQLifetimeClass::ClosestHit_To_Caller,
+    PAQLifetimeClass::Miss_To_Caller};
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, PAQLifetimeClass);
 
@@ -464,17 +453,14 @@ enum class PAQSerializationLayoutKind {
   Count
 };
 
-constexpr std::array<PAQSerializationLayoutKind,
-                     static_cast<std::size_t>(
-                         PAQSerializationLayoutKind::Count)>
-    PAQSerializationLayoutKinds = {
-        PAQSerializationLayoutKind::CallerOut,
-        PAQSerializationLayoutKind::AnyHitIn,
-        PAQSerializationLayoutKind::AnyHitOutAcceptHit,
-        PAQSerializationLayoutKind::AnyHitOutAcceptHitAndEndSearch,
-        PAQSerializationLayoutKind::MissIn,
-        PAQSerializationLayoutKind::ClosestHitOut,
-        PAQSerializationLayoutKind::MissOut};
+constexpr std::array<PAQSerializationLayoutKind, static_cast<std::size_t>(PAQSerializationLayoutKind::Count)>
+    PAQSerializationLayoutKinds = {PAQSerializationLayoutKind::CallerOut,
+                                   PAQSerializationLayoutKind::AnyHitIn,
+                                   PAQSerializationLayoutKind::AnyHitOutAcceptHit,
+                                   PAQSerializationLayoutKind::AnyHitOutAcceptHitAndEndSearch,
+                                   PAQSerializationLayoutKind::MissIn,
+                                   PAQSerializationLayoutKind::ClosestHitOut,
+                                   PAQSerializationLayoutKind::MissOut};
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, PAQSerializationLayoutKind);
 
@@ -493,8 +479,7 @@ enum class PAQLivenessStatus : uint8_t {
 // This can be computed more efficiently for all combinations together, hence
 // using a lookup table instead of querying each individual combination.
 using PAQLivenessStatusTable = llvm::EnumeratedArray<
-    llvm::EnumeratedArray<PAQLivenessStatus, PAQSerializationLayoutKind,
-                          PAQSerializationLayoutKind::Last, std::size_t>,
+    llvm::EnumeratedArray<PAQLivenessStatus, PAQSerializationLayoutKind, PAQSerializationLayoutKind::Last, std::size_t>,
     PAQLifetimeClass, PAQLifetimeClass::Last, std::size_t>;
 
 // A permutation of all PAQLifetimeClass values.
@@ -514,9 +499,7 @@ using PAQLivenessStatusTable = llvm::EnumeratedArray<
 // ordering to avoid unnecessary dummy fields. In other words, the order should
 // be a topological order of the lifetime domination graph. For example,
 // Caller_To_Caller should always come first.
-using PAQLifetimeClassPackingOrder =
-    std::array<PAQLifetimeClass,
-               static_cast<std::size_t>(PAQLifetimeClass::Count)>;
+using PAQLifetimeClassPackingOrder = std::array<PAQLifetimeClass, static_cast<std::size_t>(PAQLifetimeClass::Count)>;
 
 // Determine an ordering of lifetime classes in the TraceRay serialization
 // layout. Currently, we use a fixed hardcoded order, but we could dynamically
@@ -527,8 +510,7 @@ PAQLifetimeClassPackingOrder determineLifetimeClassPackingOrder();
 // use a static ordering, this could be done manually in a large switch
 // statement, and was done so in the past, but that was a huge, error-prone case
 // distinction.
-PAQLivenessStatusTable
-computeLivenessStatusTable(const PAQLifetimeClassPackingOrder &Ordering);
+PAQLivenessStatusTable computeLivenessStatusTable(const PAQLifetimeClassPackingOrder &Ordering);
 
 // Try to determine the unique layout kind for the given shader stage and access
 // kind. If there are multiple relevant layouts, returns std::nullopt; these
@@ -536,8 +518,7 @@ computeLivenessStatusTable(const PAQLifetimeClassPackingOrder &Ordering);
 //  - read(caller): There is no unique layout kind, because we import
 //                  multiple layouts (ClosestHitOut, MissOut).
 //  - write(anyhit): There are multiple possible layout kinds.
-std::optional<PAQSerializationLayoutKind>
-tryDetermineLayoutKind(PAQShaderStage ShaderStage, PAQAccessKind AccessKind);
+std::optional<PAQSerializationLayoutKind> tryDetermineLayoutKind(PAQShaderStage ShaderStage, PAQAccessKind AccessKind);
 
 // For every payload struct, we store PAQ qualifiers of its possibly nested
 // fields in a tree whose structure corresponds to the nested fields structure
@@ -626,14 +607,12 @@ struct PAQPayloadConfig {
   // Prefer explicit constructor over aggregate initialization to catch cases
   // of missing fields in cases we add fields to this struct.
   PAQPayloadConfig(Type *PayloadType, uint32_t MaxHitAttributeByteCnt)
-      : PayloadTy{PayloadType}, MaxHitAttributeByteCount{
-                                    MaxHitAttributeByteCnt} {}
+      : PayloadTy{PayloadType}, MaxHitAttributeByteCount{MaxHitAttributeByteCnt} {}
   Type *PayloadTy = nullptr;
   // Only relevant for TraceRay:
   uint32_t MaxHitAttributeByteCount = 0;
 
-  friend bool operator==(const PAQPayloadConfig &LHS,
-                         const PAQPayloadConfig &RHS) {
+  friend bool operator==(const PAQPayloadConfig &LHS, const PAQPayloadConfig &RHS) {
     return std::tie(LHS.PayloadTy, LHS.MaxHitAttributeByteCount) ==
            std::tie(RHS.PayloadTy, RHS.MaxHitAttributeByteCount);
   }
@@ -643,12 +622,8 @@ template <> struct DenseMapInfo<PAQPayloadConfig> {
   using T = PAQPayloadConfig;
 
   static T getEmptyKey() { return T{DenseMapInfo<Type *>::getEmptyKey(), 0}; }
-  static T getTombstoneKey() {
-    return T{DenseMapInfo<Type *>::getTombstoneKey(), 0};
-  }
-  static unsigned getHashValue(const T &Val) {
-    return llvm::hash_combine(Val.PayloadTy, Val.MaxHitAttributeByteCount);
-  }
+  static T getTombstoneKey() { return T{DenseMapInfo<Type *>::getTombstoneKey(), 0}; }
+  static unsigned getHashValue(const T &Val) { return llvm::hash_combine(Val.PayloadTy, Val.MaxHitAttributeByteCount); }
   static bool isEqual(const T &LHS, const T &RHS) { return LHS == RHS; }
 };
 
@@ -662,12 +637,8 @@ struct PAQIndexInterval {
 
   uint32_t size() const { return End - Begin; }
 
-  bool operator==(const PAQIndexInterval &Other) const {
-    return Begin == Other.Begin && End == Other.End;
-  }
-  bool operator!=(const PAQIndexInterval &Other) const {
-    return !(*this == Other);
-  }
+  bool operator==(const PAQIndexInterval &Other) const { return Begin == Other.Begin && End == Other.End; }
+  bool operator!=(const PAQIndexInterval &Other) const { return !(*this == Other); }
   // Sort lexicographically by (Begin, End)
   bool operator<(const PAQIndexInterval &Other) const {
     return std::tie(Begin, End) < std::tie(Other.Begin, Other.End);
@@ -727,8 +698,7 @@ enum class PAQSerializationInfoKind { TraceRay = 1, CallShader };
 // PAQTraceRaySerializationInfo and PAQCallShaderSerializationInfo inherit from
 // this.
 struct PAQSerializationInfoBase {
-  PAQSerializationInfoBase(PAQSerializationInfoKind InfoKind)
-      : Kind{InfoKind} {}
+  PAQSerializationInfoBase(PAQSerializationInfoKind InfoKind) : Kind{InfoKind} {}
   PAQSerializationInfoBase(PAQSerializationInfoBase &&) = default;
   PAQSerializationInfoBase &operator=(PAQSerializationInfoBase &&) = default;
   virtual ~PAQSerializationInfoBase() = default;
@@ -793,15 +763,11 @@ struct PAQHitGroupLayoutInfo {
 // Stores complete serialization info for a particular payload type for the
 // whole TraceRay pipeline.
 struct PAQTraceRaySerializationInfo : public PAQSerializationInfoBase {
-  PAQTraceRaySerializationInfo()
-      : PAQSerializationInfoBase(PAQSerializationInfoKind::TraceRay) {}
+  PAQTraceRaySerializationInfo() : PAQSerializationInfoBase(PAQSerializationInfoKind::TraceRay) {}
   PAQTraceRaySerializationInfo(PAQTraceRaySerializationInfo &&) = default;
-  PAQTraceRaySerializationInfo &
-  operator=(PAQTraceRaySerializationInfo &&) = default;
+  PAQTraceRaySerializationInfo &operator=(PAQTraceRaySerializationInfo &&) = default;
 
-  static bool classof(const PAQSerializationInfoBase *IB) {
-    return IB->Kind == PAQSerializationInfoKind::TraceRay;
-  }
+  static bool classof(const PAQSerializationInfoBase *IB) { return IB->Kind == PAQSerializationInfoKind::TraceRay; }
 
   PAQPayloadConfig PAQConfig = {nullptr, 0};
 
@@ -810,8 +776,8 @@ struct PAQTraceRaySerializationInfo : public PAQSerializationInfoBase {
   // attribute size, required to compute the maximum required payload storage
   // size. AnyHit and ClosestHit shaders know the exact attribute type and size,
   // and use specialized layouts in SpecializedHitGroupLayouts.
-  llvm::EnumeratedArray<PAQSerializationLayout, PAQSerializationLayoutKind,
-                        PAQSerializationLayoutKind::Last, std::size_t>
+  llvm::EnumeratedArray<PAQSerializationLayout, PAQSerializationLayoutKind, PAQSerializationLayoutKind::Last,
+                        std::size_t>
       LayoutsByKind;
 
   // Specialized layouts for known attribute size
@@ -837,12 +803,10 @@ struct PAQTraceRaySerializationInfo : public PAQSerializationInfoBase {
   // any PAQ qualifiers, assuming write(all) + read(all). Otherwise, RootNode
   // must be the root node of a PAQ tree containing PAQ access qualifiers for
   // PayloadType. Ownership of RootNode is transferred to the returned object.
-  static std::unique_ptr<PAQTraceRaySerializationInfo>
-  create(Module &M, const PAQPayloadConfig &PAQConfig, const PAQNode &RootNode,
-         uint64_t PayloadRegisterCount);
+  static std::unique_ptr<PAQTraceRaySerializationInfo> create(Module &M, const PAQPayloadConfig &PAQConfig,
+                                                              const PAQNode &RootNode, uint64_t PayloadRegisterCount);
 
-  virtual void
-  collectAllNodes(SmallVectorImpl<const PAQNode *> &Result) const override {
+  virtual void collectAllNodes(SmallVectorImpl<const PAQNode *> &Result) const override {
     PAQSerializationInfoBase::collectAllNodes(Result);
     if (WorstCaseHitAttributesNode)
       Result.push_back(WorstCaseHitAttributesNode.get());
@@ -850,8 +814,7 @@ struct PAQTraceRaySerializationInfo : public PAQSerializationInfoBase {
 
   // Compute a PAQHitGroupLayoutInfo, containing specialized serialization
   // layouts for a fixed number of required I32s for hit attribute storage
-  PAQHitGroupLayoutInfo
-  createHitGroupLayoutInfo(Module &M, uint32_t PayloadHitAttrI32s) const;
+  PAQHitGroupLayoutInfo createHitGroupLayoutInfo(Module &M, uint32_t PayloadHitAttrI32s) const;
 };
 
 // Serialization info for CallShader calls.
@@ -859,36 +822,30 @@ struct PAQTraceRaySerializationInfo : public PAQSerializationInfoBase {
 // read/write all payload fields. This class allows a consistent implementation
 // without special case handling for CallShader.
 struct PAQCallShaderSerializationInfo : public PAQSerializationInfoBase {
-  PAQCallShaderSerializationInfo()
-      : PAQSerializationInfoBase(PAQSerializationInfoKind::CallShader) {}
+  PAQCallShaderSerializationInfo() : PAQSerializationInfoBase(PAQSerializationInfoKind::CallShader) {}
 
-  static bool classof(const PAQSerializationInfoBase *IB) {
-    return IB->Kind == PAQSerializationInfoKind::CallShader;
-  }
+  static bool classof(const PAQSerializationInfoBase *IB) { return IB->Kind == PAQSerializationInfoKind::CallShader; }
 
   PAQSerializationLayout CallShaderSerializationLayout;
 
   // Computes a serialization info for CallShader calls for the given payload
   // type. Note that CallShader calls are not affected by PAQ access qualifiers.
   static std::unique_ptr<PAQCallShaderSerializationInfo>
-  create(Module &M, const PAQPayloadConfig &PAQConfig,
-         const PAQNode &PAQRootNode, uint64_t PayloadRegisterCount);
+  create(Module &M, const PAQPayloadConfig &PAQConfig, const PAQNode &PAQRootNode, uint64_t PayloadRegisterCount);
 };
 
 // Helper class to obtain serialization infos, importing DXIL PAQ metadata,
 // and caching already seen serialization infos.
 class PAQSerializationInfoManager {
 public:
-  PAQSerializationInfoManager(Module *M, Module *GpurtLibrary,
-                              uint32_t MaxPayloadRegisterCount);
+  PAQSerializationInfoManager(Module *M, Module *GpurtLibrary, uint32_t MaxPayloadRegisterCount);
   PAQSerializationInfoManager(const PAQSerializationInfoManager &) = delete;
   PAQSerializationInfoManager(PAQSerializationInfoManager &&) = default;
 
   // Returns the result of either getOrCreateTraceRaySerializationInfo or
   // getOrCreateCallShaderSerializationInfo depending on ShaderKind.
-  PAQSerializationInfoBase &
-  getOrCreateSerializationInfo(const PAQPayloadConfig &PayloadConfig,
-                               lgc::rt::RayTracingShaderStage ShaderKind);
+  PAQSerializationInfoBase &getOrCreateSerializationInfo(const PAQPayloadConfig &PayloadConfig,
+                                                         lgc::rt::RayTracingShaderStage ShaderKind);
 
   // Check whether a serialization info for the given
   // payload type has already been computed (or imported from DXIL metadata).
@@ -896,34 +853,29 @@ public:
   // Otherwise, compute a new serialization info with trivial qualifiers
   // (write+read everything).
   // Result is non-const to allow adding custom hitgroup layouts later on.
-  PAQTraceRaySerializationInfo &
-  getOrCreateTraceRaySerializationInfo(const PAQPayloadConfig &PAQConfig);
+  PAQTraceRaySerializationInfo &getOrCreateTraceRaySerializationInfo(const PAQPayloadConfig &PAQConfig);
 
   // Same as above, but for CallShader.
-  PAQCallShaderSerializationInfo &
-  getOrCreateCallShaderSerializationInfo(const PAQPayloadConfig &PAQConfig);
+  PAQCallShaderSerializationInfo &getOrCreateCallShaderSerializationInfo(const PAQPayloadConfig &PAQConfig);
 
   // For ClosestHit and AnyHitOutAcceptHit layouts, the layout depends on the
   // actually used hit attribute type. In this case, the HitAttributesTy
   // argument must be non-null. In all other cases, it is ignored.
-  const PAQSerializationLayout &
-  getOrCreateTraceRayLayout(PAQTraceRaySerializationInfo &TraceRayInfo,
-                            PAQSerializationLayoutKind LayoutKind,
-                            Type *HitAttributesTy = nullptr);
+  const PAQSerializationLayout &getOrCreateTraceRayLayout(PAQTraceRaySerializationInfo &TraceRayInfo,
+                                                          PAQSerializationLayoutKind LayoutKind,
+                                                          Type *HitAttributesTy = nullptr);
 
   // Convenience wrapper that selects the layout to be used for the payload
   // incoming to a shader on shader entry.
-  const PAQSerializationLayout &getOrCreateShaderStartSerializationLayout(
-      PAQSerializationInfoBase &SerializationInfo,
-      lgc::rt::RayTracingShaderStage ShaderKind,
-      Type *HitAttributesTy = nullptr);
+  const PAQSerializationLayout &getOrCreateShaderStartSerializationLayout(PAQSerializationInfoBase &SerializationInfo,
+                                                                          lgc::rt::RayTracingShaderStage ShaderKind,
+                                                                          Type *HitAttributesTy = nullptr);
   // Convenience wrapper that selects the layout to be used for the payload
   // outgoing of a shader on shader exit.
-  const PAQSerializationLayout &getOrCreateShaderExitSerializationLayout(
-      PAQSerializationInfoBase &SerializationInfo,
-      lgc::rt::RayTracingShaderStage ShaderKind,
-      Type *HitAttributesTy = nullptr,
-      AnyHitExitKind AHExitKind = AnyHitExitKind::None);
+  const PAQSerializationLayout &
+  getOrCreateShaderExitSerializationLayout(PAQSerializationInfoBase &SerializationInfo,
+                                           lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy = nullptr,
+                                           AnyHitExitKind AHExitKind = AnyHitExitKind::None);
 
   enum class MaxPayloadStorageConsideration : uint8_t {
     ConsiderOnlyTraceRay,
@@ -937,19 +889,14 @@ public:
   // TraceRay, this takes the maximum over all serialization formats.
   uint32_t getMaxPayloadStorageI32s(
       const PAQPayloadConfig &PAQConfig,
-      MaxPayloadStorageConsideration Consideration =
-          MaxPayloadStorageConsideration::ConsiderTraceRayAndCallShader);
+      MaxPayloadStorageConsideration Consideration = MaxPayloadStorageConsideration::ConsiderTraceRayAndCallShader);
 
-  uint32_t
-  getMaxPayloadStorageI32sForTraceRayFunc(const PAQPayloadConfig &PAQConfig) {
-    return getMaxPayloadStorageI32s(
-        PAQConfig, MaxPayloadStorageConsideration::ConsiderOnlyTraceRay);
+  uint32_t getMaxPayloadStorageI32sForTraceRayFunc(const PAQPayloadConfig &PAQConfig) {
+    return getMaxPayloadStorageI32s(PAQConfig, MaxPayloadStorageConsideration::ConsiderOnlyTraceRay);
   }
 
-  uint32_t
-  getMaxPayloadStorageI32sForCallShaderFunc(const PAQPayloadConfig &PAQConfig) {
-    return getMaxPayloadStorageI32s(
-        PAQConfig, MaxPayloadStorageConsideration::ConsiderOnlyCallShader);
+  uint32_t getMaxPayloadStorageI32sForCallShaderFunc(const PAQPayloadConfig &PAQConfig) {
+    return getMaxPayloadStorageI32s(PAQConfig, MaxPayloadStorageConsideration::ConsiderOnlyCallShader);
   }
 
 private:
@@ -964,12 +911,10 @@ private:
     // all CallShader payload types, we construct trivial (i.e. always read and
     // write everything) PAQNodes on demand.
     MapVector<Type *, std::unique_ptr<PAQNode>> PAQRootNodes;
-    MapVector<PAQPayloadConfig, std::unique_ptr<SerializationInfoT>>
-        SerializationInfos;
+    MapVector<PAQPayloadConfig, std::unique_ptr<SerializationInfoT>> SerializationInfos;
 
-    SerializationInfoT &
-    getOrCreateSerializationInfo(Module &M, uint32_t MaxPayloadRegisterCount,
-                                 const PAQPayloadConfig &PAQConfig);
+    SerializationInfoT &getOrCreateSerializationInfo(Module &M, uint32_t MaxPayloadRegisterCount,
+                                                     const PAQPayloadConfig &PAQConfig);
   };
 
   PAQCache<PAQTraceRaySerializationInfo> TraceRayCache;

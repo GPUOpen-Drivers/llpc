@@ -153,7 +153,8 @@ static constexpr char PsInputSemantic[] = ".ps_input_semantic";
 static constexpr char PsDummyExport[] = ".ps_dummy_export";
 static constexpr char PrerasterOutputSemantic[] = ".preraster_output_semantic";
 static constexpr char ShaderFunctions[] = ".shader_functions";
-}; // namespace PipelineMetadataKey
+static constexpr char UsesCps[] = ".uses_cps";
+} // namespace PipelineMetadataKey
 
 namespace HardwareStageMetadataKey {
 static constexpr char EntryPoint[] = ".entry_point";
@@ -354,6 +355,7 @@ static constexpr char ExecOnNoop[] = ".exec_on_noop";
 static constexpr char AlphaToMaskDisable[] = ".alpha_to_mask_disable";
 static constexpr char DepthBeforeShader[] = ".depth_before_shader";
 static constexpr char ConservativeZExport[] = ".conservative_z_export";
+static constexpr char PrimitiveOrderedPixelShader[] = ".primitive_ordered_pixel_shader";
 static constexpr char PreShaderDepthCoverageEnable[] = ".pre_shader_depth_coverage_enable";
 }; // namespace DbShaderControlMetadataKey
 
@@ -378,6 +380,7 @@ static constexpr char PrimAttr[] = ".prim_attr";
 namespace SpiPsInControlMetadataKey {
 static constexpr char NumInterps[] = ".num_interps";
 static constexpr char NumPrimInterp[] = ".num_prim_interp";
+static constexpr char ParamGen[] = ".param_gen";
 static constexpr char PsW32En[] = ".ps_w32_en";
 }; // namespace SpiPsInControlMetadataKey
 
@@ -642,8 +645,9 @@ inline const char *shaderStageToApiName(ShaderStageEnum stage) {
     return ".pixel";
   case ShaderStage::Compute:
     return ".compute";
+  default:
+    llvm::report_fatal_error("No api name for this shader stage");
   }
-  llvm::report_fatal_error("No api name for this shader stage");
 }
 
 // The names of hardware shader stages used in PAL metadata, in Util::Abi::HardwareStage order.

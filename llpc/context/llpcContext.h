@@ -123,7 +123,6 @@ public:
   void setModuleTargetMachine(llvm::Module *module);
 
   void ensureGpurtLibrary();
-
   void ensureGfxRuntimeLibrary();
 
 private:

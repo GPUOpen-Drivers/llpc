@@ -203,6 +203,11 @@ bool SpirvLowerMemoryOp::needExpandDynamicIndex(GetElementPtrInst *getElemPtr, u
             // Always expand for vector
             auto vectorTy = dyn_cast<FixedVectorType>(indexedTy);
             *dynIndexBound = vectorTy->getNumElements();
+          } else if (isa<IntegerType>(indexedTy)) {
+            // Skip scalar integer type
+            // NOTE: Normal SPIR-V translation won't generate this, it may come from our internally inserted
+            // instructions to do pointer increment.
+            allowExpand = false;
           } else {
             llvm_unreachable("Should never be called!");
             allowExpand = false;

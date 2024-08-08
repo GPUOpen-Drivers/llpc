@@ -106,7 +106,7 @@ define spir_func void @_rgen_1({} %state, i32 %rcr) #0 !spirv.ExecutionModel !15
 ; CHECK-NEXT:    [[TMP88:%.*]] = icmp ne i32 [[TMP87]], 0
 ; CHECK-NEXT:    [[TMP89:%.*]] = select i1 [[TMP88]], i32 [[TMP87]], i32 [[TMP85]]
 ; CHECK-NEXT:    [[TMP90:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP89]], i1 true)
-; CHECK-NEXT:    [[TMP91:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP74]], i32 [[TMP90]])
+; CHECK-NEXT:    [[TMP91:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP74]], i32 [[TMP90]])
 ; CHECK-NEXT:    [[TMP92:%.*]] = icmp eq i32 [[TMP74]], [[TMP91]]
 ; CHECK-NEXT:    [[TMP93:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP92]])
 ; CHECK-NEXT:    [[TMP94:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP91]])
@@ -266,7 +266,7 @@ define void @_rgen_1.resume.0({} %0, i32 %1, [1 x i32] %2) !spirv.ExecutionModel
 ; CHECK-NEXT:    [[TMP46:%.*]] = icmp ne i32 [[TMP45]], 0
 ; CHECK-NEXT:    [[TMP47:%.*]] = select i1 [[TMP46]], i32 [[TMP45]], i32 [[TMP43]]
 ; CHECK-NEXT:    [[TMP48:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP47]], i1 true)
-; CHECK-NEXT:    [[TMP49:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP32]], i32 [[TMP48]])
+; CHECK-NEXT:    [[TMP49:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP32]], i32 [[TMP48]])
 ; CHECK-NEXT:    [[TMP50:%.*]] = icmp eq i32 [[TMP32]], [[TMP49]]
 ; CHECK-NEXT:    [[TMP51:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP50]])
 ; CHECK-NEXT:    [[TMP52:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP49]])

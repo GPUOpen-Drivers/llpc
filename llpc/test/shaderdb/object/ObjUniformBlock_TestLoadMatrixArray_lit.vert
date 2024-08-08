@@ -24,10 +24,10 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr ([4 x %llpc.matrix.column], ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2), i32 0, i32 1, i32 0), align 16
 ; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr ([4 x %llpc.matrix.column], ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2), i32 0, i32 2, i32 0), align 16
 ; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr ([4 x %llpc.matrix.column], ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2), i32 0, i32 3, i32 0), align 16
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2, i32 1), align 16
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2, i32 1, i32 1, i32 0), align 16
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2, i32 1, i32 2, i32 0), align 16
-; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2, i32 1, i32 3, i32 0), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}{{.*}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2{{, i32 1|\), i32 0, i32 1}}), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}{{.*}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2{{, i32 1, i32 1, i32 0|\), i32 0, i32 1\), i32 0, i32 1, i32 0}}), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}{{.*}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2{{, i32 1, i32 2, i32 0|\), i32 0, i32 1\), i32 0, i32 2, i32 0}}), align 16
+; SHADERTEST: %{{[0-9]*}} = load <4 x float>, ptr addrspace(7) getelementptr {{(inbounds )?}}{{.*}}(<{ i32, [12 x i8], [2 x [4 x %{{[a-z.]*}}]] }>, ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 2{{, i32 1, i32 3, i32 0|\), i32 0, i32 1\), i32 0, i32 3, i32 0}}), align 16
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

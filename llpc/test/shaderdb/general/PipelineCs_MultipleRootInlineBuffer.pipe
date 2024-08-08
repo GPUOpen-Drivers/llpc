@@ -14,20 +14,8 @@
 ; SHADERTEST: [[buf_addr1:%[0-9]*]] = call ptr addrspace(4) @lgc.user.data(i32 40)
 ; SHADERTEST: [[buf1:%[0-9]*]] = ptrtoint ptr addrspace(4) [[buf_addr1]] to i64
 
-; Build the descriptor.  The first two elements comes from the address of the buffer.
-; SHADERTEST: [[buf1_vec:%[0-9]*]] = bitcast i64 [[buf1]] to <2 x i32>
-; SHADERTEST: [[buf1_0:%[0-9]*]] = extractelement <2 x i32> [[buf1_vec]], i64 0
-; SHADERTEST: [[buf1_1:%[0-9]*]] = extractelement <2 x i32> [[buf1_vec]], i64 1
-; SHADERTEST: [[desc1_0:%[0-9]*]] = insertelement <4 x i32> poison, i32 [[buf1_0]], i64 0
-; SHADERTEST: [[buf1_2:%[0-9]*]] = and i32 [[buf1_1]], 65535
-; SHADERTEST: [[desc1_1:%[0-9]*]] = insertelement <4 x i32> [[desc1_0]], i32 [[buf1_2]], i64 1
-
-; The rest of the descriptor is filled in with the literals.
-; SHADERTEST: [[desc1_2:%[0-9]*]] = insertelement <4 x i32> [[desc1_1]], i32 -1, i64 2
-; SHADERTEST: [[desc1_3:%[0-9]*]] = insertelement <4 x i32> [[desc1_2]], i32 553734060, i64 3
-
 ; Get the "fat pointer" for the buffer
-; SHADERTEST: call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[desc1_3]])
+; SHADERTEST: call ptr addrspace(7) @lgc.buffer.addr.to.ptr(i64 [[buf1]])
 
 ; Get a pointer to the first inline buffer. Offset 4 comes from the user data nodes
 ; SHADERTEST: [[buf_addr0:%[0-9]*]] = call ptr addrspace(4) @lgc.user.data(i32 4)

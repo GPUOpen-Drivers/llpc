@@ -29,12 +29,13 @@
  ***********************************************************************************************************************
  */
 #include "ProcessGfxRuntimeLibrary.h"
+#include "compilerutils/ArgPromotion.h"
+#include "compilerutils/TypesMetadata.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
-#include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/Builder.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/IR/Module.h"
 
 #define DEBUG_TYPE "process-gfxruntime-library"
 using namespace lgc;
@@ -82,12 +83,12 @@ void ProcessGfxRuntimeLibrary::processLibraryFunction(Function *&func) {
     SmallBitVector promotionMask(func->arg_size());
     for (unsigned argId = 0; argId < func->arg_size(); ++argId) {
       auto *arg = func->getArg(argId);
-      ContArgTy argTy = ContArgTy::get(func, arg);
+      TypedArgTy argTy = TypedArgTy::get(arg);
       if (!argTy.isPointerTy())
         continue;
       promotionMask.set(argId);
     }
-    func = promotePointerArguments(func, promotionMask);
+    func = CompilerUtils::promotePointerArguments(func, promotionMask);
     return;
   }
 

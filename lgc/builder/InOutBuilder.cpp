@@ -557,6 +557,36 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
   }
+
+  if (isOutput && m_shaderStage == ShaderStage::Mesh) {
+    // Record number of components for mesh shader outputs
+    for (unsigned i = 0; i < locationCount; ++i) {
+      unsigned numComponents = 0;
+      if (inOutInfo.getNumComponents() > 4) {
+        assert(locationCount % 2 == 0);        // Must have even number of locations for 64-bit data type
+        assert(inOutInfo.getComponent() == 0); // Start component must be 0 in this case
+        // NOTE: For 64-bit vec3/vec4 data types, they will occupy two consecutive locations, we only record the number
+        // of components to the former one and skip the latter one.
+        if (i % 2 != 0)
+          continue;
+        numComponents = inOutInfo.getNumComponents();
+      } else {
+        numComponents = inOutInfo.getComponent() + inOutInfo.getNumComponents();
+      }
+
+      // Update numComponents. If exists, always keep its max value.
+      if (inOutInfo.isPerPrimitive()) {
+        numComponents =
+            std::max(numComponents, resUsage->inOutUsage.mesh.primitiveOutputComponents[location + i].first);
+        resUsage->inOutUsage.mesh.primitiveOutputComponents[location + i] = {numComponents,
+                                                                             static_cast<BuiltInKind>(InvalidValue)};
+      } else {
+        numComponents = std::max(numComponents, resUsage->inOutUsage.mesh.vertexOutputComponents[location + i].first);
+        resUsage->inOutUsage.mesh.vertexOutputComponents[location + i] = {numComponents,
+                                                                          static_cast<BuiltInKind>(InvalidValue)};
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -1923,7 +1953,22 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
     case BuiltInSamplePosOffset:
       usage.fs.runAtSampleRate = true;
       break;
-
+    case BuiltInPrimType:
+      usage.fs.primType = true;
+      break;
+    case BuiltInPrimCoord:
+      usage.fs.primCoord = true;
+      // This is an emulated built-in variable.
+      // Generated after all the defined attributes, stored in Z/W channel.
+      // Hence its value also depends on interp mode.
+      if (getPipelineState()->getRasterizerState().perSampleShading)
+        usage.fs.sample = true;
+      else
+        usage.fs.center = true;
+      break;
+    case BuiltInLineStipple:
+      usage.fs.lineStipple = true;
+      break;
     default:
       break;
     }

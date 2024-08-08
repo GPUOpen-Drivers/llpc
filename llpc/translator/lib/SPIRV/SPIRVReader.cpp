@@ -45,6 +45,7 @@
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
+#include "compilerutils/TypesMetadata.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDialect.h"
@@ -53,11 +54,13 @@
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "lgc/LgcRtqDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Analysis/ConstantFolding.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/CFG.h"
@@ -97,9 +100,9 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 using namespace lgc::rt;
+using namespace lgc::rtq;
 
 namespace Llpc {
-Type *getRayQueryInternalTy(lgc::Builder *builder);
 unsigned getTraceRayParamPayloadIdx(void);
 } // namespace Llpc
 
@@ -314,7 +317,89 @@ uint64_t SPIRVToLLVM::getTypeStoreSize(Type *const t) {
   return calculatedSize;
 }
 
+unsigned SPIRVToLLVM::getImageTypeComponents(SPIRVType *t) const {
+  const auto opcode = t->getOpCode();
+  SPIRVTypeImage *spvImageTy = nullptr;
+  if (opcode == OpTypeImage)
+    spvImageTy = static_cast<SPIRVTypeImage *>(t);
+  else if (opcode == OpTypeSampledImage)
+    spvImageTy = static_cast<SPIRVTypeSampledImage *>(t)->getImageType();
+  else
+    assert(opcode == OpTypeSampler);
+
+  unsigned components = 0;
+
+  if (spvImageTy) {
+    components |= ImageComponentImage;
+    if (spvImageTy->getDescriptor().MS)
+      components |= ImageComponentFMask;
+  }
+
+  if (opcode == OpTypeSampledImage || opcode == OpTypeSampler)
+    components |= ImageComponentSampler;
+
+  return components;
+}
+
+ImageTypeIndices SPIRVToLLVM::getImageTypeIndices(unsigned imageComponents) const {
+  ImageTypeIndices result;
+  unsigned idx = 0;
+
+  if (imageComponents & ImageComponentImage) {
+    result.imagePointer = idx++;
+    result.imageStride = idx++;
+    result.imagePlaneStride = idx++;
+
+    if (imageComponents & ImageComponentFMask) {
+      result.fmaskPointer = idx++;
+      result.fmaskStride = idx++;
+    }
+  }
+
+  if (imageComponents & ImageComponentSampler) {
+    result.samplerPointer = idx++;
+    result.samplerStride = idx++;
+    result.convertingSamplerIdx = idx++;
+  }
+
+  return result;
+}
+
+Type *SPIRVToLLVM::getImageTy(unsigned imageComponents) const {
+  assert(imageComponents != 0);
+
+  Type *descPtrTy = getBuilder()->getDescPtrTy();
+  Type *i32 = getBuilder()->getInt32Ty();
+
+  SmallVector<Type *, 9> types;
+  if (imageComponents & ImageComponentImage) {
+    types.push_back(descPtrTy); // pointer
+    types.push_back(i32);       // stride
+    types.push_back(i32);       // planeStride
+
+    if (imageComponents & ImageComponentFMask) {
+      types.push_back(descPtrTy); // pointer
+      types.push_back(i32);       // stride
+    }
+  }
+
+  if (imageComponents & ImageComponentSampler) {
+    types.push_back(descPtrTy); // pointer
+    types.push_back(i32);       // stride
+    types.push_back(i32);       // convertingSamplerIdx
+  }
+
+  return StructType::get(*m_context, types);
+}
+
 SmallVector<Value *> SPIRVToLLVM::mapValue(SPIRVValue *bv, ArrayRef<Value *> values) {
+#ifndef NDEBUG
+  if (bv->hasType()) {
+    Type *t = transType(bv->getType());
+    assert(!values.empty() || t->isVoidTy());
+  }
+#endif
+
   auto oldValues = m_valueMap.lookup(bv);
   if (!oldValues.empty()) {
     if (oldValues[0] == values[0]) {
@@ -425,20 +510,20 @@ Type *SPIRVToLLVM::transFPType(SPIRVType *t) {
 }
 
 // =====================================================================================================================
-// Translate an "OpTypeArray". This contains special handling for arrays in interface storage classes which are
+// Translate an "OpType{Runtime}Array". This contains special handling for arrays in interface storage classes which are
 // explicitly laid out and may contain manually placed padding bytes. If the array needs padding, we map an array like
 // '<element>[length]' -> 'struct { <element>, <padding bytes> }[length]'.
 //
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
-template <>
-Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                         const bool isColumnMajor, const bool isParentPointer,
-                                                         LayoutMode layout) {
-  Type *elementType = transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, isParentPointer, layout);
+Type *SPIRVToLLVM::transTypeArray(SPIRVType *const spvType, const unsigned matrixStride, const bool isColumnMajor,
+                                  LayoutMode layout) {
+  const auto opcode = spvType->getOpCode();
+  assert(opcode == OpTypeArray || opcode == OpTypeRuntimeArray);
+
+  Type *elementType = transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, layout);
 
   SPIRVWord arrayStride = 0;
   const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
@@ -468,13 +553,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
     }
   }
 
-  Type *const arrayType = ArrayType::get(elementType, spvType->getArrayLength());
+  const SPIRVWord arrayLength = opcode == OpTypeArray ? spvType->getArrayLength() : SPIRVWORD_MAX;
+  Type *const arrayType = ArrayType::get(elementType, arrayLength);
 
   // Setup the replaced array type in case this array is used in default uniform struct:
   // If the member type could be found in replaced-type map, insert the replaced-type,
   // If the member type is image type, insert an int8 type. This is used for image array of array
   SPIRVType *spvElementType = spvType->getArrayElementType();
-  SPIRVTypeContext ctxElementType(spvElementType, matrixStride, isColumnMajor, isParentPointer, layout);
+  SPIRVTypeContext ctxElementType(spvElementType, matrixStride, isColumnMajor, layout);
   Type *imageElementType = nullptr;
   auto it = m_imageTypeMap.find(ctxElementType.asTuple());
   if (it != m_imageTypeMap.end()) {
@@ -485,12 +571,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
   }
 
   if (imageElementType) {
-    Type *const imageArrayType = ArrayType::get(imageElementType, spvType->getArrayLength());
-    SPIRVTypeContext ctxArray(spvType, matrixStride, isColumnMajor, isParentPointer, layout);
+    Type *const imageArrayType = ArrayType::get(imageElementType, arrayLength);
+    SPIRVTypeContext ctxArray(spvType, matrixStride, isColumnMajor, layout);
     m_imageTypeMap[ctxArray.asTuple()] = imageArrayType;
   }
 
-  return paddedArray ? recordTypeWithPad(arrayType) : arrayType;
+  if (paddedArray)
+    recordTypeWithPad(arrayType);
+  return arrayType;
 }
 
 // =====================================================================================================================
@@ -500,13 +588,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                   const bool isColumnMajor, const bool isParentPointer,
-                                                   LayoutMode layout) {
-  if (isParentPointer)
+                                                   const bool isColumnMajor, LayoutMode layout) {
+  if (layout != LayoutMode::None)
     return getBuilder()->getInt32Ty();
   return getBuilder()->getInt1Ty();
 }
@@ -517,38 +603,18 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(SPIRVType *const spvType, con
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                             const bool isColumnMajor, const bool isParentPointer,
-                                                             LayoutMode layout) {
+                                                             const bool isColumnMajor, LayoutMode layout) {
   SPIRVTypeForwardPointer *const spvForwardPointerType = static_cast<SPIRVTypeForwardPointer *>(spvType);
   const SPIRVStorageClassKind storageClass = spvForwardPointerType->getPointerStorageClass();
 
   // Forward pointers must always point to structs.
   assert(spvForwardPointerType->getPointerElementType()->isTypeStruct());
 
-  // We first have to map the pointed-to-struct to an opaque struct so we can have a forward reference to the struct.
-  StructType *const pointeeType = StructType::create(*m_context);
-
-  // Then we need to map our forward pointer itself, because the struct we are pointing to could use the pointer.
   const unsigned addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
-  Type *const type = mapType(spvType, PointerType::get(pointeeType, addrSpace));
-
-  const bool isBufferBlockPointer = storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
-                                    storageClass == StorageClassPushConstant ||
-                                    storageClass == StorageClassShaderRecordBufferKHR ||
-                                    storageClass == StorageClassPhysicalStorageBufferEXT;
-  LayoutMode structLayout = isBufferBlockPointer ? LayoutMode::Explicit : LayoutMode::Native;
-
-  // Finally we translate the struct we are pointing to create it.
-  StructType *const structType =
-      cast<StructType>(transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, structLayout));
-
-  pointeeType->setBody(structType->elements(), structType->isPacked());
-
-  return type;
+  return PointerType::get(*m_context, addrSpace);
 }
 
 // =====================================================================================================================
@@ -558,12 +624,10 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, unsigned matrixStride,
-                                                     const bool isColumnMajor, const bool isParentPointer,
-                                                     LayoutMode layout) {
+                                                     const bool isColumnMajor, LayoutMode layout) {
   const auto spvColumnType = spvType->getMatrixColumnType();
   const auto spvElementType = spvColumnType->getVectorComponentType();
   const unsigned spvColumnCount = spvType->getMatrixColumnCount();
@@ -571,13 +635,13 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
   Type *columnType = nullptr;
   unsigned columnCount = 0;
 
-  if (!isParentPointer || isColumnMajor) {
+  if (layout == LayoutMode::None || isColumnMajor) {
     // If the matrix is not explicitly laid out or is column major, just translate the column type.
-    columnType = transType(spvColumnType, matrixStride, isColumnMajor, isParentPointer, layout);
+    columnType = transType(spvColumnType, matrixStride, isColumnMajor, layout);
     columnCount = spvColumnCount;
   } else {
     // We need to transpose the matrix type to represent its layout in memory.
-    Type *const elementType = transType(spvElementType, matrixStride, isColumnMajor, isParentPointer, layout);
+    Type *const elementType = transType(spvElementType, matrixStride, isColumnMajor, layout);
 
     // NOTE: The new column after transposition is actually the original SPIR-V row vector and the column count is the
     // original SPIR-V row vector count.
@@ -626,7 +690,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
   }
 
   Type *const matrixType = ArrayType::get(columnType, columnCount);
-  return usePadding ? recordTypeWithPad(matrixType, !isColumnMajor) : matrixType;
+  if (usePadding)
+    recordTypeWithPad(matrixType, !isColumnMajor);
+  return matrixType;
 }
 
 // =====================================================================================================================
@@ -636,15 +702,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                      const bool isColumnMajor, const bool isParentPointer,
-                                                      LayoutMode layout) {
+                                                      const bool isColumnMajor, LayoutMode layout) {
   SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
-  LayoutMode pointeeLayout =
-      isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
   auto addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
 
   // Handle image etc types first, if in UniformConstant memory.
@@ -657,122 +719,18 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
     }
 
     if (spvElementType->getOpCode() == OpTypeImage || spvElementType->getOpCode() == OpTypeSampler ||
-        spvElementType->getOpCode() == OpTypeSampledImage) {
-      // Pointer to image/sampler/sampledimage type.
-      Type *imagePtrTy = nullptr;
-      SPIRVTypeImage *spvImageTy = nullptr;
+        spvElementType->getOpCode() == OpTypeSampledImage)
+      return getImageTy(getImageTypeComponents(spvElementType));
 
-      if (spvElementType->getOpCode() != OpTypeSampler) {
-        // Image or sampledimage: get the image pointer type.
-        if (spvElementType->getOpCode() == OpTypeSampledImage)
-          spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvElementType)->getImageType();
-        else
-          spvImageTy = static_cast<SPIRVTypeImage *>(spvElementType);
-        if (spvImageTy->getDescriptor().Dim == DimBuffer) {
-          // Texel buffer.
-          imagePtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorTexelBuffer);
-        } else {
-          // Image descriptor.
-          imagePtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorResource);
-        }
-        // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
-        imagePtrTy = StructType::get(*m_context, {imagePtrTy, getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty(),
-                                                  getBuilder()->getInt32Ty()});
-
-        if (spvImageTy->getDescriptor().MS) {
-          // Pointer to multisampled image is represented as two image pointers, the second one for the fmask.
-          imagePtrTy = StructType::get(*m_context, {imagePtrTy, imagePtrTy});
-        }
-      }
-
-      // For an image (not sampler or sampledimage), just return the pointer-to-image type.
-      if (spvElementType->getOpCode() == OpTypeImage)
-        return imagePtrTy;
-
-      // Sampler or sampledimage: get the sampler pointer type.
-      Type *samplerPtrTy = getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorSampler);
-      // Pointer to sampler is represented as a struct containing {pointer,stride,convertingSamplerIdx}
-      samplerPtrTy =
-          StructType::get(*m_context, {samplerPtrTy, getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty()});
-
-      // For a sampler, just return that. For a sampledimage, return a struct type containing both pointers.
-      if (!imagePtrTy)
-        return samplerPtrTy;
-      return StructType::get(*m_context, {imagePtrTy, samplerPtrTy});
-    } else {
-      // Uniform constant variable outside of a block use std430 layout.
-      pointeeLayout = isAccelerationStructureType(spvElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
-      // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base
-      // offset of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from
-      // offset 0. Here we use SPIRAS_Constant because later in llpcSpirvLowerGlobal the AS will be lowered to
-      // get.desc.ptr which returns SPIRAS_Constant ptr.
-      addrSpace = isAccelerationStructureType(spvElementType) ? SPIRAS_Constant : addrSpace;
-    }
+    // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base
+    // offset of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from
+    // offset 0. Here we use SPIRAS_Constant because later in llpcSpirvLowerGlobal the AS will be lowered to
+    // get.desc.ptr which returns SPIRAS_Constant ptr.
+    if (isAccelerationStructureType(spvElementType))
+      addrSpace = SPIRAS_Constant;
   }
 
-  Type *const pointeeType =
-      transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, pointeeLayout);
-
-  return PointerType::get(pointeeType, addrSpace);
-}
-
-// =====================================================================================================================
-// Translate an "OpTypeRuntimeArray". This contains special handling for arrays in interface storage classes which are
-// explicitly laid out and may contain manually placed padding bytes. If the array needs padding, we map an array like
-// '<element>[length]' -> 'struct { <element>, <padding bytes> }[length]'.
-//
-// @param spvType : The type.
-// @param matrixStride : The matrix stride (can be 0).
-// @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
-// @param layout : The layout mode will be used for the type translation.
-template <>
-Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                           const bool isColumnMajor, const bool isParentPointer,
-                                                           LayoutMode layout) {
-  Type *elementType = transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, isParentPointer, layout);
-
-  SPIRVWord arrayStride = 0;
-  const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
-  assert(hasArrayStride ^ (arrayStride == 0));
-
-  const uint64_t storeSize = getTypeStoreSize(elementType);
-
-  // NOTE: Padding isn't allowed for a case that the array element is a structure with array-type member in HLSL.
-  bool paddedArray = arrayStride > storeSize;
-
-  if (layout == LayoutMode::Explicit && hasArrayStride && paddedArray) {
-    const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
-
-    // Record that the array was remapped, even though we don't record a useful mapping for arrays.
-    recordRemappedTypeElements(spvType, 0, 0);
-
-    elementType = StructType::create({elementType, getPadType(padding)}, "llpc.runtime.array.element", true);
-  }
-
-  Type *const runtimeArrayType = ArrayType::get(elementType, SPIRVWORD_MAX);
-
-  // Setup the replaced array type in case this array is used in default uniform struct:
-  // If the member type could be found in replaced-type map, insert the replaced-type,
-  // If the member type is image type, insert an int8 type. This is used for image array of array
-  SPIRVType *spvElementType = spvType->getArrayElementType();
-  SPIRVTypeContext ctxElementType(spvElementType, matrixStride, isColumnMajor, isParentPointer, layout);
-  Type *imageElementType = nullptr;
-  auto it = m_imageTypeMap.find(ctxElementType.asTuple());
-  if (it != m_imageTypeMap.end()) {
-    imageElementType = static_cast<StructType *>(it->second);
-  } else if (spvElementType->getOpCode() == OpTypeImage || spvElementType->getOpCode() == OpTypeSampler ||
-             spvElementType->getOpCode() == OpTypeSampledImage) {
-    imageElementType = Type::getInt8Ty(*m_context);
-  }
-
-  if (imageElementType) {
-    Type *const imageArrayType = ArrayType::get(imageElementType, SPIRVWORD_MAX);
-    SPIRVTypeContext ctxArray(spvType, matrixStride, isColumnMajor, isParentPointer, layout);
-    m_imageTypeMap[ctxArray.asTuple()] = imageArrayType;
-  }
-
-  return paddedArray ? recordTypeWithPad(runtimeArrayType) : runtimeArrayType;
+  return PointerType::get(*m_context, addrSpace);
 }
 
 // =====================================================================================================================
@@ -783,12 +741,10 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(SPIRVType *const spvT
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                          const bool isColumnMajor, const bool isParentPointer,
-                                                          LayoutMode layout) {
+                                                          const bool isColumnMajor, LayoutMode layout) {
   SPIRVTypeStruct *const spvStructType = static_cast<SPIRVTypeStruct *>(spvType);
 
   bool isPacked = false;
@@ -896,8 +852,8 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
     if (isExplicitlyLaidOut && memberMatrixStride > 0)
       assert(memberIsColumnMajor ^ spvStructType->hasMemberDecorate(index, DecorationRowMajor));
 
-    Type *memberType = transType(spvMemberType, memberMatrixStride, memberIsColumnMajor, isParentPointer, layout);
-    SPIRVTypeContext ctxMemberType(spvMemberType, matrixStride, isColumnMajor, isParentPointer, layout);
+    Type *memberType = transType(spvMemberType, memberMatrixStride, memberIsColumnMajor, layout);
+    SPIRVTypeContext ctxMemberType(spvMemberType, matrixStride, isColumnMajor, layout);
 
     // Setup the replaced struct type in case this struct is used as default uniform:
     // 1. If the member type is sampler:
@@ -951,11 +907,13 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
   }
 
   if (hasSamplerOrNested) {
-    SPIRVTypeContext ctx(spvType, matrixStride, isColumnMajor, isParentPointer, layout);
+    SPIRVTypeContext ctx(spvType, matrixStride, isColumnMajor, layout);
     m_imageTypeMap[ctx.asTuple()] = imageStructType;
   }
 
-  return usePadding ? recordTypeWithPad(structType) : structType;
+  if (usePadding)
+    recordTypeWithPad(structType);
+  return structType;
 }
 
 // =====================================================================================================================
@@ -966,14 +924,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, const unsigned matrixStride,
-                                                     const bool isColumnMajor, const bool isParentPointer,
-                                                     LayoutMode layout) {
-  Type *const compType =
-      transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
+                                                     const bool isColumnMajor, LayoutMode layout) {
+  Type *const compType = transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, layout);
 
   // If the vector needs explicit/std430 layout, we need to use an array to represent it because of LLVM's data layout
   // rules.
@@ -987,13 +942,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
 // @param spvType : The type.
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
-// @param isParentPointer : If the parent is a pointer type.
 // @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(SPIRVType *const spvType,
                                                                    const unsigned matrixStride,
-                                                                   const bool isColumnMajor, const bool isParentPointer,
-                                                                   LayoutMode layout) {
+                                                                   const bool isColumnMajor, LayoutMode layout) {
   auto elemType = mapToBasicType(spvType->getCooperativeMatrixKHRComponentType());
   auto use = spvType->getCooperativeMatrixKHRUse();
   unsigned rows = spvType->getCooperativeMatrixKHRRows();
@@ -1008,6 +961,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(SPIRVType *co
 // @param v : SPIRV Value
 // @param layout : The layout mode will be used for the type translation.
 Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v, LayoutMode layout) {
+  assert(layout != LayoutMode::None);
   auto opCode = v->getOpCode();
   if (isAccessChainOpCode(opCode)) {
     // If the Base of the AccessChain is a structure then additional padding may be added (depending on the structure
@@ -1035,128 +989,73 @@ Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v, LayoutMode layout) {
   if (isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass()))
     layout = LayoutMode::Explicit;
 
-  return transType(v->getType()->getPointerElementType(), 0, true, true, layout);
+  return transType(v->getType()->getPointerElementType(), 0, true, layout);
 }
 
-Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                             LayoutMode layout) {
-  SPIRVTypeContext ctx(t, matrixStride, columnMajor, parentIsPointer, layout);
+Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, LayoutMode layout) {
+  SPIRVTypeContext ctx(t, matrixStride, columnMajor, layout);
   auto it = m_fullTypeMap.find(ctx.asTuple());
   if (it != m_fullTypeMap.end())
     return it->second;
 
-  auto res = transTypeImpl(t, matrixStride, columnMajor, parentIsPointer, layout);
+  auto res = transTypeImpl(t, matrixStride, columnMajor, layout);
   m_fullTypeMap[ctx.asTuple()] = res;
   return res;
 }
 
-Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                                 LayoutMode layout) {
-  // If the type is not a sub-part of a pointer or it is a forward pointer, we can look in the map.
-  if (!parentIsPointer || t->isTypeForwardPointer()) {
-    auto loc = m_typeMap.find(t);
-    if (loc != m_typeMap.end())
-      return loc->second;
-  }
-
+Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool columnMajor, LayoutMode layout) {
   t->validate();
   switch (t->getOpCode()) {
   case OpTypeVoid:
-    return mapType(t, Type::getVoidTy(*m_context));
+    return Type::getVoidTy(*m_context);
   case OpTypeInt:
-    return mapType(t, Type::getIntNTy(*m_context, t->getIntegerBitWidth()));
+    return Type::getIntNTy(*m_context, t->getIntegerBitWidth());
   case OpTypeFloat:
-    return mapType(t, transFPType(t));
+    return transFPType(t);
   case OpTypeFunction: {
     auto ft = static_cast<SPIRVTypeFunction *>(t);
     auto rt = transType(ft->getReturnType());
     std::vector<Type *> pt;
     for (size_t i = 0, e = ft->getNumParameters(); i != e; ++i)
       pt.push_back(transType(ft->getParameterType(i)));
-    return mapType(t, FunctionType::get(rt, pt, false));
+    return FunctionType::get(rt, pt, false);
   }
-  case OpTypeImage: {
-    if (layout != LayoutMode::Native)
-      return getBuilder()->getInt8Ty();
-
-    auto st = static_cast<SPIRVTypeImage *>(t);
-    // A buffer image is represented by a texel buffer descriptor. Any other image is represented by an array
-    // of three image descriptors, to allow for multi-plane YCbCr conversion. (The f-mask part of a multi-sampled
-    // image is not an array of three.)
-    Type *imageTy = nullptr;
-    if (st->getDescriptor().Dim == DimBuffer) {
-      imageTy = PointerType::get(*m_context, SPIRAS_Constant);
-    } else {
-      Type *singleImageTy = PointerType::get(*m_context, SPIRAS_Constant);
-      imageTy = ArrayType::get(singleImageTy, 3);
-      if (st->getDescriptor().MS) {
-        // A multisampled image is represented by a struct containing both the
-        // image descriptor and the fmask descriptor.
-        imageTy = StructType::get(*m_context, {imageTy, singleImageTy});
-      }
-    }
-    return mapType(t, imageTy);
-  }
+  case OpTypeImage:
   case OpTypeSampler:
-  case OpTypeSampledImage: {
-    if (layout != LayoutMode::Native)
+  case OpTypeSampledImage:
+    if (layout != LayoutMode::Native && layout != LayoutMode::None)
       return getBuilder()->getInt8Ty();
 
-    // Get sampler type.
-    // A sampler is represented by a struct containing the sampler itself, and the convertingSamplerIdx, an i32
-    // that is either 0 or the 1-based index into the converting samplers.
-    Type *ty = PointerType::get(*m_context, SPIRAS_Constant);
-    ty = StructType::get(*m_context, {ty, getBuilder()->getInt32Ty()});
-    if (t->getOpCode() == OpTypeSampledImage) {
-      // A sampledimage is represented by a struct containing the image descriptor
-      // and the sampler descriptor.
-      Type *imageTy = transType(static_cast<SPIRVTypeSampledImage *>(t)->getImageType());
-      ty = StructType::get(*m_context, {imageTy, ty});
-    }
-    return mapType(t, ty);
-  }
+    return getImageTy(getImageTypeComponents(t));
   case OpTypeAccelerationStructureKHR: {
     auto int32x2Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-    return mapType(t, int32x2Ty);
+    return int32x2Ty;
   }
   case OpTypeRayQueryKHR:
-    return mapType(t, getRayQueryInternalTy(m_builder));
-  case OpTypeArray: {
-    Type *newTy = transTypeWithOpcode<OpTypeArray>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
-  }
+    return rtq::getRayQueryType(*m_context);
+  case OpTypeArray:
+  case OpTypeRuntimeArray:
+    return transTypeArray(t, matrixStride, columnMajor, layout);
   case OpTypeBool: {
-    Type *newTy = transTypeWithOpcode<OpTypeBool>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypeBool>(t, matrixStride, columnMajor, layout);
   }
   case OpTypeForwardPointer: {
-    Type *newTy = transTypeWithOpcode<OpTypeForwardPointer>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypeForwardPointer>(t, matrixStride, columnMajor, layout);
   }
   case OpTypeMatrix: {
-    Type *newTy = transTypeWithOpcode<OpTypeMatrix>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypeMatrix>(t, matrixStride, columnMajor, layout);
   }
   case OpTypePointer: {
-    Type *newTy = transTypeWithOpcode<OpTypePointer>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
-  }
-  case OpTypeRuntimeArray: {
-    Type *newTy = transTypeWithOpcode<OpTypeRuntimeArray>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypePointer>(t, matrixStride, columnMajor, layout);
   }
   case OpTypeStruct: {
-    Type *newTy = transTypeWithOpcode<OpTypeStruct>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypeStruct>(t, matrixStride, columnMajor, layout);
   }
   case OpTypeVector: {
-    Type *newTy = transTypeWithOpcode<OpTypeVector>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypeVector>(t, matrixStride, columnMajor, layout);
   }
   case OpTypeCooperativeMatrixKHR: {
-    Type *newTy =
-        transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(t, matrixStride, columnMajor, parentIsPointer, layout);
-    return parentIsPointer ? newTy : mapType(t, newTy);
+    return transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(t, matrixStride, columnMajor, layout);
   }
   default: {
     llvm_unreachable("Not implemented");
@@ -2115,15 +2014,11 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   Type *alignmentType = loadType;
   // Vectors are represented as arrays in memory, so we need to cast the array to a vector before loading.
   if (spvType->isTypeVector()) {
-    Type *const vectorType = transType(spvType, 0, false, true, LayoutMode::Native);
-    Type *const castType = vectorType->getPointerTo(loadPointer->getType()->getPointerAddressSpace());
-    loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
-    loadType = vectorType;
+    loadType = transType(spvType, 0, false, LayoutMode::Native);
 
     const bool scalarBlockLayout = getPipelineOptions()->scalarBlockLayout;
-
     if (!scalarBlockLayout)
-      alignmentType = vectorType;
+      alignmentType = loadType;
   }
 
   LoadInst *load = getBuilder()->CreateAlignedLoad(loadType, loadPointer,
@@ -2240,14 +2135,11 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       storeValue = getBuilder()->CreateZExtOrBitCast(storeValue, alignmentType);
       storeType = storeValue->getType();
     } else {
-      storeType = transType(spvType, 0, false, true, LayoutMode::Native);
+      storeType = transType(spvType, 0, false, LayoutMode::Native);
     }
 
     // Vectors are represented as arrays in memory, so we need to cast the array to a vector before storing.
     if (spvType->isTypeVector()) {
-      Type *const castType = storeType->getPointerTo(storePointer->getType()->getPointerAddressSpace());
-      storePointer = getBuilder()->CreateBitCast(storePointer, castType);
-
       const bool scalarBlockLayout = getPipelineOptions()->scalarBlockLayout;
       if (!scalarBlockLayout)
         alignmentType = storeType;
@@ -2834,7 +2726,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
   LayoutMode loadLayout = isStorageClassExplicitlyLaidOut(m_bm, spvLoadType->getPointerStorageClass())
                               ? LayoutMode::Explicit
                               : LayoutMode::Native;
-  Type *const loadType = transType(spvCopyMemLoadType, 0, true, true, loadLayout);
+  Type *const loadType = transType(spvCopyMemLoadType, 0, true, loadLayout);
   bool isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
   Value *const load =
       addLoadInstRecursively(spvCopyMemLoadType, loadPointer, loadType, isSrcVolatile, isCoherent, isNonTemporal);
@@ -2846,7 +2738,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
                                ? LayoutMode::Explicit
                                : LayoutMode::Native;
 
-  Type *const storeType = transType(spvCopyMemStoreType, 0, true, true, storeLayout);
+  Type *const storeType = transType(spvCopyMemStoreType, 0, true, storeLayout);
   isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
 
   addStoreInstRecursively(spvCopyMemStoreType, storePointer, storeType, load, isDestVolatile, isCoherent,
@@ -2872,6 +2764,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   SPIRVLoad *const spvLoad = static_cast<SPIRVLoad *>(spvValue);
   LayoutMode layout = LayoutMode::Native;
 
+  Value *const loadPointer =
+      transValue(spvLoad->getSrc(), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+
   const auto storageClassKind = spvLoad->getSrc()->getType()->getPointerStorageClass();
   // Handle UniformConstant image/sampler/sampledimage load.
   if (storageClassKind == StorageClassUniformConstant) {
@@ -2879,7 +2774,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     case OpTypeImage:
     case OpTypeSampler:
     case OpTypeSampledImage:
-      return transLoadImage(spvLoad->getSrc());
+      return loadPointer;
     case OpTypeAccelerationStructureKHR: {
       if (getPipelineContext()->getRayTracingState()->forceInvalidAccelStruct) {
         // Always return invalid AS address (0x0, 0x0) if the option is set.
@@ -2895,9 +2790,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
       break;
     }
   }
-
-  Value *const loadPointer =
-      transValue(spvLoad->getSrc(), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
 
   bool isVolatile = spvLoad->SPIRVMemoryAccess::isVolatile(true);
   const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
@@ -2984,11 +2876,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 //
 // @param spvImageLoadPtr : The image/sampler/sampledimage pointer
 Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
-  SPIRVType *spvElementTy = spvImageLoadPtr->getType()->getPointerElementType();
-  Type *elementTy = transType(spvElementTy, 0, false, false, LayoutMode::Native);
   BasicBlock *bb = getBuilder()->GetInsertBlock();
-  Value *base = transValueMulti(spvImageLoadPtr, bb->getParent(), bb)[0];
-  return loadImageSampler(elementTy, base);
+  return transValueMulti(spvImageLoadPtr, bb->getParent(), bb)[0];
 }
 
 // =====================================================================================================================
@@ -2998,142 +2887,40 @@ Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
 // @param imgDescGpuAddress : image descriptor's gpu memory address
 // @param bindlessTexture : true is bindless texture, false is bindless image
 Value *SPIRVToLLVM::transLoadBindlessImage(SPIRVType *spvElementTy, Value *imgDescGpuAddress, bool bindlessTexture) {
+  unsigned components = getImageTypeComponents(spvElementTy);
+  auto idxs = getImageTypeIndices(components);
+  Type *descPtrTy = getBuilder()->getDescPtrTy();
+  Type *elementTy = getImageTy(components);
+  auto imageDescAddr = getBuilder()->CreateIntToPtr(imgDescGpuAddress, descPtrTy);
 
-  Type *elementTy = transType(spvElementTy, 0, false, false, LayoutMode::Native);
-  Type *gpuAddrAsPtrTy = getBuilder()->getPtrTy(SPIRAS_Constant);
-  auto imageDescAddr = getBuilder()->CreateIntToPtr(imgDescGpuAddress, gpuAddrAsPtrTy);
+  assert(bindlessTexture == ((components & ImageComponentSampler) != 0));
 
-  SPIRVTypeImage *spvImageTy = nullptr;
-  if (spvElementTy->getOpCode() == OpTypeSampledImage) {
-    spvImageTy = static_cast<SPIRVTypeSampledImage *>(spvElementTy)->getImageType();
-  } else {
-    spvImageTy = static_cast<SPIRVTypeImage *>(spvElementTy);
-  }
+  // Fill in the pointer components. Strides are generally left as poison because GEP cannot be used on the result of
+  // "loading" a bindless image/texture.
+  Value *result = PoisonValue::get(elementTy);
 
-  auto desc = spvImageTy->getDescriptor();
-  Value *imageDescPtr = nullptr;
+  if (components & ImageComponentImage) {
+    result = getBuilder()->CreateInsertValue(result, imageDescAddr, idxs.imagePointer);
 
-  // Handle samplerBuffer or imageBuffer
-  if (desc.Dim == DimBuffer) {
-    auto bufferDescStride = getBuilder()->getInt32(DescriptorSizeBuffer);
-    imageDescPtr = getBuilder()->CreateInsertValue(
-        PoisonValue::get(StructType::get(*m_context, {imageDescAddr->getType(), bufferDescStride->getType(),
-                                                      bufferDescStride->getType(), getBuilder()->getInt32Ty()})),
-        imageDescAddr, 0);
-    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, bufferDescStride, 1);
-  } else {
-    // The descriptor stride is unimportant for bindless texture/image, just use it as a placeholder
-    auto imageDescStride = getBuilder()->getInt32(DescriptorSizeResource);
-    imageDescPtr = getBuilder()->CreateInsertValue(
-        PoisonValue::get(StructType::get(*m_context, {imageDescAddr->getType(), imageDescStride->getType(),
-                                                      imageDescStride->getType(), getBuilder()->getInt32Ty()})),
-        imageDescAddr, 0);
+    // TODO: Planes may be loaded opportunistically, so need a valid plane stride to avoid UB.
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->getInt32(0), idxs.imagePlaneStride);
 
-    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, imageDescStride, 1);
-    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, getBuilder()->getInt32(DescriptorSizeResource), 2);
-    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, getBuilder()->getInt32(1), 3);
-  }
-
-  // Insert fmask descriptor address into structure
-  if (desc.MS) {
-    auto fMaskOffset = getBuilder()->getInt64(DescriptorSizeResource + DescriptorSizeSampler);
-    constexpr unsigned descriptorSizeFmask = 8 * sizeof(uint32_t);
-    auto fmaskDescStride = getBuilder()->getInt32(descriptorSizeFmask);
-    Value *fMaskDescAddr =
-        getBuilder()->CreateIntToPtr(getBuilder()->CreateAdd(imgDescGpuAddress, fMaskOffset), gpuAddrAsPtrTy);
-
-    auto fmaskDescPtr = getBuilder()->CreateInsertValue(
-        PoisonValue::get(StructType::get(*m_context, {fMaskDescAddr->getType(), fmaskDescStride->getType(),
-                                                      fmaskDescStride->getType(), getBuilder()->getInt32Ty()})),
-        fMaskDescAddr, 0);
-    fmaskDescPtr = getBuilder()->CreateInsertValue(fmaskDescPtr, fmaskDescStride, 1);
-    imageDescPtr = getBuilder()->CreateInsertValue(
-        PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})), imageDescPtr,
-        0);
-    imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, fmaskDescPtr, 1);
-  }
-
-  // True for bindless texture, otherwise is bindless image
-  if (bindlessTexture) {
-    auto samplerOffset = getBuilder()->getInt64(DescriptorSizeResource);
-    auto samplerDescStride = getBuilder()->getInt32(DescriptorSizeSampler);
-
-    Value *samplerDescAddr =
-        getBuilder()->CreateIntToPtr(getBuilder()->CreateAdd(imgDescGpuAddress, samplerOffset), gpuAddrAsPtrTy);
-
-    Type *samplerPtrTy = StructType::get(
-        *m_context, {samplerDescAddr->getType(), getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty()});
-    Value *samplerDescPtr = Constant::getNullValue(samplerPtrTy);
-
-    samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, samplerDescAddr, 0);
-    samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, samplerDescStride, 1);
-
-    Value *descPtr =
-        PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
-    descPtr = getBuilder()->CreateInsertValue(descPtr, imageDescPtr, 0);
-    descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
-
-    return loadImageSampler(elementTy, descPtr);
-  }
-
-  return loadImageSampler(elementTy, imageDescPtr);
-}
-
-// =====================================================================================================================
-// Generate a load of an image, sampler or sampledimage
-//
-// @param elementTy : Element type being loaded
-// @param base : Pointer to load from
-Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
-  if (auto structTy = dyn_cast<StructType>(elementTy)) {
-    if (!structTy->getElementType(1)->isIntegerTy()) {
-      // The item being loaded is a struct of two items that need loading separately (excluding the case below that
-      // is it a struct with an i32, which is a sampler with its convertingSamplerIdx). There are two cases
-      // of that:
-      // 1. A sampledimage is an image plus a sampler.
-      // 2. An image that is multisampled is an image plus an fmask.
-      Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
-      Value *element1 = loadImageSampler(structTy->getElementType(1), ptr1);
-      Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
-      Value *element0 = loadImageSampler(structTy->getElementType(0), ptr0);
-      Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(structTy), element0, 0);
-      result = getBuilder()->CreateInsertValue(result, element1, 1);
-      return result;
+    if (components & ImageComponentFMask) {
+      auto fmaskOffset = DescriptorSizeResource + DescriptorSizeSampler;
+      Value *fmaskDescAddr = getBuilder()->CreateConstGEP1_32(getBuilder()->getInt8Ty(), imageDescAddr, fmaskOffset);
+      result = getBuilder()->CreateInsertValue(result, fmaskDescAddr, idxs.fmaskPointer);
     }
-
-    // The item being loaded is a struct where element 1 is integer. That must be a sampler with its i32
-    // convertingSamplerIdx. The loaded value inherits the convertingSamplerIdx from the
-    // {pointer,stride,convertingSamplerIdx} struct that represents the descriptor pointer.
-    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
-    Value *loadedVal = loadImageSampler(structTy->getElementType(0), base);
-    loadedVal = getBuilder()->CreateInsertValue(PoisonValue::get(structTy), loadedVal, 0);
-    return getBuilder()->CreateInsertValue(loadedVal, convertingSamplerIdx, 1);
   }
 
-  // The image or sampler "descriptor" is in fact a struct containing the pointer and stride. We only
-  // need the pointer here.
-  Value *ptr = getBuilder()->CreateExtractValue(base, 0);
+  if (components & ImageComponentSampler) {
+    auto samplerOffset = DescriptorSizeResource;
+    Value *samplerDescAddr = getBuilder()->CreateConstGEP1_32(getBuilder()->getInt8Ty(), imageDescAddr, samplerOffset);
 
-  if (auto arrayTy = dyn_cast<ArrayType>(elementTy)) {
-    // The element type being loaded is an array. That must be where a non-texel-buffer image is represented as
-    // an array of three image descriptors, to allow for multiple planes in YCbCr conversion. Normally we only
-    // load one descriptor; if there are any converting samplers, we load all three, and rely on later optimizations
-    // to remove the unused ones (and thus stop us reading off the end of the descriptor table).
-    Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(arrayTy), ptr, 0);
-    // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
-    if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 4) {
-      Value *planeStride = getBuilder()->CreateExtractValue(base, 2);
-      Type *ptrTy = ptr->getType();
-
-      for (unsigned planeIdx = 1; planeIdx != arrayTy->getNumElements(); ++planeIdx) {
-        ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, planeStride);
-        ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
-        result = getBuilder()->CreateInsertValue(result, ptr, planeIdx);
-      }
-    }
-    return result;
+    result = getBuilder()->CreateInsertValue(result, samplerDescAddr, idxs.samplerPointer);
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->getInt32(0), idxs.convertingSamplerIdx);
   }
-  return ptr;
+
+  return result;
 }
 
 // =====================================================================================================================
@@ -3180,11 +2967,47 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
         elementWorklist.push_back(spvTy->getStructMemberType(i));
   }
 
-  Value *imageDescPtr = nullptr;
-  Value *samplerDescPtr = nullptr;
+  unsigned components = getImageTypeComponents(spvTy);
+  auto idxs = getImageTypeIndices(components);
+  Value *result = PoisonValue::get(getImageTy(components));
 
-  if (getPipelineOptions()->getGlState().replaceSetWithResourceType)
+  unsigned imageDescSet = descriptorSet;
+  unsigned fmaskDescSet = descriptorSet;
+  unsigned samplerDescSet = descriptorSet;
+
+  if (getPipelineOptions()->getGlState().replaceSetWithResourceType) {
     assert(spvTy->getOpCode() != OpTypeSampler);
+
+    if (spvTy->getOpCode() == OpTypeImage) {
+      imageDescSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorImage);
+    } else if (spvTy->getOpCode() == OpTypeSampledImage) {
+      if (getPipelineOptions()->getGlState().enableCombinedTexture) {
+        imageDescSet =
+            PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
+      } else {
+        imageDescSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
+      }
+    }
+
+    fmaskDescSet = imageDescSet;
+    samplerDescSet = imageDescSet;
+
+    if (spvTy->getOpCode() != OpTypeImage)
+      fmaskDescSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
+
+    if (!getPipelineOptions()->getGlState().enableCombinedTexture)
+      samplerDescSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
+  }
+
+  unsigned convertingSamplerIdx = 0;
+  unsigned nextIdx = 1;
+  for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
+    if (convertingSampler.set == descriptorSet && convertingSampler.binding == binding) {
+      convertingSamplerIdx = nextIdx;
+      break;
+    }
+    nextIdx += convertingSampler.values.size() / ConvertingSamplerDwordCount;
+  }
 
   if (spvTy->getOpCode() != OpTypeSampler) {
     // Image or sampledimage -- need to get the image pointer-and-stride.
@@ -3197,143 +3020,46 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
 
-    if (getPipelineOptions()->getGlState().replaceSetWithResourceType) {
-      if (spvTy->getOpCode() == OpTypeImage) {
-        descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorImage);
-      } else if (spvTy->getOpCode() == OpTypeSampledImage) {
-        if (getPipelineOptions()->getGlState().enableCombinedTexture) {
-          descriptorSet =
-              PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
-        } else {
-          descriptorSet =
-              PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
-        }
-      }
+    Value *imagePointer = getBuilder()->CreateGetDescPtr(resType, resType, imageDescSet, binding);
+    Value *imageStride = getBuilder()->CreateGetDescStride(resType, resType, imageDescSet, binding);
+    result = getBuilder()->CreateInsertValue(result, imagePointer, idxs.imagePointer);
+    result = getBuilder()->CreateInsertValue(result, imageStride, idxs.imageStride);
+
+    if (convertingSamplerIdx == 0) {
+      result = getBuilder()->CreateInsertValue(result, getBuilder()->getInt32(0), idxs.imagePlaneStride);
+    } else {
+      auto samplerMetadata =
+          m_convertingSamplers[convertingSamplerIdx - 1].values.data() + DescriptorSizeSamplerInDwords;
+      Value *planes = getBuilder()->getInt32(
+          reinterpret_cast<const Vkgc::SamplerYCbCrConversionMetaData *>(samplerMetadata)->word1.planes);
+      Value *planeStride = getBuilder()->CreateUDiv(imageStride, planes);
+      result = getBuilder()->CreateInsertValue(result, planeStride, idxs.imagePlaneStride);
     }
 
-    imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, resType);
-
     if (desc->MS) {
-      if (getPipelineOptions()->getGlState().replaceSetWithResourceType && spvTy->getOpCode() != OpTypeImage)
-        descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
-      // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-      Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
-                                                    ResourceNodeType::DescriptorFmask);
-      imageDescPtr = getBuilder()->CreateInsertValue(
-          PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
-          imageDescPtr, 0);
-      imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, fmaskDescPtr, 1);
+      Value *fmaskPointer = getBuilder()->CreateGetDescPtr(ResourceNodeType::DescriptorFmask,
+                                                           ResourceNodeType::DescriptorFmask, fmaskDescSet, binding);
+      Value *fmaskStride = getBuilder()->CreateGetDescStride(ResourceNodeType::DescriptorFmask,
+                                                             ResourceNodeType::DescriptorFmask, fmaskDescSet, binding);
+      result = getBuilder()->CreateInsertValue(result, fmaskPointer, idxs.fmaskPointer);
+      result = getBuilder()->CreateInsertValue(result, fmaskStride, idxs.fmaskStride);
     }
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
-    if (getPipelineOptions()->getGlState().replaceSetWithResourceType &&
-        !getPipelineOptions()->getGlState().enableCombinedTexture)
-      descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
-    // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
-    samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding,
-                                             ResourceNodeType::DescriptorSampler);
-
-    if (spvTy->getOpCode() == OpTypeSampler)
-      return samplerDescPtr;
-  }
-
-  if (imageDescPtr) {
-    if (samplerDescPtr) {
-      Value *descPtr =
-          PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
-      descPtr = getBuilder()->CreateInsertValue(descPtr, imageDescPtr, 0);
-      descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
-      return descPtr;
+    if (convertingSamplerIdx == 0) {
+      Value *samplerPointer = getBuilder()->CreateGetDescPtr(
+          ResourceNodeType::DescriptorSampler, ResourceNodeType::DescriptorSampler, samplerDescSet, binding);
+      Value *samplerStride = getBuilder()->CreateGetDescStride(
+          ResourceNodeType::DescriptorSampler, ResourceNodeType::DescriptorSampler, samplerDescSet, binding);
+      result = getBuilder()->CreateInsertValue(result, samplerPointer, idxs.samplerPointer);
+      result = getBuilder()->CreateInsertValue(result, samplerStride, idxs.samplerStride);
     }
-    return imageDescPtr;
-  }
-  return samplerDescPtr;
-}
-
-// =====================================================================================================================
-// Get an image/sampler descriptor pointer-and-stride struct
-//
-// @param resType : ResourceNodeType value
-// @param descriptorSet : Descriptor set
-// @param binding : Binding
-// @param searchType : ResourceNodeType to find user resource node
-Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
-                                            ResourceNodeType searchType) {
-  if (resType != ResourceNodeType::DescriptorSampler) {
-    // f-mask/texel buffer, where a pointer is represented by a struct {pointer,stride}.
-    Value *descPtr = getBuilder()->CreateGetDescPtr(resType, searchType, descriptorSet, binding);
-    Value *descStride = getBuilder()->CreateGetDescStride(resType, searchType, descriptorSet, binding);
-    descPtr = getBuilder()->CreateInsertValue(
-        PoisonValue::get(StructType::get(*m_context, {descPtr->getType(), descStride->getType(), descStride->getType(),
-                                                      getBuilder()->getInt32Ty()})),
-        descPtr, 0);
-    descPtr = getBuilder()->CreateInsertValue(descPtr, descStride, 1);
-
-    if (resType == ResourceNodeType::DescriptorResource) {
-      // Image, where a pointer is represented by a struct {pointer, stride, planeStride, isResource}
-      unsigned convertingSamplerIdx = 0;
-      unsigned nextIdx = 1;
-      for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
-        if (convertingSampler.set == descriptorSet && convertingSampler.binding == binding) {
-          convertingSamplerIdx = nextIdx;
-          break;
-        }
-        nextIdx += convertingSampler.values.size() / ConvertingSamplerDwordCount;
-      }
-      if (convertingSamplerIdx == 0) {
-        descPtr = getBuilder()->CreateInsertValue(descPtr, getBuilder()->getInt32(DescriptorSizeResource), 2);
-      } else {
-        // Sampler Descriptor includes {sampler, YCbCrMetaDta}
-        auto samplerMetadata =
-            m_convertingSamplers[convertingSamplerIdx - 1].values.data() + DescriptorSizeSamplerInDwords;
-        Value *planes = getBuilder()->getInt32(
-            reinterpret_cast<const Vkgc::SamplerYCbCrConversionMetaData *>(samplerMetadata)->word1.planes);
-        Value *planeStride = getBuilder()->CreateUDiv(descStride, planes);
-        descPtr = getBuilder()->CreateInsertValue(descPtr, planeStride, 2);
-      }
-      descPtr = getBuilder()->CreateInsertValue(descPtr, getBuilder()->getInt32(1), 3);
-    }
-    return descPtr;
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->getInt32(convertingSamplerIdx),
+                                             idxs.convertingSamplerIdx);
   }
 
-  // A sampler pointer is represented by a struct {pointer,stride,convertingSamplerIdx}, where
-  // convertingSamplerIdx is 0 or the 1-based converting sampler index. Here we use descriptorSet and binding
-  // to detect whether it is a converting sampler, and set up the converting sampler index.
-  unsigned convertingSamplerIdx = 0;
-  unsigned nextIdx = 1;
-  unsigned convertingSamplerDescriptorSet = descriptorSet;
-  if (getPipelineOptions()->getGlState().replaceSetWithResourceType &&
-      descriptorSet ==
-          PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler)) {
-    // When using 'replaceSetWithResourceType' option (OGL default) it's not possible to match converting samplers
-    // for 'DescriptorResource' and 'DescriptorSampler' at the same time, which is needed to handle YCbCr formats.
-    // Converting sampler with YCbCr metadata has 'DescriptorResource' set assigned, hence looking for it instead.
-    convertingSamplerDescriptorSet =
-        PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
-  }
-  for (const ConvertingSampler &convertingSampler : m_convertingSamplers) {
-    if (convertingSampler.set == convertingSamplerDescriptorSet && convertingSampler.binding == binding) {
-      convertingSamplerIdx = nextIdx;
-      break;
-    }
-    nextIdx += convertingSampler.values.size() / ConvertingSamplerDwordCount;
-  }
-  Type *samplerPtrTy = StructType::get(*m_context, {getBuilder()->getDescPtrTy(ResourceNodeType::DescriptorSampler),
-                                                    getBuilder()->getInt32Ty(), getBuilder()->getInt32Ty()});
-  Value *samplerDescPtr = Constant::getNullValue(samplerPtrTy);
-
-  if (convertingSamplerIdx == 0) {
-    // Not a converting sampler. Get a normal sampler pointer and stride and put it in the struct.
-    samplerDescPtr = getBuilder()->CreateInsertValue(
-        samplerDescPtr, getBuilder()->CreateGetDescPtr(resType, searchType, descriptorSet, binding), 0);
-    samplerDescPtr = getBuilder()->CreateInsertValue(
-        samplerDescPtr, getBuilder()->CreateGetDescStride(resType, searchType, descriptorSet, binding), 1);
-  } else {
-    // It is a converting sampler. Return the struct with just the converting sampler index.
-    samplerDescPtr = getBuilder()->CreateInsertValue(samplerDescPtr, getBuilder()->getInt32(convertingSamplerIdx), 2);
-  }
-  return samplerDescPtr;
+  return result;
 }
 
 // =====================================================================================================================
@@ -3725,6 +3451,17 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
         llvm_unreachable("unhandled type in access chain");
       }
     }
+    // Process GEP last access chain type
+    switch (spvAccessElementType->getOpCode()) {
+    case OpTypeRayQueryKHR: {
+      SmallVector<Value *> args;
+      args.insert(args.end(), gepIndices.begin(), gepIndices.end());
+      base = getBuilder()->create<GepOpaqueOp>(basePointeeType, inBound, base, args);
+      gepIndices.erase(gepIndices.begin() + 1, gepIndices.end());
+      basePointeeType = transType(spvAccessElementType);
+      break;
+    }
+    }
 
     Type *finalPointeeType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
     flushGep();
@@ -3745,7 +3482,7 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
       // 'proxyType' is the replaced type for struct/array type with image/sampler member.
       // In which, image/sampler member is replaced by int8 type, and non-image member is replaced by empty sturct.
       Type *proxyType = nullptr;
-      SPIRVTypeContext ctx(spvAccessType, 0, true, true, layout);
+      SPIRVTypeContext ctx(spvAccessType, 0, true, layout);
       auto it = m_imageTypeMap.find(ctx.asTuple());
       if (it != m_imageTypeMap.end())
         proxyType = it->second;
@@ -3773,8 +3510,7 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
             elementWorklist.push_back(spvElementType->getStructMemberType(i));
       }
 
-      Type *imageSamplerType = transType(spvElementType);
-      result.push_back(indexDescPtr(imageSamplerType, base, offset));
+      result.push_back(indexDescPtr(spvElementType, base, offset));
     }
   }
 
@@ -3790,54 +3526,49 @@ template <> SmallVector<Value *> SPIRVToLLVM::transValueMultiWithOpcode<OpAccess
 }
 
 // =====================================================================================================================
-// Apply an array index to a pointer to array of image/sampler/sampledimage.
-// A pointer to sampledimage is in fact a structure containing pointer to image and pointer to sampler.
-// A pointer to image when the image is multisampled is in fact a structure containing pointer to image
-// and pointer to fmask descriptor.
+// Apply an array index to a "pointer" to array of image/sampler/sampledimage.
+// The pointer is in fact a structure containing multiple pointers and stride information.
 //
-// @param elementTy : Ultimate non-array element type
+// @param spvElementTy : Ultimate non-array element type
 // @param base : Base pointer to add index to
 // @param index : Index value
-Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
-  auto structTy = dyn_cast<StructType>(elementTy);
-  if (structTy && !structTy->getElementType(structTy->getNumElements() - 1)->isIntegerTy()) {
-    // The element type is a struct containing two image/sampler elements. The cases where this happens are:
-    // 1. A sampledimage is a struct containing image and sampler.
-    // 2. An image that is multisampled is a struct containing image and fmask.
-    // In both cases, the pointer type is also a struct containing the corresponding two pointer-and-samples.
-    // Index them separately.
-    assert(structTy->getNumElements() == 2);
-    Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
-    Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
-    ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index);
-    ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index);
-    base = getBuilder()->CreateInsertValue(PoisonValue::get(base->getType()), ptr0, 0);
-    base = getBuilder()->CreateInsertValue(base, ptr1, 1);
-    return base;
-  }
+Value *SPIRVToLLVM::indexDescPtr(SPIRVType *spvElementTy, Value *base, Value *index) {
+  unsigned components = getImageTypeComponents(spvElementTy);
+  auto idxs = getImageTypeIndices(components);
 
-  // A sampler pointer is represented by a {pointer,stride,convertingSamplerIdx} struct. If the converting sampler
-  // index is non-zero (i.e. it is actually a converting sampler), we also want to modify that index. That can only
-  // happen if there are any converting samplers at all.
-  if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() == 3) {
-    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
-    Value *modifiedIdx = getBuilder()->CreateAdd(convertingSamplerIdx, index);
-    Value *isConvertingSampler = getBuilder()->CreateICmpNE(convertingSamplerIdx, getBuilder()->getInt32(0));
-    modifiedIdx = getBuilder()->CreateSelect(isConvertingSampler, modifiedIdx, getBuilder()->getInt32(0));
-    base = getBuilder()->CreateInsertValue(base, modifiedIdx, 2);
-  }
-
-  // The descriptor "pointer" is in fact a struct containing the pointer and stride.
-  Value *ptr = getBuilder()->CreateExtractValue(base, 0);
-  Value *stride = getBuilder()->CreateExtractValue(base, 1);
   index = getBuilder()->CreateZExtOrTrunc(index, getBuilder()->getInt32Ty());
-  index = getBuilder()->CreateMul(index, stride);
 
-  // Do the indexing operation by GEPping as a byte pointer.
-  Type *ptrTy = ptr->getType();
-  ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, index);
-  ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
-  base = getBuilder()->CreateInsertValue(base, ptr, 0);
+  if (components & ImageComponentImage) {
+    Value *pointer = getBuilder()->CreateExtractValue(base, idxs.imagePointer);
+    Value *stride = getBuilder()->CreateExtractValue(base, idxs.imageStride);
+    Value *offset = getBuilder()->CreateMul(index, stride);
+    pointer = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), pointer, offset);
+    base = getBuilder()->CreateInsertValue(base, pointer, idxs.imagePointer);
+  }
+
+  if (components & ImageComponentFMask) {
+    Value *pointer = getBuilder()->CreateExtractValue(base, idxs.fmaskPointer);
+    Value *stride = getBuilder()->CreateExtractValue(base, idxs.fmaskStride);
+    Value *offset = getBuilder()->CreateMul(index, stride);
+    pointer = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), pointer, offset);
+    base = getBuilder()->CreateInsertValue(base, pointer, idxs.fmaskPointer);
+  }
+
+  if (components & ImageComponentSampler) {
+    Value *pointer = getBuilder()->CreateExtractValue(base, idxs.samplerPointer);
+    Value *stride = getBuilder()->CreateExtractValue(base, idxs.samplerStride);
+    Value *offset = getBuilder()->CreateMul(index, stride);
+    pointer = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), pointer, offset);
+    base = getBuilder()->CreateInsertValue(base, pointer, idxs.samplerPointer);
+
+    if (!m_convertingSamplers.empty()) {
+      Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, idxs.convertingSamplerIdx);
+      Value *updated = getBuilder()->CreateAdd(convertingSamplerIdx, index);
+      Value *isConverting = getBuilder()->CreateICmpNE(convertingSamplerIdx, getBuilder()->getInt32(0));
+      convertingSamplerIdx = getBuilder()->CreateSelect(isConverting, updated, getBuilder()->getInt32(0));
+      base = getBuilder()->CreateInsertValue(base, convertingSamplerIdx, idxs.convertingSamplerIdx);
+    }
+  }
 
   return base;
 }
@@ -3873,9 +3604,25 @@ SmallVector<Value *> SPIRVToLLVM::transValueMultiWithOpcode<OpInBoundsPtrAccessC
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpImage>(SPIRVValue *const spvValue) {
-  Value *sampledImage = transValue(static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(0),
-                                   getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  return getBuilder()->CreateExtractValue(sampledImage, uint64_t(0));
+  SPIRVValue *spvSrc = static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(0);
+  Value *src = transValue(spvSrc, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+  auto srcIdxs = getImageTypeIndices(getImageTypeComponents(spvSrc->getType()));
+  unsigned dstComponents = getImageTypeComponents(spvValue->getType());
+  auto dstIdxs = getImageTypeIndices(dstComponents);
+  Value *result = PoisonValue::get(getImageTy(dstComponents));
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(src, srcIdxs.imagePointer),
+                                           dstIdxs.imagePointer);
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(src, srcIdxs.imageStride),
+                                           dstIdxs.imageStride);
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(src, srcIdxs.imagePlaneStride),
+                                           dstIdxs.imagePlaneStride);
+  if (dstComponents & ImageComponentFMask) {
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(src, srcIdxs.fmaskPointer),
+                                             dstIdxs.fmaskPointer);
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(src, srcIdxs.fmaskStride),
+                                             dstIdxs.fmaskStride);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3883,14 +3630,31 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpImage>(SPIRVValue *const 
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(SPIRVValue *const spvValue) {
-  Value *image = transValue(static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(0),
-                            getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-  Value *sampler = transValue(static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(1),
-                              getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-
-  Value *result = PoisonValue::get(StructType::get(*m_context, {image->getType(), sampler->getType()}));
-  result = getBuilder()->CreateInsertValue(result, image, uint64_t(0));
-  result = getBuilder()->CreateInsertValue(result, sampler, 1);
+  SPIRVValue *spvImage = static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(0);
+  SPIRVValue *spvSampler = static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(1);
+  Value *image = transValue(spvImage, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+  Value *sampler = transValue(spvSampler, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+  auto imageIdxs = getImageTypeIndices(getImageTypeComponents(spvImage->getType()));
+  auto samplerIdxs = getImageTypeIndices(getImageTypeComponents(spvSampler->getType()));
+  unsigned dstComponents = getImageTypeComponents(spvValue->getType());
+  auto dstIdxs = getImageTypeIndices(dstComponents);
+  Value *result = PoisonValue::get(getImageTy(dstComponents));
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(image, imageIdxs.imagePointer),
+                                           dstIdxs.imagePointer);
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(image, imageIdxs.imageStride),
+                                           dstIdxs.imageStride);
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(image, imageIdxs.imagePlaneStride),
+                                           dstIdxs.imagePlaneStride);
+  if (dstComponents & ImageComponentFMask) {
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(image, imageIdxs.fmaskPointer),
+                                             dstIdxs.fmaskPointer);
+    result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(image, imageIdxs.fmaskStride),
+                                             dstIdxs.fmaskStride);
+  }
+  result = getBuilder()->CreateInsertValue(
+      result, getBuilder()->CreateExtractValue(sampler, samplerIdxs.samplerPointer), dstIdxs.samplerPointer);
+  result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(sampler, samplerIdxs.samplerStride),
+                                           dstIdxs.samplerStride);
   return result;
 }
 
@@ -3929,6 +3693,22 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDemoteToHelperInvocationE
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpIsHelperInvocationEXT>(SPIRVValue *const spvValue) {
   return getBuilder()->CreateIsHelperInvocation();
+}
+
+// =====================================================================================================================
+// Handle OpBeginInvocationInterlockEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpBeginInvocationInterlockEXT>(SPIRVValue *const spvValue) {
+  return getBuilder()->create<PopsBeginInterlockOp>();
+}
+
+// =====================================================================================================================
+// Handle OpEndInvocationInterlockEXT.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpEndInvocationInterlockEXT>(SPIRVValue *const spvValue) {
+  return getBuilder()->create<PopsEndInterlockOp>();
 }
 
 // =====================================================================================================================
@@ -4366,13 +4146,15 @@ Value *SPIRV::SPIRVToLLVM::createTraceRayDialectOp(SPIRVValue *const spvValue) {
   Value *const rayTMax = transValue(spvOperands[9], func, block);
   Value *const payload = transValue(spvOperands[10], func, block);
 
+  getRaytracingContext()->updateRayFlagsKnownBits(computeKnownBits(rayFlags, m_m->getDataLayout()));
+
   auto accelStructAsI64 = getBuilder()->CreateBitCast(accelStruct, getBuilder()->getInt64Ty());
 
   Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType());
 
   // Wrap payload with struct, PAQ handling expects a struct type.
   // FIXME: We should support non-struct types for PAQ
-  if (getRaytracingContext()->isContinuationsMode() && !payloadTy->isStructTy())
+  if (!payloadTy->isStructTy())
     payloadTy = StructType::get(*m_context, {payloadTy}, "");
 
   auto paq = getPaqFromSize(getBuilder()->getContext(), alignTo(m_m->getDataLayout().getTypeAllocSize(payloadTy), 4));
@@ -4406,7 +4188,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRV
 
   // Wrap payload with struct, PAQ handling expects a struct type.
   // FIXME: We should support non-struct types for PAQ
-  if (getRaytracingContext()->isContinuationsMode() && !callableDataTy->isStructTy())
+  if (!callableDataTy->isStructTy())
     callableDataTy = StructType::get(*m_context, {callableDataTy}, "");
 
   auto *call = getBuilder()->create<CallCallableShaderOp>(shaderIndex, callableData, dataByteSize);
@@ -5109,7 +4891,7 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
     case OpTypeSampler:
     case OpTypeSampledImage:
       // Only translate image/sampler array type to record the m_imageTypeMap
-      transType(spvVarType, 0, true, true, layout);
+      transType(spvVarType, 0, true, layout);
       return nullptr;
     default:
       if (!isAccelerationStructureType(spvElementType))
@@ -5121,7 +4903,7 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
   Type *const ptrType = transType(spvVar->getType());
   unsigned addrSpace = ptrType->getPointerAddressSpace();
 
-  Type *const varType = transType(spvVarType, 0, true, true, layout);
+  Type *const varType = transType(spvVarType, 0, true, layout);
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
   Constant *initializer = nullptr;
@@ -5219,8 +5001,8 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
     assert(bb->isEntryBlock());
     getBuilder()->SetInsertPoint(bb, bb->getFirstInsertionPt());
     auto allocAddr = m_m->getDataLayout().getAllocaAddrSpace();
-    Value *const var = getBuilder()->CreateAlloca(varType, allocAddr, nullptr, spvVar->getName());
 
+    Value *const var = getBuilder()->CreateAlloca(varType, allocAddr, nullptr, spvVar->getName());
     getBuilder()->restoreIP(insertPoint);
 
     if (initializer)
@@ -5283,6 +5065,26 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
 
   return globalVar;
 }
+
+// =====================================================================================================================
+// find spirv type recursively
+//
+// @param spvTy : A SPIR-V type to search
+// @param Op : Spirv type opcode
+bool SPIRVToLLVM::hasSpirvType(SPIRVType *spvTy, Op ty) {
+  if (spvTy->getOpCode() == ty)
+    return true;
+  else if (spvTy->isTypeStruct()) {
+    for (unsigned i = 0; i < spvTy->getStructMemberCount(); ++i) {
+      if (hasSpirvType(spvTy->getStructMemberType(i), ty))
+        return true;
+    }
+    return false;
+  } else if (spvTy->isTypeArray()) {
+    return hasSpirvType(spvTy->getArrayElementType(), ty);
+  }
+  return false;
+};
 
 // =====================================================================================================================
 // Handle OpTranspose.
@@ -5728,6 +5530,26 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
                                                                        coopMatrixC, isSignedA, isSignedB, isSat, 0,
                                                                        elemBasicTypeC, elemBasicTypeA, "mulAdd");
   return coopMatrixD;
+}
+
+// =====================================================================================================================
+// Handle OpRayQueryInitializeKHR.
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpRayQueryInitializeKHR>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *rayQuery = transValue(spvOperands[0], func, block);
+  Value *accStru = transValue(spvOperands[1], func, block);
+  accStru = getBuilder()->CreateBitCast(accStru, getBuilder()->getInt64Ty());
+  Value *rayFlags = transValue(spvOperands[2], func, block);
+  Value *mask = transValue(spvOperands[3], func, block);
+  Value *origin = transValue(spvOperands[4], func, block);
+  Value *tmin = transValue(spvOperands[5], func, block);
+  Value *dir = transValue(spvOperands[6], func, block);
+  Value *tmax = transValue(spvOperands[7], func, block);
+  return getBuilder()->create<InitializeOp>(rayQuery, accStru, rayFlags, mask, origin, tmin, dir, tmax);
 }
 
 /// For instructions, this function assumes they are created in order
@@ -6356,7 +6178,8 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
 
   case OpControlBarrier:
   case OpMemoryBarrier:
-    return mapValue(bv, transBarrierFence(static_cast<SPIRVInstruction *>(bv), bb));
+    transBarrierFence(static_cast<SPIRVInstruction *>(bv), bb);
+    return {};
 
   case OpSNegate: {
     if (bv->getType()->isTypeCooperativeMatrixKHR()) {
@@ -6914,6 +6737,10 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     return mapValue(bv, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(bv));
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
+  case OpBeginInvocationInterlockEXT:
+    return mapValue(bv, transValueWithOpcode<OpBeginInvocationInterlockEXT>(bv));
+  case OpEndInvocationInterlockEXT:
+    return mapValue(bv, transValueWithOpcode<OpEndInvocationInterlockEXT>(bv));
   case OpTraceRayKHR:
     return mapValue(bv, createTraceRayDialectOp(bv));
   case OpExecuteCallableKHR:
@@ -6945,6 +6772,127 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     return mapValue(bv, transValueWithOpcode<OpCooperativeMatrixStoreKHR>(bv));
   case OpCooperativeMatrixMulAddKHR:
     return mapValue(bv, transValueWithOpcode<OpCooperativeMatrixMulAddKHR>(bv));
+  case OpRayQueryInitializeKHR:
+    return mapValue(bv, transValueWithOpcode<OpRayQueryInitializeKHR>(bv));
+  case OpRayQueryTerminateKHR: {
+    auto *bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<TerminateOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGenerateIntersectionKHR: {
+    auto *bi = static_cast<SPIRVInstruction *>(bv);
+    auto query = transValue(bi->getOperands()[0], f, bb);
+    auto hitT = transValue(bi->getOperands()[1], f, bb);
+    return mapValue(bv, m_builder->create<IntersectionCommitAabbOp>(query, hitT));
+  }
+  case OpRayQueryConfirmIntersectionKHR: {
+    auto *bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<IntersectionCommitTriangleOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryProceedKHR: {
+    auto *bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<ProceedOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGetIntersectionTypeKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    bool committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv, m_builder->create<IntersectionTypeOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetRayTMinKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<RayTMinOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGetRayFlagsKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<rtq::RayFlagsOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGetIntersectionTKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv, m_builder->create<IntersectionTOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionInstanceCustomIndexKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv,
+                    m_builder->create<IntersectionInstanceIdOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionInstanceIdKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv,
+                    m_builder->create<IntersectionInstanceIndexOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv, m_builder->create<IntersectionContributionToHitGroupIndexOp>(
+                            transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionGeometryIndexKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv,
+                    m_builder->create<IntersectionGeometryIndexOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionPrimitiveIndexKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(
+        bv, m_builder->create<IntersectionPrimitiveIndexOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionBarycentricsKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv,
+                    m_builder->create<IntersectionBarycentricsOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionFrontFaceKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv, m_builder->create<IntersectionFrontFaceOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionCandidateAABBOpaqueKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<IntersectionCandidateAabbOpaqueOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGetIntersectionObjectRayDirectionKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(
+        bv, m_builder->create<IntersectionObjectRayDirectionOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionObjectRayOriginKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(
+        bv, m_builder->create<IntersectionObjectRayOriginOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetWorldRayDirectionKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<IntersectionWorldRayDirectionOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGetWorldRayOriginKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    return mapValue(bv, m_builder->create<IntersectionWorldRayOriginOp>(transValue(bi->getOperands()[0], f, bb)));
+  }
+  case OpRayQueryGetIntersectionObjectToWorldKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv,
+                    m_builder->create<IntersectionObjectToWorldOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionWorldToObjectKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv,
+                    m_builder->create<IntersectionWorldToObjectOp>(transValue(bi->getOperands()[0], f, bb), committed));
+  }
+  case OpRayQueryGetIntersectionTriangleVertexPositionsKHR: {
+    auto bi = static_cast<SPIRVInstruction *>(bv);
+    auto rayquery = transValue(bi->getOperands()[0], f, bb);
+    auto committed = isRayQueryCommittedIntersection(bi->getOperands()[1]);
+    return mapValue(bv, m_builder->create<IntersectionTriangleVertexPositionsOp>(rayquery, committed));
+  }
   default: {
     auto oc = bv->getOpCode();
     if (isCmpOpCode(oc))
@@ -7028,6 +6976,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
     if (isFuncNoUnwind())
       f->addFnAttr(Attribute::NoUnwind);
     foreachFuncCtlMask(bf, [&](Attribute::AttrKind attr) { f->addFnAttr(attr); });
+    f->addFnAttr(Attribute::AlwaysInline);
   }
 
   for (Function::arg_iterator i = f->arg_begin(), e = f->arg_end(); i != e; ++i) {
@@ -7082,23 +7031,22 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
 
   m_blockPredecessorToCount.erase(f);
 
-  auto getContArgTy = [&](SPIRVType *argTy) {
-    if (argTy->isTypePointer()) {
-      auto storageClass = argTy->getPointerStorageClass();
-      const unsigned addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
+  auto getContArgTy = [&](Type *irTy, SPIRVType *argTy) {
+    if (isa<PointerType>(irTy)) {
       Type *pointeeType = transType(argTy->getPointerElementType());
-      Type *ptrTy = PointerType::get(*m_context, addrSpace);
-      return ContArgTy(ptrTy, pointeeType);
+      return TypedArgTy(irTy, pointeeType);
     }
-    return ContArgTy(transType(argTy));
+    return TypedArgTy(irTy);
   };
 
-  SmallVector<ContArgTy> argTys;
+  SmallVector<TypedArgTy> argTys;
   for (unsigned i = 0; i < bf->getNumArguments(); ++i) {
+    Type *irArgTy = f->getArg(i)->getType();
     auto argTy = bf->getArgument(i)->getType();
-    argTys.push_back(getContArgTy(argTy));
+    argTys.push_back(getContArgTy(irArgTy, argTy));
   }
-  ContFuncTy funcTys(getContArgTy(bf->getType()), argTys);
+  Type *irRetTy = f->getFunctionType()->getReturnType();
+  TypedFuncTy funcTys(getContArgTy(irRetTy, bf->getType()), argTys);
   funcTys.writeMetadata(f);
 
   return f;
@@ -7251,149 +7199,197 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
 }
 
 // =============================================================================
+// Scan backwards from an image/sampler or pointer-to-image/sampler value and set non-uniform/coherent/volatile flags.
+static void scanImageDescNonUniformCV(SPIRVToLLVM::ExtractedImageInfo *info, SPIRVValue *spvValue, bool image,
+                                      bool sampler) {
+  for (;;) {
+    if (image) {
+      if (spvValue->hasDecorate(DecorationCoherent))
+        info->flags |= lgc::Builder::ImageFlagCoherent;
+      if (spvValue->hasDecorate(DecorationVolatile))
+        info->flags |= lgc::Builder::ImageFlagVolatile;
+    }
+
+    const auto opcode = spvValue->getOpCode();
+
+    // Section 2.16.1 ("Universal Validation Rules") of the SPIR-V specification (version 1.6) says:
+    //
+    //    "Image, sampler, and sampled image objects must not appear as operands to OpPhi instructions, or OpSelect
+    //    instructions, or any instructions other than the image or sampler instructions specified to operate on them."
+    //
+    // However, we have some legacy workloads in our database which break this rule. We're doing a best-effort
+    // treatment here because it is easy to do so in our design.
+    bool isPhiOrSelect = opcode == OpPhi || opcode == OpSelect;
+    if (spvValue->hasDecorate(DecorationNonUniformEXT) || isPhiOrSelect) {
+      if (image)
+        info->flags |= lgc::Builder::ImageFlagNonUniformImage;
+      if (sampler)
+        info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
+    }
+    if (isPhiOrSelect)
+      break;
+
+    if (opcode == OpCopyObject || opcode == OpCopyLogical) {
+      spvValue = static_cast<SPIRVCopyBase *>(spvValue)->getOperand();
+      continue;
+    }
+
+    if (opcode == OpImage) {
+      assert(!sampler);
+      spvValue = static_cast<SPIRVImage *>(spvValue)->getOperand(0);
+      continue;
+    }
+    if (opcode == OpSampledImage) {
+      auto *sampledImage = static_cast<SPIRVSampledImage *>(spvValue);
+      if (image)
+        scanImageDescNonUniformCV(info, sampledImage->getOperands()[0], true, false);
+      if (sampler)
+        scanImageDescNonUniformCV(info, sampledImage->getOperands()[1], false, true);
+      break;
+    }
+
+    if (opcode == OpLoad) {
+      spvValue = static_cast<SPIRVLoad *>(spvValue)->getSrc();
+      continue;
+    }
+
+    bool isAccessChain = opcode == OpAccessChain || opcode == OpInBoundsAccessChain;
+    if (isAccessChain) {
+      spvValue = static_cast<SPIRVInstruction *>(spvValue)->getOperands()[0];
+      continue;
+    }
+
+    bool isObject = opcode == OpVariable || opcode == OpFunctionParameter;
+    if (isObject) {
+      if (image && !spvValue->hasDecorate(DecorationAliased))
+        info->flags |= lgc::Builder::ImageFlagNotAliased;
+      break;
+    }
+
+    if (opcode == OpBitcast || opcode == OpUndef)
+      break;
+
+    llvm_unreachable("unhandled image/sampler definition");
+  }
+}
+
+// =============================================================================
+// Scan backwards from an image/sampler or pointer-to-image/sampler value and set the force readfirstlane flag
+// if a non-constant index is found.
+static void scanImageDescForceReadFirstLane(SPIRVToLLVM::ExtractedImageInfo *info, SPIRVValue *spvValue, bool image,
+                                            bool sampler) {
+  for (;;) {
+    const auto opcode = spvValue->getOpCode();
+
+    if (opcode == OpCopyObject || opcode == OpCopyLogical) {
+      spvValue = static_cast<SPIRVCopyBase *>(spvValue)->getOperand();
+      continue;
+    }
+
+    if (opcode == OpImage) {
+      assert(!sampler);
+      spvValue = static_cast<SPIRVImage *>(spvValue)->getOperand(0);
+      continue;
+    }
+    if (opcode == OpSampledImage) {
+      auto *sampledImage = static_cast<SPIRVSampledImage *>(spvValue);
+      if (image)
+        scanImageDescForceReadFirstLane(info, sampledImage->getOperands()[0], true, false);
+      if (sampler)
+        scanImageDescForceReadFirstLane(info, sampledImage->getOperands()[1], false, true);
+      break;
+    }
+
+    if (opcode == OpLoad) {
+      spvValue = static_cast<SPIRVLoad *>(spvValue)->getSrc();
+      continue;
+    }
+
+    bool isAccessChain = opcode == OpAccessChain || opcode == OpInBoundsAccessChain;
+    if (isAccessChain) {
+      auto *spvAccessChain = static_cast<SPIRVAccessChainBase *>(spvValue);
+      std::vector<SPIRVValue *> spvIndicesVec = spvAccessChain->getIndices();
+
+      // Check if any index is not a constant, set the flag true
+      for (auto idxIt : spvIndicesVec) {
+        if (idxIt->getOpCode() != OpConstant) {
+          if (image)
+            info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneImage;
+          if (sampler)
+            info->flags |= lgc::Builder::ImageFlagEnforceReadFirstLaneSampler;
+          return;
+        }
+      }
+
+      spvValue = static_cast<SPIRVInstruction *>(spvValue)->getOperands()[0];
+      continue;
+    }
+
+    bool isObject = opcode == OpVariable || opcode == OpFunctionParameter;
+    if (isObject)
+      break;
+
+    if (opcode == OpBitcast || opcode == OpUndef)
+      break;
+
+    llvm_unreachable("unhandled image/sampler definition");
+  }
+}
+
+// =============================================================================
 // Get image and/or sampler descriptors, and get information from the image
 // type.
 void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info) {
-  auto setEnforceReadFirstLaneFlag = [&](SPIRVValue *accessChainInst, bool isImage) {
-    if (!accessChainInst || !isAccessChainOpCode(accessChainInst->getOpCode()))
-      return;
-    SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(accessChainInst);
-    std::vector<SPIRVValue *> spvIndicesVec = spvAccessChain->getIndices();
-    // Check if any index is not a constant, set the flag true
-    bool enforceReadFirstlane = false;
-    for (auto idxIt : spvIndicesVec) {
-      if (idxIt->getOpCode() != OpConstant) {
-        enforceReadFirstlane = true;
-        break;
-      }
-    }
-    if (enforceReadFirstlane)
-      info->flags |= isImage ? lgc::Builder::ImageFlagEnforceReadFirstLaneImage
-                             : lgc::Builder::ImageFlagEnforceReadFirstLaneSampler;
-  };
+  // Get the descriptor(s).
+  SPIRVType *spvImageType = nullptr;
 
+  if (bImageInst->getOpCode() == OpImageTexelPointer) {
+    bImageInst = static_cast<SPIRVImageTexelPointer *>(bImageInst)->getImage();
+    spvImageType = static_cast<SPIRVTypeImage *>(bImageInst->getType()->getPointerElementType());
+  } else {
+    spvImageType = static_cast<SPIRVTypeImage *>(bImageInst->getType());
+  }
+
+  if (spvImageType->getOpCode() == OpTypeImage) {
+    info->desc = &static_cast<SPIRVTypeImage *>(spvImageType)->getDescriptor();
+  } else {
+    assert(spvImageType->getOpCode() == OpTypeSampledImage);
+    info->desc = &static_cast<SPIRVTypeSampledImage *>(spvImageType)->getImageType()->getDescriptor();
+  }
+  info->dim = convertDimension(info->desc);
+
+  unsigned components = getImageTypeComponents(spvImageType);
+  const auto idxs = getImageTypeIndices(components);
+  Value *image = transValue(bImageInst, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+
+  if (components & ImageComponentImage) {
+    info->imagePointer = getBuilder()->CreateExtractValue(image, idxs.imagePointer);
+    info->imagePlaneStride = getBuilder()->CreateExtractValue(image, idxs.imagePlaneStride);
+  }
+
+  if (components & ImageComponentFMask)
+    info->fmaskPointer = getBuilder()->CreateExtractValue(image, idxs.fmaskPointer);
+
+  if (components & ImageComponentSampler) {
+    info->samplerPointer = getBuilder()->CreateExtractValue(image, idxs.samplerPointer);
+    info->convertingSamplerIdx = getBuilder()->CreateExtractValue(image, idxs.convertingSamplerIdx);
+  }
+
+  // Analyze the data flow for coheren/volatile/(non-)uniformness.
   bool forceNonUniform = isShaderStageInMask(convertToShaderStage(m_execModule),
                                              getPipelineOptions()->forceNonUniformResourceIndexStageMask);
-
-  if (forceNonUniform || bImageInst->hasDecorate(DecorationNonUniformEXT)) {
+  if (forceNonUniform) {
     info->flags |= lgc::Builder::ImageFlagNonUniformImage;
-    if (bImageInst->getType()->getOpCode() == OpTypeSampledImage)
+    if (components & ImageComponentSampler)
       info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
   }
 
-  if (bImageInst->getOpCode() == OpImageTexelPointer) {
-    // We are looking at the OpImageTexelPointer for an image atomic. Load the
-    // image descriptor from its image pointer.
-    SPIRVValue *bImagePtr = static_cast<SPIRVImageTexelPointer *>(bImageInst)->getImage();
-    info->desc = &static_cast<SPIRVTypeImage *>(bImagePtr->getType()->getPointerElementType())->getDescriptor();
-    info->dim = convertDimension(info->desc);
-    info->imageDesc = transLoadImage(bImagePtr);
-    if (isa<StructType>(info->imageDesc->getType())) {
-      // Extract image descriptor from struct containing image+fmask descs.
-      info->imageDesc = getBuilder()->CreateExtractValue(info->imageDesc, uint64_t(0));
-    }
-    if (isa<ArrayType>(info->imageDesc->getType())) {
-      // Extract image descriptor from possible array of multi-plane image descriptors.
-      info->imageDesc = getBuilder()->CreateExtractValue(info->imageDesc, 0);
-    }
-    // We also need to trace back to the OpVariable/OpUntypedVariableKHR or OpFunctionParam to find
-    // the coherent and volatile decorations.
-    SPIRVValue *imageAccessChain = nullptr;
-    while (bImagePtr->getOpCode() == OpAccessChain || bImagePtr->getOpCode() == OpInBoundsAccessChain) {
-      std::vector<SPIRVValue *> operands = static_cast<SPIRVInstTemplateBase *>(bImagePtr)->getOperands();
-      for (SPIRVValue *operand : operands) {
-        if (forceNonUniform || operand->hasDecorate(DecorationNonUniformEXT))
-          info->flags |= lgc::Builder::ImageFlagNonUniformImage;
-      }
-      imageAccessChain = bImagePtr;
-      bImagePtr = operands[0];
-    }
-    assert(bImagePtr->getOpCode() == OpVariable || bImagePtr->getOpCode() == OpFunctionParameter);
-    if (bImageInst->hasDecorate(DecorationCoherent))
-      info->flags |= lgc::Builder::ImageFlagCoherent;
-    if (bImageInst->hasDecorate(DecorationVolatile))
-      info->flags |= lgc::Builder::ImageFlagVolatile;
-
-    // Set enforce readfirstlane flag for accessing image array
-    if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0)
-      setEnforceReadFirstLaneFlag(imageAccessChain, true);
-
-    return;
-  }
-
-  SPIRVValue *imageLoadSrc = nullptr;
-  SPIRVValue *samplerLoadSrc = nullptr;
-  if (bImageInst->getOpCode() == OpLoad) {
-    SPIRVLoad *load = static_cast<SPIRVLoad *>(bImageInst);
-    SPIRVValue *const loadSrc = load->getSrc();
-
-    if (loadSrc->isCoherent())
-      info->flags |= lgc::Builder::ImageFlagCoherent;
-    if (loadSrc->isVolatile())
-      info->flags |= lgc::Builder::ImageFlagVolatile;
-    if (load->getType()->getOpCode() == OpTypeSampledImage) {
-      imageLoadSrc = loadSrc;
-      samplerLoadSrc = loadSrc;
-    } else {
-      imageLoadSrc = loadSrc;
-    }
-  }
-
-  // We need to scan back through OpImage/OpSampledImage just to find any
-  // NonUniform decoration.
-  SPIRVValue *scanBackInst = bImageInst;
-  while (scanBackInst->getOpCode() == OpImage || scanBackInst->getOpCode() == OpSampledImage) {
-    if (scanBackInst->getOpCode() == OpSampledImage) {
-      auto sampler = static_cast<SPIRVInstTemplateBase *>(scanBackInst)->getOpValue(1);
-      if (forceNonUniform || sampler->hasDecorate(DecorationNonUniformEXT))
-        info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
-      if (sampler->getOpCode() == OpLoad)
-        samplerLoadSrc = static_cast<SPIRVLoad *>(sampler)->getSrc();
-    }
-    scanBackInst = static_cast<SPIRVInstTemplateBase *>(scanBackInst)->getOpValue(0);
-    if (forceNonUniform || scanBackInst->hasDecorate(DecorationNonUniformEXT))
-      info->flags |= lgc::Builder::ImageFlagNonUniformImage;
-    if (scanBackInst->getOpCode() == OpLoad)
-      imageLoadSrc = static_cast<SPIRVLoad *>(scanBackInst)->getSrc();
-  }
-  // Set enforce readfirstlane flag for accessing image or sampled image array
-  if ((info->flags & lgc::Builder::ImageFlagNonUniformImage) == 0)
-    setEnforceReadFirstLaneFlag(imageLoadSrc, true);
-  if ((info->flags & lgc::Builder::ImageFlagNonUniformSampler) == 0)
-    setEnforceReadFirstLaneFlag(samplerLoadSrc, false);
-
-  if (imageLoadSrc && (imageLoadSrc->getOpCode() == OpVariable || imageLoadSrc->getOpCode() == OpFunctionParameter) &&
-      !imageLoadSrc->hasDecorate(DecorationAliased))
-    info->flags |= lgc::Builder::ImageFlagNotAliased;
-
-  // Get the IR value for the image/sampledimage.
-  Value *desc = transValue(bImageInst, getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
-
-  SPIRVType *bImageTy = bImageInst->getType();
-  if (bImageTy->getOpCode() == OpTypeSampledImage) {
-    // For a sampledimage, the IR value is a struct containing the image and the
-    // sampler.
-    info->samplerDesc = getBuilder()->CreateExtractValue(desc, 1);
-    desc = getBuilder()->CreateExtractValue(desc, uint64_t(0));
-    bImageTy = static_cast<SPIRVTypeSampledImage *>(bImageTy)->getImageType();
-  }
-  assert(bImageTy->getOpCode() == OpTypeImage);
-  info->desc = &static_cast<const SPIRVTypeImage *>(bImageTy)->getDescriptor();
-  info->dim = convertDimension(info->desc);
-
-  if (info->desc->MS) {
-    // For a multisampled image, the IR value is a struct containing the image
-    // descriptor and the fmask descriptor.
-    info->fmaskDesc = getBuilder()->CreateExtractValue(desc, 1);
-    desc = getBuilder()->CreateExtractValue(desc, uint64_t(0));
-  }
-
-  // desc might be an array of multi-plane descriptors (for YCbCrSampler conversion).
-  info->imageDescArray = desc;
-  if (isa<ArrayType>(desc->getType()))
-    desc = getBuilder()->CreateExtractValue(desc, 0);
-
-  info->imageDesc = desc;
+  scanImageDescNonUniformCV(info, bImageInst, components & ImageComponentImage, components & ImageComponentSampler);
+  bool imageUniform = (components & ImageComponentImage) && !(info->flags & lgc::Builder::ImageFlagNonUniformImage);
+  bool samplerUniform =
+      (components & ImageComponentSampler) && !(info->flags & lgc::Builder::ImageFlagNonUniformSampler);
+  if (imageUniform || samplerUniform)
+    scanImageDescForceReadFirstLane(info, bImageInst, imageUniform, samplerUniform);
 }
 
 // =============================================================================
@@ -7656,7 +7652,7 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
 Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
 
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVInstTemplateBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -7687,7 +7683,8 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicB
   Type *resultTy = transType(bii->getType());
 
   // Create the image load.
-  return getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, coord, nullptr);
+  return getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer, coord,
+                                       nullptr);
 }
 
 // =============================================================================
@@ -7696,7 +7693,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, Ba
 
   if (getPipelineOptions()->shadowDescriptorTableUsage != Vkgc::ShadowDescriptorTableUsage::Disable) {
     // Get image type descriptor and fmask descriptor.
-    ExtractedImageInfo imageInfo = {bb};
+    ExtractedImageInfo imageInfo;
     auto bii = static_cast<SPIRVInstTemplateBase *>(bi);
     getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -7720,7 +7717,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentMaskFetchFromInst(SPIRVInstruction *bi, Ba
 
     // Create the image load.
     Value *result =
-        getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.fmaskDesc, coord, nullptr);
+        getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.fmaskPointer, coord, nullptr);
     return getBuilder()->CreateExtractElement(result, uint64_t(0));
   }
 
@@ -7756,7 +7753,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
     comparator = transValue(bit->getOpValue(opndIdx++), bb->getParent(), bb);
 
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo = {};
   getImageDesc(pointerBi, &imageInfo);
 
   // Set up address arguments.
@@ -7809,8 +7806,8 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
   Value *result = nullptr;
   switch (bi->getOpCode()) {
   case OpAtomicCompareExchange:
-    result = getBuilder()->CreateImageAtomicCompareSwap(imageInfo.dim, imageInfo.flags, ordering, imageInfo.imageDesc,
-                                                        coord, inputData, comparator);
+    result = getBuilder()->CreateImageAtomicCompareSwap(imageInfo.dim, imageInfo.flags, ordering,
+                                                        imageInfo.imagePointer, coord, inputData, comparator);
     break;
 
   case OpAtomicStore:
@@ -7871,7 +7868,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
   }
 
   if (!result) {
-    result = getBuilder()->CreateImageAtomic(atomicOp, imageInfo.dim, imageInfo.flags, ordering, imageInfo.imageDesc,
+    result = getBuilder()->CreateImageAtomic(atomicOp, imageInfo.dim, imageInfo.flags, ordering, imageInfo.imagePointer,
                                              coord, inputData);
   }
   if (bi->getOpCode() == OpAtomicLoad && bi->getType()->isTypeFloat())
@@ -7920,7 +7917,7 @@ Value *SPIRVToLLVM::ConvertingSamplerSelectLadderHelper(Value *result, Value *co
 // Translate image sample to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource and sampler descriptors.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -7975,17 +7972,22 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
   setupImageAddressOperands(bii, opndIdx, hasProj, addr, &imageInfo, nullptr);
 
   // First do a normal image sample, extracting the sampler from the {sampler,convertingSamplerIdx} struct.
-  Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
-  Value *result =
-      getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, addr);
+  Value *result = getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer,
+                                                  imageInfo.samplerPointer, addr);
 
   if (!m_convertingSamplers.empty()) {
+    Value *planes = PoisonValue::get(ArrayType::get(getBuilder()->getDescPtrTy(), 3));
+    for (unsigned i = 0; i < 3; ++i) {
+      Value *offset = getBuilder()->CreateMul(imageInfo.imagePlaneStride, getBuilder()->getInt32(i));
+      Value *plane = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), imageInfo.imagePointer, offset);
+      planes = getBuilder()->CreateInsertValue(planes, plane, i);
+    }
+
     auto createImageSampleConvert = [&](Value *samplerDescIn) -> Value * {
-      return getBuilder()->CreateImageSampleConvert(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDescArray,
-                                                    samplerDescIn, addr);
+      return getBuilder()->CreateImageSampleConvert(resultTy, imageInfo.dim, imageInfo.flags, planes, samplerDescIn,
+                                                    addr);
     };
-    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 1);
-    result = ConvertingSamplerSelectLadderHelper(result, convertingSamplerIdx, createImageSampleConvert);
+    result = ConvertingSamplerSelectLadderHelper(result, imageInfo.convertingSamplerIdx, createImageSampleConvert);
   }
 
   // For a sparse sample, swap the struct elements back again.
@@ -8003,7 +8005,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
 // Translate image gather to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource and sampler descriptors.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -8060,9 +8062,6 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
     }
   }
 
-  // A sampler descriptor is encoded as {desc,convertingSamplerIdx}. Extract the actual sampler.
-  Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
-
   Value *result = nullptr;
   if (constOffsets) {
     // A gather with non-standard offsets is done as four separate gathers. If
@@ -8074,7 +8073,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
     for (int idx = 3; idx >= 0; --idx) {
       addr[lgc::Builder::ImageAddressIdxOffset] = getBuilder()->CreateExtractValue(constOffsets, idx);
       Value *singleResult = getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags,
-                                                            imageInfo.imageDesc, samplerDesc, addr);
+                                                            imageInfo.imagePointer, imageInfo.samplerPointer, addr);
       if (resultTy != origResultTy) {
         // Handle sparse.
         residency = getBuilder()->CreateExtractValue(singleResult, 1);
@@ -8091,8 +8090,8 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
   }
 
   // Create the image gather call.
-  result =
-      getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, addr);
+  result = getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer,
+                                           imageInfo.samplerPointer, addr);
 
   // For a sparse gather, swap the struct elements back again.
   if (resultTy != origResultTy) {
@@ -8109,7 +8108,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
 // Translate image fetch/read to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -8148,8 +8147,8 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
       // This is an OpImageFetch with sample, or an OpImageRead with sample and
       // subpass data dimension. We need to use the fmask variant of the builder
       // method. First we need to get the fmask descriptor.
-      result = getBuilder()->CreateImageLoadWithFmask(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc,
-                                                      imageInfo.fmaskDesc, coord, sampleNum);
+      result = getBuilder()->CreateImageLoadWithFmask(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer,
+                                                      imageInfo.fmaskPointer, coord, sampleNum);
     } else {
       // This is an OpImageRead with sample but not subpass data dimension.
       // Append the sample onto the coordinate.
@@ -8164,7 +8163,8 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
   if (!result) {
     // We did not do the "load with fmask" above. Do the normal image load now.
     Value *lod = addr[lgc::Builder::ImageAddressIdxLod];
-    result = getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, coord, lod);
+    result =
+        getBuilder()->CreateImageLoad(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer, coord, lod);
   }
 
   // For a sparse read/fetch, swap the struct elements back again.
@@ -8182,7 +8182,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
 // Translate image write to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -8230,38 +8230,38 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
 
   // Do the image store.
   Value *lod = addr[lgc::Builder::ImageAddressIdxLod];
-  return getBuilder()->CreateImageStore(texel, imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, coord, lod);
+  return getBuilder()->CreateImageStore(texel, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer, coord, lod);
 }
 
 // =============================================================================
 // Translate OpImageQueryLevels to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQueryLevelsFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
   // Generate the operation.
-  return getBuilder()->CreateImageQueryLevels(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc);
+  return getBuilder()->CreateImageQueryLevels(imageInfo.dim, imageInfo.flags, imageInfo.imagePointer);
 }
 
 // =============================================================================
 // Translate OpImageQuerySamples to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQuerySamplesFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
   // Generate the operation.
-  return getBuilder()->CreateImageQuerySamples(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc);
+  return getBuilder()->CreateImageQuerySamples(imageInfo.dim, imageInfo.flags, imageInfo.imagePointer);
 }
 
 // =============================================================================
 // Translate OpImageQuerySize/OpImageQuerySizeLod to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQuerySizeFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource descriptor.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
@@ -8269,31 +8269,28 @@ Value *SPIRVToLLVM::transSPIRVImageQuerySizeFromInst(SPIRVInstruction *bi, Basic
   Value *lod = getBuilder()->getInt32(0);
   if (bii->getOpCode() == OpImageQuerySizeLod)
     lod = transValue(bii->getOpValue(1), bb->getParent(), bb);
-  return getBuilder()->CreateImageQuerySize(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, lod);
+  return getBuilder()->CreateImageQuerySize(imageInfo.dim, imageInfo.flags, imageInfo.imagePointer, lod);
 }
 
 // =============================================================================
 // Translate OpImageQueryLod to LLVM IR
 Value *SPIRVToLLVM::transSPIRVImageQueryLodFromInst(SPIRVInstruction *bi, BasicBlock *bb) {
   // Get image type descriptor and load resource and sampler descriptors.
-  ExtractedImageInfo imageInfo = {bb};
+  ExtractedImageInfo imageInfo;
   auto bii = static_cast<SPIRVImageInstBase *>(bi);
   getImageDesc(bii->getOpValue(0), &imageInfo);
 
-  // A sampler descriptor is encoded as {desc,convertingSamplerIdx}. Extract the actual sampler.
-  Value *samplerDesc = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 0);
-
   // Generate the operation for normal image get lod.
   Value *coord = transValue(bii->getOpValue(1), bb->getParent(), bb);
-  Value *result =
-      getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDesc, coord);
+  Value *result = getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imagePointer,
+                                                  imageInfo.samplerPointer, coord);
 
   if (!m_convertingSamplers.empty()) {
     auto createImageGetLod = [&](Value *samplerDescIn) -> Value * {
-      return getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imageDesc, samplerDescIn, coord);
+      return getBuilder()->CreateImageGetLod(imageInfo.dim, imageInfo.flags, imageInfo.imagePointer, samplerDescIn,
+                                             coord);
     };
-    Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(imageInfo.samplerDesc, 1);
-    result = ConvertingSamplerSelectLadderHelper(result, convertingSamplerIdx, createImageGetLod);
+    result = ConvertingSamplerSelectLadderHelper(result, imageInfo.convertingSamplerIdx, createImageGetLod);
   }
 
   // NOTE: This is a workaround. When UV width equals 0, the result return 0, but we expect the value is
@@ -8421,8 +8418,6 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       m_requireFullQuads = m_entryTarget->getExecutionMode(ExecutionModeRequireFullQuadsKHR) != nullptr;
 
     m_maximallyReconverges = m_entryTarget->getExecutionMode(ExecutionModeMaximallyReconvergesKHR) != nullptr;
-  } else {
-    createLibraryEntryFunc();
   }
 
   // Determine any denormal overrides to be applied.
@@ -8571,8 +8566,13 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     // Set DLLExport on targeted entry-point so we can find it later.
     if (!m_bm->getEntryPoint(bf->getId()) || bf == m_entryTarget) {
       auto f = transFunction(bf);
-      if (bf == m_entryTarget)
-        f->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+      if (bf == m_entryTarget) {
+        Vkgc::ShaderStage stage = convertToShaderStage(m_execModule);
+        if (stage > ShaderStageCompute)
+          lgc::rt::setLgcRtShaderStage(f, getLgcRtShaderStage(stage));
+        else
+          lgc::Pipeline::markShaderEntryPoint(f, getLgcShaderStage(stage));
+      }
     }
   }
 
@@ -8815,6 +8815,12 @@ bool SPIRVToLLVM::transMetadata() {
           } else
             fragmentMode.earlyFragmentTests = true;
         }
+
+        if (bf->getExecutionMode(ExecutionModePixelInterlockOrderedEXT) ||
+            bf->getExecutionMode(ExecutionModePixelInterlockUnorderedEXT) ||
+            bf->getExecutionMode(ExecutionModeSampleInterlockOrderedEXT) ||
+            bf->getExecutionMode(ExecutionModeSampleInterlockUnorderedEXT))
+          fragmentMode.enablePops = true;
 
         fragmentMode.waveOpsRequireHelperLanes = m_maximallyReconverges && m_hasDemoteToHelper;
 
@@ -9797,7 +9803,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 
       const unsigned remappedIdx = isRemappedTypeElements(bt) ? lookupRemappedTypeElements(bt, memberIdx) : memberIdx;
       const DataLayout &dl = m_m->getDataLayout();
-      Type *const ty = transType(bt, 0, false, true, LayoutMode::Explicit);
+      Type *const ty = transType(bt, 0, false, LayoutMode::Explicit);
       assert(ty->isStructTy());
       const StructLayout *const sl = dl.getStructLayout(static_cast<StructType *>(ty));
 
@@ -10486,12 +10492,7 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb
   return call;
 }
 
-Instruction *SPIRVToLLVM::transBarrier(BasicBlock *bb, SPIRVWord execScope, SPIRVWord memSema, SPIRVWord memScope) {
-  transMemFence(bb, memSema, memScope);
-  return getBuilder()->CreateBarrier();
-}
-
-Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope) {
+void SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope) {
   AtomicOrdering ordering = AtomicOrdering::NotAtomic;
 
   // We are safe to downgrade the SequentiallyConsistent to AcquireRelease based on Vulkan validation rules within a
@@ -10513,7 +10514,7 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRV
   }
 
   if (ordering == AtomicOrdering::NotAtomic)
-    return nullptr;
+    return;
 
   SyncScope::ID scope = SyncScope::System;
 
@@ -10539,15 +10540,12 @@ Instruction *SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRV
     llvm_unreachable("Invalid scope");
   }
 
-  return new FenceInst(*m_context, ordering, scope, bb);
+  getBuilder()->CreateFence(ordering, scope);
 }
 
-Instruction *SPIRVToLLVM::transBarrierFence(SPIRVInstruction *mb, BasicBlock *bb) {
+void SPIRVToLLVM::transBarrierFence(SPIRVInstruction *mb, BasicBlock *bb) {
   assert(bb && "Invalid BB");
-  std::string funcName;
   auto getIntVal = [](SPIRVValue *value) { return static_cast<SPIRVConstant *>(value)->getZExtIntValue(); };
-
-  Instruction *barrier = nullptr;
 
   if (mb->getOpCode() == OpMemoryBarrier) {
     auto memB = static_cast<SPIRVMemoryBarrier *>(mb);
@@ -10555,26 +10553,59 @@ Instruction *SPIRVToLLVM::transBarrierFence(SPIRVInstruction *mb, BasicBlock *bb
     SPIRVWord memScope = getIntVal(memB->getOpValue(0));
     SPIRVWord memSema = getIntVal(memB->getOpValue(1));
 
-    barrier = transMemFence(bb, memSema, memScope);
-  } else if (mb->getOpCode() == OpControlBarrier) {
+    transMemFence(bb, memSema, memScope);
+    return;
+  }
+
+  if (mb->getOpCode() == OpControlBarrier) {
     auto ctlB = static_cast<SPIRVControlBarrier *>(mb);
 
     SPIRVWord execScope = getIntVal(ctlB->getExecScope());
     SPIRVWord memSema = getIntVal(ctlB->getMemSemantic());
     SPIRVWord memScope = getIntVal(ctlB->getMemScope());
 
-    barrier = transBarrier(bb, execScope, memSema, memScope);
-  } else
-    llvm_unreachable("Invalid instruction");
+    // Normalize the ordering semantics. Section 9.6 ("Shader Memory Access
+    // Ordering") of the Vulkan 1.3.285 specification says:
+    //
+    //    "Sequentially consistent atomics and barriers are not supported and SequentiallyConsistent is treated as
+    //    AcquireRelease. SequentiallyConsistent should not be used."
+    //
+    // Release semantics are handled by a fence before the barrier, acquire
+    // semantics are handled by a fence after the barrier.
+    if (memSema & (MemorySemanticsAcquireReleaseMask | MemorySemanticsSequentiallyConsistentMask))
+      memSema |= MemorySemanticsReleaseMask | MemorySemanticsAcquireMask;
+    memSema &= ~(MemorySemanticsAcquireReleaseMask | MemorySemanticsSequentiallyConsistentMask);
 
-  if (barrier) {
-    setName(barrier, mb);
+    transMemFence(bb, memSema & ~MemorySemanticsAcquireMask, memScope);
 
-    if (CallInst *call = dyn_cast<CallInst>(barrier))
-      setAttrByCalledFunc(call);
+    switch (execScope) {
+    case ScopeCrossDevice:
+    case ScopeQueueFamilyKHR:
+    case ScopeDevice:
+      // We cannot implement control barriers at these scopes, but apparently a spec oversight left them as valid
+      // and at least some version(s) of Doom4 actually had them. We'll just treat them like workgroup barriers.
+    case ScopeWorkgroup:
+      getBuilder()->CreateBarrier();
+      break;
+
+    case ScopeSubgroup:
+      getBuilder()->CreateIntrinsic(Intrinsic::amdgcn_wave_barrier, {}, {});
+      break;
+
+    case ScopeShaderCallKHR:
+    case ScopeInvocation:
+      /* Noop */
+      break;
+
+    default:
+      llvm_unreachable("unsupported execution scope on OpControlBarrier");
+    }
+
+    transMemFence(bb, memSema & ~MemorySemanticsReleaseMask, memScope);
+    return;
   }
 
-  return barrier;
+  llvm_unreachable("Invalid instruction");
 }
 
 llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *v) {
@@ -10594,12 +10625,12 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
     // Function declaration
     if (v->getOpCode() == OpFunction) {
       if (static_cast<const SPIRVFunction *>(v)->getNumBasicBlock() == 0)
-        return GlobalValue::ExternalLinkage;
+        return GlobalValue::WeakAnyLinkage;
     }
     // Variable declaration
     if (v->getOpCode() == OpVariable) {
       if (static_cast<const SPIRVVariable *>(v)->getInitializer() == 0)
-        return GlobalValue::ExternalLinkage;
+        return GlobalValue::WeakAnyLinkage;
     }
     // Definition
     return GlobalValue::AvailableExternallyLinkage;
@@ -10610,22 +10641,7 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
       // Tentative definition
       return GlobalValue::CommonLinkage;
   }
-  return GlobalValue::ExternalLinkage;
-}
-
-llvm::Function *SPIRVToLLVM::createLibraryEntryFunc() {
-  auto builder = getBuilder();
-  FunctionType *funcTy = FunctionType::get(builder->getVoidTy(), {}, false);
-  auto func = Function::Create(funcTy, GlobalValue::ExternalLinkage, "libraryEntry", m_m);
-  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-  builder->SetInsertPoint(entryBlock);
-  builder->CreateRetVoid();
-  std::vector<Metadata *> execModelMDs;
-  execModelMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(builder->getInt32Ty(), ExecutionModelGLCompute)));
-  auto execModelMdNode = MDNode::get(*m_context, execModelMDs);
-  func->addMetadata(gSPIRVMD::ExecutionModel, *execModelMdNode);
-  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-  return func;
+  return GlobalValue::WeakAnyLinkage;
 }
 
 PipelineContext *SPIRVToLLVM::getPipelineContext() const {
@@ -10879,6 +10895,11 @@ void SPIRVToLLVM::insertScratchBoundsChecks(SPIRVValue *memOp, const ScratchBoun
   }
 }
 
+bool SPIRVToLLVM::isRayQueryCommittedIntersection(SPIRVValue *bv) {
+  auto spvInterSect = static_cast<SPIRVConstant *>(bv);
+  return spvInterSect->getZExtIntValue() == RayQueryIntersectionRayQueryCommittedIntersectionKHR;
+}
+
 void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
   auto llpcContext = static_cast<Llpc::Context *>(m_context);
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
@@ -10968,7 +10989,7 @@ void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
             auto output = cast<GlobalVariable>(getTranslatedValue(bv, nullptr, nullptr));
             MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
             assert(metaNode);
-            auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+            auto elemMeta = mdconst::extract<Constant>(metaNode->getOperand(0));
             // Find the innermost array-element
             auto elemTy = bt;
             uint64_t elemCount = 0;

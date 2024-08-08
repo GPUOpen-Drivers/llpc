@@ -210,6 +210,10 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
     return "MultiDispatchInfo";
   case ShaderInput::PrimMask:
     return "PrimMask";
+  case ShaderInput::CollisionWaveId:
+    return "CollisionWaveId";
+  case ShaderInput::ProvokingVtxInfo:
+    return "ProvokingVtxInfo";
   case ShaderInput::OffChipLdsBase:
     return "OffChipLdsBase";
   case ShaderInput::StreamOutInfo:
@@ -232,8 +236,6 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
     return "EsGsOffset";
   case ShaderInput::TfBufferBase:
     return "TfBufferBase";
-  case ShaderInput::ProvokingVtxInfo:
-    return "ProvokingVtxInfo";
   case ShaderInput::VertexId:
     return "VertexId";
   case ShaderInput::RelVertexId:
@@ -497,7 +499,8 @@ static const ShaderInputDesc GsSgprInputs[] = {
 // SGPRs: FS
 static const ShaderInputDesc FsSgprInputs[] = {
     {ShaderInput::PrimMask, offsetof(InterfaceData, entryArgIdxs.fs.primMask), true},
-    {ShaderInput::ProvokingVtxInfo, offsetof(InterfaceData, entryArgIdxs.fs.provokingVtxInfo), false},
+    {ShaderInput::CollisionWaveId, offsetof(InterfaceData, entryArgIdxs.fs.collisionWaveId)},
+    {ShaderInput::ProvokingVtxInfo, offsetof(InterfaceData, entryArgIdxs.fs.provokingVtxInfo)},
 };
 
 // SGPRs: CS
@@ -556,7 +559,7 @@ static const ShaderInputDesc FsVgprInputs[] = {
     {ShaderInput::LinearInterpSample, offsetof(InterfaceData, entryArgIdxs.fs.linearInterp.sample), true},
     {ShaderInput::LinearInterpCenter, offsetof(InterfaceData, entryArgIdxs.fs.linearInterp.center), true},
     {ShaderInput::LinearInterpCentroid, offsetof(InterfaceData, entryArgIdxs.fs.linearInterp.centroid), true},
-    {ShaderInput::LineStipple, 0, true},
+    {ShaderInput::LineStipple, offsetof(InterfaceData, entryArgIdxs.fs.lineStipple), true},
     {ShaderInput::FragCoordX, offsetof(InterfaceData, entryArgIdxs.fs.fragCoord.x), true},
     {ShaderInput::FragCoordY, offsetof(InterfaceData, entryArgIdxs.fs.fragCoord.y), true},
     {ShaderInput::FragCoordZ, offsetof(InterfaceData, entryArgIdxs.fs.fragCoord.z), true},
@@ -629,6 +632,11 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
         }
       }
     }
+    break;
+  case ShaderStage::Fragment:
+    if (pipelineState->getTargetInfo().getGfxIpVersion().major < 11 &&
+        pipelineState->getShaderModes()->getFragmentShaderMode().enablePops)
+      getShaderInputUsage(shaderStage, ShaderInput::CollisionWaveId)->enable();
     break;
   default:
     break;

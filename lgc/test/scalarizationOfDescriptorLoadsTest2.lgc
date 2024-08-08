@@ -17,12 +17,12 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(4) poison, i64 [[TMP2]]
 ; CHECK-NEXT:    [[TMP6:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP5]], align 16, !invariant.load [[META16:![0-9]+]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = bitcast <4 x i32> [[TMP6]] to <4 x float>
-; CHECK-NEXT:    [[TMP14:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP3]], align 32, !invariant.load [[META16]]
+; CHECK-NEXT:    [[TMP14:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP3]], align 4, !invariant.load [[META16]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP1]])
 ; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP8]], i32 [[TMP1]])
 ; CHECK-NEXT:    [[TMP10:%.*]] = sext i32 [[TMP9]] to i64
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(4) poison, i64 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP11]], align 32, !invariant.load [[META16]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP11]], align 4, !invariant.load [[META16]]
 ; CHECK-NEXT:    [[TMP13:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.last.use.v8i32(i32 [[TMP8]], <8 x i32> [[TMP12]])
 ; CHECK-NEXT:    call void @llvm.amdgcn.image.store.1d.v4f32.i32(<4 x float> [[TMP7]], i32 15, i32 1, <8 x i32> [[TMP13]], i32 0, i32 0)
 ; CHECK-NEXT:    ret void

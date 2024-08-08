@@ -791,6 +791,8 @@ typedef SPIRVInstNoOperand<OpUnreachable> SPIRVUnreachable;
 typedef SPIRVInstNoOperand<OpKill> SPIRVKill;
 typedef SPIRVInstNoOperand<OpDemoteToHelperInvocationEXT> SPIRVDemoteToHelperInvocationEXT;
 typedef SPIRVInstNoOperand<OpTerminateInvocation> SPIRVTerminateInvocation;
+typedef SPIRVInstNoOperand<OpBeginInvocationInterlockEXT> SPIRVBeginInvocationInterlockEXT;
+typedef SPIRVInstNoOperand<OpEndInvocationInterlockEXT> SPIRVEndInvocationInterlockEXT;
 
 class SPIRVReturnValue : public SPIRVInstruction {
 public:

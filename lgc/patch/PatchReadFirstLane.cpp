@@ -536,7 +536,7 @@ void ReadFirstLaneOptimizer::applyReadFirstLane(Instruction *inst, BuilderBase &
   if (isFloat)
     newInst = builder.CreateBitCast(inst, builder.getInt32Ty());
 
-  Value *readFirstLane = builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, newInst);
+  Value *readFirstLane = builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, newInst);
 
   Value *replaceInst = nullptr;
   if (isFloat) {

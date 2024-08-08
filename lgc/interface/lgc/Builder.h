@@ -919,6 +919,9 @@ public:
   // Get address space of constant memory.
   static unsigned getAddrSpaceConst();
 
+  // Get address space of global memory.
+  static unsigned getAddrSpaceGlobal();
+
   // Get address space of local (thread-global) memory.
   static unsigned getAddrSpaceLocal();
 

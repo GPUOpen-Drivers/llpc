@@ -16,6 +16,7 @@ option(LLVMRAYTRACING_BUILD_TESTS "Build raytracing tests")
 add_llvm_library(LLVMRaytracing
   lib/CleanupContinuations.cpp
   lib/Continuations.cpp
+  lib/ContinuationsLint.cpp
   lib/CpsStackLowering.cpp
   lib/DXILContIntrinsicPrepare.cpp
   lib/DXILContLgcRtOpConverter.cpp
@@ -24,17 +25,18 @@ add_llvm_library(LLVMRaytracing
   lib/GpurtContext.cpp
   lib/GpurtDialect.cpp
   lib/LegacyCleanupContinuations.cpp
+  lib/ContinuationsStatsReport.cpp
   lib/LgcCpsDialect.cpp
+  lib/LgcCpsJumpInliner.cpp
   lib/LgcIlCpsDialect.cpp
   lib/LgcRtDialect.cpp
   lib/LgcRtqDialect.cpp
   lib/LowerAwait.cpp
+  lib/LowerRayQuery.cpp
   lib/LowerRaytracingPipeline.cpp
   lib/PassRegistry.inc
   lib/PayloadAccessQualifiers.cpp
-  lib/RegisterBuffer.cpp
   lib/RemoveTypesMetadata.cpp
-  lib/TypesMetadata.cpp
 
   DEPENDS
   intrinsics_gen

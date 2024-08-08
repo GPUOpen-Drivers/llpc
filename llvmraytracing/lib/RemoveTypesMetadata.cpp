@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -23,9 +23,9 @@
  *
  **********************************************************************************************************************/
 
-//===- RemoveTypesMetadata.cpp - Erase !types metadata --------------------===//
+//===- RemoveTypesMetadata.cpp - Erase !pointeetys metadata ---------------===//
 //
-// A pass that removes !types metadata from functions.
+// A pass that removes !pointeetys metadata from functions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -37,15 +37,13 @@ using namespace llvm;
 
 #define DEBUG_TYPE "remove-types-metadata"
 
-llvm::PreservedAnalyses
-RemoveTypesMetadataPass::run(llvm::Module &M,
-                             llvm::ModuleAnalysisManager &AnalysisManager) {
+llvm::PreservedAnalyses RemoveTypesMetadataPass::run(llvm::Module &M, llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run remove-types-metadata pass\n");
 
   bool Changed = false;
   for (Function &F : M) {
-    if (F.hasMetadata("types")) {
-      F.setMetadata("types", nullptr);
+    if (F.hasMetadata("pointeetys")) {
+      F.setMetadata("pointeetys", nullptr);
       Changed = true;
     }
   }

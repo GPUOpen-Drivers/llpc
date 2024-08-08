@@ -31,7 +31,12 @@
 #pragma once
 
 #include "llpcSpirvLower.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/IR/PassManager.h"
+
+namespace llvm {
+class Value;
+} // namespace llvm
 
 namespace Llpc {
 

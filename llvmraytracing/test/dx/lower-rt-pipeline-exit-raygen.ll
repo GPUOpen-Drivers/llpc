@@ -15,18 +15,20 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 @"\01?Scene@@3URaytracingAccelerationStructure@@A" = external constant %dx.types.Handle, align 4
 @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A" = external constant %dx.types.Handle, align 4
 
-declare void @continuation.waitContinue(i64, i64, ...) noreturn
+declare void @lgc.ilcps.waitContinue(...) noreturn
 
-declare !types !24 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data)
+declare !pointeetys !24 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data)
 
-define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+declare !pointeetys !27 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
+
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !{%struct.DispatchSystemData poison} {
   %dispatchPayloadPtr = getelementptr inbounds %struct.DispatchSystemData, ptr %data, i32 0, i32 0
   %dispatchPayload = load <3 x i32>, ptr %dispatchPayloadPtr, align 4
   %deadLaneDispatchPayload = insertelement <3 x i32> %dispatchPayload, i32 -11, i32 0
   %systemData = insertvalue %struct.SystemData poison, <3 x i32> %deadLaneDispatchPayload, 0, 0
   %addrSuffix = load i32, ptr %data, align 4
   %addr = zext i32 %addrSuffix to i64
-  call void @continuation.waitContinue(i64 %addr, i64 -1, %struct.SystemData %systemData)
+  call void @lgc.ilcps.waitContinue(i64 %addr, i64 -1, %struct.SystemData %systemData)
   unreachable
 }
 
@@ -69,18 +71,21 @@ attributes #0 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="fa
 !21 = !{void ()* @MyRayGen, !"MyRayGen", null, null, !22}
 !22 = !{i32 8, i32 7, i32 5, !23}
 !23 = !{i32 0}
-!24 = !{!"function", i32 poison, !25}
+!24 = !{%struct.DispatchSystemData poison}
 !25 = !{i32 0, %struct.DispatchSystemData poison}
+!26 = !{i32 0, %struct.TraversalData poison}
+!27 = !{%struct.TraversalData poison}
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyRayGen(
 ; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR1:[0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META16]] !continuation [[META19:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DISPATCHPAYLOAD_I:%.*]] = load <3 x i32>, ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DEADLANEDISPATCHPAYLOAD_I:%.*]] = insertelement <3 x i32> [[DISPATCHPAYLOAD_I]], i32 -11, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEMDATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] poison, <3 x i32> [[DEADLANEDISPATCHPAYLOAD_I]], 0, 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ADDRSUFFIX_I:%.*]] = load i32, ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ADDR_I:%.*]] = zext i32 [[ADDRSUFFIX_I]] to i64
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @continuation.waitContinue(i64 [[ADDR_I]], i64 -1, [[STRUCT_SYSTEMDATA]] [[SYSTEMDATA_I]]) #[[ATTR3:[0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.ilcps.waitContinue(i64 [[ADDR_I]], i64 -1, [[STRUCT_SYSTEMDATA]] [[SYSTEMDATA_I]]) #[[ATTR3:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE:       _cont_ExitRayGen.exit:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void

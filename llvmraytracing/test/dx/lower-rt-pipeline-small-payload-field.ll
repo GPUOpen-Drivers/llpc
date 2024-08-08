@@ -2,7 +2,7 @@
 ; Test copying of fields between local and global payload whose size
 ; is not a multiple of i32s, requiring copies at a smaller granularity
 ; for at least a suffix of the fields.
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S %s --lint-abort-on-error | FileCheck %s
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error | FileCheck %s
 
 target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
@@ -26,21 +26,18 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 
 ; Function Attrs: nounwind
-define void @MissPAQ(%struct.PAQPayload* noalias nocapture %payload) #0 !types !17 {
+define void @MissPAQ(%struct.PAQPayload* noalias nocapture %payload) #0 !pointeetys !17 {
   %1 = getelementptr inbounds %struct.PAQPayload, %struct.PAQPayload* %payload, i32 0, i32 1
   store i16 17, i16* %1, align 4
   ret void
 }
 
 ; Function Attrs: nounwind
-define void @MissNoPAQ(%struct.NoPAQPayload* noalias nocapture %payload) #0 !types !31 {
+define void @MissNoPAQ(%struct.NoPAQPayload* noalias nocapture %payload) #0 !pointeetys !31 {
   %1 = getelementptr inbounds %struct.NoPAQPayload, %struct.NoPAQPayload* %payload, i32 0, i32 1
   store i16 17, i16* %1, align 4
   ret void
 }
-
-; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_cont_SetupRayGen() #1
 
 ; Function Attrs: alwaysinline
 declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #1
@@ -52,27 +49,29 @@ declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemD
 declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #1
 
 ; Function Attrs: alwaysinline
-declare !types !19 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #1
+declare !pointeetys !19 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #1
 
 ; Function Attrs: alwaysinline
-declare !types !21 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %struct.BuiltInTriangleIntersectionAttributes) #1
+declare !pointeetys !21 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %struct.BuiltInTriangleIntersectionAttributes) #1
 
 ; Function Attrs: alwaysinline
-declare !types !22 i1 @_cont_IsEndSearch(%struct.TraversalData*) #1
+declare !pointeetys !22 i1 @_cont_IsEndSearch(%struct.TraversalData*) #1
 
 ; Function Attrs: nounwind memory(read)
-declare !types !24 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #2
+declare !pointeetys !24 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #2
 
 ; Function Attrs: nounwind memory(none)
-declare !types !26 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #3
+declare !pointeetys !26 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #3
 
 ; Function Attrs: nounwind memory(none)
-declare !types !28 void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData*) #3
+declare !pointeetys !28 void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData*) #3
 
 ; Function Attrs: alwaysinline
-define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #1 !types !30 {
+define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #1 !pointeetys !30 {
   ret i32 5
 }
+
+declare !pointeetys !31 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
 attributes #0 = { nounwind }
 attributes #1 = { alwaysinline }
@@ -104,131 +103,160 @@ attributes #3 = { nounwind memory(none) }
 !14 = !{void (%struct.PAQPayload*)* @MissPAQ, !"MissPAQ", null, null, !15}
 !15 = !{i32 8, i32 11, i32 6, i32 24, i32 5, !16}
 !16 = !{i32 0}
-!17 = !{!"function", !"void", !18}
+!17 = !{%struct.PAQPayload poison}
 !18 = !{i32 0, %struct.PAQPayload poison}
-!19 = !{!"function", %struct.BuiltInTriangleIntersectionAttributes poison, !20}
+!19 = !{%struct.SystemData poison}
 !20 = !{i32 0, %struct.SystemData poison}
-!21 = !{!"function", !"void", !20, %struct.BuiltInTriangleIntersectionAttributes poison}
-!22 = !{!"function", i1 poison, !23}
+!21 = !{%struct.SystemData poison}
+!22 = !{%struct.TraversalData poison}
 !23 = !{i32 0, %struct.TraversalData poison}
-!24 = !{!"function", i32 poison, !20, !25}
+!24 = !{null, %struct.SystemData poison, %struct.HitData poison}
 !25 = !{i32 0, %struct.HitData poison}
-!26 = !{!"function", !"void", !27}
+!26 = !{%struct.DispatchSystemData poison}
 !27 = !{i32 0, %struct.DispatchSystemData poison}
-!28 = !{!"function", !"void", !29}
+!28 = !{%struct.AnyHitTraversalData poison}
 !29 = !{i32 0, %struct.AnyHitTraversalData poison}
-!30 = !{!"function", i32 poison, !27}
-!31 = !{!"function", !"void", !32}
+!30 = !{%struct.DispatchSystemData poison}
+!31 = !{%struct.NoPAQPayload poison}
 !32 = !{i32 0, %struct.NoPAQPayload poison}
 !33 = !{void (%struct.NoPAQPayload*)* @MissNoPAQ, !"MissNoPAQ", null, null, !34}
 !34 = !{i32 8, i32 11, i32 6, i32 24, i32 5, !35}
 !35 = !{i32 0}
 
 ; CHECK-LABEL: define %struct.DispatchSystemData @MissPAQ(
-; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META21:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] !continuation [[META23:![0-9]+]] {
+; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [16 x i32] [[PADDING:%.*]], [11 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META21:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] !continuation [[META23:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [11 x i32], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
+; CHECK-NEXT:    store [11 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 [[TMP7]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 1
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    store i32 [[TMP10]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 1
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 1
+; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP19]], align 4
 ; CHECK-NEXT:    store i32 [[TMP12]], ptr [[TMP11]], align 4
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 2
-; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 2
+; CHECK-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP25]], align 4
 ; CHECK-NEXT:    store i32 [[TMP14]], ptr [[TMP13]], align 4
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 3
-; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 3
+; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP34]], align 4
 ; CHECK-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 1
 ; CHECK-NEXT:    store i16 17, ptr [[TMP17]], align 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 1
 ; CHECK-NEXT:    [[TMP21:%.*]] = load i8, ptr [[TMP18]], align 1
-; CHECK-NEXT:    store i8 [[TMP21]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 1
+; CHECK-NEXT:    store i8 [[TMP21]], ptr [[TMP20]], align 1
+; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr [[TMP20]], i32 1
 ; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr [[TMP18]], i32 1
 ; CHECK-NEXT:    [[TMP23:%.*]] = load i8, ptr [[TMP22]], align 1
-; CHECK-NEXT:    store i8 [[TMP23]], ptr addrspace(20) getelementptr (i8, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), i32 1), align 1
+; CHECK-NEXT:    store i8 [[TMP23]], ptr [[TMP35]], align 1
 ; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 2
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 2
 ; CHECK-NEXT:    [[TMP27:%.*]] = load i32, ptr [[TMP24]], align 4
-; CHECK-NEXT:    store i32 [[TMP27]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 2), align 4
+; CHECK-NEXT:    store i32 [[TMP27]], ptr [[TMP26]], align 4
+; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr i8, ptr [[TMP26]], i32 4
 ; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr [[TMP24]], i32 4
 ; CHECK-NEXT:    [[TMP29:%.*]] = load i8, ptr [[TMP28]], align 1
-; CHECK-NEXT:    store i8 [[TMP29]], ptr addrspace(20) getelementptr (i8, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 2), i32 4), align 1
+; CHECK-NEXT:    store i8 [[TMP29]], ptr [[TMP37]], align 1
+; CHECK-NEXT:    [[TMP38:%.*]] = getelementptr i8, ptr [[TMP26]], i32 5
 ; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr i8, ptr [[TMP24]], i32 5
 ; CHECK-NEXT:    [[TMP31:%.*]] = load i8, ptr [[TMP30]], align 1
-; CHECK-NEXT:    store i8 [[TMP31]], ptr addrspace(20) getelementptr (i8, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 2), i32 5), align 1
+; CHECK-NEXT:    store i8 [[TMP31]], ptr [[TMP38]], align 1
 ; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP33:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP32]], align 4
-; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP33]]), !continuation.registercount [[META22]]
+; CHECK-NEXT:    [[TMP36:%.*]] = load [11 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP33]], [16 x i32] poison, [11 x i32] [[TMP36]]), !continuation.registercount [[META22]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define %struct.DispatchSystemData @MissNoPAQ(
-; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage [[META21]] !continuation.registercount [[META19:![0-9]+]] !continuation [[META24:![0-9]+]] {
+; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [16 x i32] [[PADDING:%.*]], [14 x i32] [[PAYLOAD:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage [[META21]] !continuation.registercount [[META19:![0-9]+]] !continuation [[META24:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
+; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [14 x i32], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_NOPAQPAYLOAD:%.*]], align 8
+; CHECK-NEXT:    store [14 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_NOPAQPAYLOAD]], ptr [[TMP2]], i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 [[TMP5]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 1
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
-; CHECK-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP17]], align 4
+; CHECK-NEXT:    store i32 [[TMP9]], ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
-; CHECK-NEXT:    store i32 [[TMP9]], ptr [[TMP8]], align 4
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i32, ptr [[TMP17]], i32 1
+; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP23]], align 4
+; CHECK-NEXT:    store i32 [[TMP11]], ptr [[TMP8]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 2
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
-; CHECK-NEXT:    store i32 [[TMP11]], ptr [[TMP10]], align 4
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[TMP17]], i32 2
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP26]], align 4
+; CHECK-NEXT:    store i32 [[TMP15]], ptr [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 3
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
-; CHECK-NEXT:    store i32 [[TMP13]], ptr [[TMP12]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[TMP17]], i32 3
+; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP16]], align 4
+; CHECK-NEXT:    store i32 [[TMP19]], ptr [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 4
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
-; CHECK-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
+; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr [[TMP17]], i32 4
+; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP28]], align 4
+; CHECK-NEXT:    store i32 [[TMP21]], ptr [[TMP14]], align 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 5
-; CHECK-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
-; CHECK-NEXT:    store i32 [[TMP19]], ptr [[TMP18]], align 4
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP17]], i32 5
+; CHECK-NEXT:    [[TMP54:%.*]] = load i32, ptr [[TMP22]], align 4
+; CHECK-NEXT:    store i32 [[TMP54]], ptr [[TMP18]], align 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 6
-; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
-; CHECK-NEXT:    store i32 [[TMP21]], ptr [[TMP20]], align 4
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i32, ptr [[TMP17]], i32 6
+; CHECK-NEXT:    [[TMP55:%.*]] = load i32, ptr [[TMP31]], align 4
+; CHECK-NEXT:    store i32 [[TMP55]], ptr [[TMP20]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_NOPAQPAYLOAD]], ptr [[TMP2]], i32 0, i32 1
 ; CHECK-NEXT:    store i16 17, ptr [[TMP24]], align 4
 ; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr inbounds [[STRUCT_NOPAQPAYLOAD]], ptr [[TMP2]], i32 0
-; CHECK-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 4
-; CHECK-NEXT:    store i32 [[TMP26]], ptr addrspace(20) @PAYLOAD, align 4
+; CHECK-NEXT:    [[TMP29:%.*]] = load i32, ptr [[TMP25]], align 4
+; CHECK-NEXT:    store i32 [[TMP29]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
 ; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i32, ptr [[TMP25]], i32 1
-; CHECK-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP27]], align 4
-; CHECK-NEXT:    store i32 [[TMP28]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 7), align 4
-; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 1
-; CHECK-NEXT:    [[TMP30:%.*]] = load i32, ptr [[TMP29]], align 4
-; CHECK-NEXT:    store i32 [[TMP30]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 8), align 4
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 2
-; CHECK-NEXT:    [[TMP32:%.*]] = load i32, ptr [[TMP31]], align 4
-; CHECK-NEXT:    store i32 [[TMP32]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 9), align 4
-; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 3
-; CHECK-NEXT:    [[TMP34:%.*]] = load i32, ptr [[TMP33]], align 4
-; CHECK-NEXT:    store i32 [[TMP34]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 10), align 4
-; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 4
-; CHECK-NEXT:    [[TMP40:%.*]] = load i32, ptr [[TMP39]], align 4
-; CHECK-NEXT:    store i32 [[TMP40]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 11), align 4
-; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 5
+; CHECK-NEXT:    [[TMP32:%.*]] = load i32, ptr [[TMP27]], align 4
+; CHECK-NEXT:    store i32 [[TMP32]], ptr [[TMP30]], align 4
+; CHECK-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i32, ptr [[TMP30]], i32 1
+; CHECK-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 1
+; CHECK-NEXT:    [[TMP35:%.*]] = load i32, ptr [[TMP34]], align 4
+; CHECK-NEXT:    store i32 [[TMP35]], ptr [[TMP33]], align 4
+; CHECK-NEXT:    [[TMP36:%.*]] = getelementptr inbounds i32, ptr [[TMP30]], i32 2
+; CHECK-NEXT:    [[TMP37:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 2
 ; CHECK-NEXT:    [[TMP38:%.*]] = load i32, ptr [[TMP37]], align 4
-; CHECK-NEXT:    store i32 [[TMP38]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 12), align 4
-; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 6
-; CHECK-NEXT:    [[TMP36:%.*]] = load i32, ptr [[TMP35]], align 4
-; CHECK-NEXT:    store i32 [[TMP36]], ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 13), align 4
+; CHECK-NEXT:    store i32 [[TMP38]], ptr [[TMP36]], align 4
+; CHECK-NEXT:    [[TMP39:%.*]] = getelementptr inbounds i32, ptr [[TMP30]], i32 3
+; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 3
+; CHECK-NEXT:    [[TMP41:%.*]] = load i32, ptr [[TMP40]], align 4
+; CHECK-NEXT:    store i32 [[TMP41]], ptr [[TMP39]], align 4
+; CHECK-NEXT:    [[TMP42:%.*]] = getelementptr inbounds i32, ptr [[TMP30]], i32 4
+; CHECK-NEXT:    [[TMP43:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 4
+; CHECK-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4
+; CHECK-NEXT:    store i32 [[TMP44]], ptr [[TMP42]], align 4
+; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr inbounds i32, ptr [[TMP30]], i32 5
+; CHECK-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 5
+; CHECK-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP52]], align 4
+; CHECK-NEXT:    store i32 [[TMP47]], ptr [[TMP51]], align 4
+; CHECK-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[TMP30]], i32 6
+; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr [[TMP27]], i32 6
+; CHECK-NEXT:    [[TMP50:%.*]] = load i32, ptr [[TMP49]], align 4
+; CHECK-NEXT:    store i32 [[TMP50]], ptr [[TMP48]], align 4
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP46:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP45]], align 4
-; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP46]]), !continuation.registercount [[META19]]
+; CHECK-NEXT:    [[TMP53:%.*]] = load [14 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP46]], [16 x i32] poison, [14 x i32] [[TMP53]]), !continuation.registercount [[META19]]
 ; CHECK-NEXT:    unreachable
 ;
 ;

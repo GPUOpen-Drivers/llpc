@@ -61,6 +61,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
+namespace CompilerUtils {
+
 class TypeLowering;
 
 /// Given a type, check if it should be replaced.
@@ -169,14 +171,16 @@ private:
   llvm::SmallVector<std::function<ConstantTypeLoweringFn>> m_constantRules;
 
   /// Cache mappings of types (including no-op mappings).
-  compilerutils::LoweringPointerTupleMap<llvm::Type *, llvm::Type *, false> m_typeConversions;
+  CompilerUtils::LoweringPointerTupleMap<llvm::Type *, llvm::Type *, false> m_typeConversions;
 
   llvm::IRBuilder<> m_builder;
 
   /// Map original values to type-converted values.
-  compilerutils::LoweringPointerTupleMap<llvm::Value *, llvm::Value *, true> m_valueMap;
+  CompilerUtils::LoweringPointerTupleMap<llvm::Value *, llvm::Value *, true> m_valueMap;
 
   std::vector<std::pair<llvm::PHINode *, llvm::SmallVector<llvm::PHINode *>>> m_phis;
   std::vector<llvm::Instruction *> m_instructionsToErase;
   llvm::SmallVector<llvm::Function *> m_functionsToErase;
 };
+
+} // namespace CompilerUtils

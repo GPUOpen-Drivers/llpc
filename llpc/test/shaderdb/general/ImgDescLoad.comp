@@ -5,21 +5,9 @@
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: [[IMG_DESC:%[0-9]*]] = load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 32, !invariant.load
-; SHADERTEST: [[SMP_DESC:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 16, !invariant.load
-; SHADERTEST: %{{[0-9]*}} = extractelement <4 x i32> [[SMP_DESC]], i64 0
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.readfirstlane(i32 %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = insertelement <4 x i32> poison, i32 %{{[0-9]*}}, i64 0
-; SHADERTEST: %{{[0-9]*}} = extractelement <4 x i32> [[SMP_DESC]], i64 1
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.readfirstlane(i32 %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = insertelement <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i64 1
-; SHADERTEST: %{{[0-9]*}} = extractelement <4 x i32> [[SMP_DESC]], i64 2
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.readfirstlane(i32 %{{[0-9]*}})
-; SHADERTEST: %{{[0-9]*}} = insertelement <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i64 2
-; SHADERTEST: %{{[0-9]*}} = extractelement <4 x i32> [[SMP_DESC]], i64 3
-; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.readfirstlane(i32 %{{[0-9]*}})
-; SHADERTEST: [[NEW_SMP_DESC:%[0-9]*]] = insertelement <4 x i32> %{{[0-9]*}}, i32 %{{[0-9]*}}, i64 3
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.l.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[IMG_DESC]], <4 x i32> [[NEW_SMP_DESC]], i1 false, i32 0, i32 0)
+; SHADERTEST: [[IMG_DESC:%[0-9]*]] = load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 4, !invariant.load !12
+; SHADERTEST: [[SMP_DESC:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 4, !invariant.load !12
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.l.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[IMG_DESC]], <4 x i32> [[SMP_DESC]], i1 false, i32 0, i32 0)
 */
 // END_SHADERTEST
 

@@ -40,7 +40,9 @@ def LgcRtqDialect : Dialect {
 
 def V2F32 : TgConstant<(FixedVectorType F32, 2)>, Type;
 def V3F32 : TgConstant<(FixedVectorType F32, 3)>, Type;
+def A3V3F32 : TgConstant<(ArrayType V3F32, 3)>, Type;
 def A4V3F32 : TgConstant<(ArrayType V3F32, 4)>, Type;
+def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 
 class LgcRtqOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcRtqDialect, mnemonic_, traits_ # [NoUnwind, WillReturn]>;
@@ -368,5 +370,26 @@ def IntersectionWorldToObjectOp : LgcRtqOp<"intersection.world.to.object", [Memo
     If `committed` is false, behavior is undefined if the most recent use of `proceed` returned false.
 
     If `committed` is true, behavior is undefined if there is no currently committed intersection.
+  }];
+}
+
+def GepOpaqueOp: LgcRtqOp<"gep.opaque", [Memory<[(read ArgMem)]>]> {
+  let arguments = (ins type:$base_type, AttrI1:$inbound, PointerType:$base_pointer, varargs:$offsets);
+  let results = (outs PrivatePointer:$result);
+
+  let summary = "GEP a rayquery pointer from a base object pointer";
+  let description = [{
+    Returns a opaque rayquery pointer from a base object pointer through gep array of indices
+  }];
+}
+
+// =====================================================================================================================
+def IntersectionTriangleVertexPositionsOp : LgcRtqOp<"intersection.triangle.vertex.position", [Memory<[(read ArgMem)]>]> {
+  let arguments = (ins PointerType:$ray_query, AttrI1:$committed);
+  let results = (outs A3V3F32:$result);
+
+  let summary = "Fetch the triangle vertex points";
+  let description = [{
+    Returns the intersected vec3[3] triangle vertices from the ray query.
   }];
 }

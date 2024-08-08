@@ -352,6 +352,9 @@ public:
   // Checks if SW-emulated stream-out should be enabled
   bool enableSwXfb();
 
+  // Checks if we export vertex/primitive attributes by parameter export instruction
+  bool exportAttributeByExportInstruction() const;
+
   // Gets resource usage of the specified shader stage
   ResourceUsage *getShaderResourceUsage(ShaderStageEnum shaderStage);
 
@@ -518,7 +521,7 @@ public:
     llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned *>(&value), sizeof(value) / sizeof(unsigned));
     unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
     for (unsigned index = 0; index < count; ++index)
-      values[index] = llvm::mdconst::dyn_extract<llvm::ConstantInt>(metaNode->getOperand(index))->getZExtValue();
+      values[index] = llvm::mdconst::extract<llvm::ConstantInt>(metaNode->getOperand(index))->getZExtValue();
     return count;
   }
 

@@ -165,6 +165,12 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeQuadDerivativesKHR:
   case ExecutionModeRequireFullQuadsKHR:
   case ExecutionModeFPFastMathDefault:
+  case ExecutionModePixelInterlockOrderedEXT:
+  case ExecutionModePixelInterlockUnorderedEXT:
+  case ExecutionModeSampleInterlockOrderedEXT:
+  case ExecutionModeSampleInterlockUnorderedEXT:
+  case ExecutionModeShadingRateInterlockOrderedEXT:
+  case ExecutionModeShadingRateInterlockUnorderedEXT:
     return true;
   default:
     return false;
@@ -569,6 +575,9 @@ inline bool isValid(spv::Capability V) {
   case CapabilityGroupNonUniformRotateKHR:
   case CapabilityQuadControlKHR:
   case CapabilityFloatControls2:
+  case CapabilityFragmentShaderSampleInterlockEXT:
+  case CapabilityFragmentShaderShadingRateInterlockEXT:
+  case CapabilityFragmentShaderPixelInterlockEXT:
     return true;
   default:
     return false;

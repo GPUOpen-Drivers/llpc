@@ -162,6 +162,7 @@ PreservedAnalyses PatchInvariantLoads::run(Function &function, FunctionAnalysisM
           case Intrinsic::amdgcn_init_exec_from_input:
           case Intrinsic::invariant_start:
           case Intrinsic::invariant_end:
+          case Intrinsic::assume:
             continue;
           default:
             break;

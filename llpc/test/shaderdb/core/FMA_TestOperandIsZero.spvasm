@@ -1,12 +1,11 @@
 ; Test on fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc --disable-fma=false -v -gfxip=11 %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: call ninf float @llvm.amdgcn.fma.legacy(float %{{.*}}, float %{{.*}}, float %{{.*}})
-; SHADERTEST: call ninf float @llvm.amdgcn.fma.legacy(float %{{.*}}, float %{{.*}}, float %{{.*}})
-; SHADERTEST: call ninf float @llvm.amdgcn.fma.legacy(float %{{.*}}, float %{{.*}}, float %{{.*}})
-; SHADERTEST: AMDLLPC SUCCESS
+; RUN: amdllpc --disable-fma=false -stop-after=lgc-patch-mul-dx9-zero %gfxip -o - %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: @lgc.shader.FS.main(
+; SHADERTEST: call nnan float @llvm.amdgcn.fma.legacy(float {{.*}}, float {{.*}}, float {{.*}})
+; SHADERTEST: call nnan float @llvm.amdgcn.fma.legacy(float {{.*}}, float {{.*}}, float {{.*}})
+; SHADERTEST: call nnan float @llvm.amdgcn.fma.legacy(float {{.*}}, float {{.*}}, float {{.*}})
 ; END_SHADERTEST
 
 ; SPIR-V
@@ -31,9 +30,9 @@
                OpDecorate %b Location 1
                OpDecorate %a Location 0
                OpDecorate %fragColor Location 0
-               OpDecorate %22 FPFastMathMode NotInf
-               OpDecorate %32 FPFastMathMode NotInf
-               OpDecorate %38 FPFastMathMode NotInf
+               OpDecorate %22 FPFastMathMode NotNaN
+               OpDecorate %32 FPFastMathMode NotNaN
+               OpDecorate %38 FPFastMathMode NotNaN
        %void = OpTypeVoid
           %3 = OpTypeFunction %void
       %float = OpTypeFloat 32
@@ -72,7 +71,8 @@
          %37 = OpSelect %float %35 %float_0 %36
          %38 = OpExtInst %float %1 Fma %34 %37 %23
          %39 = OpFAdd %float %38 %22
-               OpStore %d %39
+		 %40 = OpFAdd %float %39 %33
+               OpStore %d %40
          %26 = OpLoad %float %d
          %27 = OpCompositeConstruct %v4float %26 %26 %26 %26
                OpStore %fragColor %27

@@ -68,7 +68,9 @@ enum class ShaderInput : unsigned {
   MultiDispatchInfo, // Multiple dispatch info, include TG_SIZE and etc.
 
   // FS SGPRs
-  PrimMask, // Primitive mask
+  PrimMask,         // Primitive mask
+  CollisionWaveId,  // POPS collision wave ID
+  ProvokingVtxInfo, // Provoking vertex info
 
   // Appears in hardware HS, ES, VS SGPRs
   OffChipLdsBase, // Off-chip LDS buffer base
@@ -90,9 +92,6 @@ enum class ShaderInput : unsigned {
 
   // Unmerged hardware HS SGPRs
   TfBufferBase, // TF buffer base
-
-  // FS SGPRs
-  ProvokingVtxInfo, // Provoking vertex info
 
   FirstVgpr, // Enums less than this are SGPRs
 

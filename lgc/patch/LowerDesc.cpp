@@ -93,12 +93,12 @@ void LowerDesc::visitLoadBufferDesc(LoadBufferDescOp &op) {
   // available in LGC as we don't expect front-end would required such usage.)
   assert(!(flags & Builder::BufferFlagAddress) && "Returning a 64-bit address is unsupported by lgc.load.buffer.desc");
 
-  Value *desc = builder.CreateBufferDesc(op.getDescSet(), op.getBinding(), op.getDescIndex(), flags);
+  Value *desc = builder.CreateBufferDesc(op.getDescSet(), op.getBinding(), op.getDescIndex(), flags, true);
 
   m_toErase.push_back(&op);
 
   // Convert to fat pointer.
-  op.replaceAllUsesWith(builder.create<BufferDescToPtrOp>(desc));
+  op.replaceAllUsesWith(desc);
 }
 
 // =====================================================================================================================
@@ -121,6 +121,6 @@ void LowerDesc::visitLoadStridedBufferDesc(LoadStridedBufferDescOp &op) {
 
   m_toErase.push_back(&op);
 
-  op.replaceAllUsesWith(builder.create<StridedBufferDescToPtrOp>(desc));
+  op.replaceAllUsesWith(desc);
 }
 } // namespace lgc

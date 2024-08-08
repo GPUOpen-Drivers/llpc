@@ -4,7 +4,7 @@
 define i32 @simple(i32 %x) {
 ; CHECK-LABEL: @simple(
 ; CHECK-NEXT:    [[Y:%.*]] = mul i32 [[X:%.*]], 2
-; CHECK-NEXT:    [[R:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[Y]])
+; CHECK-NEXT:    [[R:%.*]] = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 [[Y]])
 ; CHECK-NEXT:    ret i32 [[R]]
 ;
   %y = mul i32 %x, 2
@@ -15,9 +15,9 @@ define i32 @simple(i32 %x) {
 define i32 @simple2(i32 %x) {
 ; CHECK-LABEL: @simple2(
 ; CHECK-NEXT:    [[A:%.*]] = mul i32 [[X:%.*]], 5
-; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[A]])
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 [[A]])
 ; CHECK-NEXT:    [[B:%.*]] = add i32 [[TMP1]], 2
-; CHECK-NEXT:    [[R:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[B]])
+; CHECK-NEXT:    [[R:%.*]] = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 [[B]])
 ; CHECK-NEXT:    ret i32 [[R]]
 ;
   %a = mul i32 %x, 5
@@ -32,8 +32,8 @@ define <2 x i32> @vec2(ptr addrspace(4) %ptr) {
 ; CHECK-NEXT:    [[DESC:%.*]] = load <2 x i32>, ptr addrspace(4) [[PTR_OFS]], align 16
 ; CHECK-NEXT:    [[DESC_0:%.*]] = extractelement <2 x i32> [[DESC]], i32 0
 ; CHECK-NEXT:    [[DESC_1:%.*]] = extractelement <2 x i32> [[DESC]], i32 1
-; CHECK-NEXT:    [[RF_0:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[DESC_0]])
-; CHECK-NEXT:    [[RF_1:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[DESC_1]])
+; CHECK-NEXT:    [[RF_0:%.*]] = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 [[DESC_0]])
+; CHECK-NEXT:    [[RF_1:%.*]] = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 [[DESC_1]])
 ; CHECK-NEXT:    [[OUT_0:%.*]] = insertelement <2 x i32> poison, i32 [[RF_0]], i32 0
 ; CHECK-NEXT:    [[OUT_1:%.*]] = insertelement <2 x i32> [[OUT_0]], i32 [[RF_1]], i32 1
 ; CHECK-NEXT:    ret <2 x i32> [[OUT_1]]

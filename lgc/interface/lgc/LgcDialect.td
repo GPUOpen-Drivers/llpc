@@ -47,7 +47,7 @@ class LgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
 
 def BufferAddrToPtrOp : LgcOp<"buffer.addr.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins I64:$addr);
+  let arguments = (ins I64:$address);
   let results = (outs BufferPointer:$result);
 
   let summary = "convert a buffer address into a buffer fat pointer";
@@ -162,6 +162,26 @@ def LoadStridedBufferDescOp : LgcOp<"load.strided.buffer.desc", [Memory<[]>, Wil
   }];
 }
 
+def BufferLoadDescToPtrOp : LgcOp<"buffer.load.desc.to.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins ConstantPointer:$descPtr, AttrI1:$forceRawView, AttrI1:$isCompact);
+  let results = (outs BufferPointer:$result);
+
+  let summary = "convert a constant buffer pointer to a fat buffer pointer and implicitly do the load";
+  let description = [{
+    Given a constant buffer pointer, load from the pointer and returns a fat buffer pointer to the start of the buffer.
+  }];
+}
+
+def StridedBufferLoadDescToPtrOp : LgcOp<"stride.buffer.load.desc.to.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins ConstantPointer:$descPtr, AttrI1:$forceRawView, AttrI1:$isCompact, I32:$stride);
+  let results = (outs BufferStridedPointer:$result);
+
+  let summary = "convert a constant buffer pointer to a fat strided buffer pointer and implicitly do the load";
+  let description = [{
+    Given a constant buffer pointer, load from the buffer pointer and returns a fat strided buffer descriptor pointer to the start of the buffer.
+  }];
+}
+
 def DebugPrintfOp : LgcOp<"debug.printf", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
   let arguments = (ins ImmutableStringAttr:$format, varargs:$args);
   let results = (outs);
@@ -256,30 +276,19 @@ def GetMeshBuiltinInputOp : LgcOp<"get.mesh.builtin.input", [Memory<[]>, WillRet
   }];
 }
 
-def WriteMeshVertexOutputOp : LgcOp<"write.mesh.vertex.output", [Memory<[]>]> {
-  let arguments = (ins I32:$output_offset, I32:$vertex_index, value:$output_value);
+def WriteMeshOutputOp : LgcOp<"write.mesh.output", [Memory<[]>]> {
+  let arguments = (ins AttrI1:$is_primitive, AttrI32:$location, I32:$location_offset, I32:$component_index, I32:$prim_or_vertex_index, value:$output_value);
   let results = (outs);
 
-  let summary = "Write mesh shader vertex outputs";
+  let summary = "Write mesh shader primitive/vertex outputs";
   let description = [{
-    In the mesh shader, write mesh shader vertex outputs to LDS.
+    In the mesh shader, write mesh shader primitive/vertex outputs to LDS.
 
-    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed vertex.
-    `vertex_index` is the vertex index specifying which vertex to write.
-    `output_value` is the output value to write.
-  }];
-}
-
-def WriteMeshPrimitiveOutputOp : LgcOp<"write.mesh.primitive.output", [Memory<[]>]> {
-  let arguments = (ins I32:$output_offset, I32:$primitive_index, value:$output_value);
-  let results = (outs);
-
-  let summary = "Write mesh shader primitive outputs";
-  let description = [{
-    In the mesh shader, write mesh shader primitive outputs to LDS.
-
-    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed primitive.
-    `primitive_index` is the primitive index specifying which primitive to write.
+    `is_primitive` indicates if this write is for a primitive output or for a vertex output.
+    `location` is the start location of this output.
+    `location_offset` is the relative location offset of this output, used by arrayed outputs.
+    `component_index` is the component index of this output when component addressing is involved.
+    `prim_or_vertex_index` is the primitive/vertex index specifying which primitive/vertex to write.
     `output_value` is the output value to write.
   }];
 }
@@ -367,6 +376,26 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
     - InterpModeCustom to retrieve the attribute of the vertex with the `i32` index `interp_value` (which must be 0, 1,
       or 2). The raw HW vertex index is used, which may be different from the API vertex index; it is up to the user of
       this operation to map between HW and API.
+  }];
+}
+
+def PopsBeginInterlockOp : LgcOp<"pops.begin.interlock", [WillReturn]> {
+  let arguments = (ins);
+  let results = (outs);
+
+  let summary = "begin a POPS critical section";
+  let description = [{
+    Only used in PS to begin a critical section of primitive ordered pixel shading (POPS).
+  }];
+}
+
+def PopsEndInterlockOp : LgcOp<"pops.end.interlock", [WillReturn]> {
+  let arguments = (ins);
+  let results = (outs);
+
+  let summary = "end a POPS critical section";
+  let description = [{
+    Only used in PS to end a critical section of primitive ordered pixel shading (POPS).
   }];
 }
 

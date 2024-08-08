@@ -40,7 +40,6 @@
 #include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerCfgMerges.h"
 #include "llpcSpirvLowerGlobal.h"
-#include "llpcSpirvLowerRayQuery.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "llpcTimerProfiler.h"
@@ -53,6 +52,7 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "lgc/LgcRtqDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/RuntimeContext.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -81,6 +81,7 @@
 
 using namespace lgc;
 using namespace lgc::rt;
+using namespace lgc::rtq;
 using namespace llvm;
 using namespace lgc::cps;
 
@@ -90,8 +91,8 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcCpsDialect,
-                                                         continuations::ContinuationsDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcRtqDialect,
+                                                         LgcCpsDialect, continuations::ContinuationsDialect>(*this);
 
   reset();
 }
@@ -279,7 +280,6 @@ void Context::ensureGpurtLibrary() {
 
   lowerPassMgr->addPass(SpirvLowerCfgMerges());
   lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
-  lowerPassMgr->addPass(SpirvLowerRayQuery(true));
   lowerPassMgr->addPass(AlwaysInlinerPass());
   lowerPassMgr->addPass(SpirvLowerAccessChain());
   lowerPassMgr->addPass(SpirvLowerGlobal());

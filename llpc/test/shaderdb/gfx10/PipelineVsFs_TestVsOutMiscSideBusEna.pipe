@@ -56,6 +56,7 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .kill_enable:    false
 ; SHADERTEST-NEXT:         .mask_export_enable: false
 ; SHADERTEST-NEXT:         .pre_shader_depth_coverage_enable: 0
+; SHADERTEST-NEXT:         .primitive_ordered_pixel_shader: false
 ; SHADERTEST-NEXT:         .stencil_test_val_export_enable: 0
 ; SHADERTEST-NEXT:         .z_export_enable: 0
 ; SHADERTEST-NEXT:         .z_order:        0x1

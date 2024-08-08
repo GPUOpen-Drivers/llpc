@@ -47,7 +47,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
 ; CHECK-NEXT:    [[TMP21:%.*]] = icmp ne i32 [[TMP20]], 0
 ; CHECK-NEXT:    [[TMP22:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP21]])
 ; CHECK-NEXT:    [[TMP23:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP22]], i1 true)
-; CHECK-NEXT:    [[TMP24:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP20]], i32 [[TMP23]])
+; CHECK-NEXT:    [[TMP24:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP20]], i32 [[TMP23]])
 ; CHECK-NEXT:    [[TMP25:%.*]] = icmp eq i32 [[TMP20]], [[TMP24]]
 ; CHECK-NEXT:    [[TMP26:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP25]])
 ; CHECK-NEXT:    [[TMP27:%.*]] = and i32 [[TMP24]], -64

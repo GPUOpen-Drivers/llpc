@@ -1,0 +1,107 @@
+; This test is to check output packing of mesh shader in LDS space. If we treat each location
+; of a mesh shader output as vec4, the LDS usage will exceed HW limitation. But if we pack
+; those outputs tightly in LDS space, the LDS usage will be reduced greatly.
+;
+; In this test, we have 25 vertex outputs and 2 primitive outputs. Further, the mesh shader
+; uses 2500 dwords shared variable. All consumes LDS space. If output packing in LDS space
+; is not performed, the outputs will consume 4 * (25 + 2) * 128 = 13824 dwords. If packing
+; is enabled, the LDS consumption will be reduced to (25 + 2) * 128 = 3456. The effect is
+; noticeable.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: // LLPC mesh shader LDS region info (in dwords) and general info
+
+; SHADERTEST-LABEL: Per-vertex Output                        : offset = 0x0083, size = 0x0C80
+; SHADERTEST-LABEL: Per-primitive Output                     : offset = 0x0D03, size = 0x0100
+
+; SHADERTEST-LABEL: Vertex Outputs Layout (stride = 25, exports = 25):
+; SHADERTEST-LABEL: -- location = 0, components = 1, offset = 0
+; SHADERTEST-LABEL: -- location = 1, components = 1, offset = 1
+; SHADERTEST-LABEL: -- location = 2, components = 1, offset = 2
+; SHADERTEST-LABEL: -- location = 3, components = 1, offset = 3
+; SHADERTEST-LABEL: -- location = 4, components = 1, offset = 4
+; SHADERTEST-LABEL: -- location = 5, components = 1, offset = 5
+; SHADERTEST-LABEL: -- location = 6, components = 1, offset = 6
+; SHADERTEST-LABEL: -- location = 7, components = 1, offset = 7
+; SHADERTEST-LABEL: -- location = 8, components = 1, offset = 8
+; SHADERTEST-LABEL: -- location = 9, components = 1, offset = 9
+; SHADERTEST-LABEL: -- location = 10, components = 1, offset = 10
+; SHADERTEST-LABEL: -- location = 11, components = 1, offset = 11
+; SHADERTEST-LABEL: -- location = 12, components = 1, offset = 12
+; SHADERTEST-LABEL: -- location = 13, components = 1, offset = 13
+; SHADERTEST-LABEL: -- location = 14, components = 1, offset = 14
+; SHADERTEST-LABEL: -- location = 15, components = 1, offset = 15
+; SHADERTEST-LABEL: -- location = 16, components = 1, offset = 16
+; SHADERTEST-LABEL: -- location = 17, components = 1, offset = 17
+; SHADERTEST-LABEL: -- location = 18, components = 1, offset = 18
+; SHADERTEST-LABEL: -- location = 19, components = 1, offset = 19
+; SHADERTEST-LABEL: -- location = 20, components = 1, offset = 20
+; SHADERTEST-LABEL: -- location = 21, components = 1, offset = 21
+; SHADERTEST-LABEL: -- location = 22, components = 1, offset = 22
+; SHADERTEST-LABEL: -- location = 23, components = 1, offset = 23
+; SHADERTEST-LABEL: -- location = 24, components = 1, offset = 24
+
+; SHADERTEST-LABEL: Primitive outputs layout (stride = 2, exports = 2):
+; SHADERTEST-LABEL: -- location = 0, components = 1, offset = 0
+; SHADERTEST-LABEL: -- location = 1, components = 1, offset = 1
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[MeshGlsl]
+#version 460 core
+
+#extension GL_EXT_mesh_shader: enable
+#extension GL_EXT_shader_explicit_arithmetic_types: enable
+
+layout(local_size_x=128, local_size_y=1, local_size_z=1) in;
+layout(points, max_vertices = 128, max_primitives = 128) out;
+
+layout(location = 0) out float vertex[][25];
+
+layout(location = 25) out perprimitiveEXT float primitive[][2];
+
+shared float sharedVar[2500];
+
+void main() {
+  SetMeshOutputsEXT(128, 128);
+
+  for (int i = 0; i < 25; i++)
+    vertex[gl_LocalInvocationIndex][i] = float(i / 25.0);
+
+  primitive[gl_LocalInvocationIndex][0] = 0.0;
+  primitive[gl_LocalInvocationIndex][1] = 0.5;
+
+  sharedVar[gl_LocalInvocationIndex] = float(gl_LocalInvocationIndex);
+}
+
+[MeshInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 460 core
+
+#extension GL_EXT_mesh_shader: enable
+
+layout(location = 0) in float vertex[25];
+layout(location = 25) in perprimitiveEXT float primitive[2];
+
+layout(location = 0) out vec4 outColor;
+
+void main() {
+  outColor = vec4(0.0);
+
+  for (int i = 0; i < 25; i++)
+    outColor.x += vertex[i];
+
+  outColor.y += primitive[0];
+  outColor.y += primitive[1];
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+patchControlPoints = 3

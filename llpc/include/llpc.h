@@ -157,6 +157,7 @@ struct RayTracingPipelineBuildOut {
   BinaryData librarySummary;                           ///< Output MsgPack summary for use in library link; not created
                                                        ///< when compiling in pure pipeline mode
   bool hasTraceRay;                                    ///< Output whether have traceray module
+  bool isCps;                                          ///< Output whether is the pipeline is compiled in CPS mode
 };
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66

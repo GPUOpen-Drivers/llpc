@@ -52,9 +52,8 @@
          %18 = OpLoad %v4float %b0
          %19 = OpConvertFToS %v4int %18
          %20 = OpSConvert %v4int16 %19
-         %21 = OpSDotAccSatKHR %int16 %17 %20 %5
-         %22 = OpSConvert %int %21
-         %23 = OpCompositeConstruct %v4int %22 %22 %22 %22
+         %21 = OpSDotAccSatKHR %int %17 %20 %5
+         %23 = OpCompositeConstruct %v4int %21 %21 %21 %21
                OpStore %c %23
          %24 = OpLoad %v4int %c
          %25 = OpConvertSToF %v4float %24

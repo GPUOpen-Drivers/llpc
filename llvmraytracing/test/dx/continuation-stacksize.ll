@@ -1,7 +1,7 @@
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' \
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' \
 ; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=POSTPROCESS-STACKSIZE %s
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,dxil-cont-post-process,lint,remove-types-metadata' \
-; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=POSTPROCESS-STATESIZE %s
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,remove-types-metadata' \
+; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=CLEANUP-STATESIZE %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
 
@@ -25,8 +25,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 ; Function Attrs: alwaysinline
 declare i32 @_cont_GetContinuationStackAddr() #0
 
-; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_cont_SetupRayGen() #0
+declare !pointeetys !33 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
 ; Function Attrs: alwaysinline
 declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
@@ -35,22 +34,22 @@ declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalDat
 declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
 
 ; Function Attrs: alwaysinline
-declare !types !17 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
+declare !pointeetys !17 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
 
 ; Function Attrs: nounwind memory(none)
-declare !types !19 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
+declare !pointeetys !19 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
 
-define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !{%struct.DispatchSystemData poison} {
   ret void
 }
 
 ; Function Attrs: alwaysinline
-define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #0 !types !21 {
+define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #0 !pointeetys !21 {
   ret i32 5
 }
 
 ; Function Attrs: alwaysinline
-define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, float %6, float %7, float %8, float %9, float %10, float %11, float %12, float %13) #0 !types !22 {
+define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, float %6, float %7, float %8, float %9, float %10, float %11, float %12, float %13) #0 !pointeetys !22 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
@@ -60,7 +59,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 }
 
 ; Function Attrs: alwaysinline
-define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !types !23 {
+define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !pointeetys !23 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
@@ -71,10 +70,10 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !typ
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
 
-; POSTPROCESS-STACKSIZE-DAG: define void @main({{.*}}){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
+; POSTPROCESS-STACKSIZE-DAG: define void @main({{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; POSTPROCESS-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
-; POSTPROCESS-STATESIZE-DAG: define void @main({{.*}}){{.*}} !continuation.state ![[main_state:[0-9]+]]
-; POSTPROCESS-STATESIZE-DAG: ![[main_state]] = !{i32 0}
+; CLEANUP-STATESIZE-DAG: define void @main({{.*}} !continuation.state ![[main_state:[0-9]+]]
+; CLEANUP-STATESIZE-DAG: ![[main_state]] = !{i32 0}
 
 define void @main() {
   %params = alloca %struct.TheirParams, align 4
@@ -85,9 +84,9 @@ define void @main() {
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[maintrace_stacksize]] = !{i32 180}
 
-; CLEANUP-STACKSIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
+; CLEANUP-STACKSIZE-DAG: define void @mainTrace{{.*}}%struct.DispatchSystemData{{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
 ; CLEANUP-STACKSIZE-DAG: ![[maintrace_stacksize]] = !{i32 180}
-; CLEANUP-STATESIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.state ![[main_state]]
+; CLEANUP-STATESIZE-DAG: define void @mainTrace{{.*}}%struct.DispatchSystemData{{.*}} !continuation.state ![[main_state]]
 
 ; SAVESTATE-STACKSIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
 ; SAVESTATE-STACKSIZE-DAG: ![[maintrace_stacksize]] = !{i32 180}
@@ -109,22 +108,22 @@ define void @mainTrace() {
 
 ; CLEANUP-STACKSIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]
 ; CLEANUP-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 348}
-; CLEANUP-STATESIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.state ![[called_state:[0-9]+]]
+; CLEANUP-STATESIZE-DAG: define void @called{{.*}}%struct.DispatchSystemData{{.*}} !continuation.state ![[called_state:[0-9]+]]
 ; CLEANUP-STATESIZE-DAG: ![[called_state]] = !{i32 204}
 
 ; SAVESTATE-STACKSIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]
 ; SAVESTATE-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 348}
-; SAVESTATE-STATESIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.state ![[called_state:[0-9]+]]
+; SAVESTATE-STATESIZE-DAG: define void @called{{.*}}%struct.DispatchSystemData{{.*}} !continuation.state ![[called_state:[0-9]+]]
 ; SAVESTATE-STATESIZE-DAG: ![[called_state]] = !{i32 204}
 
-define void @called(%struct.MyParams* %arg) !types !24 {
+define void @called(%struct.MyParams* %arg) !pointeetys !24 {
   %params = alloca %struct.TheirParams2, align 4
   call void @dx.op.callShader.struct.TheirParams2(i32 159, i32 2, %struct.TheirParams2* nonnull %params)
   ret void
 }
 
 ; Function Attrs: nounwind
-declare !types !26 void @dx.op.traceRay.struct.RayPayload(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.RayPayload*) #2
+declare !pointeetys !26 void @dx.op.traceRay.struct.RayPayload(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.RayPayload*) #2
 
 ; Function Attrs: nounwind memory(none)
 declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.ResourceProperties) #1
@@ -133,10 +132,10 @@ declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.
 declare %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32, %dx.types.Handle) #3
 
 ; Function Attrs: nounwind
-declare !types !28 void @dx.op.callShader.struct.TheirParams(i32, i32, %struct.TheirParams*) #2
+declare !pointeetys !28 void @dx.op.callShader.struct.TheirParams(i32, i32, %struct.TheirParams*) #2
 
 ; Function Attrs: nounwind
-declare !types !30 void @dx.op.callShader.struct.TheirParams2(i32, i32, %struct.TheirParams2*) #2
+declare !pointeetys !30 void @dx.op.callShader.struct.TheirParams2(i32, i32, %struct.TheirParams2*) #2
 
 attributes #0 = { alwaysinline }
 attributes #1 = { nounwind memory(none) }
@@ -166,18 +165,20 @@ attributes #3 = { nounwind memory(read) }
 !14 = !{i32 8, i32 12}
 !15 = !{void ()* @mainTrace, !"mainTrace", null, null, !16}
 !16 = !{i32 8, i32 7}
-!17 = !{!"function", %struct.BuiltInTriangleIntersectionAttributes poison, !18}
+!17 = !{%struct.SystemData poison}
 !18 = !{i32 0, %struct.SystemData poison}
-!19 = !{!"function", !"void", !20}
+!19 = !{%struct.DispatchSystemData poison}
 !20 = !{i32 0, %struct.DispatchSystemData poison}
-!21 = !{!"function", i32 poison, !20}
-!22 = !{!"function", !"void", !20, i64 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison}
-!23 = !{!"function", !"void", !20, i32 poison}
-!24 = !{!"function", !"void", !25}
+!21 = !{%struct.DispatchSystemData poison}
+!22 = !{%struct.DispatchSystemData poison}
+!23 = !{%struct.DispatchSystemData poison}
+!24 = !{%struct.MyParams poison}
 !25 = !{i32 0, %struct.MyParams poison}
-!26 = !{!"function", !"void", i32 poison, %dx.types.Handle poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, !27}
+!26 = !{%struct.RayPayload poison}
 !27 = !{i32 0, %struct.RayPayload poison}
-!28 = !{!"function", !"void", i32 poison, i32 poison, !29}
+!28 = !{%struct.TheirParams poison}
 !29 = !{i32 0, %struct.TheirParams poison}
-!30 = !{!"function", !"void", i32 poison, i32 poison, !31}
+!30 = !{%struct.TheirParams2 poison}
 !31 = !{i32 0, %struct.TheirParams2 poison}
+!32 = !{i32 0, %struct.TraversalData poison}
+!33 = !{%struct.TraversalData poison}

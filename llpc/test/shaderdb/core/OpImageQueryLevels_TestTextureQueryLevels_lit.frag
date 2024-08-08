@@ -31,9 +31,9 @@ void main()
 ; SHADERTEST: ptr addrspace(4) (...) @lgc.create.get.desc.ptr.p4{{.*}}(i32 1, i32 1, i64 1, i32 0)
 ; SHADERTEST: ptr addrspace(4) (...) @lgc.create.get.desc.ptr.p4{{.*}}(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 0, i32 512, ptr addrspace(4) {{.*}})
-; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 128, ptr addrspace(4) {{.*}})
+; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32  640, ptr addrspace(4) {{.*}})
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 512, ptr addrspace(4) {{.*}})
-; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 8, i32 128, ptr addrspace(4) {{.*}})
+; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 8, i32  640, ptr addrspace(4) {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

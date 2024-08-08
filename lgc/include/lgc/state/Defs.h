@@ -62,7 +62,7 @@ const static char ImmutableConvertingSamplerGlobal[] = "lgc.immutable.converting
 const static char EsGsEntryPoint[] = "lgc.shader.ESGS.main";
 const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
 
-const static char NggAttribExport[] = "lgc.ngg.attrib.export";
+const static char NggAttributeThroughMemory[] = "lgc.ngg.attribute.through.memory";
 const static char NggXfbExport[] = "lgc.ngg.xfb.export.";
 const static char NggWriteGsOutput[] = "lgc.ngg.write.GS.output.";
 const static char NggReadGsOutput[] = "lgc.ngg.read.GS.output.";

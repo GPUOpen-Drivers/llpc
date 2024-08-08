@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -68,24 +68,16 @@ constexpr unsigned MaxArgumentDwords = 32;
 constexpr unsigned CpsPayloadMaxNumVgprs = MaxArgumentDwords;
 
 unsigned getArgumentDwordCount(const llvm::DataLayout &DL, llvm::Type *type);
-unsigned getArgumentDwordCount(const llvm::DataLayout &DL,
-                               llvm::ArrayRef<llvm::Type *> types);
-std::optional<unsigned>
-getRemainingArgumentDwords(const llvm::DataLayout &DL,
-                           llvm::ArrayRef<llvm::Type *> arguments);
+unsigned getArgumentDwordCount(const llvm::DataLayout &DL, llvm::ArrayRef<llvm::Type *> types);
+std::optional<unsigned> getRemainingArgumentDwords(const llvm::DataLayout &DL, llvm::ArrayRef<llvm::Type *> arguments);
 
 bool isCpsFunction(const llvm::Function &fn);
 void setCpsFunctionLevel(llvm::Function &fn, CpsLevel level);
 CpsLevel getCpsLevelFromFunction(const llvm::Function &fn);
 CpsLevel getCpsLevelForShaderStage(lgc::rt::RayTracingShaderStage stage);
 uint8_t getPotentialCpsReturnLevels(lgc::rt::RayTracingShaderStage stage);
-void pushStateToCpsStack(llvm_dialects::Builder &builder,
-                         lgc::cps::JumpOp &jumpOp);
-llvm::Value *popStateFromCpsStack(llvm_dialects::Builder &builder,
-                                  const llvm::DataLayout &DL,
-                                  llvm::Type *stateType);
-llvm::Value *
-lowerAsContinuationReference(llvm::IRBuilder<> &Builder,
-                             lgc::cps::AsContinuationReferenceOp &AsCROp,
-                             llvm::Value *Relocation = nullptr);
+void pushStateToCpsStack(llvm_dialects::Builder &builder, lgc::cps::JumpOp &jumpOp);
+llvm::Value *popStateFromCpsStack(llvm_dialects::Builder &builder, const llvm::DataLayout &DL, llvm::Type *stateType);
+llvm::Value *lowerAsContinuationReference(llvm::IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCROp,
+                                          llvm::Value *Relocation = nullptr);
 } // namespace lgc::cps

@@ -1640,27 +1640,24 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
 Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder, Value *attr, Value *channel,
                                                            Value *coordI, Value *coordJ, Value *primMask) {
   Value *result = nullptr;
-  Attribute::AttrKind attribs[] = {Attribute::ReadNone};
   if (m_gfxIp.major >= 11) {
     // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
     Value *param =
-        builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask}, attribs);
+        builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_lds_param_load, {channel, attr, primMask});
 
     // tmp = llvm.amdgcn.interp.inreg.p10(p10, coordI, p0)
-    result =
-        builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p10", builder.getFloatTy(), {param, coordI, param}, attribs);
+    result = builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_interp_inreg_p10, {param, coordI, param});
 
     // llvm.amdgcn.interp.inreg.p2(p20, coordJ, tmp)
-    result =
-        builder.CreateNamedCall("llvm.amdgcn.interp.inreg.p2", builder.getFloatTy(), {param, coordJ, result}, attribs);
+    result = builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_interp_inreg_p2, {param, coordJ, result});
   } else {
     // llvm.amdgcn.interp.p1(coordI, attr_channel, attr, m0)
-    result = builder.CreateNamedCall("llvm.amdgcn.interp.p1", builder.getFloatTy(), {coordI, channel, attr, primMask},
-                                     attribs);
+    result =
+        builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_interp_p1, {coordI, channel, attr, primMask});
 
     // llvm.amdgcn.interp.p2(p1, coordJ, attr_channel, attr, m0)
-    result = builder.CreateNamedCall("llvm.amdgcn.interp.p2", builder.getFloatTy(),
-                                     {result, coordJ, channel, attr, primMask}, attribs);
+    result = builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_interp_p2,
+                                     {result, coordJ, channel, attr, primMask});
   }
   return result;
 }
@@ -1679,11 +1676,10 @@ Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, 
                                                           Value *coordI, Value *coordJ, Value *primMask,
                                                           Value *highHalf) {
   Value *result = nullptr;
-  Attribute::AttrKind attribs[] = {Attribute::ReadNone};
   if (m_gfxIp.major >= 11) {
     // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
     Value *param =
-        builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask}, attribs);
+        builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_lds_param_load, {channel, attr, primMask});
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 494282
     // Old version of code
@@ -1702,12 +1698,12 @@ Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, 
     result = builder.CreateIntrinsic(builder.getHalfTy(), interpP2Intrinsic, {param, coordJ, result, highHalf});
   } else {
     // llvm.amdgcn.interp.p1.f16(coordI, attr_channel, attr, highhalf, m0)
-    result = builder.CreateNamedCall("llvm.amdgcn.interp.p1.f16", builder.getFloatTy(),
-                                     {coordI, channel, attr, highHalf, primMask}, attribs);
+    result = builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_interp_p1_f16,
+                                     {coordI, channel, attr, highHalf, primMask});
 
     // llvm.amdgcn.interp.p2.f16(p1, coordJ, attr_channel, attr, highhalf, m0)
-    result = builder.CreateNamedCall("llvm.amdgcn.interp.p2.f16", builder.getHalfTy(),
-                                     {result, coordJ, channel, attr, highHalf, primMask}, attribs);
+    result = builder.CreateIntrinsic(builder.getHalfTy(), Intrinsic::amdgcn_interp_p2_f16,
+                                     {result, coordJ, channel, attr, highHalf, primMask});
   }
   return result;
 }
@@ -1729,8 +1725,8 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
 
   if (m_gfxIp.major >= 11) {
     // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
-    compValue = builder.CreateNamedCall("llvm.amdgcn.lds.param.load", builder.getFloatTy(), {channel, attr, primMask},
-                                        {Attribute::ReadNone});
+    compValue =
+        builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_lds_param_load, {channel, attr, primMask});
     DppCtrl dppCtrl;
     if (interpParam == INTERP_PARAM_P0)
       dppCtrl = DppCtrl::DppQuadPerm0000;
@@ -1755,7 +1751,7 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
         attr,                          // attr
         primMask                       // m0
     };
-    compValue = builder.CreateNamedCall("llvm.amdgcn.interp.mov", builder.getFloatTy(), args, {Attribute::ReadNone});
+    compValue = builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_interp_mov, args);
   }
   // Two int8s are also packed like 16-bit in a 32-bit channel in previous export stage
   if (bitWidth == 8 || bitWidth == 16) {
@@ -2086,21 +2082,10 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
 void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset,
                                                           Value *compIdx, Value *vertexOrPrimitiveIdx,
                                                           bool isPerPrimitive, BuilderBase &builder) {
-  // outputOffset = (location + locOffset) * 4 + compIdx * (bitWidth == 64 ? 2 : 1)
-  Value *outputOffset = builder.CreateAdd(builder.getInt32(location), locOffset);
-  outputOffset = builder.CreateShl(outputOffset, 2);
-
-  auto outputTy = output->getType();
-  if (outputTy->getScalarSizeInBits() == 64) {
+  if (output->getType()->getScalarSizeInBits() == 64)
     compIdx = builder.CreateShl(compIdx, 1);
-  }
 
-  outputOffset = builder.CreateAdd(outputOffset, compIdx);
-
-  if (isPerPrimitive)
-    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
-  else
-    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  builder.create<WriteMeshOutputOp>(isPerPrimitive, location, locOffset, compIdx, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -2667,6 +2652,30 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
     input = getShadingRate(builder);
+    break;
+  }
+  case BuiltInPrimType: {
+    input = getPrimType(builder);
+    break;
+  }
+  case BuiltInLineStipple: {
+    input = getLineStipple(builder);
+    break;
+  }
+  case BuiltInPrimCoord: {
+    assert(inOutUsage.builtInInputLocMap.find(BuiltInPrimCoord) != inOutUsage.builtInInputLocMap.end());
+    const unsigned loc = inOutUsage.builtInInputLocMap[BuiltInPrimCoord];
+
+    // Emulation for primCoord vGpr, specially, its value comes from z/w (ST) value, hence should be vec4 when interp.
+    const unsigned builtInId =
+        m_pipelineState->getRasterizerState().perSampleShading ? BuiltInInterpPerspSample : BuiltInInterpPerspCenter;
+    Value *interpValue =
+        patchFsBuiltInInputImport(FixedVectorType::get(builder.getFloatTy(), 4), builtInId, nullptr, builder);
+    Value *result = patchFsGenericInputImport(FixedVectorType::get(builder.getFloatTy(), 4), loc, nullptr, nullptr,
+                                              false, InOutInfo::InterpModeSmooth, interpValue, false, builder);
+    input = PoisonValue::get(FixedVectorType::get(builder.getFloatTy(), 2));
+    input = builder.CreateInsertElement(input, builder.CreateExtractElement(result, 2), builder.getInt32(0));
+    input = builder.CreateInsertElement(input, builder.CreateExtractElement(result, 3), builder.getInt32(1));
     break;
   }
   // Handle internal-use built-ins for sample position emulation
@@ -3426,15 +3435,10 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
 
   (void(builtInUsage)); // Unused
 
-  // outputOffset = location * 4 + elemIdx
-  Value *outputOffset = builder.getInt32(4 * loc);
-  if (elemIdx)
-    outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
+  if (!elemIdx)
+    elemIdx = builder.getInt32(0);
 
-  if (isPerPrimitive)
-    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
-  else
-    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  builder.create<WriteMeshOutputOp>(isPerPrimitive, loc, builder.getInt32(0), elemIdx, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -5403,6 +5407,29 @@ void PatchInOutImportExport::exportShadingRate(Value *shadingRate, BuilderBase &
 }
 
 // =====================================================================================================================
+// Gets HW primitive type from ancillary bits.
+Value *PatchInOutImportExport::getPrimType(BuilderBase &builder) {
+  assert(m_shaderStage == ShaderStage::Fragment);
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
+  auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
+
+  // Prim Type = Ancillary[1:0]
+  return builder.CreateAnd(ancillary, 0x3);
+}
+
+// =====================================================================================================================
+// Gets HW line stipple value from lineStipple value.
+//
+// @param builder : the builder to use
+Value *PatchInOutImportExport::getLineStipple(BuilderBase &builder) {
+  assert(m_shaderStage == ShaderStage::Fragment);
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
+  auto line_stipple = getFunctionArgument(m_entryPoint, entryArgIdxs.lineStipple);
+
+  return builder.CreateBitCast(line_stipple, builder.getFloatTy());
+}
+
+// =====================================================================================================================
 // Gets HW shading rate and converts them to LGC definitions.
 //
 // @param builder : the builder to use
@@ -5510,7 +5537,7 @@ void PatchInOutImportExport::exportVertexAttribs(BuilderBase &builder) {
   }
 
   for (auto &attribExport : m_attribExports) {
-    if (m_gfxIp.major <= 10) {
+    if (m_pipelineState->exportAttributeByExportInstruction()) {
       unsigned channelMask = 0;
       for (unsigned i = 0; i < 4; ++i) {
         assert(attribExport.second[i]);
@@ -5531,10 +5558,10 @@ void PatchInOutImportExport::exportVertexAttribs(BuilderBase &builder) {
       Value *attribValue = PoisonValue::get(FixedVectorType::get(builder.getFloatTy(), 4)); // Always be <4 x float>
       for (unsigned i = 0; i < 4; ++i)
         attribValue = builder.CreateInsertElement(attribValue, attribExport.second[i], i);
-      // NOTE: For GFX11+, vertex attributes are exported through memory. This call will be expanded when NGG primitive
+      // NOTE: Create a call if we export vertex attribute through memory. This call will be expanded when NGG primitive
       // shader is generated. The arguments are: buffer descriptor of attribute ring, attribute location, and attribute
       // export value.
-      builder.CreateNamedCall(lgcName::NggAttribExport, builder.getVoidTy(),
+      builder.CreateNamedCall(lgcName::NggAttributeThroughMemory, builder.getVoidTy(),
                               {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(),
                                builder.getInt32(attribExport.first), attribValue},
                               {});

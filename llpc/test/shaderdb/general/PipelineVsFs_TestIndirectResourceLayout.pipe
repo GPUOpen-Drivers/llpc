@@ -27,7 +27,7 @@
 ; SHADERTEST: [[Value0:%[.a-zA-Z0-9]+]] = extractelement <4 x float> [[Value]], i64 0
 ; SHADERTEST: [[Color0:%[0-9]*]] = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float [[Value0]], float [[Value1]])
 ; SHADERTEST: [[Color1:%[0-9]*]] = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float [[Value2]], float [[Value3]])
-; SHADERTEST: call void @llvm.amdgcn.exp.compr.v2f16(i32 immarg 0, i32 immarg 15, <2 x half> [[Color0]], <2 x half> [[Color1]], i1 immarg true, i1 immarg true)
+; SHADERTEST: call void @llvm.amdgcn.exp.compr.v2f16(i32 0, i32 15, <2 x half> [[Color0]], <2 x half> [[Color1]], i1 true, i1 true)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

@@ -1,4 +1,4 @@
-; RUN: amdllpc -gfxip 11.0 -o - -print-after=prepare-continuations -gpurt-use-dumped=true -llpc-raytracing-mode=continuations -emit-lgc %s | FileCheck -check-prefixes=CHECK %s
+; RUN: amdllpc -gfxip 11.0 -o - -print-after=prepare-continuations -llpc-raytracing-mode=continuations -emit-lgc %s | FileCheck -check-prefixes=CHECK %s
 
 [Version]
 version = 70
@@ -160,7 +160,6 @@ rtState.traceRayWaveDensityThreshold[10] = 1
 rtState.traceRayWaveDensityThreshold[11] = 1
 rtState.traceRayWaveDensityThreshold[12] = 1
 rtState.gpurtFeatureFlags = 0
-rtState.gpurtShaderLibrary = Shader_0x6E9B9DD1ADBD5A1D.spv
 rtState.gpurtFuncTable.pFunc[0] = TraceRay2_0
 rtState.gpurtFuncTable.pFunc[1] = TraceRayInline2_0
 rtState.gpurtFuncTable.pFunc[2] = TraceRayUsingHitToken2_0
@@ -184,5 +183,5 @@ pipelineLibStageMask = 0
 
 ; CHECK-LABEL: ; ModuleID = 'lgcPipeline'
 ; CHECK-NEXT: source_filename = "main"
-; CHECK: define dllexport void @lgc.shader.CS.main() !lgc.shaderstage !{{[0-9]+}} !lgc.rt.shaderstage !{{[0-9]+}} {
+; CHECK: define dllexport void @lgc.shader.CS.main() !lgc.rt.shaderstage !{{[0-9]+}} !lgc.shaderstage !{{[0-9]+}} {
 ; CHECK: call void (...) @lgc.cps.jump(

@@ -27,7 +27,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A" = external constant %dx.types.Handle, align 4
 @"\01?gOutput@@3V?$RWTexture2D@V?$vector@M$03@@@@A" = external constant %dx.types.Handle, align 4
 
-define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !types !{!"function", !"void", !{i32 0, %struct.DispatchSystemData poison}} {
+define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !{%struct.DispatchSystemData poison} {
   ret void
 }
 
@@ -36,6 +36,7 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @RayGen(
 ; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META23:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META23]] !continuation [[META27:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [7 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A", align 4
@@ -55,40 +56,47 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], i64 [[ADDR_I]], 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr [[TMP10]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr addrspace(20) @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 -1, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount [[META32:![0-9]+]], !continuation.wait.await [[META13]], !continuation.returnedRegistercount [[META25:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[AWAIT:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP12]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 -1, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [10 x i32] poison, [1 x i32] [[TMP12]]), !continuation.registercount [[META32:![0-9]+]], !continuation.wait.await [[META13]], !continuation.returnedRegistercount [[META25:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } @await(ptr [[TMP17]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } [[TMP20]], 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [3 x i32] [[TMP15]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_MYPAYLOAD]] poison, ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP19]], ptr [[TMP14]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = load i32, ptr [[TMP24]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP38]], ptr [[TMP16]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP26]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP21]], ptr [[TMP18]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP18]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(20) getelementptr inbounds (i32, ptr addrspace(20) @PAYLOAD, i32 2), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[TMP26]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP25]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP23]], ptr [[TMP22]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } [[TMP20]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP13]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split:
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load float, ptr [[TMP6]], align 8, !tbaa [[TBAA28]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 4, !tbaa [[TBAA33:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = sitofp i32 [[TMP26]] to float
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = load double, ptr [[TMP28]], align 8, !tbaa [[TBAA35:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = fptrunc double [[TMP29]] to float
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP31]], i8 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP32]], i8 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP39]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP34]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP24]], float [[TMP27]], float [[TMP30]], float 0.000000e+00, i8 15)
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = load float, ptr [[TMP6]], align 8, !tbaa [[TBAA28]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4, !tbaa [[TBAA33:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = sitofp i32 [[TMP44]] to float
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load double, ptr [[TMP46]], align 8, !tbaa [[TBAA35:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = fptrunc double [[TMP47]] to float
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP49]], i8 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP50]], i8 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP37]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP52]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP42]], float [[TMP45]], float [[TMP48]], float 0.000000e+00, i8 15)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.end.p0(i64 16, ptr [[TMP5]]) #[[ATTR0]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
 ;
@@ -119,7 +127,7 @@ define void @RayGen() #0 {
 }
 
 ; Function Attrs: nounwind
-declare !types !32 void @dx.op.traceRay.struct.MyPayload(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.MyPayload*) #0
+declare !pointeetys !32 void @dx.op.traceRay.struct.MyPayload(i32, %dx.types.Handle, i32, i32, i32, i32, i32, float, float, float, float, float, float, float, float, %struct.MyPayload*) #0
 
 ; Function Attrs: nounwind
 declare void @dx.op.textureStore.f32(i32, %dx.types.Handle, i32, i32, i32, float, float, float, float, i8) #0
@@ -134,9 +142,6 @@ declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.
 declare %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32, %dx.types.Handle) #2
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_cont_SetupRayGen() #3
-
-; Function Attrs: alwaysinline
 declare %struct.DispatchSystemData @_AmdWaitAwaitTraversal(i64, i64, %struct.TraversalData) #3
 
 ; Function Attrs: alwaysinline
@@ -146,36 +151,38 @@ declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemD
 declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #3
 
 ; Function Attrs: alwaysinline
-declare !types !34 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #3
+declare !pointeetys !34 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #3
 
 ; Function Attrs: nounwind memory(read)
-declare !types !36 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData* nocapture readnone) #2
+declare !pointeetys !36 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData* nocapture readnone) #2
 
 ; Function Attrs: alwaysinline
-declare !types !38 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %struct.BuiltInTriangleIntersectionAttributes) #3
+declare !pointeetys !38 void @_cont_SetTriangleHitAttributes(%struct.SystemData*, %struct.BuiltInTriangleIntersectionAttributes) #3
 
 ; Function Attrs: alwaysinline
-declare !types !39 i1 @_cont_IsEndSearch(%struct.TraversalData*) #3
+declare !pointeetys !39 i1 @_cont_IsEndSearch(%struct.TraversalData*) #3
 
 ; Function Attrs: nounwind memory(read)
-declare !types !41 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #2
+declare !pointeetys !41 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #2
+
+declare !pointeetys !50 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
 ; Function Attrs: nounwind memory(none)
-declare !types !43 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
+declare !pointeetys !43 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
 
 ; Function Attrs: nounwind memory(none)
-declare !types !44 void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData*) #1
+declare !pointeetys !44 void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData*) #1
 
 ; Function Attrs: nounwind
 declare i64 @_AmdGetResumePointAddr() #3
 
 ; Function Attrs: alwaysinline
-define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #3 !types !46 {
+define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #3 !pointeetys !46 {
   ret i32 5
 }
 
 ; Function Attrs: alwaysinline
-define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, float %6, float %7, float %8, float %9, float %10, float %11, float %12, float %13) #3 !types !47 {
+define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, float %6, float %7, float %8, float %9, float %10, float %11, float %12, float %13) #3 !pointeetys !47 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
@@ -188,10 +195,10 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare !types !48 void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #4
+declare !pointeetys !48 void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #4
 
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
-declare !types !48 void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #4
+declare !pointeetys !48 void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture) #4
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind memory(none) }
@@ -240,21 +247,22 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 !29 = !{!"int", !26, i64 0}
 !30 = !{!31, !31, i64 0}
 !31 = !{!"double", !26, i64 0}
-!32 = !{!"function", !"void", i32 poison, %dx.types.Handle poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, !33}
+!32 = !{%struct.MyPayload poison}
 !33 = !{i32 0, %struct.MyPayload poison}
-!34 = !{!"function", %struct.BuiltInTriangleIntersectionAttributes poison, !35}
+!34 = !{%struct.SystemData poison}
 !35 = !{i32 0, %struct.SystemData poison}
-!36 = !{!"function", <3 x i32> poison, !37}
+!36 = !{%struct.DispatchSystemData poison}
 !37 = !{i32 0, %struct.DispatchSystemData poison}
-!38 = !{!"function", !"void", !35, %struct.BuiltInTriangleIntersectionAttributes poison}
-!39 = !{!"function", i1 poison, !40}
+!38 = !{%struct.SystemData poison}
+!39 = !{%struct.TraversalData poison}
 !40 = !{i32 0, %struct.TraversalData poison}
-!41 = !{!"function", i32 poison, !35, !42}
+!41 = !{null, %struct.SystemData poison, %struct.HitData poison}
 !42 = !{i32 0, %struct.HitData poison}
-!43 = !{!"function", !"void", !37}
-!44 = !{!"function", !"void", !45}
+!43 = !{%struct.DispatchSystemData poison}
+!44 = !{%struct.AnyHitTraversalData poison}
 !45 = !{i32 0, %struct.AnyHitTraversalData poison}
-!46 = !{!"function", i32 poison, !37}
-!47 = !{!"function", !"void", !37, i64 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison, float poison}
-!48 = !{!"function", !"void", i64 poison, !49}
+!46 = !{%struct.DispatchSystemData poison}
+!47 = !{%struct.DispatchSystemData poison}
+!48 = !{i8 poison}
 !49 = !{i32 0, i8 poison}
+!50 = !{%struct.AnyHitTraversalData poison}

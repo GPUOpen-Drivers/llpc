@@ -28,11 +28,11 @@ declare i32 @lgc.create.subgroup.clustered.reduction.i32(...)
 ; CHECK-NEXT:    [[TMP6:%.*]] = or i32 [[TMP4]], [[TMP5]]
 ; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @llvm.amdgcn.update.dpp.i32(i32 undef, i32 [[TMP6]], i32 320, i32 15, i32 15, i1 true)
 ; CHECK-NEXT:    [[TMP8:%.*]] = or i32 [[TMP6]], [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.permlanex16(i32 undef, i32 [[TMP8]], i32 -1, i32 -1, i1 true, i1 false)
+; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 undef, i32 [[TMP8]], i32 -1, i32 -1, i1 true, i1 false)
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP8]], [[TMP9]]
-; CHECK-NEXT:    [[TMP11:%.*]] = call i32 @llvm.amdgcn.permlane64(i32 [[TMP10]])
+; CHECK-NEXT:    [[TMP11:%.*]] = call i32 @llvm.amdgcn.permlane64{{(.i32)?}}(i32 [[TMP10]])
 ; CHECK-NEXT:    [[TMP12:%.*]] = or i32 [[TMP10]], [[TMP11]]
-; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @llvm.amdgcn.readfirstlane(i32 [[TMP12]])
+; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 [[TMP12]])
 ; CHECK-NEXT:    [[R1:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP13]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @llvm.amdgcn.set.inactive.i32(i32 [[VALUE2:%.*]], i32 0)
 ; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @llvm.amdgcn.update.dpp.i32(i32 undef, i32 [[TMP14]], i32 177, i32 15, i32 15, i1 true)
@@ -43,7 +43,7 @@ declare i32 @lgc.create.subgroup.clustered.reduction.i32(...)
 ; CHECK-NEXT:    [[TMP20:%.*]] = or i32 [[TMP18]], [[TMP19]]
 ; CHECK-NEXT:    [[TMP21:%.*]] = call i32 @llvm.amdgcn.update.dpp.i32(i32 undef, i32 [[TMP20]], i32 320, i32 15, i32 15, i1 true)
 ; CHECK-NEXT:    [[TMP22:%.*]] = or i32 [[TMP20]], [[TMP21]]
-; CHECK-NEXT:    [[TMP23:%.*]] = call i32 @llvm.amdgcn.permlanex16(i32 undef, i32 [[TMP22]], i32 -1, i32 -1, i1 true, i1 false)
+; CHECK-NEXT:    [[TMP23:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 undef, i32 [[TMP22]], i32 -1, i32 -1, i1 true, i1 false)
 ; CHECK-NEXT:    [[TMP24:%.*]] = or i32 [[TMP22]], [[TMP23]]
 ; CHECK-NEXT:    [[R2:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP24]])
 ; CHECK-NEXT:    [[R:%.*]] = add i32 [[R2]], [[R1]]

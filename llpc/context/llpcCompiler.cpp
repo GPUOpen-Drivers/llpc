@@ -61,6 +61,7 @@
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/EnumIterator.h"
+#include "lgc/GpurtDialect.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/PassManager.h"
@@ -786,12 +787,12 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   }
   if (varElemTy->getOpCode() == OpTypeMatrix) {
     symbolInfo->columnCount = varElemTy->getMatrixColumnCount();
-    if (varElemTy->getMatrixColumnType()->getOpCode() == OpTypeVector)
-      symbolInfo->componentCount = varElemTy->getMatrixColumnType()->getVectorComponentCount();
     varElemTy = varElemTy->getMatrixColumnType();
   }
-  if (varElemTy->getOpCode() == OpTypeVector)
+  if (varElemTy->getOpCode() == OpTypeVector) {
+    symbolInfo->componentCount = varElemTy->getVectorComponentCount();
     varElemTy = varElemTy->getVectorComponentType();
+  }
 
   switch (varElemTy->getOpCode()) {
   case OpTypeInt: {
@@ -1020,8 +1021,8 @@ void Compiler::buildShaderModuleResourceUsage(
   if (func) {
     if (auto em = func->getExecutionMode(ExecutionModeLocalSize)) {
       shaderModuleUsage.localSizeX = em->getLiterals()[0];
-      shaderModuleUsage.localSizeX = em->getLiterals()[1];
-      shaderModuleUsage.localSizeX = em->getLiterals()[2];
+      shaderModuleUsage.localSizeY = em->getLiterals()[1];
+      shaderModuleUsage.localSizeZ = em->getLiterals()[2];
     }
   }
 
@@ -1110,6 +1111,7 @@ void Compiler::buildShaderModuleResourceUsage(
           ResourceNodeData textureSymbol = {};
           textureSymbol.binding = defaultUniformSymbol.binding;
           textureSymbol.location = defaultUniformSymbol.location;
+          textureSymbol.spvId = defaultUniformSymbol.spvId;
           textureSymbol.arraySize = getSamplerArraySizeInSpvStruct(varElemTy) * defaultUniformSymbol.arraySize;
           textureSymbol.isDefaultUniformSampler = true;
           if (textureSymbol.arraySize > 0)
@@ -1790,7 +1792,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     // Create empty modules and set target machine in each.
     SmallVector<std::unique_ptr<Module>> modules(shaderInfo.size());
     unsigned stageSkipMask = 0;
-    unsigned numStagesWithRayQuery = 0;
 
     bool enableAdvancedBlend = false;
     const GraphicsPipelineBuildInfo *pipelineInfo = nullptr;
@@ -1865,8 +1866,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (moduleData->usage.enableRayQuery) {
         assert(!moduleData->usage.rayQueryLibrary);
         context->ensureGpurtLibrary();
-        lowerPassMgr->addPass(SpirvLowerRayQuery(false));
-        ++numStagesWithRayQuery;
       }
 
       if (shaderIndex == ShaderStageFragment && enableAdvancedBlend) {
@@ -1904,28 +1903,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
     if (needLowerGpurt)
       setUseGpurt(&*pipeline);
-
-    if (numStagesWithRayQuery) {
-      setUseGpurt(&*pipeline);
-      GpurtContext &gpurtContext = GpurtContext::get(*context);
-
-      LLPC_OUTS("// LLPC link ray query modules");
-
-      for (unsigned shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex) {
-        const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
-        if (!shaderInfoEntry)
-          continue;
-
-        const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
-        if (!moduleData || !moduleData->usage.enableRayQuery)
-          continue;
-
-        // Modules are consumed by linking, so clone as needed.
-        Linker linker(*modules[shaderIndex]);
-        if (linker.linkInModule(CloneModule(*gpurtContext.theModule)))
-          result = Result::ErrorInvalidShader;
-      }
-    }
 
     SmallVector<std::unique_ptr<Module>, ShaderStageGfxCount> modulesToLink;
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
@@ -2675,13 +2652,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     const auto &shaderInfo = pipelineInfo->pShaders[i];
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
     if (moduleData->usage.hasTraceRay) {
-      pipelineOut->hasTraceRay = true;
-
       summary.usesTraceRay = true;
-
-      // TODO: Leverage static analysis (could be moved to *after* the compilation of shaders?)
-      summary.knownSetRayFlags = 0;
-      summary.knownUnsetRayFlags = 0;
       break;
     }
   }
@@ -2692,6 +2663,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
     auto &shaderInfo = rayTracingShaderInfo[i];
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+
     if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
         shaderInfo->entryStage == ShaderStageRayTracingIntersect) {
       if (moduleData->usage.enableRayQuery) {
@@ -2700,9 +2672,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     }
   }
 
-  // For continuations mode, it must be indirect mode.
-  if (rayTracingContext.isContinuationsMode())
-    rayTracingContext.setIndirectPipeline();
+  if (summary.knownSetRayFlags != ~0u || summary.knownUnsetRayFlags != ~0u) {
+    auto knownBits = KnownBits(32);
+    knownBits.One = APInt(32, summary.knownSetRayFlags);
+    knownBits.Zero = APInt(32, summary.knownUnsetRayFlags);
+    rayTracingContext.updateRayFlagsKnownBits(knownBits);
+  }
 
   // Add entry module
   PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
@@ -2714,6 +2689,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
                                            helperThreadProvider);
 
   if (result == Result::Success) {
+    auto knownFlags = rayTracingContext.getRayFlagsKnownBits();
+    summary.knownSetRayFlags &= knownFlags.One.getZExtValue();
+    summary.knownUnsetRayFlags &= knownFlags.Zero.getZExtValue();
+
+    pipelineOut->hasTraceRay = summary.hasTraceRayModule;
+
     std::string summaryMsgpack = summary.encodeMsgpack();
     void *allocBuf = nullptr;
     size_t shaderGroupHandleSize = pipelineInfo->shaderGroupCount * sizeof(RayTracingShaderIdentifier);
@@ -2797,6 +2778,9 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     pipelineOut->librarySummary.pCode = summaryOut;
     pipelineOut->librarySummary.codeSize = summaryMsgpack.size();
     memcpy(summaryOut, summaryMsgpack.data(), summaryMsgpack.size());
+
+    pipelineOut->isCps = rayTracingContext.isContinuationsMode();
+    pipelineOut->isCps |= rayTracingContext.getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continufy;
   }
 
   return result;
@@ -2848,6 +2832,9 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
   if (rtContext->getIndirectStageMask() == 0) {
     options.rtIndirectMode = lgc::RayTracingIndirectMode::NotIndirect;
   } else if (rtContext->isContinuationsMode() && !LgcContext::getEmitLgc()) {
+    // Assure indirect mode setting here, indirect stage mask may change after SPIRVReader.
+    options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
+
     // For continuations mode, we need to run LowerRaytracingPipelinePass here first separately because we need to
     // collect metadata added by the pass
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(context->getLgcContext()));
@@ -3092,8 +3079,6 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
   std::vector<std::unique_ptr<Module>> modules(shaderInfo.size());
   mainContext->setBuilder(builderContext->createBuilder(&*pipeline));
-  const bool continuationsMode = (pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations);
-  bool needTraversal = false;
 
   mainContext->ensureGpurtLibrary();
 
@@ -3115,10 +3100,6 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     if (!shaderInfoEntry->pModuleData)
       continue;
 
-    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
-    if (moduleData->usage.enableRayQuery || moduleData->usage.hasTraceRay)
-      needTraversal = true;
-
     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
     lowerPassMgr->setPassIndex(&passIndex);
     SpirvLower::registerTranslationPasses(*lowerPassMgr);
@@ -3127,8 +3108,6 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
     lowerPassMgr->addPass(SpirvLowerCfgMerges());
     lowerPassMgr->addPass(AlwaysInlinerPass());
-    if (moduleData->usage.enableRayQuery)
-      lowerPassMgr->addPass(SpirvLowerRayQuery());
 
     // Run the passes.
     bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
@@ -3138,9 +3117,8 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     }
   }
 
-  // Step 2: Link rayquery modules
+  // Step 2: Set up traversal module and kernel entry
   std::vector<std::unique_ptr<Module>> newModules;
-  std::vector<bool> moduleUsesRayQuery;
   // Record which module calls TraceRay(), except the first one (For indirect mode, it is the entry function which will
   // never call TraceRay(). For inlined mode, we don't need to care).
   std::vector<bool> moduleCallsTraceRay;
@@ -3153,31 +3131,30 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   auto indirectStageMask = rtContext.getIndirectStageMask() & ShaderStageAllRayTracingBit;
   assert(indirectStageMask == 0 || indirectStageMask == ShaderStageAllRayTracingBit);
 
+  const bool isContinuationsMode = rtContext.isContinuationsMode();
+
+  // TODO: Do not build launch kernel for library.
   std::unique_ptr<Module> entry = std::move(modules.back());
   modules.pop_back();
   shaderInfo = shaderInfo.drop_back();
 
   newModules.push_back(std::move(entry));
-  moduleUsesRayQuery.push_back(false);
 
   for (unsigned shaderIndex = 0; shaderIndex < pipelineInfo->shaderCount; ++shaderIndex) {
     const auto *shaderInfoEntry = shaderInfo[shaderIndex];
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
     auto shaderModule = std::move(modules[shaderIndex]);
 
-    if (moduleData->usage.enableRayQuery) {
-      Linker linker(*shaderModule);
-      if (linker.linkInModule(CloneModule(*gpurtContext.theModule)))
-        return Result::ErrorInvalidShader;
-    }
-
     newModules.push_back(std::move(shaderModule));
     moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
-    moduleUsesRayQuery.push_back(moduleData->usage.enableRayQuery);
   }
 
-  // TODO: For continuations, we only need to compile the GpuRt module separately if there are TraceRay usages
-  //       to compile the Traversal shader. For callable shaders, it is not required.
+  bool needTraversal = rtContext.getRayTracingLibrarySummary().usesTraceRay;
+
+  // When compiling library, we do not build traversal module, as we will always use the one from complete pipeline.
+  if (rtContext.getRayTracingPipelineBuildInfo()->libraryMode == LibraryMode::Library)
+    needTraversal = false;
+
   if (needTraversal) {
     auto fetchRayTracingFuncName = [&](Vkgc::RAYTRACING_ENTRY_FUNC attribute) -> StringRef {
       return mainContext->getPipelineContext()->getRayTracingFunctionName(attribute);
@@ -3185,12 +3162,12 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     StringRef traceRayFuncName = fetchRayTracingFuncName(Vkgc::RT_ENTRY_TRACE_RAY);
     // For continuations, the entry is _cont_Traversal.
     constexpr char ContTraceRayFuncName[] = "_cont_Traversal";
-    if (continuationsMode)
+    if (isContinuationsMode)
       traceRayFuncName = ContTraceRayFuncName;
 
     std::unique_ptr<Module> traversal = CloneModule(*gpurtContext.theModule);
 
-    // Prepare GpuRt module to be compiled separately
+    // Prepare traversal module to be compiled separately
     for (auto funcIt = traversal->begin(), funcEnd = traversal->end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
       if (func->getName().starts_with(traceRayFuncName)) {
@@ -3207,22 +3184,20 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     newModules.push_back(std::move(traversal));
     moduleCallsTraceRay.push_back(false);
-    moduleUsesRayQuery.push_back(false);
   }
 
   assert(moduleCallsTraceRay.size() == (newModules.size() - 1));
-  assert(moduleUsesRayQuery.size() == newModules.size());
 
+  // Step 3: Run lower passes on all modules
   for (unsigned i = 0; i < newModules.size(); i++) {
     auto module = (newModules[i].get());
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
     SpirvLower::registerLoweringPasses(*passMgr);
     LowerFlag flag = {};
     flag.isRayTracing = true;
-    flag.isRayQuery = moduleUsesRayQuery[i];
     flag.isInternalRtShader = false;
     SpirvLower::addPasses(mainContext, ShaderStageCompute, *passMgr, timerProfiler.getTimer(TimerLower), flag);
-    if (continuationsMode) {
+    if (isContinuationsMode) {
       passMgr->addPass(PrepareContinuations());
     }
     bool success = runPasses(&*passMgr, module);
@@ -3232,6 +3207,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     }
   }
 
+  // Step 4: Link module if necessary
   if (indirectStageMask == 0) {
     auto &mainModule = newModules[0];
     Linker linker(*mainModule);
@@ -3257,15 +3233,17 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   entry = std::move(newModules[0]);
 
   std::unique_ptr<Module> traversalModule;
-  if (indirectStageMask != 0) {
+  if (indirectStageMask != 0 && needTraversal) {
     traversalModule = std::move(newModules.back());
     newModules.pop_back();
+    rtContext.getRayTracingLibrarySummary().hasTraceRayModule = true;
   }
 
   InternalHelperThreadProvider ourHelperThreadProvider;
   if (cl::AddRtHelpers && !helperThreadProvider)
     helperThreadProvider = &ourHelperThreadProvider;
 
+  // Step 5: Generate ELFs
   if (helperThreadProvider) {
     std::vector<Result> results(newModules.size(), Result::Success);
     std::vector<Module *> modulePointers;
@@ -3332,9 +3310,13 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
   // Build traversal at last after we gather all needed information.
   if (traversalModule) {
-    if (rtContext.isContinuationsMode())
+    if (isContinuationsMode)
       ContHelper::setPreservedPayloadRegisterCount(*traversalModule,
                                                    rtContext.getRayTracingLibrarySummary().maxUsedPayloadRegisterCount);
+
+    auto rayFlagsKnownBits = rtContext.getRayFlagsKnownBits();
+    lgc::gpurt::setKnownSetRayFlags(*traversalModule, rayFlagsKnownBits.One.getZExtValue());
+    lgc::gpurt::setKnownUnsetRayFlags(*traversalModule, rayFlagsKnownBits.Zero.getZExtValue());
 
     Result result =
         buildRayTracingPipelineElf(mainContext, std::move(traversalModule), pipelineElfs[newModules.size()],
@@ -3389,24 +3371,8 @@ void Compiler::adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *r
     // 1. Add raytracing pipeline indirect pipeline metadata
     // The metadata is needed for RGP to correctly show different subtype of shaders.
     // Determine the shader subtype by name
-    auto subtype = "Unknown";
-    if (auto shaderStage = tryGetLgcRtShaderStageFromName(shaderFunctionName)) {
-      auto stage = shaderStage.value();
-      if (stage == lgc::rt::RayTracingShaderStage::RayGeneration)
-        subtype = "RayGeneration";
-      else if (stage == lgc::rt::RayTracingShaderStage::Miss)
-        subtype = "Miss";
-      else if (stage == lgc::rt::RayTracingShaderStage::AnyHit)
-        subtype = "AnyHit";
-      else if (stage == lgc::rt::RayTracingShaderStage::ClosestHit)
-        subtype = "ClosestHit";
-      else if (stage == lgc::rt::RayTracingShaderStage::Intersection)
-        subtype = "Intersection";
-      else if (stage == lgc::rt::RayTracingShaderStage::Callable)
-        subtype = "Callable";
-      else if (stage == lgc::rt::RayTracingShaderStage::Traversal)
-        subtype = "Traversal";
-    }
+    auto subtype = lgc::rt::getShaderSubtypeForRtShaderStage(
+        tryGetLgcRtShaderStageFromName(shaderFunctionName).value_or(lgc::rt::RayTracingShaderStage::Count));
     shaderFunction[".shader_subtype"] = subtype;
 
     // 2. Apply the .internal_pipeline_hash to .api_shader_hash in .shader_functions section

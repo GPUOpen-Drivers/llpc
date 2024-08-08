@@ -192,6 +192,8 @@ private:
 
   void exportShadingRate(llvm::Value *shadingRate, BuilderBase &builder);
   llvm::Value *getShadingRate(BuilderBase &builderBase);
+  llvm::Value *getPrimType(BuilderBase &builder);
+  llvm::Value *getLineStipple(BuilderBase &builderBase);
 
   void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
   void exportVertexAttribs(BuilderBase &builder);

@@ -1,0 +1,132 @@
+; Check that the ray tracing continuations mode option is set but the pipeline is still compiled in unified mode.
+; This ensures pipeline will not get into indirect mode unexpectedly when it can be unified.
+
+; RUN: amdllpc -gfxip 11.0 -emit-llvm -o - %s | FileCheck -check-prefixes=CHECK %s
+
+; CHECK-NOT:     call void {{.*}} @llvm.amdgcn.cs.chain.
+; CHECK:     call <4 x i32> @llvm.amdgcn.image.bvh.intersect.ray.
+
+[Version]
+version = 69
+
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  vec3 color;
+};
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(binding = 1, set = 0, rgba32f) uniform image2D g_dst;
+
+layout(location = 14) rayPayloadEXT RayPayload g_ray;
+
+void main() {
+  vec3 origin;
+  origin.x = gl_LaunchIDEXT.x;
+  origin.y = gl_LaunchIDEXT.y;
+  origin.z = 0;
+
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff, 
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              origin.xyz, /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 14);
+
+  imageStore(g_dst, ivec2(gl_LaunchIDEXT.xy), vec4(g_ray.color, 0));
+}
+
+[rgenInfo]
+entryPoint = main
+
+[chitGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  vec3 color;
+};
+
+layout(shaderRecordEXT, std430) buffer sbt {
+  float z;
+};
+
+hitAttributeEXT vec2 g_hit;
+rayPayloadInEXT RayPayload g_ray;
+
+void main() {
+  g_ray.color.xy = g_hit;
+  g_ray.color.z = z;
+}
+
+[chitInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 0xffffffff
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = DescriptorImage
+userDataNode[0].next[1].offsetInDwords = 4
+userDataNode[0].next[1].sizeInDwords = 8
+userDataNode[0].next[1].set = 0x00000000
+userDataNode[0].next[1].binding = 1
+userDataNode[1].visibility = 0xffffffff
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = DescriptorConstBufferCompact
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 2
+userDataNode[1].next[0].set = 0x0000005D
+userDataNode[1].next[0].binding = 17
+userDataNode[1].next[1].type = DescriptorConstBuffer
+userDataNode[1].next[1].offsetInDwords = 2
+userDataNode[1].next[1].sizeInDwords = 4
+userDataNode[1].next[1].set = 0x0000005D
+userDataNode[1].next[1].binding = 0
+userDataNode[1].next[2].type = DescriptorBuffer
+userDataNode[1].next[2].offsetInDwords = 6
+userDataNode[1].next[2].sizeInDwords = 4
+userDataNode[1].next[2].set = 0x0000005D
+userDataNode[1].next[2].binding = 1
+
+[RayTracingPipelineState]
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+groups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR
+groups[1].closestHitShader = 1
+maxRecursionDepth = 1
+indirectStageMask = 0x0
+mode = 3
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2164261887
+rtState.nodeStrideShift = 7
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.outerTileSize = 4
+rtState.dispatchDimSwizzleMode = 0
+rtState.enableDispatchRaysInnerSwizzle = 1
+rtState.enableDispatchRaysOuterSwizzle = 1
+rtState.enableOptimalLdsStackSizeForIndirect = 1
+rtState.enableOptimalLdsStackSizeForUnified = 1
+payloadSizeMaxInLib = 12
+attributeSizeMaxInLib = 8
+hasPipelineLibrary = 0

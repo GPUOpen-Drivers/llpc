@@ -97,7 +97,7 @@ std::optional<ShaderStageEnum> lgc::getShaderStage(const GlobalObject *func) {
   // Check for the metadata that is added by PipelineState::link.
   MDNode *stageMetaNode = func->getMetadata(ShaderStageMetadata);
   if (stageMetaNode)
-    return ShaderStageEnum(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
+    return ShaderStageEnum(mdconst::extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
   return std::nullopt;
 }
 

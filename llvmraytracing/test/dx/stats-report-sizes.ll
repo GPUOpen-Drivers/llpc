@@ -1,6 +1,6 @@
-; RUN: opt --report-cont-state-sizes       --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-CONT-SIZES
-; RUN: opt --report-payload-register-sizes --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-PAYLOAD-SIZES
-; RUN: opt --report-system-data-sizes      --verify-each -passes='dxil-cont-post-process,lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-SYSTEM-DATA-SIZES
+; RUN: opt --report-cont-state-sizes       --verify-each -passes='continuations-stats-report,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-CONT-SIZES
+; RUN: opt --report-payload-register-sizes --verify-each -passes='continuations-stats-report,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-PAYLOAD-SIZES
+; RUN: opt --report-system-data-sizes      --verify-each -passes='continuations-stats-report,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-SYSTEM-DATA-SIZES
 
 target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
@@ -10,8 +10,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 declare i32 @continuation.initialContinuationStackPtr()
 declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
-declare %struct.DispatchSystemData @_cont_SetupRayGen()
-declare void @continuation.continue(i64, ...)
+declare void @lgc.ilcps.continue(i64, ...)
 
 ; REPORT-CONT-SIZES: Continuation state size of "RayGen" (raygeneration): 108 bytes
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "RayGen" (raygeneration): 28 and 24 bytes
@@ -19,21 +18,21 @@ define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !continuat
   %csp = alloca i32, align 4
   %cspInit = call i32 @continuation.initialContinuationStackPtr()
   store i32 %cspInit, i32* %csp
-  call void (i64, ...) @continuation.continue(i64 2), !continuation.registercount !6
+  call void (i64, ...) @lgc.ilcps.continue(i64 2, i32 poison, i64 poison), !continuation.registercount !6
   ret void
 }
 
 ; This is needed as fake continuation of RayGen, because we only report continuation state sizes
 ; if we find a continuation function using !continuation metadata.
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "RayGen.resume.0" (raygeneration) is "struct.DispatchSystemData", size: 4 bytes
-define void @RayGen.resume.0(i64 %0, %struct.DispatchSystemData  %1) !continuation !3 !lgc.rt.shaderstage !12 {
+define void @RayGen.resume.0(i64 %0, { %struct.DispatchSystemData } %1) !continuation !3 !lgc.rt.shaderstage !12 {
   ret void
 }
 
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "CHS" (closesthit): 32 and 36 bytes
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "CHS" (closesthit) is "struct.CHSSystemData", size: 400 bytes
 define void @CHS(i64 %returnAddr, %struct.CHSSystemData %0) !continuation !14 !continuation.registercount !8 !lgc.rt.shaderstage !13 {
-  call void (i64, ...) @continuation.continue(i64 2), !continuation.registercount !9
+  call void (i64, ...) @lgc.ilcps.continue(i64 2, i32 poison, i64 poison), !continuation.registercount !9
   ret void
 }
 

@@ -51,7 +51,7 @@ public:
 
   LLPC_NODISCARD Result GetEntry(Vkgc::HashId hash, bool allocateOnMiss, Vkgc::EntryHandle *pHandle);
 
-  LLPC_NODISCARD void ReleaseEntry(Vkgc::RawEntryHandle rawHandle);
+  void ReleaseEntry(Vkgc::RawEntryHandle rawHandle);
 
   LLPC_NODISCARD Result WaitForEntry(Vkgc::RawEntryHandle rawHandle);
 

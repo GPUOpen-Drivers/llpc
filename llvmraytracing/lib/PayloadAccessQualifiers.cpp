@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -47,8 +47,7 @@ using namespace llvm;
 // Maybe change to PAQ-specific value
 #define DEBUG_TYPE "lower-raytracing-pipeline"
 
-llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
-                                    PAQShaderStage ShaderStage) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream, PAQShaderStage ShaderStage) {
   StringRef String = [ShaderStage]() {
     switch (ShaderStage) {
     case PAQShaderStage::Caller:
@@ -68,8 +67,7 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
   return Stream;
 }
 
-llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
-                                    PAQAccessKind AccessKind) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream, PAQAccessKind AccessKind) {
   if (AccessKind == PAQAccessKind::Read) {
     Stream << "read";
   } else {
@@ -79,8 +77,7 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
   return Stream;
 }
 
-void PAQAccessMask::print(llvm::raw_ostream &Stream,
-                          std::optional<PAQAccessKind> RestrAccessKind) const {
+void PAQAccessMask::print(llvm::raw_ostream &Stream, std::optional<PAQAccessKind> RestrAccessKind) const {
   for (PAQAccessKind AccessKind : {PAQAccessKind::Write, PAQAccessKind::Read}) {
     if (RestrAccessKind && AccessKind != RestrAccessKind)
       continue;
@@ -102,8 +99,7 @@ void PAQAccessMask::print(llvm::raw_ostream &Stream,
   }
 }
 
-llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
-                                    PAQLifetimeClass LifetimeClass) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream, PAQLifetimeClass LifetimeClass) {
   StringRef String = [LifetimeClass]() {
     switch (LifetimeClass) {
     case PAQLifetimeClass::Caller_To_Caller:
@@ -137,16 +133,14 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
   return Stream;
 }
 
-static std::string
-determineSerializationInfoPrefix(const PAQPayloadConfig &PAQConfig) {
+static std::string determineSerializationInfoPrefix(const PAQPayloadConfig &PAQConfig) {
   std::string Result;
   raw_string_ostream Str{Result};
   if (cast<StructType>(PAQConfig.PayloadTy)->hasName())
     Str << PAQConfig.PayloadTy->getStructName();
   if (PAQConfig.MaxHitAttributeByteCount != 0) {
     assert(PAQConfig.MaxHitAttributeByteCount % RegisterBytes == 0);
-    Str << ".attr_max_" << PAQConfig.MaxHitAttributeByteCount / RegisterBytes
-        << "_i32s";
+    Str << ".attr_max_" << PAQConfig.MaxHitAttributeByteCount / RegisterBytes << "_i32s";
   }
   return Result;
 }
@@ -155,9 +149,8 @@ determineSerializationInfoPrefix(const PAQPayloadConfig &PAQConfig) {
 // OptNumHitAttrI32s is only set if we are generating a specialized layout for a
 // particular hit attribute size obtained from the actual hit attribute type
 // (not the max hit attribute size)
-static std::string
-determineLayoutSuffix(std::optional<PAQSerializationLayoutKind> OptLayoutKind,
-                      std::optional<uint32_t> OptNumPayloadHitAttrI32s) {
+static std::string determineLayoutSuffix(std::optional<PAQSerializationLayoutKind> OptLayoutKind,
+                                         std::optional<uint32_t> OptNumPayloadHitAttrI32s) {
   std::string Result;
   raw_string_ostream Str{Result};
   Str << "layout_";
@@ -176,8 +169,7 @@ determineLayoutSuffix(std::optional<PAQSerializationLayoutKind> OptLayoutKind,
 
 // Also used to determine the names of serialization structs,
 // hence no spaces are used.
-llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
-                                    PAQSerializationLayoutKind LayoutKind) {
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream, PAQSerializationLayoutKind LayoutKind) {
   StringRef Identifier = [LayoutKind]() {
     switch (LayoutKind) {
     case PAQSerializationLayoutKind::CallerOut:
@@ -203,12 +195,9 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Stream,
   return Stream;
 }
 
-std::optional<PAQSerializationLayoutKind>
-llvm::tryDetermineLayoutKind(PAQShaderStage ShaderStage,
-                             PAQAccessKind AccessKind) {
-  assert((AccessKind == PAQAccessKind::Read ||
-          AccessKind == PAQAccessKind::Write) &&
-         "Invalid access kind!");
+std::optional<PAQSerializationLayoutKind> llvm::tryDetermineLayoutKind(PAQShaderStage ShaderStage,
+                                                                       PAQAccessKind AccessKind) {
+  assert((AccessKind == PAQAccessKind::Read || AccessKind == PAQAccessKind::Write) && "Invalid access kind!");
   switch (ShaderStage) {
   case PAQShaderStage::Caller: {
     if (AccessKind == PAQAccessKind::Write)
@@ -238,16 +227,14 @@ llvm::tryDetermineLayoutKind(PAQShaderStage ShaderStage,
   llvm_unreachable("invalid shader stage");
 }
 
-static void printPAQNodeImpl(llvm::raw_ostream &Stream, const PAQNode &Node,
-                             int Depth) {
+static void printPAQNodeImpl(llvm::raw_ostream &Stream, const PAQNode &Node, int Depth) {
   Stream.indent(2 * (Depth + 1));
 
   // Print mask
   Stream << "Access: ";
   if (Node.AccessMask) {
     // Print partially manually to align access masks
-    for (PAQAccessKind AccessKind :
-         {PAQAccessKind::Write, PAQAccessKind::Read}) {
+    for (PAQAccessKind AccessKind : {PAQAccessKind::Write, PAQAccessKind::Read}) {
       uint64_t Begin = Stream.tell();
       Node.AccessMask->print(Stream, AccessKind);
       uint64_t CharsWritten = Stream.tell() - Begin;
@@ -308,13 +295,10 @@ void PAQSerializationLayout::print(raw_ostream &O, bool SingleLine) const {
   }
 
   // Sort by interval for output
-  SmallVector<std::pair<const PAQNode *, PAQNodeStorageInfo>, 32>
-      SortedNodeStorageInfosVector(NodeStorageInfos.begin(),
-                                   NodeStorageInfos.end());
+  SmallVector<std::pair<const PAQNode *, PAQNodeStorageInfo>, 32> SortedNodeStorageInfosVector(NodeStorageInfos.begin(),
+                                                                                               NodeStorageInfos.end());
   llvm::sort(SortedNodeStorageInfosVector,
-             [](const auto &LHS, const auto &RHS) {
-               return LHS.second.IndexIntervals < RHS.second.IndexIntervals;
-             });
+             [](const auto &LHS, const auto &RHS) { return LHS.second.IndexIntervals < RHS.second.IndexIntervals; });
 
   if (SingleLine) {
     O << *SerializationTy << " ; { ";
@@ -332,9 +316,7 @@ void PAQSerializationLayout::print(raw_ostream &O, bool SingleLine) const {
   assert(PayloadRootNode);
   auto *Indent = "  ";
 
-  auto TypeName = cast<StructType>(PayloadRootNode->Ty)->hasName()
-                      ? PayloadRootNode->Ty->getStructName()
-                      : "unnamed";
+  auto TypeName = cast<StructType>(PayloadRootNode->Ty)->hasName() ? PayloadRootNode->Ty->getStructName() : "unnamed";
   O << "Serialization layout for type " << TypeName << "\n";
 
   // Print type with body
@@ -363,12 +345,13 @@ void PAQSerializationLayout::print(raw_ostream &O, bool SingleLine) const {
 
   O << Indent << "Node storage intervals:\n";
   for (const auto &NodeWithInfo : SortedNodeStorageInfosVector) {
-    O << Indent << Indent << *NodeWithInfo.first->Ty << " at "
-      << NodeWithInfo.second << "\n";
+    O << Indent << Indent << *NodeWithInfo.first->Ty << " at " << NodeWithInfo.second << "\n";
   }
 }
 
-void PAQSerializationLayout::dump() const { print(dbgs()); }
+void PAQSerializationLayout::dump() const {
+  print(dbgs());
+}
 
 // In DXIL Metadata, read/write qualifiers are encoded in a bitmask with a
 // single bit per combination of read or write and shader stage.
@@ -382,9 +365,7 @@ void PAQSerializationLayout::dump() const { print(dbgs()); }
 // Miss       8-11
 // Anyhit     12-15
 static PAQAccessMask importPAQAccessMaskFromDXILBitMask(uint32_t DXILBitMask) {
-  auto GetAccessOffset = [](PAQAccessKind AccessKind) {
-    return AccessKind == PAQAccessKind::Read ? 0 : 1;
-  };
+  auto GetAccessOffset = [](PAQAccessKind AccessKind) { return AccessKind == PAQAccessKind::Read ? 0 : 1; };
   auto GetStageOffset = [](PAQShaderStage ShaderStage) {
     switch (ShaderStage) {
     case PAQShaderStage::Caller:
@@ -403,8 +384,7 @@ static PAQAccessMask importPAQAccessMaskFromDXILBitMask(uint32_t DXILBitMask) {
 
   PAQAccessMask Result;
   for (PAQShaderStage Stage : PAQShaderStages) {
-    for (PAQAccessKind AccessKind :
-         {PAQAccessKind::Read, PAQAccessKind::Write}) {
+    for (PAQAccessKind AccessKind : {PAQAccessKind::Read, PAQAccessKind::Write}) {
 
       uint64_t Offset = GetAccessOffset(AccessKind) + GetStageOffset(Stage);
       Result.set(Stage, AccessKind, DXILBitMask & (1u << Offset));
@@ -414,8 +394,7 @@ static PAQAccessMask importPAQAccessMaskFromDXILBitMask(uint32_t DXILBitMask) {
 }
 
 // Constexpr so we can test with static_asserts
-static constexpr PAQLifetimeClass
-lifetimeClassFromAccessMask(PAQAccessMask AccessMask) {
+static constexpr PAQLifetimeClass lifetimeClassFromAccessMask(PAQAccessMask AccessMask) {
   using Stage = PAQShaderStage;
   if (AccessMask.get(Stage::Caller, PAQAccessKind::Write)) {
     if (AccessMask.get(Stage::Caller, PAQAccessKind::Read))
@@ -424,8 +403,7 @@ lifetimeClassFromAccessMask(PAQAccessMask AccessMask) {
       return PAQLifetimeClass::Caller_To_ClosestHitAndMiss;
     if (AccessMask.get(Stage::ClosestHit, PAQAccessKind::Read))
       return PAQLifetimeClass::Caller_To_ClosestHit;
-    assert(AccessMask.get(Stage::AnyHit, PAQAccessKind::Read) &&
-           "Unexpected access mask!");
+    assert(AccessMask.get(Stage::AnyHit, PAQAccessKind::Read) && "Unexpected access mask!");
     return PAQLifetimeClass::Caller_To_AnyHit;
   }
   // write(caller) is unset
@@ -436,27 +414,23 @@ lifetimeClassFromAccessMask(PAQAccessMask AccessMask) {
       return PAQLifetimeClass::AnyHit_To_ClosestHitAndMiss;
     if (AccessMask.get(Stage::ClosestHit, PAQAccessKind::Read))
       return PAQLifetimeClass::AnyHit_To_ClosestHit;
-    assert(AccessMask.get(Stage::AnyHit, PAQAccessKind::Read) &&
-           "Unexpected access mask!");
+    assert(AccessMask.get(Stage::AnyHit, PAQAccessKind::Read) && "Unexpected access mask!");
     return PAQLifetimeClass::AnyHit_To_AnyHit;
   }
   // write(caller, anyhit) are unset
-  assert(AccessMask.get(Stage::Caller, PAQAccessKind::Read) &&
-         "Unexpected PAQ access mask!");
+  assert(AccessMask.get(Stage::Caller, PAQAccessKind::Read) && "Unexpected PAQ access mask!");
   if (AccessMask.get(Stage::ClosestHit, PAQAccessKind::Write)) {
     if (AccessMask.get(Stage::Miss, PAQAccessKind::Write))
       return PAQLifetimeClass::ClosestHitAndMiss_To_Caller;
     return PAQLifetimeClass::ClosestHit_To_Caller;
   }
-  assert(AccessMask.get(Stage::Miss, PAQAccessKind::Write) &&
-         "Unexpected PAQ access mask!");
+  assert(AccessMask.get(Stage::Miss, PAQAccessKind::Write) && "Unexpected PAQ access mask!");
   return PAQLifetimeClass::Miss_To_Caller;
 }
 
 // Helper namespace containing testing code for lifetimeClassFromAccessMask
 namespace lifetimeTest {
-static constexpr PAQAccessMask makeMask(PAQShaderStage WriteStage,
-                                        PAQShaderStage ReadStage) {
+static constexpr PAQAccessMask makeMask(PAQShaderStage WriteStage, PAQShaderStage ReadStage) {
   PAQAccessMask Result;
   Result.set(WriteStage, PAQAccessKind::Write);
   Result.set(ReadStage, PAQAccessKind::Read);
@@ -465,49 +439,30 @@ static constexpr PAQAccessMask makeMask(PAQShaderStage WriteStage,
 using Stage = PAQShaderStage;
 using Lifetime = PAQLifetimeClass;
 
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller,
-                                                   Stage::Caller)) ==
-                  Lifetime::Caller_To_Caller,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller, Stage::Caller)) == Lifetime::Caller_To_Caller,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller,
-                                                   Stage::ClosestHit)) ==
-                  Lifetime::Caller_To_ClosestHit,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller, Stage::ClosestHit)) == Lifetime::Caller_To_ClosestHit,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller,
-                                                   Stage::Miss)) ==
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller, Stage::Miss)) ==
                   Lifetime::Caller_To_ClosestHitAndMiss,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller,
-                                                   Stage::AnyHit)) ==
-                  Lifetime::Caller_To_AnyHit,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Caller, Stage::AnyHit)) == Lifetime::Caller_To_AnyHit,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit,
-                                                   Stage::Caller)) ==
-                  Lifetime::AnyHit_To_Caller,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit, Stage::Caller)) == Lifetime::AnyHit_To_Caller,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit,
-                                                   Stage::ClosestHit)) ==
-                  Lifetime::AnyHit_To_ClosestHit,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit, Stage::ClosestHit)) == Lifetime::AnyHit_To_ClosestHit,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit,
-                                                   Stage::Miss)) ==
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit, Stage::Miss)) ==
                   Lifetime::AnyHit_To_ClosestHitAndMiss,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit,
-                                                   Stage::AnyHit)) ==
-                  Lifetime::AnyHit_To_AnyHit,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::AnyHit, Stage::AnyHit)) == Lifetime::AnyHit_To_AnyHit,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::ClosestHit,
-                                                   Stage::Caller)) ==
-                  Lifetime::ClosestHit_To_Caller,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::ClosestHit, Stage::Caller)) == Lifetime::ClosestHit_To_Caller,
               "Invalid lifetime class!");
-static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Miss,
-                                                   Stage::Caller)) ==
-                  Lifetime::Miss_To_Caller,
+static_assert(lifetimeClassFromAccessMask(makeMask(Stage::Miss, Stage::Caller)) == Lifetime::Miss_To_Caller,
               "Invalid lifetime class!");
 static_assert(
-    lifetimeClassFromAccessMask(makeMask(Stage::ClosestHit, Stage::Caller)
-                                    .set(Stage::Miss, PAQAccessKind::Write)) ==
+    lifetimeClassFromAccessMask(makeMask(Stage::ClosestHit, Stage::Caller).set(Stage::Miss, PAQAccessKind::Write)) ==
         Lifetime::ClosestHitAndMiss_To_Caller,
     "Invalid lifetime class!");
 } // namespace lifetimeTest
@@ -524,19 +479,16 @@ std::optional<int64_t> tryExtractSExtIntegerFromMDOp(const MDOperand &Op) {
 // the returned object corresponding to the fields in PayloadType have no
 // children yet. If TypeAnnotationMDTuple is nullptr, all fields have
 // write(all) + read(all) access masks.
-static std::unique_ptr<PAQNode>
-createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
+static std::unique_ptr<PAQNode> createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
   StructType *PayloadStructType = dyn_cast<StructType>(&PayloadType);
   if (!PayloadStructType)
     report_fatal_error("Unexpected non-struct annotated payload type");
 
   uint32_t NumElements = PayloadStructType->getNumElements();
-  if (TypeAnnotationMDTuple &&
-      NumElements != TypeAnnotationMDTuple->getNumOperands())
+  if (TypeAnnotationMDTuple && NumElements != TypeAnnotationMDTuple->getNumOperands())
     report_fatal_error("Incorrect number of metadata entries");
 
-  std::unique_ptr<PAQNode> RootNode =
-      std::make_unique<PAQNode>(PAQNode{&PayloadType});
+  std::unique_ptr<PAQNode> RootNode = std::make_unique<PAQNode>(PAQNode{&PayloadType});
 
   // If the payload type is PAQ-annotated, create child nodes
   // with their access masks. Otherwise, set a trivial access
@@ -553,13 +505,10 @@ createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
       if (!FieldMDTuple || FieldMDTuple->getNumOperands() != 2)
         report_fatal_error("Unexpected metadata format");
 
-      std::optional<int64_t> OptTag =
-          tryExtractSExtIntegerFromMDOp(FieldMDTuple->getOperand(0));
-      std::optional<int64_t> BitMask =
-          tryExtractSExtIntegerFromMDOp(FieldMDTuple->getOperand(1));
+      std::optional<int64_t> OptTag = tryExtractSExtIntegerFromMDOp(FieldMDTuple->getOperand(0));
+      std::optional<int64_t> BitMask = tryExtractSExtIntegerFromMDOp(FieldMDTuple->getOperand(1));
       constexpr int64_t KDxilPayloadFieldAnnotationAccessTag = 0;
-      if (OptTag != KDxilPayloadFieldAnnotationAccessTag ||
-          !BitMask.has_value())
+      if (OptTag != KDxilPayloadFieldAnnotationAccessTag || !BitMask.has_value())
         report_fatal_error("Unexpected metadata format");
 
       // Only import bitmask if the value is non-zero.
@@ -577,8 +526,7 @@ createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
       // in both cases, and differentiate later on to assign the empty mask
       // for the first case.
       if (BitMask.value() != 0) {
-        ChildNode.AccessMask =
-            importPAQAccessMaskFromDXILBitMask(BitMask.value());
+        ChildNode.AccessMask = importPAQAccessMaskFromDXILBitMask(BitMask.value());
       }
 
       RootNode->Children.push_back(std::move(ChildNode));
@@ -604,9 +552,9 @@ createPayloadRootNode(Type &PayloadType, MDTuple *TypeAnnotationMDTuple) {
 // from children if uniform.
 // For leaves, the lifetime class is set from the access mask (if set).
 // For inner nodes, the lifetime class is propagated from children if uniform.
-static void createNestedStructHierarchyRecursively(
-    PAQNode &Node,
-    const MapVector<Type *, std::unique_ptr<PAQNode>> *ModulePayloadRootNodes) {
+static void
+createNestedStructHierarchyRecursively(PAQNode &Node,
+                                       const MapVector<Type *, std::unique_ptr<PAQNode>> *ModulePayloadRootNodes) {
 
   // If Node.AccessMask is unset, there are two possible cases:
   //  - Node is a nested payload field. In this case, the field was *not*
@@ -641,8 +589,7 @@ static void createNestedStructHierarchyRecursively(
         IsNestedPayload = true;
         if (It->second.get() != &Node) {
           PayloadTypeRootNode = It->second.get();
-          assert(PayloadTypeRootNode->Children.size() ==
-                     StructTy->getNumElements() &&
+          assert(PayloadTypeRootNode->Children.size() == StructTy->getNumElements() &&
                  "Inconsistent number of elements in payload PAQ node!");
         }
       }
@@ -683,8 +630,7 @@ static void createNestedStructHierarchyRecursively(
       ChildAccessMask = PayloadTypeRootNode->Children[I].AccessMask;
     }
     if (ChildrenArePrepopulated) {
-      assert(!ChildAccessMask.has_value() ||
-             Node.Children[I].AccessMask == ChildAccessMask);
+      assert(!ChildAccessMask.has_value() || Node.Children[I].AccessMask == ChildAccessMask);
     } else {
       Type *ChildTy = StructTy->getElementType(I);
       Node.Children.emplace_back();
@@ -715,16 +661,13 @@ static void createNestedStructHierarchyRecursively(
     assert(Node.AccessMask.value_or(CommonAccessMask) == CommonAccessMask);
     Node.AccessMask = CommonAccessMask;
     assert(!Node.LifetimeClass.has_value() ||
-           *Node.LifetimeClass ==
-               lifetimeClassFromAccessMask(Node.AccessMask.value()));
+           *Node.LifetimeClass == lifetimeClassFromAccessMask(Node.AccessMask.value()));
   }
 }
 
-[[maybe_unused]] static void dumpPAQTree(StructType *PayloadType,
-                                         const PAQNode &Node) {
+[[maybe_unused]] static void dumpPAQTree(StructType *PayloadType, const PAQNode &Node) {
   // print for testing
-  llvm::dbgs() << "PAQ qualifiers for payload struct " << PayloadType->getName()
-               << ":\n";
+  llvm::dbgs() << "PAQ qualifiers for payload struct " << PayloadType->getName() << ":\n";
   for (const auto &Child : Node.Children)
     llvm::dbgs() << Child;
 
@@ -743,17 +686,14 @@ static void createNestedStructHierarchyRecursively(
 // may exist in Node.
 // Note that setting an access mask for a node applies the same mask to its
 // whole subtree.
-static void createNestedStructHierarchy(
-    Type *PayloadType, PAQNode &Node,
-    const MapVector<Type *, std::unique_ptr<PAQNode>> *ModulePayloadRootNodes) {
+static void createNestedStructHierarchy(Type *PayloadType, PAQNode &Node,
+                                        const MapVector<Type *, std::unique_ptr<PAQNode>> *ModulePayloadRootNodes) {
   createNestedStructHierarchyRecursively(Node, ModulePayloadRootNodes);
   LLVM_DEBUG(dumpPAQTree(cast<StructType>(PayloadType), Node));
 }
 
-static std::unique_ptr<PAQNode>
-createTrivialHierarchicalPayloadRootNode(Type &PayloadType) {
-  std::unique_ptr<PAQNode> RootNode =
-      createPayloadRootNode(PayloadType, nullptr);
+static std::unique_ptr<PAQNode> createTrivialHierarchicalPayloadRootNode(Type &PayloadType) {
+  std::unique_ptr<PAQNode> RootNode = createPayloadRootNode(PayloadType, nullptr);
   assert(RootNode && "Failed to create PAQ tree for payload type");
   createNestedStructHierarchy(&PayloadType, *RootNode, nullptr);
   return RootNode;
@@ -803,14 +743,12 @@ createTrivialHierarchicalPayloadRootNode(Type &PayloadType) {
 // This function only imports qualifiers on direct members from DXIL metadata.
 // Recursive traversal of nested structs is done later, using the annotations on
 // the top-level payload structs collected in this first phase.
-static MapVector<Type *, std::unique_ptr<PAQNode>>
-importModulePAQRootNodes(const Module &M) {
+static MapVector<Type *, std::unique_ptr<PAQNode>> importModulePAQRootNodes(const Module &M) {
   LLVM_DEBUG(dbgs() << "Importing DXIL PAQ metadata\n");
   auto *MDName = "dx.dxrPayloadAnnotations";
   auto *MD = M.getNamedMetadata(MDName);
   if (!MD) {
-    LLVM_DEBUG(dbgs() << "PAQ: metadata " << MDName
-                      << " not found, skipping PAQ import\n");
+    LLVM_DEBUG(dbgs() << "PAQ: metadata " << MDName << " not found, skipping PAQ import\n");
     return {};
   }
 
@@ -822,8 +760,7 @@ importModulePAQRootNodes(const Module &M) {
     MDTuple *MDTup = dyn_cast<MDTuple>(Annot);
     if (!MDTup || MDTup->getNumOperands() == 0)
       continue;
-    std::optional<int64_t> OptTag =
-        tryExtractSExtIntegerFromMDOp(MDTup->getOperand(0));
+    std::optional<int64_t> OptTag = tryExtractSExtIntegerFromMDOp(MDTup->getOperand(0));
     constexpr int64_t KDxilPayloadAnnotationStructTag = 0;
     if (OptTag != KDxilPayloadAnnotationStructTag)
       continue;
@@ -856,10 +793,8 @@ importModulePAQRootNodes(const Module &M) {
       report_fatal_error("Unexpected metadata format.");
 
     Type *PayloadType = TypeConstMD->getType();
-    std::unique_ptr<PAQNode> RootNode =
-        createPayloadRootNode(*PayloadType, TypeAnnotationMDTuple);
-    bool Inserted =
-        PayloadRootNodes.insert({PayloadType, std::move(RootNode)}).second;
+    std::unique_ptr<PAQNode> RootNode = createPayloadRootNode(*PayloadType, TypeAnnotationMDTuple);
+    bool Inserted = PayloadRootNodes.insert({PayloadType, std::move(RootNode)}).second;
     (void)Inserted;
     assert(Inserted && "Duplicate PayloadType in result map!");
   }
@@ -870,19 +805,16 @@ importModulePAQRootNodes(const Module &M) {
 // Computes PAQ trees for all payload types for which DXIL payload annotation
 // metadata is present. For payload types without annotations, trivial
 // PAQ trees are created later on demand.
-static MapVector<Type *, std::unique_ptr<PAQNode>>
-importModulePayloadPAQNodes(const Module &M) {
+static MapVector<Type *, std::unique_ptr<PAQNode>> importModulePayloadPAQNodes(const Module &M) {
   // Import from metadata. This needs to happen for all structs
   // before we recursively traverse field members, because
   // payload fields can be of payload struct type, in which case
   // the qualifiers are obtained from its type.
-  MapVector<Type *, std::unique_ptr<PAQNode>> PayloadRootNodes =
-      importModulePAQRootNodes(M);
+  MapVector<Type *, std::unique_ptr<PAQNode>> PayloadRootNodes = importModulePAQRootNodes(M);
 
   // Recursively create the nested struct hierarchy
   for (auto &TypeWithInfo : PayloadRootNodes) {
-    createNestedStructHierarchy(TypeWithInfo.first, *TypeWithInfo.second,
-                                &PayloadRootNodes);
+    createNestedStructHierarchy(TypeWithInfo.first, *TypeWithInfo.second, &PayloadRootNodes);
   }
 
   return PayloadRootNodes;
@@ -924,9 +856,8 @@ void PAQNode::collectNodes(SmallVectorImpl<const PAQNode *> &Result) const {
 //    have layouts with overlapping storage for fields that cannot be
 //    simultaneously live. For example, a "write(closesthit)" field may share
 //    storage with a "write(miss)" field in a CallerIn layout.
-static MapVector<const PAQNode *, PAQIndexIntervals>
-checkSerializationLayout(const PAQSerializationLayout &Layout,
-                         const DataLayout &DL) {
+static MapVector<const PAQNode *, PAQIndexIntervals> checkSerializationLayout(const PAQSerializationLayout &Layout,
+                                                                              const DataLayout &DL) {
   StructType *SerializationTy = Layout.SerializationTy;
   if (!SerializationTy)
     return {};
@@ -981,21 +912,19 @@ checkSerializationLayout(const PAQSerializationLayout &Layout,
 //       structs. If at some point we also use inner nodes in serialization
 //       structs, we should also check consistency between a node and its
 //       ancestors (i.e. parent structs).
-[[maybe_unused]] static void checkTraceRaySerializationInfoImpl(
-    ArrayRef<const PAQSerializationLayout *> Layouts,
-    const SmallDenseMap<const PAQNode *, const PAQNode *> &EquivalentNodes,
-    const DataLayout &DL) {
+[[maybe_unused]] static void
+checkTraceRaySerializationInfoImpl(ArrayRef<const PAQSerializationLayout *> Layouts,
+                                   const SmallDenseMap<const PAQNode *, const PAQNode *> &EquivalentNodes,
+                                   const DataLayout &DL) {
   MapVector<const PAQNode *, PAQIndexIntervals> MergedNodeIntervals;
   for (const PAQSerializationLayout *Layout : Layouts) {
     StructType *SerializationTy = Layout->SerializationTy;
     if (!SerializationTy) {
       if (!Layout->NodeStorageInfos.empty())
-        report_fatal_error(
-            "Empty serialization struct but non-empty contained fields!");
+        report_fatal_error("Empty serialization struct but non-empty contained fields!");
       continue;
     }
-    MapVector<const PAQNode *, PAQIndexIntervals> NodeIntervals =
-        checkSerializationLayout(*Layout, DL);
+    MapVector<const PAQNode *, PAQIndexIntervals> NodeIntervals = checkSerializationLayout(*Layout, DL);
 
     for (const auto &NodeWithIntervals : NodeIntervals) {
       const PAQNode *Node = NodeWithIntervals.first;
@@ -1009,8 +938,7 @@ checkSerializationLayout(const PAQSerializationLayout &Layout,
       }
       // Try to insert. If already present, compare offsets
       auto InsertionResult = MergedNodeIntervals.insert({Node, Intervals});
-      const PAQIndexIntervals &ExistingIntervals =
-          InsertionResult.first->second;
+      const PAQIndexIntervals &ExistingIntervals = InsertionResult.first->second;
       if (!IsEquivalent && Intervals != ExistingIntervals) {
         report_fatal_error("Inconsistent serialization offset!");
       }
@@ -1027,8 +955,7 @@ checkSerializationLayout(const PAQSerializationLayout &Layout,
       if (PrefixRange->empty() || ContainingRange->empty())
         continue;
       if (ContainingRange->size() < PrefixRange->size() ||
-          (ContainingRange->size() == PrefixRange->size() &&
-           ContainingRange->back().End < PrefixRange->back().End)) {
+          (ContainingRange->size() == PrefixRange->size() && ContainingRange->back().End < PrefixRange->back().End)) {
         std::swap(PrefixRange, ContainingRange);
       }
 
@@ -1056,14 +983,12 @@ checkSerializationLayout(const PAQSerializationLayout &Layout,
 // HitGroupLayouts in TraceRaySerializationInfo are not checked.
 // However, if HitGroupLayout is non-null, its consistency with the
 // other layouts will be checked as well.
-[[maybe_unused]] static void checkTraceRaySerializationInfo(
-    const PAQTraceRaySerializationInfo &TraceRaySerializationInfo,
-    const DataLayout &DL,
-    const PAQHitGroupLayoutInfo *HitGroupLayout = nullptr) {
+[[maybe_unused]] static void
+checkTraceRaySerializationInfo(const PAQTraceRaySerializationInfo &TraceRaySerializationInfo, const DataLayout &DL,
+                               const PAQHitGroupLayoutInfo *HitGroupLayout = nullptr) {
 
-  SmallVector<const PAQSerializationLayout *,
-              static_cast<std::size_t>(PAQSerializationLayoutKind::Count) + 2>
-      Layouts{make_pointer_range(TraceRaySerializationInfo.LayoutsByKind)};
+  SmallVector<const PAQSerializationLayout *, static_cast<std::size_t>(PAQSerializationLayoutKind::Count) + 2> Layouts{
+      make_pointer_range(TraceRaySerializationInfo.LayoutsByKind)};
 
   SmallDenseMap<const PAQNode *, const PAQNode *> EquivalentNodes;
   if (HitGroupLayout) {
@@ -1099,19 +1024,17 @@ PAQLifetimeClassPackingOrder llvm::determineLifetimeClassPackingOrder() {
 // lifetime class its index in the ordering. This allows to quickly determine
 // the relative order of two given lifetime classes in the PackingOrder.
 using PAQLifetimeClassOrderingIndices =
-    llvm::EnumeratedArray<unsigned, PAQLifetimeClass, PAQLifetimeClass::Last,
-                          std::size_t>;
+    llvm::EnumeratedArray<unsigned, PAQLifetimeClass, PAQLifetimeClass::Last, std::size_t>;
 
-static PAQLifetimeClassOrderingIndices computeLifetimeClassOrderingIndices(
-    const PAQLifetimeClassPackingOrder &Ordering) {
+static PAQLifetimeClassOrderingIndices
+computeLifetimeClassOrderingIndices(const PAQLifetimeClassPackingOrder &Ordering) {
   PAQLifetimeClassOrderingIndices Result{};
   assert(Result.size() == Ordering.size() && "Inconsistent array lengths!");
   for (PAQLifetimeClass LifetimeClass : PAQLifetimeClasses)
     Result[LifetimeClass] = -1;
   for (unsigned I = 0; I < Ordering.size(); ++I) {
     PAQLifetimeClass LifetimeClass = Ordering[I];
-    assert(Result[LifetimeClass] == static_cast<unsigned>(-1) &&
-           "Duplicate ordering entry!");
+    assert(Result[LifetimeClass] == static_cast<unsigned>(-1) && "Duplicate ordering entry!");
     Result[LifetimeClass] = I;
   }
   return Result;
@@ -1120,24 +1043,19 @@ static PAQLifetimeClassOrderingIndices computeLifetimeClassOrderingIndices(
 // Returns whether a lifetime class is functionally live in the given layout
 // kind. Even if not live, it might be contained as dummy in the layout to
 // guarantee stable offsets of other lifetime classes.
-static bool isLiveInLayout(PAQLifetimeClass LifetimeClass,
-                           PAQSerializationLayoutKind LayoutKind) {
+static bool isLiveInLayout(PAQLifetimeClass LifetimeClass, PAQSerializationLayoutKind LayoutKind) {
   // Consistent criteria to query whether a lifetime class of type FromXXX
   // or ToXXX is live in LayoutKind
   const bool FromCaller = true;
   const bool FromAnyHit = (LayoutKind != PAQSerializationLayoutKind::CallerOut);
-  const bool FromClosestHit =
-      (LayoutKind == PAQSerializationLayoutKind::ClosestHitOut);
+  const bool FromClosestHit = (LayoutKind == PAQSerializationLayoutKind::ClosestHitOut);
   const bool FromMiss = (LayoutKind == PAQSerializationLayoutKind::MissOut);
   const bool ToCaller = true;
-  const bool ToAnyHit =
-      (LayoutKind <= PAQSerializationLayoutKind::AnyHitOutAcceptHit);
+  const bool ToAnyHit = (LayoutKind <= PAQSerializationLayoutKind::AnyHitOutAcceptHit);
   const bool ToClosestHit =
-      (LayoutKind != PAQSerializationLayoutKind::MissIn &&
-       LayoutKind <= PAQSerializationLayoutKind::ClosestHitIn);
+      (LayoutKind != PAQSerializationLayoutKind::MissIn && LayoutKind <= PAQSerializationLayoutKind::ClosestHitIn);
   const bool ToClosestHitAndMiss =
-      (LayoutKind <= std::max(PAQSerializationLayoutKind::MissIn,
-                              PAQSerializationLayoutKind::ClosestHitIn));
+      (LayoutKind <= std::max(PAQSerializationLayoutKind::MissIn, PAQSerializationLayoutKind::ClosestHitIn));
 
   switch (LifetimeClass) {
   case PAQLifetimeClass::Caller_To_Caller:
@@ -1182,8 +1100,7 @@ static bool isLiveInLayout(PAQLifetimeClass LifetimeClass,
 // or PAQSerializationLayoutKind.
 using LayoutBitmask = uint8_t;
 static constexpr uint64_t MaxNumLayoutsInBitmask = 8 * sizeof(LayoutBitmask);
-static_assert(static_cast<std::size_t>(PAQSerializationLayoutKind::Count) <=
-                  MaxNumLayoutsInBitmask,
+static_assert(static_cast<std::size_t>(PAQSerializationLayoutKind::Count) <= MaxNumLayoutsInBitmask,
               "Increase BitMask width");
 
 // Used from LayoutComputer if the serialization does not fit into registers
@@ -1195,8 +1112,7 @@ static std::unique_ptr<PAQNode> createPayloadMemPointerNode(Module &M) {
 
   // Use a single I32 to store the pointer
   Type *I32 = Type::getInt32Ty(M.getContext());
-  return std::make_unique<PAQNode>(
-      PAQNode{I32, {}, AccessMask, lifetimeClassFromAccessMask(AccessMask)});
+  return std::make_unique<PAQNode>(PAQNode{I32, {}, AccessMask, lifetimeClassFromAccessMask(AccessMask)});
 }
 
 namespace {
@@ -1293,9 +1209,7 @@ public:
     // Set of all node infos to be possibly included in one of the layouts.
     SmallVector<NodeInfo, 16> NodeInfos = {};
     // We generate one result layout per layout info
-    SmallVector<LayoutInfo,
-                static_cast<std::size_t>(PAQSerializationLayoutKind::Count)>
-        LayoutInfos = {};
+    SmallVector<LayoutInfo, static_cast<std::size_t>(PAQSerializationLayoutKind::Count)> LayoutInfos = {};
     // Storage is allocated greedily, ordered by PAQLifetimeClass as in
     // PackingOrder
     PAQLifetimeClassPackingOrder PackingOrder = {};
@@ -1316,9 +1230,7 @@ public:
 
   struct Result {
     // Computed layouts, in order.
-    SmallVector<PAQSerializationLayout,
-                static_cast<std::size_t>(PAQSerializationLayoutKind::Count)>
-        Layouts;
+    SmallVector<PAQSerializationLayout, static_cast<std::size_t>(PAQSerializationLayoutKind::Count)> Layouts;
 
     // Non-null if a payload memory pointer is required
     std::unique_ptr<PAQNode> PayloadMemPointerNode;
@@ -1336,8 +1248,7 @@ private:
   LayoutComputer(const CreateInfo &CInfo) : CInfo{CInfo} {}
 
   Result run() {
-    assert(CInfo.LayoutInfos.size() <= MaxNumLayoutsInBitmask &&
-           "Too many layouts");
+    assert(CInfo.LayoutInfos.size() <= MaxNumLayoutsInBitmask && "Too many layouts");
 
     prepareSortedNodeInfos();
     computeAllocation();
@@ -1370,10 +1281,8 @@ private:
 
     // Tries to allocate the given fixed intervals.
     // Returns true on success.
-    bool tryAllocateFixedIntervals(const PAQIndexIntervals &FixedIndexIntervals,
-                                   LayoutBitmask LivenessBitmask,
-                                   unsigned MaxNumI32s,
-                                   unsigned &NumAllocatedI32s) {
+    bool tryAllocateFixedIntervals(const PAQIndexIntervals &FixedIndexIntervals, LayoutBitmask LivenessBitmask,
+                                   unsigned MaxNumI32s, unsigned &NumAllocatedI32s) {
       NumAllocatedI32s = 0;
       for (const PAQIndexInterval &Interval : FixedIndexIntervals) {
         assert(Interval.size() != 0 && "Trying to allocate empty interval!");
@@ -1382,8 +1291,7 @@ private:
           return false;
         }
         ensureSize(Interval.End);
-        for (unsigned I32Index = Interval.Begin; I32Index < Interval.End;
-             ++I32Index) {
+        for (unsigned I32Index = Interval.Begin; I32Index < Interval.End; ++I32Index) {
           // Check for overlap
           if (UsageMatrix[I32Index] & LivenessBitmask)
             return false;
@@ -1403,24 +1311,20 @@ private:
       SortedNodeInfos.push_back(&NodeInfo);
     }
 
-    PAQLifetimeClassOrderingIndices OrderingIndices =
-        computeLifetimeClassOrderingIndices(CInfo.PackingOrder);
+    PAQLifetimeClassOrderingIndices OrderingIndices = computeLifetimeClassOrderingIndices(CInfo.PackingOrder);
 
-    auto GetSortKey =
-        [&](const NodeInfo &Info) -> std::tuple<unsigned, unsigned> {
+    auto GetSortKey = [&](const NodeInfo &Info) -> std::tuple<unsigned, unsigned> {
       // Nodes with fixed assignments come first
       unsigned Order = Info.FixedIndexIntervals.empty() ? 1 : 0;
       const auto &OptLifetimeClass = Info.Node->LifetimeClass;
-      unsigned LifetimeClassIndex =
-          OptLifetimeClass ? OrderingIndices[OptLifetimeClass.value()] : 0;
+      unsigned LifetimeClassIndex = OptLifetimeClass ? OrderingIndices[OptLifetimeClass.value()] : 0;
       return {Order, LifetimeClassIndex};
     };
 
     // stable_sort so original order is preserved if possible
-    std::stable_sort(SortedNodeInfos.begin(), SortedNodeInfos.end(),
-                     [GetSortKey](const NodeInfo *LHS, const NodeInfo *RHS) {
-                       return GetSortKey(*LHS) < GetSortKey(*RHS);
-                     });
+    std::stable_sort(
+        SortedNodeInfos.begin(), SortedNodeInfos.end(),
+        [GetSortKey](const NodeInfo *LHS, const NodeInfo *RHS) { return GetSortKey(*LHS) < GetSortKey(*RHS); });
   }
 
   // Sets OptAllocation.
@@ -1474,9 +1378,8 @@ private:
       // Handle case that the node has pre-assigned indices first
       if (!NodeInfo->FixedIndexIntervals.empty()) {
         unsigned NumAllocatedI32s = 0;
-        if (!Allocation->tryAllocateFixedIntervals(
-                NodeInfo->FixedIndexIntervals, LivenessBitmask, MaxNumI32s,
-                NumAllocatedI32s)) {
+        if (!Allocation->tryAllocateFixedIntervals(NodeInfo->FixedIndexIntervals, LivenessBitmask, MaxNumI32s,
+                                                   NumAllocatedI32s)) {
           // Failure. Reset allocation and return.
           OptAllocation.reset();
           return;
@@ -1525,31 +1428,23 @@ private:
   }
 
   void addPayloadMemPointer() {
-    assert(PayloadMemPointerNode == nullptr &&
-           "Payload mem pointer already initialized!");
+    assert(PayloadMemPointerNode == nullptr && "Payload mem pointer already initialized!");
     PayloadMemPointerNode = createPayloadMemPointerNode(CInfo.M);
-    PAQIndexInterval Interval = {FirstPayloadMemoryPointerRegister,
-                                 FirstPayloadMemoryPointerRegister + 1};
-    PayloadMemPointerNodeInfo =
-        NodeInfo{PayloadMemPointerNode.get(), {Interval}, LayoutBitmask(-1)};
-    SortedNodeInfos.insert(SortedNodeInfos.begin(),
-                           &PayloadMemPointerNodeInfo.value());
+    PAQIndexInterval Interval = {FirstPayloadMemoryPointerRegister, FirstPayloadMemoryPointerRegister + 1};
+    PayloadMemPointerNodeInfo = NodeInfo{PayloadMemPointerNode.get(), {Interval}, LayoutBitmask(-1)};
+    SortedNodeInfos.insert(SortedNodeInfos.begin(), &PayloadMemPointerNodeInfo.value());
   }
 
-  PAQSerializationLayout
-  createSerializationLayout(const I32Allocation &Allocation,
-                            unsigned LayoutIndex) const {
+  PAQSerializationLayout createSerializationLayout(const I32Allocation &Allocation, unsigned LayoutIndex) const {
     PAQSerializationLayout Layout = {};
-    for (unsigned NodeIndex = 0; NodeIndex < SortedNodeInfos.size();
-         ++NodeIndex) {
+    for (unsigned NodeIndex = 0; NodeIndex < SortedNodeInfos.size(); ++NodeIndex) {
       const NodeInfo *NInfo = SortedNodeInfos[NodeIndex];
       assert(NInfo->Node && "Nullptr node in layout!");
       // Check whether this node is included in the current layout
       if ((NInfo->LivenessBitmask & (1u << LayoutIndex)) == 0)
         continue;
 
-      Layout.NodeStorageInfos[NInfo->Node] =
-          PAQNodeStorageInfo{Allocation.NodeIndexIntervals[NodeIndex]};
+      Layout.NodeStorageInfos[NInfo->Node] = PAQNodeStorageInfo{Allocation.NodeIndexIntervals[NodeIndex]};
 
       for (const auto &Interval : Allocation.NodeIndexIntervals[NodeIndex]) {
         assert(Interval.size() != 0 && "Unexpected empty interval!");
@@ -1560,8 +1455,7 @@ private:
     if (Layout.NumStorageI32s) {
       Type *I32 = Type::getInt32Ty(CInfo.M.getContext());
       ArrayType *ArrType = ArrayType::get(I32, Layout.NumStorageI32s);
-      Layout.SerializationTy =
-          StructType::create({ArrType}, CInfo.LayoutInfos[LayoutIndex].Name);
+      Layout.SerializationTy = StructType::create({ArrType}, CInfo.LayoutInfos[LayoutIndex].Name);
     }
 
     Layout.PayloadMemPointerNode = PayloadMemPointerNode.get();
@@ -1575,10 +1469,8 @@ private:
     Result Result{};
     Result.MaxNumI32s = Allocation.numUsedI32s();
     Result.Layouts.reserve(CInfo.LayoutInfos.size());
-    for (unsigned LayoutIndex = 0; LayoutIndex < CInfo.LayoutInfos.size();
-         ++LayoutIndex) {
-      Result.Layouts.push_back(
-          createSerializationLayout(Allocation, LayoutIndex));
+    for (unsigned LayoutIndex = 0; LayoutIndex < CInfo.LayoutInfos.size(); ++LayoutIndex) {
+      Result.Layouts.push_back(createSerializationLayout(Allocation, LayoutIndex));
     }
     Result.PayloadMemPointerNode = std::move(PayloadMemPointerNode);
     return Result;
@@ -1595,8 +1487,7 @@ private:
 
 } // namespace
 
-static std::unique_ptr<PAQNode>
-createHitAttributeStorageNode(Module &M, uint64_t PayloadHitAttrI32s) {
+static std::unique_ptr<PAQNode> createHitAttributeStorageNode(Module &M, uint64_t PayloadHitAttrI32s) {
   assert(PayloadHitAttrI32s && "Attempting to create empty hit attribute node");
   Type *I32 = Type::getInt32Ty(M.getContext());
   Type *I32Arr = ArrayType::get(I32, PayloadHitAttrI32s);
@@ -1604,8 +1495,7 @@ createHitAttributeStorageNode(Module &M, uint64_t PayloadHitAttrI32s) {
   AccessMask.set(PAQShaderStage::AnyHit, PAQAccessKind::Write);
   AccessMask.set(PAQShaderStage::AnyHit, PAQAccessKind::Read);
   AccessMask.set(PAQShaderStage::ClosestHit, PAQAccessKind::Read);
-  return std::make_unique<PAQNode>(
-      PAQNode{I32Arr, {}, AccessMask, lifetimeClassFromAccessMask(AccessMask)});
+  return std::make_unique<PAQNode>(PAQNode{I32Arr, {}, AccessMask, lifetimeClassFromAccessMask(AccessMask)});
 }
 
 // Table indexed by PAQLifetimeClass containing liveness bitmasks,
@@ -1613,19 +1503,16 @@ createHitAttributeStorageNode(Module &M, uint64_t PayloadHitAttrI32s) {
 // In other words, the j-th bit in the i-th bitmask specifies whether
 // PAQLifetimeClass i is live in PAQSerializationLayoutKind j.
 using LivenessBitmaskTable =
-    llvm::EnumeratedArray<LayoutBitmask, PAQLifetimeClass,
-                          PAQLifetimeClass::Last, std::size_t>;
+    llvm::EnumeratedArray<LayoutBitmask, PAQLifetimeClass, PAQLifetimeClass::Last, std::size_t>;
 
 static const LivenessBitmaskTable &getLivenessBitmaskTable() {
   static const LivenessBitmaskTable LivenessTable = []() {
     LivenessBitmaskTable Initializer = {};
     for (PAQLifetimeClass LifetimeClass : PAQLifetimeClasses) {
-      for (PAQSerializationLayoutKind LayoutKind :
-           PAQSerializationLayoutKinds) {
+      for (PAQSerializationLayoutKind LayoutKind : PAQSerializationLayoutKinds) {
         bool IsLive = isLiveInLayout(LifetimeClass, LayoutKind);
         if (IsLive) {
-          Initializer[LifetimeClass] |=
-              (1u << static_cast<std::size_t>(LayoutKind));
+          Initializer[LifetimeClass] |= (1u << static_cast<std::size_t>(LayoutKind));
         }
       }
     }
@@ -1636,23 +1523,19 @@ static const LivenessBitmaskTable &getLivenessBitmaskTable() {
 }
 
 // LayoutComputer wrapper for TraceRay
-static LayoutComputer::Result
-computeTraceRayLayouts(Module &M, ArrayRef<const PAQNode *> Nodes,
-                       const PAQNode *HitAttributesNode,
-                       const PAQNode *PayloadRootNode,
-                       unsigned PayloadRegisterCount, StringRef NamePrefix) {
+static LayoutComputer::Result computeTraceRayLayouts(Module &M, ArrayRef<const PAQNode *> Nodes,
+                                                     const PAQNode *HitAttributesNode, const PAQNode *PayloadRootNode,
+                                                     unsigned PayloadRegisterCount, StringRef NamePrefix) {
   LayoutComputer::CreateInfo LayoutCreateInfo = {M};
   LayoutCreateInfo.LayoutInfos.reserve(PAQSerializationLayoutKinds.size());
 
   for (auto LayoutKind : PAQSerializationLayoutKinds) {
     std::string TypeName;
     raw_string_ostream TypeNameStream(TypeName);
-    TypeNameStream << NamePrefix << "."
-                   << determineLayoutSuffix(LayoutKind, {});
+    TypeNameStream << NamePrefix << "." << determineLayoutSuffix(LayoutKind, {});
     LayoutComputer::LayoutInfo LayoutInfo = {TypeNameStream.str()};
     // We rely on using layout kinds as index into layout infos
-    assert(static_cast<std::size_t>(LayoutKind) ==
-           LayoutCreateInfo.LayoutInfos.size());
+    assert(static_cast<std::size_t>(LayoutKind) == LayoutCreateInfo.LayoutInfos.size());
     LayoutCreateInfo.LayoutInfos.push_back({LayoutInfo});
   }
 
@@ -1661,23 +1544,19 @@ computeTraceRayLayouts(Module &M, ArrayRef<const PAQNode *> Nodes,
   LayoutCreateInfo.PackingOrder = determineLifetimeClassPackingOrder();
   LayoutCreateInfo.PayloadRegisterCount = PayloadRegisterCount;
 
-  const LivenessBitmaskTable &BitmaskByLifetimeClass =
-      getLivenessBitmaskTable();
+  const LivenessBitmaskTable &BitmaskByLifetimeClass = getLivenessBitmaskTable();
 
   for (const PAQNode *Node : Nodes) {
     assert(Node);
-    LayoutBitmask LivenessBitmask =
-        BitmaskByLifetimeClass[Node->LifetimeClass.value()];
+    LayoutBitmask LivenessBitmask = BitmaskByLifetimeClass[Node->LifetimeClass.value()];
     LayoutComputer::NodeInfo NodeInfo = {Node, {}, LivenessBitmask};
     if (Node == HitAttributesNode) {
       // fix hit attribute registers
-      assert(Node->Ty->isArrayTy() &&
-             Node->Ty->getArrayElementType()->isIntegerTy(32) &&
+      assert(Node->Ty->isArrayTy() && Node->Ty->getArrayElementType()->isIntegerTy(32) &&
              "Hit attribute storage must be i32 array!");
       unsigned NumHitAttributeI32s = Node->Ty->getArrayNumElements();
       NodeInfo.FixedIndexIntervals = {
-          {FirstPayloadHitAttributeStorageRegister,
-           FirstPayloadHitAttributeStorageRegister + NumHitAttributeI32s}};
+          {FirstPayloadHitAttributeStorageRegister, FirstPayloadHitAttributeStorageRegister + NumHitAttributeI32s}};
     }
     LayoutCreateInfo.NodeInfos.push_back(NodeInfo);
   }
@@ -1685,14 +1564,12 @@ computeTraceRayLayouts(Module &M, ArrayRef<const PAQNode *> Nodes,
   return LayoutComputer::create(LayoutCreateInfo);
 }
 
-std::unique_ptr<PAQTraceRaySerializationInfo>
-PAQTraceRaySerializationInfo::create(Module &M,
-                                     const PAQPayloadConfig &PAQConfig,
-                                     const PAQNode &RootNode,
-                                     uint64_t PayloadRegisterCount) {
+std::unique_ptr<PAQTraceRaySerializationInfo> PAQTraceRaySerializationInfo::create(Module &M,
+                                                                                   const PAQPayloadConfig &PAQConfig,
+                                                                                   const PAQNode &RootNode,
+                                                                                   uint64_t PayloadRegisterCount) {
   assert(PAQConfig.PayloadTy == RootNode.Ty);
-  std::unique_ptr<PAQTraceRaySerializationInfo> Result =
-      std::make_unique<PAQTraceRaySerializationInfo>();
+  std::unique_ptr<PAQTraceRaySerializationInfo> Result = std::make_unique<PAQTraceRaySerializationInfo>();
   Result->PayloadRootNode = &RootNode;
   Result->PAQConfig = PAQConfig;
 
@@ -1707,16 +1584,14 @@ PAQTraceRaySerializationInfo::create(Module &M,
   // registers, e.g. in case no intersection shaders are present.
   assert(PAQConfig.MaxHitAttributeByteCount <= GlobalMaxHitAttributeBytes);
   const uint32_t MaxInlineHitAttrBytes = getInlineHitAttrsBytes(M);
-  const uint32_t InlineHitAttrBytes =
-      std::min(MaxInlineHitAttrBytes, PAQConfig.MaxHitAttributeByteCount);
-  const uint64_t PayloadHitAttrI32s = divideCeil(
-      PAQConfig.MaxHitAttributeByteCount - InlineHitAttrBytes, RegisterBytes);
+  const uint32_t InlineHitAttrBytes = std::min(MaxInlineHitAttrBytes, PAQConfig.MaxHitAttributeByteCount);
+  const uint64_t PayloadHitAttrI32s =
+      divideCeil(PAQConfig.MaxHitAttributeByteCount - InlineHitAttrBytes, RegisterBytes);
 
   if (PayloadHitAttrI32s != 0) {
     // Add node representing hit attribute storage
     Result->MaximumNumHitAttributesI32s = PayloadHitAttrI32s;
-    Result->WorstCaseHitAttributesNode =
-        createHitAttributeStorageNode(M, PayloadHitAttrI32s);
+    Result->WorstCaseHitAttributesNode = createHitAttributeStorageNode(M, PayloadHitAttrI32s);
   }
 
   // Compute set of individual layouts using LayoutComputer
@@ -1724,16 +1599,14 @@ PAQTraceRaySerializationInfo::create(Module &M,
   Result->collectAllNodes(Nodes);
   std::string NamePrefix = determineSerializationInfoPrefix(PAQConfig);
   LayoutComputer::Result LayoutResult = computeTraceRayLayouts(
-      M, Nodes, Result->WorstCaseHitAttributesNode.get(),
-      Result->PayloadRootNode, PayloadRegisterCount, NamePrefix);
+      M, Nodes, Result->WorstCaseHitAttributesNode.get(), Result->PayloadRootNode, PayloadRegisterCount, NamePrefix);
 
   // Move layouts to Result, and do dumping and checking
   Result->MaxStorageI32s = LayoutResult.MaxNumI32s;
   // This may be nullptr if registers suffice
   Result->PayloadMemPointerNode = std::move(LayoutResult.PayloadMemPointerNode);
   for (PAQSerializationLayoutKind LayoutKind : PAQSerializationLayoutKinds) {
-    Result->LayoutsByKind[LayoutKind] =
-        std::move(LayoutResult.Layouts[static_cast<std::size_t>(LayoutKind)]);
+    Result->LayoutsByKind[LayoutKind] = std::move(LayoutResult.Layouts[static_cast<std::size_t>(LayoutKind)]);
     // For lit testing: Dump type information
     LLVM_DEBUG(Result->LayoutsByKind[LayoutKind].print(dbgs(), true));
   }
@@ -1744,33 +1617,28 @@ PAQTraceRaySerializationInfo::create(Module &M,
   return Result;
 }
 
-PAQHitGroupLayoutInfo PAQTraceRaySerializationInfo::createHitGroupLayoutInfo(
-    Module &M, uint32_t PayloadHitAttrI32s) const {
+PAQHitGroupLayoutInfo PAQTraceRaySerializationInfo::createHitGroupLayoutInfo(Module &M,
+                                                                             uint32_t PayloadHitAttrI32s) const {
 
   PAQHitGroupLayoutInfo HitGroupLayoutInfo{};
   HitGroupLayoutInfo.NumHitAttributesI32s = PayloadHitAttrI32s;
 
   if (PayloadHitAttrI32s != 0) {
     // Add node representing hit attribute storage of reduced size
-    HitGroupLayoutInfo.HitAttributesNode =
-        createHitAttributeStorageNode(M, PayloadHitAttrI32s);
+    HitGroupLayoutInfo.HitAttributesNode = createHitAttributeStorageNode(M, PayloadHitAttrI32s);
   }
 
   for (PAQSerializationLayoutKind LayoutKind :
-       {PAQSerializationLayoutKind::AnyHitOutAcceptHit,
-        PAQSerializationLayoutKind::ClosestHitIn}) {
+       {PAQSerializationLayoutKind::AnyHitOutAcceptHit, PAQSerializationLayoutKind::ClosestHitIn}) {
     const PAQSerializationLayout &DefaultLayout = LayoutsByKind[LayoutKind];
 
     // Look up storage interval of hit attributes in default layout
-    auto It =
-        DefaultLayout.NodeStorageInfos.find(WorstCaseHitAttributesNode.get());
+    auto It = DefaultLayout.NodeStorageInfos.find(WorstCaseHitAttributesNode.get());
     assert(It != DefaultLayout.NodeStorageInfos.end());
     const PAQNodeStorageInfo &HitAtttrsSI = It->second;
-    assert(HitAtttrsSI.IndexIntervals.size() == 1 &&
-           "Hit attributes must be contiguous!");
+    assert(HitAtttrsSI.IndexIntervals.size() == 1 && "Hit attributes must be contiguous!");
     PAQIndexInterval HitAttrInterval = HitAtttrsSI.IndexIntervals[0];
-    PAQIndexInterval NewHitAttrInterval = {
-        HitAttrInterval.Begin, HitAttrInterval.Begin + PayloadHitAttrI32s};
+    PAQIndexInterval NewHitAttrInterval = {HitAttrInterval.Begin, HitAttrInterval.Begin + PayloadHitAttrI32s};
 
     // Start with copy, then specialize
     PAQSerializationLayout Layout = DefaultLayout;
@@ -1778,10 +1646,8 @@ PAQHitGroupLayoutInfo PAQTraceRaySerializationInfo::createHitGroupLayoutInfo(
     // Update hit attribute index interval and hit attribute node
     Layout.NodeStorageInfos.erase(WorstCaseHitAttributesNode.get());
     if (HitGroupLayoutInfo.HitAttributesNode) {
-      Layout.NodeStorageInfos[HitGroupLayoutInfo.HitAttributesNode.get()] = {
-          {NewHitAttrInterval}};
-      Layout.HitAttributeStorageNode =
-          HitGroupLayoutInfo.HitAttributesNode.get();
+      Layout.NodeStorageInfos[HitGroupLayoutInfo.HitAttributesNode.get()] = {{NewHitAttrInterval}};
+      Layout.HitAttributeStorageNode = HitGroupLayoutInfo.HitAttributesNode.get();
     } else {
       Layout.HitAttributeStorageNode = nullptr;
     }
@@ -1803,12 +1669,10 @@ PAQHitGroupLayoutInfo PAQTraceRaySerializationInfo::createHitGroupLayoutInfo(
       std::string NewTypeName;
       raw_string_ostream NewTypeNameStream(NewTypeName);
       NewTypeNameStream << determineSerializationInfoPrefix(PAQConfig) << "."
-                        << determineLayoutSuffix(LayoutKind,
-                                                 PayloadHitAttrI32s);
+                        << determineLayoutSuffix(LayoutKind, PayloadHitAttrI32s);
       Type *I32 = Type::getInt32Ty(M.getContext());
       ArrayType *ArrType = ArrayType::get(I32, Layout.NumStorageI32s);
-      Layout.SerializationTy =
-          StructType::create({ArrType}, NewTypeNameStream.str());
+      Layout.SerializationTy = StructType::create({ArrType}, NewTypeNameStream.str());
 
       // For lit testing: Dump type information
       LLVM_DEBUG(Layout.print(dbgs(), true));
@@ -1829,17 +1693,15 @@ PAQHitGroupLayoutInfo PAQTraceRaySerializationInfo::createHitGroupLayoutInfo(
   return HitGroupLayoutInfo;
 }
 
-[[maybe_unused]] static void
-checkCallShaderSerializationInfo(const PAQCallShaderSerializationInfo &Info,
-                                 const DataLayout &DL) {
+[[maybe_unused]] static void checkCallShaderSerializationInfo(const PAQCallShaderSerializationInfo &Info,
+                                                              const DataLayout &DL) {
   checkSerializationLayout(Info.CallShaderSerializationLayout, DL);
 }
 
 // LayoutComputer wrapper for CallShader
-static LayoutComputer::Result
-computeCallShaderLayout(Module &M, ArrayRef<const PAQNode *> Nodes,
-                        const PAQNode *PayloadRootNode,
-                        unsigned PayloadRegisterCount, StringRef NamePrefix) {
+static LayoutComputer::Result computeCallShaderLayout(Module &M, ArrayRef<const PAQNode *> Nodes,
+                                                      const PAQNode *PayloadRootNode, unsigned PayloadRegisterCount,
+                                                      StringRef NamePrefix) {
   std::string TypeName;
   raw_string_ostream TypeNameStream(TypeName);
   TypeNameStream << NamePrefix
@@ -1861,20 +1723,17 @@ computeCallShaderLayout(Module &M, ArrayRef<const PAQNode *> Nodes,
 }
 
 std::unique_ptr<PAQCallShaderSerializationInfo>
-PAQCallShaderSerializationInfo::create(Module &M,
-                                       const PAQPayloadConfig &PAQConfig,
-                                       const PAQNode &PAQRootNode,
+PAQCallShaderSerializationInfo::create(Module &M, const PAQPayloadConfig &PAQConfig, const PAQNode &PAQRootNode,
                                        uint64_t PayloadRegisterCount) {
   assert(PAQConfig.PayloadTy == PAQRootNode.Ty);
-  std::unique_ptr<PAQCallShaderSerializationInfo> Result =
-      std::make_unique<PAQCallShaderSerializationInfo>();
+  std::unique_ptr<PAQCallShaderSerializationInfo> Result = std::make_unique<PAQCallShaderSerializationInfo>();
   Result->PayloadRootNode = &PAQRootNode;
 
   SmallVector<const PAQNode *, 16> Nodes;
   Result->collectAllNodes(Nodes);
   std::string NamePrefix = determineSerializationInfoPrefix(PAQConfig);
-  LayoutComputer::Result LayoutResult = computeCallShaderLayout(
-      M, Nodes, Result->PayloadRootNode, PayloadRegisterCount, NamePrefix);
+  LayoutComputer::Result LayoutResult =
+      computeCallShaderLayout(M, Nodes, Result->PayloadRootNode, PayloadRegisterCount, NamePrefix);
 
   // may be nullptr if registers suffice
   Result->PayloadMemPointerNode = std::move(LayoutResult.PayloadMemPointerNode);
@@ -1894,17 +1753,14 @@ PAQCallShaderSerializationInfo::create(Module &M,
   return Result;
 }
 
-PAQSerializationInfoManager::PAQSerializationInfoManager(
-    Module *M, Module *GpurtLibrary, uint32_t MaxPayloadRegCount)
-    : Mod{M}, GpurtLibrary{GpurtLibrary},
-      MaxPayloadRegisterCount(MaxPayloadRegCount) {
+PAQSerializationInfoManager::PAQSerializationInfoManager(Module *M, Module *GpurtLibrary, uint32_t MaxPayloadRegCount)
+    : Mod{M}, GpurtLibrary{GpurtLibrary}, MaxPayloadRegisterCount(MaxPayloadRegCount) {
   TraceRayCache.PAQRootNodes = importModulePayloadPAQNodes(*M);
 }
 
 PAQSerializationInfoBase &
-PAQSerializationInfoManager::getOrCreateSerializationInfo(
-    const PAQPayloadConfig &PayloadConfig,
-    lgc::rt::RayTracingShaderStage ShaderKind) {
+PAQSerializationInfoManager::getOrCreateSerializationInfo(const PAQPayloadConfig &PayloadConfig,
+                                                          lgc::rt::RayTracingShaderStage ShaderKind) {
   switch (ShaderKind) {
   case lgc::rt::RayTracingShaderStage::RayGeneration:
     llvm_unreachable("RayGen does not have an incoming payload");
@@ -1921,26 +1777,22 @@ PAQSerializationInfoManager::getOrCreateSerializationInfo(
 }
 
 PAQTraceRaySerializationInfo &
-PAQSerializationInfoManager::getOrCreateTraceRaySerializationInfo(
-    const PAQPayloadConfig &PAQConfig) {
-  return TraceRayCache.getOrCreateSerializationInfo(
-      *GpurtLibrary, MaxPayloadRegisterCount, PAQConfig);
+PAQSerializationInfoManager::getOrCreateTraceRaySerializationInfo(const PAQPayloadConfig &PAQConfig) {
+  return TraceRayCache.getOrCreateSerializationInfo(*GpurtLibrary, MaxPayloadRegisterCount, PAQConfig);
 }
 
 PAQCallShaderSerializationInfo &
-PAQSerializationInfoManager::getOrCreateCallShaderSerializationInfo(
-    const PAQPayloadConfig &PAQConfig) {
+PAQSerializationInfoManager::getOrCreateCallShaderSerializationInfo(const PAQPayloadConfig &PAQConfig) {
   // Ensure caching doesn't depend on irrelevant fields
   PAQPayloadConfig PAQConfigWithRelevantData = PAQConfig;
   PAQConfigWithRelevantData.MaxHitAttributeByteCount = 0;
-  return CallShaderCache.getOrCreateSerializationInfo(
-      *GpurtLibrary, MaxPayloadRegisterCount, PAQConfigWithRelevantData);
+  return CallShaderCache.getOrCreateSerializationInfo(*GpurtLibrary, MaxPayloadRegisterCount,
+                                                      PAQConfigWithRelevantData);
 }
 
 template <typename SerializationInfoT>
-SerializationInfoT &PAQSerializationInfoManager::PAQCache<SerializationInfoT>::
-    getOrCreateSerializationInfo(Module &M, uint32_t MaxPayloadRegisterCount,
-                                 const PAQPayloadConfig &PAQConfig) {
+SerializationInfoT &PAQSerializationInfoManager::PAQCache<SerializationInfoT>::getOrCreateSerializationInfo(
+    Module &M, uint32_t MaxPayloadRegisterCount, const PAQPayloadConfig &PAQConfig) {
   auto It = SerializationInfos.find(PAQConfig);
   if (It != SerializationInfos.end())
     return *It->second;
@@ -1950,52 +1802,43 @@ SerializationInfoT &PAQSerializationInfoManager::PAQCache<SerializationInfoT>::
   if (PAQNodeIt != PAQRootNodes.end()) {
     PAQRootNode = PAQNodeIt->second.get();
   } else {
-    auto PAQRootNodeUniquePtr =
-        createTrivialHierarchicalPayloadRootNode(*PAQConfig.PayloadTy);
+    auto PAQRootNodeUniquePtr = createTrivialHierarchicalPayloadRootNode(*PAQConfig.PayloadTy);
     PAQRootNode = PAQRootNodeUniquePtr.get();
     PAQRootNodes.insert({PAQConfig.PayloadTy, std::move(PAQRootNodeUniquePtr)});
   }
 
   // Compute info
-  std::unique_ptr<SerializationInfoT> Info = SerializationInfoT::create(
-      M, PAQConfig, *PAQRootNode, MaxPayloadRegisterCount);
-  auto InsertionResult =
-      SerializationInfos.insert({PAQConfig, std::move(Info)});
+  std::unique_ptr<SerializationInfoT> Info =
+      SerializationInfoT::create(M, PAQConfig, *PAQRootNode, MaxPayloadRegisterCount);
+  auto InsertionResult = SerializationInfos.insert({PAQConfig, std::move(Info)});
   assert(InsertionResult.second && "Unexpected map duplicate!");
 
   return *InsertionResult.first->second;
 }
 
-uint32_t PAQSerializationInfoManager::getMaxPayloadStorageI32s(
-    const PAQPayloadConfig &PAQConfig,
-    MaxPayloadStorageConsideration Consideration) {
+uint32_t PAQSerializationInfoManager::getMaxPayloadStorageI32s(const PAQPayloadConfig &PAQConfig,
+                                                               MaxPayloadStorageConsideration Consideration) {
   if (!PAQConfig.PayloadTy)
     return 0;
 
   uint32_t Result = 0;
 
   if (Consideration == MaxPayloadStorageConsideration::ConsiderOnlyTraceRay ||
-      Consideration ==
-          MaxPayloadStorageConsideration::ConsiderTraceRayAndCallShader) {
-    Result = std::max(
-        Result, getOrCreateTraceRaySerializationInfo(PAQConfig).MaxStorageI32s);
+      Consideration == MaxPayloadStorageConsideration::ConsiderTraceRayAndCallShader) {
+    Result = std::max(Result, getOrCreateTraceRaySerializationInfo(PAQConfig).MaxStorageI32s);
   }
 
   if (Consideration == MaxPayloadStorageConsideration::ConsiderOnlyCallShader ||
-      Consideration ==
-          MaxPayloadStorageConsideration::ConsiderTraceRayAndCallShader) {
-    Result = std::max(
-        Result,
-        getOrCreateCallShaderSerializationInfo(PAQConfig).MaxStorageI32s);
+      Consideration == MaxPayloadStorageConsideration::ConsiderTraceRayAndCallShader) {
+    Result = std::max(Result, getOrCreateCallShaderSerializationInfo(PAQConfig).MaxStorageI32s);
   }
 
   return Result;
 }
 
 const PAQSerializationLayout &
-PAQSerializationInfoManager::getOrCreateTraceRayLayout(
-    PAQTraceRaySerializationInfo &TraceRayInfo,
-    PAQSerializationLayoutKind LayoutKind, Type *HitAttributesTy) {
+PAQSerializationInfoManager::getOrCreateTraceRayLayout(PAQTraceRaySerializationInfo &TraceRayInfo,
+                                                       PAQSerializationLayoutKind LayoutKind, Type *HitAttributesTy) {
 
   if (LayoutKind != PAQSerializationLayoutKind::AnyHitOutAcceptHit &&
       LayoutKind != PAQSerializationLayoutKind::ClosestHitIn)
@@ -2006,18 +1849,15 @@ PAQSerializationInfoManager::getOrCreateTraceRayLayout(
   // create a specialized layout with reduced hit attribute storage size.
   assert(HitAttributesTy && "Hit attributes type required!");
 
-  uint64_t AttrsBytes =
-      Mod->getDataLayout().getTypeStoreSize(HitAttributesTy).getFixedValue();
+  uint64_t AttrsBytes = Mod->getDataLayout().getTypeStoreSize(HitAttributesTy).getFixedValue();
   if (AttrsBytes > TraceRayInfo.PAQConfig.MaxHitAttributeByteCount)
     report_fatal_error("Hit attributes are too large!");
   uint64_t InlineHitAttrsBytes = getInlineHitAttrsBytes(*GpurtLibrary);
-  uint64_t AttrsInPayloadBytes =
-      AttrsBytes > InlineHitAttrsBytes ? AttrsBytes - InlineHitAttrsBytes : 0;
+  uint64_t AttrsInPayloadBytes = AttrsBytes > InlineHitAttrsBytes ? AttrsBytes - InlineHitAttrsBytes : 0;
 
   // Number of I32s required in the payload storage
   uint64_t PayloadHitAttrI32s = divideCeil(AttrsInPayloadBytes, RegisterBytes);
-  assert(PayloadHitAttrI32s <= TraceRayInfo.MaximumNumHitAttributesI32s &&
-         "Hit attributes are too large!");
+  assert(PayloadHitAttrI32s <= TraceRayInfo.MaximumNumHitAttributesI32s && "Hit attributes are too large!");
   if (PayloadHitAttrI32s == TraceRayInfo.MaximumNumHitAttributesI32s) {
     // Hit attributes have maximum size, no need to use specialized layout
     return TraceRayInfo.LayoutsByKind[LayoutKind];
@@ -2028,60 +1868,43 @@ PAQSerializationInfoManager::getOrCreateTraceRayLayout(
   auto It = HitGroupLayouts.find(PayloadHitAttrI32s);
   if (It == HitGroupLayouts.end()) {
     // Create new specialized hit group layout
-    PAQHitGroupLayoutInfo HitGroupLayout =
-        TraceRayInfo.createHitGroupLayoutInfo(*Mod, PayloadHitAttrI32s);
-    It = HitGroupLayouts.insert({PayloadHitAttrI32s, std::move(HitGroupLayout)})
-             .first;
+    PAQHitGroupLayoutInfo HitGroupLayout = TraceRayInfo.createHitGroupLayoutInfo(*Mod, PayloadHitAttrI32s);
+    It = HitGroupLayouts.insert({PayloadHitAttrI32s, std::move(HitGroupLayout)}).first;
   }
   const PAQHitGroupLayoutInfo &HitGroupLayoutInfo = It->second;
   if (LayoutKind == PAQSerializationLayoutKind::AnyHitOutAcceptHit)
     return HitGroupLayoutInfo.AnyHitOutAcceptHitLayout;
 
-  assert(LayoutKind == PAQSerializationLayoutKind::ClosestHitIn &&
-         "Unexpected layout kind!");
+  assert(LayoutKind == PAQSerializationLayoutKind::ClosestHitIn && "Unexpected layout kind!");
   return HitGroupLayoutInfo.ClosestHitInLayout;
 }
 
-const PAQSerializationLayout &
-PAQSerializationInfoManager::getOrCreateShaderStartSerializationLayout(
-    PAQSerializationInfoBase &SerializationInfo,
-    lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy) {
+const PAQSerializationLayout &PAQSerializationInfoManager::getOrCreateShaderStartSerializationLayout(
+    PAQSerializationInfoBase &SerializationInfo, lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy) {
 
   assert(ShaderKind != lgc::rt::RayTracingShaderStage::RayGeneration &&
-         ShaderKind != lgc::rt::RayTracingShaderStage::Intersection &&
-         "Invalid shader kind!");
+         ShaderKind != lgc::rt::RayTracingShaderStage::Intersection && "Invalid shader kind!");
   if (ShaderKind == lgc::rt::RayTracingShaderStage::Callable)
-    return cast<PAQCallShaderSerializationInfo>(SerializationInfo)
-        .CallShaderSerializationLayout;
+    return cast<PAQCallShaderSerializationInfo>(SerializationInfo).CallShaderSerializationLayout;
 
   // Always set for non-intersection
-  PAQShaderStage ShaderStage =
-      rtShaderStageToPAQShaderStage(ShaderKind).value();
+  PAQShaderStage ShaderStage = rtShaderStageToPAQShaderStage(ShaderKind).value();
   // Always set for non-caller, non-intersection read access
-  PAQSerializationLayoutKind LayoutKind =
-      tryDetermineLayoutKind(ShaderStage, PAQAccessKind::Read).value();
-  return getOrCreateTraceRayLayout(
-      cast<PAQTraceRaySerializationInfo>(SerializationInfo), LayoutKind,
-      HitAttributesTy);
+  PAQSerializationLayoutKind LayoutKind = tryDetermineLayoutKind(ShaderStage, PAQAccessKind::Read).value();
+  return getOrCreateTraceRayLayout(cast<PAQTraceRaySerializationInfo>(SerializationInfo), LayoutKind, HitAttributesTy);
 }
 
-const PAQSerializationLayout &
-PAQSerializationInfoManager::getOrCreateShaderExitSerializationLayout(
-    PAQSerializationInfoBase &SerializationInfo,
-    lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy,
+const PAQSerializationLayout &PAQSerializationInfoManager::getOrCreateShaderExitSerializationLayout(
+    PAQSerializationInfoBase &SerializationInfo, lgc::rt::RayTracingShaderStage ShaderKind, Type *HitAttributesTy,
     AnyHitExitKind AHExitKind) {
 
   assert(ShaderKind != lgc::rt::RayTracingShaderStage::RayGeneration &&
-         ShaderKind != lgc::rt::RayTracingShaderStage::Intersection &&
-         "Invalid shader kind!");
+         ShaderKind != lgc::rt::RayTracingShaderStage::Intersection && "Invalid shader kind!");
   if (ShaderKind == lgc::rt::RayTracingShaderStage::Callable)
-    return cast<PAQCallShaderSerializationInfo>(SerializationInfo)
-        .CallShaderSerializationLayout;
+    return cast<PAQCallShaderSerializationInfo>(SerializationInfo).CallShaderSerializationLayout;
 
-  PAQShaderStage ShaderStage =
-      rtShaderStageToPAQShaderStage(ShaderKind).value();
-  std::optional<PAQSerializationLayoutKind> OptLayoutKind =
-      tryDetermineLayoutKind(ShaderStage, PAQAccessKind::Write);
+  PAQShaderStage ShaderStage = rtShaderStageToPAQShaderStage(ShaderKind).value();
+  std::optional<PAQSerializationLayoutKind> OptLayoutKind = tryDetermineLayoutKind(ShaderStage, PAQAccessKind::Write);
   if (!OptLayoutKind) {
     // Only for anyhit there are multiple outgoing layout alternatives
     assert(ShaderStage == PAQShaderStage::AnyHit && "Unexpected shader stage!");
@@ -2089,14 +1912,12 @@ PAQSerializationInfoManager::getOrCreateShaderExitSerializationLayout(
     if (AHExitKind == AnyHitExitKind::IgnoreHit) {
       OptLayoutKind = PAQSerializationLayoutKind::AnyHitOutIgnoreHit;
     } else if (AHExitKind == AnyHitExitKind::AcceptHitAndEndSearch) {
-      OptLayoutKind =
-          PAQSerializationLayoutKind::AnyHitOutAcceptHitAndEndSearch;
+      OptLayoutKind = PAQSerializationLayoutKind::AnyHitOutAcceptHitAndEndSearch;
     } else {
       assert(AHExitKind == AnyHitExitKind::AcceptHit);
       OptLayoutKind = PAQSerializationLayoutKind::AnyHitOutAcceptHit;
     }
   }
-  return getOrCreateTraceRayLayout(
-      cast<PAQTraceRaySerializationInfo>(SerializationInfo),
-      OptLayoutKind.value(), HitAttributesTy);
+  return getOrCreateTraceRayLayout(cast<PAQTraceRaySerializationInfo>(SerializationInfo), OptLayoutKind.value(),
+                                   HitAttributesTy);
 }

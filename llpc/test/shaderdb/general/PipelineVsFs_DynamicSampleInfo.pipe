@@ -244,6 +244,6 @@ attribute[1].offset = 16
 ; SHADERTEST-NEXT:    [[TMP91:%.*]] = extractelement <4 x float> [[TMP87]], i32 3
 ; SHADERTEST-NEXT:    [[TMP92:%.*]] = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float [[TMP88]], float [[TMP89]])
 ; SHADERTEST-NEXT:    [[TMP93:%.*]] = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float [[TMP90]], float [[TMP91]])
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.compr.v2f16(i32 immarg 0, i32 immarg 15, <2 x half> [[TMP92]], <2 x half> [[TMP93]], i1 immarg true, i1 immarg true) #[[ATTR10:[0-9]+]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.compr.v2f16(i32 0, i32 15, <2 x half> [[TMP92]], <2 x half> [[TMP93]], i1 true, i1 true)
 ; SHADERTEST-NEXT:    ret void
 ;

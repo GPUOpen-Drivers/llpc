@@ -30,6 +30,7 @@
  */
 
 #include "compilerutils/CompilerUtils.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"

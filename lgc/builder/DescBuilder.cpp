@@ -28,6 +28,7 @@
  * @brief LLPC source file: implementation of Builder methods for descriptor loads
  ***********************************************************************************************************************
  */
+#include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
@@ -55,9 +56,10 @@ using namespace llvm;
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
 // @param stride : stride for index mode access
+// @param convertFatPointer : Whether to convert to a fat pointer
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
-                                     unsigned stride, const Twine &instName) {
+                                     unsigned stride, bool convertFatPointer, const Twine &instName) {
   Value *desc = nullptr;
   bool return64Address = false;
   descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
@@ -94,6 +96,9 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
   if (!node)
     report_fatal_error("Resource node not found");
 
+  const bool isCompact = (node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
+                                   node->concreteType == ResourceNodeType::DescriptorConstBufferCompact));
+
   if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
     // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
     // indexed and is not an InlineBuffer.
@@ -113,12 +118,27 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     desc = create<LoadUserDataOp>(descTy, dwordOffset * 4);
     if (return64Address)
       return desc;
+    assert(convertFatPointer);
+    if (isCompact) {
+      desc = CreateBitCast(desc, getInt64Ty());
+      if (stride == 0)
+        desc = create<BufferAddrToPtrOp>(desc);
+      else
+        desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride));
+    } else {
+      desc = create<BufferDescToPtrOp>(desc);
+    }
   } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
     // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
     Value *descPtr = getDescPtr(node->concreteType, topNode, node, binding);
     if (return64Address)
       return descPtr;
-    desc = buildInlineBufferDesc(descPtr, stride);
+    assert(convertFatPointer);
+    desc = CreatePtrToInt(descPtr, getInt64Ty());
+    if (stride == 0)
+      desc = create<BufferAddrToPtrOp>(desc);
+    else
+      desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride));
   } else {
     ResourceNodeType resType = node->concreteType;
     ResourceNodeType abstractType = node->abstractType;
@@ -144,31 +164,17 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     }
 
     // Cast it to the right type.
-    descPtr = CreateBitCast(descPtr, getDescPtrTy(resType));
-    // Load the descriptor.
-    desc = CreateLoad(getDescTy(resType), descPtr);
-
-    {
-      // Force convert the buffer view to raw view.
-      if (flags & BufferFlagForceRawView) {
-        Value *desc1 = CreateExtractElement(desc, 1);
-        Value *desc2 = CreateExtractElement(desc, 2);
-        Value *desc3 = CreateExtractElement(desc, 3);
-        // stride is 14 bits in dword1[29:16]
-        Value *stride = CreateAnd(CreateLShr(desc1, getInt32(16)), getInt32(0x3fff));
-        stride = CreateBinaryIntrinsic(Intrinsic::smax, stride, getInt32(1));
-        // set srd with new stride = 0 and new num_record = stride * num_record, num_record is dword2[31:0]
-        desc = CreateInsertElement(desc, CreateAnd(desc1, getInt32(0xc000ffff)), 1);
-        desc = CreateInsertElement(desc, CreateMul(stride, desc2), 2);
-        // gfx10 and gfx11 have oob fields with 2 bits in dword3[29:28] here force to set to 3 as OOB_COMPLETE mode.
-        desc = CreateInsertElement(desc, CreateOr(desc3, getInt32(0x30000000)), 3);
-      }
+    descPtr = CreateBitCast(descPtr, getDescPtrTy());
+    if (convertFatPointer) {
+      bool forceRawView = flags & BufferFlagForceRawView;
+      if (stride == 0)
+        desc = create<BufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact);
+      else
+        desc = create<StridedBufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact, getInt32(stride));
+    } else {
+      // Load the descriptor.
+      desc = CreateLoad(getDescTy(resType), descPtr);
     }
-  }
-
-  if (node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
-               node->concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
-    desc = buildBufferCompactDesc(desc, stride);
   }
 
   if (!instName.isTriviallyEmpty())
@@ -235,7 +241,7 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
         // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
         // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
         // expect the caller to handle it.
-        return PoisonValue::get(getDescPtrTy(concreteType));
+        return PoisonValue::get(getDescPtrTy());
       }
       assert(node && "missing resource node");
     }
@@ -274,8 +280,7 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
     descPtr = getDescPtr(concreteType, topNode, node, binding);
   }
 
-  // Cast to the right pointer type.
-  return CreateBitCast(descPtr, getDescPtrTy(concreteType));
+  return descPtr;
 }
 
 // =====================================================================================================================
@@ -353,6 +358,7 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, const ResourceNode
   AddressExtender extender(GetInsertBlock()->getParent());
   Value *descPtr = create<LoadUserDataOp>(getInt32Ty(), topNode->offsetInDwords * 4);
   descPtr = extender.extend(descPtr, highHalf, getPtrTy(ADDR_SPACE_CONST), *this);
+  CreateAssumptionDereferenceableAndAlign(descPtr, ~0u, 4);
   return CreateConstGEP1_32(getInt8Ty(), descPtr, offsetInBytes);
 }
 
@@ -369,46 +375,36 @@ Value *BuilderImpl::scalarizeIfUniform(Value *value, bool isNonUniform) {
 }
 
 // =====================================================================================================================
-// Calculate a buffer descriptor for an inline buffer
-//
-// @param descPtr : Pointer to inline buffer
-// @param stride :  stride for the buffer descriptor to access in index mode
-Value *BuilderImpl::buildInlineBufferDesc(Value *descPtr, unsigned stride) {
-  // Bitcast the pointer to v2i32
-  descPtr = CreatePtrToInt(descPtr, getInt64Ty());
-  descPtr = CreateBitCast(descPtr, FixedVectorType::get(getInt32Ty(), 2));
-
-  return buildBufferCompactDesc(descPtr, stride);
-}
-
-// =====================================================================================================================
 // Build buffer compact descriptor
 //
 // @param desc : The buffer descriptor base to build for the buffer compact descriptor
 // @param stride :  stride for the buffer descriptor to access in index mode
 Value *BuilderImpl::buildBufferCompactDesc(Value *desc, unsigned stride) {
+  // Bitcast the pointer to v2i32
+  desc = CreatePtrToInt(desc, getInt64Ty());
+  desc = CreateBitCast(desc, FixedVectorType::get(getInt32Ty(), 2));
   const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // Extract compact buffer descriptor
-  Value *descElem0 = CreateExtractElement(desc, uint64_t(0));
-  Value *descElem1 = CreateExtractElement(desc, 1);
+  Value *addrLo = CreateExtractElement(desc, uint64_t(0));
+  Value *addrHi = CreateExtractElement(desc, 1);
 
   // Build normal buffer descriptor
   Value *bufDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), 4));
   {
     // Dword 0
-    bufDesc = CreateInsertElement(bufDesc, descElem0, uint64_t(0));
+    bufDesc = CreateInsertElement(bufDesc, addrLo, uint64_t(0));
 
     // Dword 1
     SqBufRsrcWord1 sqBufRsrcWord1 = {};
     sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
-    descElem1 = CreateAnd(descElem1, getInt32(sqBufRsrcWord1.u32All));
+    addrHi = CreateAnd(addrHi, getInt32(sqBufRsrcWord1.u32All));
     if (stride) {
       SqBufRsrcWord1 sqBufRsrcWord1Stride = {};
       sqBufRsrcWord1Stride.bits.stride = stride;
-      descElem1 = CreateOr(descElem1, getInt32(sqBufRsrcWord1Stride.u32All));
+      addrHi = CreateOr(addrHi, getInt32(sqBufRsrcWord1Stride.u32All));
     }
-    bufDesc = CreateInsertElement(bufDesc, descElem1, 1);
+    bufDesc = CreateInsertElement(bufDesc, addrHi, 1);
 
     // Dword 2
     SqBufRsrcWord2 sqBufRsrcWord2 = {};

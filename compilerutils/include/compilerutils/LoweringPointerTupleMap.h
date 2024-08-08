@@ -37,7 +37,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace compilerutils {
+namespace CompilerUtils {
 
 /// @brief A key-value map from pointer keys to tuples of pointers that is optimized for value and type lowering uses
 ///
@@ -252,4 +252,4 @@ private:
   }
 };
 
-} // namespace compilerutils
+} // namespace CompilerUtils

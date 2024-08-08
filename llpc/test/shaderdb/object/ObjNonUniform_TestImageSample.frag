@@ -28,17 +28,17 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 0
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 384
-; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 24
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512,
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512,
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512,
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 896,
+; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 536,
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST-COUNT-12: call i32 @llvm.amdgcn.readfirstlane
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: {{%[0-9]*}} = call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: {{%[0-9]*}} = bitcast float {{%[0-9]*}} to i32
-; SHADERTEST: {{%[0-9]*}} = call i32 @llvm.amdgcn.readfirstlane(i32 {{%[0-9]*}})
+; SHADERTEST: {{%[0-9]*}} = call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 {{%[0-9]*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

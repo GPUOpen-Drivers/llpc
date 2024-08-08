@@ -132,15 +132,18 @@ enum MemberType : unsigned {
   MemberTypeGpurtOption,                  // VFX member type: SectionGpurtOption
   MemberTypeExtendedRobustness,           // VFX member type: SectionExtendedRobustness
   MemberTypeAdvancedBlendInfo,            // VFX member type: SectionAdvancedBlendInfo
-  MemberTypeGlAttribLocation,             // GL vertex attribute location
-  MemberTypeGlShaderInfo,                 // GL SPIRV parameters
-  MemberTypeGlVertexAttrib,               // GL vertex input attribute
-  MemberTypeGlVertexBinding,              // GL vertex input binding
-  MemberTypeGlVertexFormat,               // GL vertex attribute format
-  MemberTypeGlSpirvPipelineLayout,        // GL SPIRV explicit pipeline layout
-  MemberTypeGlPatchParameter,             // GL program patch parameter
-  MemberTypeGlSpeicalizeUniformDesc,      // GL program specialized uniform
-  MemberTypeGlFfxTexturekey,              // GL FFX texture key
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
+  MemberTypeGlState, // VFX member type: SectionGlState
+#endif
+  MemberTypeGlAttribLocation,        // GL vertex attribute location
+  MemberTypeGlShaderInfo,            // GL SPIRV parameters
+  MemberTypeGlVertexAttrib,          // GL vertex input attribute
+  MemberTypeGlVertexBinding,         // GL vertex input binding
+  MemberTypeGlVertexFormat,          // GL vertex attribute format
+  MemberTypeGlSpirvPipelineLayout,   // GL SPIRV explicit pipeline layout
+  MemberTypeGlPatchParameter,        // GL program patch parameter
+  MemberTypeGlSpeicalizeUniformDesc, // GL program specialized uniform
+  MemberTypeGlFfxTexturekey,         // GL FFX texture key
 };
 
 // =====================================================================================================================

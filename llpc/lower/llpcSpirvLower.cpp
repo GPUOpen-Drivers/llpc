@@ -33,6 +33,7 @@
 #include "LowerPostInline.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerCfgMerges.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
@@ -182,8 +183,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
   if (lowerFlag.isRayTracing) {
     assert(context->getPipelineType() == PipelineType::RayTracing);
-    auto *pipelineInfo = static_cast<const RayTracingPipelineBuildInfo *>(context->getPipelineBuildInfo());
-    if (pipelineInfo->mode != Vkgc::LlpcRaytracingMode::Continuations) {
+    if (!static_cast<RayTracingContext *>(context->getPipelineContext())->isContinuationsMode()) {
       passMgr.addPass(SpirvLowerRayTracing());
       passMgr.addPass(AlwaysInlinerPass());
     }
@@ -215,7 +215,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 // @param [in/out] passMgr : Pass manager
 void SpirvLower::registerTranslationPasses(lgc::PassManager &passMgr) {
   passMgr.registerPass("llpc-spirv-lower-translator", SpirvLowerTranslator::name());
-  passMgr.registerPass("llpc-spirv-lower-ray-query", SpirvLowerRayQuery::name());
   passMgr.registerPass("llpc-spirv-lower-gpurt-library", SpirvProcessGpuRtLibrary::name());
 }
 

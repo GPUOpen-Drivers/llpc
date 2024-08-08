@@ -3,24 +3,24 @@
 
 %struct.Payload = type { float, i32, i64, i32 }
 
-declare !types !0 i32 @_AmdValueI32Count(%struct.Payload*)
+declare !pointeetys !0 i32 @_AmdValueI32Count(%struct.Payload*)
 
-declare !types !2 i32 @_AmdValueGetI32(%struct.Payload*, i32)
+declare !pointeetys !0 i32 @_AmdValueGetI32(%struct.Payload*, i32)
 
-declare !types !3 void @_AmdValueSetI32(%struct.Payload*, i32, i32)
+declare !pointeetys !0 void @_AmdValueSetI32(%struct.Payload*, i32, i32)
 
-define i32 @count(%struct.Payload* %pl) !types !0 {
+define i32 @count(%struct.Payload* %pl) !pointeetys !0 {
 ; CHECK-LABEL: define i32 @count
-; CHECK-SAME: (ptr [[PL:%.*]]) !types [[META1:![0-9]+]] {
+; CHECK-SAME: (ptr [[PL:%.*]]) !pointeetys [[META1:![0-9]+]] {
 ; CHECK-NEXT:    ret i32 5
 ;
   %val = call i32 @_AmdValueI32Count(%struct.Payload* %pl)
   ret i32 %val
 }
 
-define i32 @get(%struct.Payload* %pl) !types !0 {
+define i32 @get(%struct.Payload* %pl) !pointeetys !0 {
 ; CHECK-LABEL: define i32 @get
-; CHECK-SAME: (ptr [[PL:%.*]]) !types [[META1]] {
+; CHECK-SAME: (ptr [[PL:%.*]]) !pointeetys [[META1]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[PL]], i32 2
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    ret i32 [[TMP2]]
@@ -29,9 +29,9 @@ define i32 @get(%struct.Payload* %pl) !types !0 {
   ret i32 %val
 }
 
-define void @set(%struct.Payload* %pl, i32 %val) !types !4 {
+define void @set(%struct.Payload* %pl, i32 %val) !pointeetys !0 {
 ; CHECK-LABEL: define void @set
-; CHECK-SAME: (ptr [[PL:%.*]], i32 [[VAL:%.*]]) !types [[META3:![0-9]+]] {
+; CHECK-SAME: (ptr [[PL:%.*]], i32 [[VAL:%.*]]) !pointeetys [[META3:![0-9]+]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[PL]], i32 2
 ; CHECK-NEXT:    store i32 [[VAL]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    ret void
@@ -42,9 +42,5 @@ define void @set(%struct.Payload* %pl, i32 %val) !types !4 {
 
 !continuation.stackAddrspace = !{!5}
 
-!0 = !{!"function", i32 poison, !1}
-!1 = !{i32 0, %struct.Payload poison}
-!2 = !{!"function", i32 poison, !1, i32 poison}
-!3 = !{!"function", !"void", !1, i32 poison, i32 poison}
-!4 = !{!"function", !"void", !1, i32 poison}
+!0 = !{%struct.Payload poison}
 !5 = !{i32 21}

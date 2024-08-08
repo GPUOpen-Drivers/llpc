@@ -11,8 +11,28 @@
 [Version]
 version = 53
 
-[rgenSpvFile]
-fileName = Shader_0xF10BE264545A9F4B.spv
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(binding = 1, set = 0, rgba32f) uniform image2D g_dst;
+
+layout(location = 0) rayPayloadEXT vec3 g_ray;
+
+void main() {
+  vec3 origin;
+  origin.x = gl_LaunchIDEXT.x;
+  origin.y = gl_LaunchIDEXT.y;
+  origin.z = 0;
+
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff, 
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              origin.xyz, /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 0);
+
+  imageStore(g_dst, ivec2(gl_LaunchIDEXT.xy), vec4(g_ray, 0));
+}
 
 [rgenInfo]
 entryPoint = main
@@ -41,8 +61,14 @@ options.disableLicmThreshold = 0
 options.unrollHintThreshold = 0
 options.dontUnrollHintThreshold = 0
 
-[missSpvFile]
-fileName = Shader_0xE7D0EF376FDDEA56.spv
+[missGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+void main()
+{
+}
+
 
 [missInfo]
 entryPoint = main
@@ -71,8 +97,16 @@ options.disableLicmThreshold = 0
 options.unrollHintThreshold = 0
 options.dontUnrollHintThreshold = 0
 
-[chitSpvFile]
-fileName = Shader_0x04BDF3B158225AFA.spv
+[chitGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+layout(location = 0) rayPayloadInEXT vec3 hitValue;
+
+void main()
+{
+    hitValue = vec3(3, 4, 5);
+}
 
 [chitInfo]
 entryPoint = main
@@ -101,38 +135,14 @@ options.disableLicmThreshold = 0
 options.unrollHintThreshold = 0
 options.dontUnrollHintThreshold = 0
 
-[chitSpvFile]
-fileName = Shader_0x89ABD17F2942EFC4.spv
+[sectGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : enable
 
-[chitInfo]
-entryPoint = main
-options.trapPresent = 0
-options.debugMode = 0
-options.enablePerformanceData = 0
-options.allowReZ = 0
-options.vgprLimit = 0
-options.sgprLimit = 0
-options.maxThreadGroupsPerComputeUnit = 0
-options.waveSize = 0
-options.wgpMode = 0
-options.waveBreakSize = None
-options.forceLoopUnrollCount = 0
-options.useSiScheduler = 0
-options.updateDescInElf = 0
-options.allowVaryWaveSize = 0
-options.enableLoadScalarizer = 0
-options.disableLicm = 0
-options.unrollThreshold = 0
-options.scalarThreshold = 0
-options.disableLoopUnroll = 0
-options.fp32DenormalMode = Auto
-options.adjustDepthImportVrs = 0
-options.disableLicmThreshold = 0
-options.unrollHintThreshold = 0
-options.dontUnrollHintThreshold = 0
-
-[sectSpvFile]
-fileName = Shader_0xAD98DA756C353EFE.spv
+void main()
+{
+    reportIntersectionEXT(0.5, 0u);
+}
 
 [sectInfo]
 entryPoint = main

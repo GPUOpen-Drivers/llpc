@@ -68,7 +68,7 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
 
   if (!needLowerClipVertex() && !needLowerFrontColor() && !needLowerBackColor() && !needLowerFrontSecondaryColor() &&
       !needLowerBackSecondaryColor() && !needEmulateDrawPixels() && !needEmulateTwoSideLighting() &&
-      !needEmulateBitmap() && !needLowerFragColor())
+      !needEmulateBitmap() && !needLowerFragColor() && !needEmulateSmoothStipple())
     return PreservedAnalyses::all();
 
   buildPatchPositionInfo();
@@ -94,6 +94,9 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
   if (needEmulateDrawPixels())
     emulateDrawPixels();
 
+  if (needEmulateSmoothStipple())
+    emulateSmoothStipple();
+
   // Two side lighting patch should place just before bitmap patch.
   if (needEmulateTwoSideLighting())
     emulateTwoSideLighting();
@@ -115,6 +118,7 @@ bool LowerGLCompatibility::needRun() {
                                                   ->getPipelineShaderInfo(m_shaderStage)
                                                   ->pModuleData);
     auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+    auto options = m_context->getPipelineContext()->getPipelineOptions();
     result |= moduleData->usage.useClipVertex;
     result |= moduleData->usage.useFrontColor;
     result |= moduleData->usage.useBackColor;
@@ -125,6 +129,9 @@ bool LowerGLCompatibility::needRun() {
     result |= buildInfo->glState.enableBitmap;
     result |= buildInfo->glState.enableBitmapLsb;
     result |= buildInfo->glState.enableColorClampFs;
+    result |= options->getGlState().enablePolygonStipple;
+    result |= options->getGlState().enableLineSmooth;
+    result |= options->getGlState().enablePointSmooth;
   }
   return result;
 }
@@ -136,7 +143,7 @@ bool LowerGLCompatibility::needRun() {
 unsigned LowerGLCompatibility::getUniformLocation(llvm::GlobalVariable *var) {
   assert(var->getType()->getAddressSpace() == SPIRAS_Uniform && var->hasMetadata(gSPIRVMD::UniformConstant));
   MDNode *metaNode = var->getMetadata(gSPIRVMD::UniformConstant);
-  return mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(3))->getZExtValue();
+  return mdconst::extract<ConstantInt>(metaNode->getOperand(3))->getZExtValue();
 }
 
 // =====================================================================================================================
@@ -280,7 +287,7 @@ void LowerGLCompatibility::collectEmulationResource() {
       llvm::SmallVector<ShaderInOutMetadata> mds;
       MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
       assert(metaNode);
-      auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+      auto inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
       auto valueType = global.getValueType();
       bool isStructureOrArrayOfStructure =
           (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
@@ -310,7 +317,7 @@ void LowerGLCompatibility::collectEmulationResource() {
       llvm::SmallVector<ShaderInOutMetadata> mds;
       MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
       assert(metaNode);
-      auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+      auto inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
       auto valueType = global.getValueType();
       bool isStructureOrArrayOfStructure =
           (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
@@ -384,7 +391,7 @@ void LowerGLCompatibility::collectEmulationResource() {
     auto glOut = cast<GlobalVariable>(m_out);
     MDNode *metaNode = glOut->getMetadata(gSPIRVMD::InOut);
     assert(metaNode);
-    auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+    auto inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
     for (User *user : m_out->users()) {
       SmallVector<Value *> indexOperands;
       // The user is a GEP
@@ -510,8 +517,16 @@ bool LowerGLCompatibility::needEmulateTwoSideLighting() {
 // Check whether need do emulate for bitmap.
 bool LowerGLCompatibility::needEmulateBitmap() {
   auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  return (m_shaderStage == ShaderStageFragment) && buildInfo->glState.enableBitmap;
+}
+
+// =====================================================================================================================
+// Check whether need do emulate point/line smooth and line/polygon stipple.
+bool LowerGLCompatibility::needEmulateSmoothStipple() {
+  auto options = m_context->getPipelineContext()->getPipelineOptions();
   return (m_shaderStage == ShaderStageFragment) &&
-         (buildInfo->glState.enableBitmap || buildInfo->glState.enableBitmapLsb);
+         (options->getGlState().enablePolygonStipple || options->getGlState().enableLineSmooth ||
+          options->getGlState().enablePointSmooth);
 }
 
 // =====================================================================================================================
@@ -887,6 +902,221 @@ void LowerGLCompatibility::emulateBitmap() {
   val = m_builder->CreateExtractElement(val, ConstantInt::get(int32Type, 0));
   auto cmp = m_builder->CreateICmpEQ(val, ConstantInt::get(int32Type, 0));
   m_builder->CreateCondBr(cmp, m_entryPointEnd, m_originalEntryBlock);
+}
+
+// =====================================================================================================================
+// Patch alpha scaling factor to the 4th channel of a fragment output, excluding built-in variables.
+//
+// @param [in] val           : input value for alpha scaling, which is an output in fragment stage.
+// @param [in] valTy         : current input value's type, should be global's valueType in top-level.
+// @param [in] metaVal       : metadata value of current output variable.
+// @param [in] alphaScaleVal : calculated alpha scaling results, default value is one.
+void LowerGLCompatibility::patchAlphaScaling(Value *val, Type *valTy, Constant *metaVal, Value *alphaScaleVal) {
+  ShaderInOutMetadata outputMeta = {};
+
+  if (valTy->isArrayTy()) {
+    outputMeta.U64All[0] = cast<ConstantInt>(metaVal->getOperand(2))->getZExtValue();
+    outputMeta.U64All[1] = cast<ConstantInt>(metaVal->getOperand(3))->getZExtValue();
+
+    if (!outputMeta.IsBuiltIn) {
+      auto elemMeta = cast<Constant>(metaVal->getOperand(1));
+      const uint64_t elemCount = val->getType()->getArrayNumElements();
+      for (unsigned idx = 0; idx < elemCount; ++idx) {
+        Value *elem = m_builder->CreateExtractValue(val, {idx}, "");
+        patchAlphaScaling(elem, elem->getType(), elemMeta, alphaScaleVal);
+      }
+    }
+  } else if (valTy->isStructTy()) {
+    const uint64_t memberCount = val->getType()->getStructNumElements();
+    for (unsigned memberIdx = 0; memberIdx < memberCount; ++memberIdx) {
+      auto memberMeta = cast<Constant>(metaVal->getOperand(memberIdx));
+      Value *member = m_builder->CreateExtractValue(val, {memberIdx});
+      patchAlphaScaling(member, member->getType(), memberMeta, alphaScaleVal);
+    }
+  } else {
+    Constant *inOutMetaConst = cast<Constant>(metaVal);
+    outputMeta.U64All[0] = cast<ConstantInt>(inOutMetaConst->getOperand(0))->getZExtValue();
+    outputMeta.U64All[1] = cast<ConstantInt>(inOutMetaConst->getOperand(1))->getZExtValue();
+
+    // When enabling line smooth, alpha channel will be patched with a scaling factor.
+    if (!outputMeta.IsBuiltIn && outputMeta.NumComponents == 4 && alphaScaleVal) {
+      Value *outputValue = m_builder->CreateLoad(valTy, val);
+      Value *scaledAlpha = m_builder->CreateExtractElement(outputValue, 3);
+      Value *alphaScaleFactor = m_builder->CreateLoad(m_builder->getFloatTy(), alphaScaleVal);
+      scaledAlpha = m_builder->CreateFMul(alphaScaleFactor, scaledAlpha);
+      outputValue = m_builder->CreateInsertElement(outputValue, scaledAlpha, m_builder->getInt32(3));
+      m_builder->CreateStore(outputValue, val);
+    }
+  }
+}
+
+// =====================================================================================================================
+// Emulate for point/line smooth and line/polygon stipple.
+void LowerGLCompatibility::emulateSmoothStipple() {
+  auto options = m_context->getPipelineContext()->getPipelineOptions();
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  bool needYInvert = pipelineBuildInfo->getGlState().originUpperLeft;
+  m_builder->SetInsertPointPastAllocas(m_entryPoint);
+  // Acquire FragCoord.
+  Value *fragCoord = m_builder->CreateReadBuiltInInput(lgc::BuiltInKind::BuiltInFragCoord);
+  // Acquire PrimType.
+  // 0 : point.
+  // 1 : line.
+  // 2 : triangle.
+  // 3 : rectangle.
+  // PrimType (i32) : comes from HW PS Input : ANCILLARY_ENA - Prim Type[1:0]
+  Value *primType = m_builder->CreateReadBuiltInInput(lgc::BuiltInKind::BuiltInPrimType);
+
+  // 1. Patch Polygon Stipple.
+  if (options->getGlState().enablePolygonStipple) {
+    constexpr uint32_t PolygonStippleSize = 32; // For Y Invert.
+
+    // If this is in triangle mode, skip emulation.
+    Value *isTriangle = m_builder->CreateICmpUGT(primType, m_builder->getInt32(1));
+    m_builder->SetInsertPoint(SplitBlockAndInsertIfThen(isTriangle, m_builder->GetInsertPoint(), false));
+
+    Value *calcFragCoord = m_builder->CreateFPToUI(fragCoord, FixedVectorType::get(m_builder->getInt32Ty(), 4));
+    Value *calcFragCoordX = m_builder->CreateExtractElement(calcFragCoord, m_builder->getInt32(0));
+    Value *calcFragCoordY = m_builder->CreateExtractElement(calcFragCoord, m_builder->getInt32(1));
+    Value *bufferDesc = m_builder->create<lgc::LoadBufferDescOp>(
+        Vkgc::InternalDescriptorSetId, Vkgc::InternalBinding::PixelOpInternalBinding, m_builder->getInt32(0),
+        lgc::Builder::BufferFlagNonConst);
+
+    // For Y Invert
+    if (needYInvert) {
+      Value *winSizeOffset =
+          m_builder->CreateInBoundsGEP(m_builder->getInt32Ty(), bufferDesc, m_builder->getInt32(PolygonStippleSize));
+      winSizeOffset = m_builder->CreateLoad(m_builder->getInt32Ty(), winSizeOffset);
+      calcFragCoordY = m_builder->CreateSub(winSizeOffset, calcFragCoordY);
+    }
+
+    // active = ( x % 32 ) & ( y % 32 )
+    // HW load polygon stipple pattern in right order in Bytes here, y offset doesn't need to be reverted.
+    Value *yOffset = m_builder->CreateAnd(calcFragCoordY, m_builder->getInt32(0x1fu));
+    Value *descPtr = m_builder->CreateInBoundsGEP(m_builder->getInt32Ty(), bufferDesc, yOffset);
+    Value *stipplePattern = m_builder->CreateLoad(m_builder->getInt32Ty(), descPtr);
+
+    // xOffset = ( x % 32 ) / 8
+    Value *xOffset = m_builder->CreateAnd(calcFragCoordX, m_builder->getInt32(0x18u));
+    // xInByteOffset = x % 8
+    Value *xInByteOffset = m_builder->CreateAnd(calcFragCoordX, m_builder->getInt32(0x7u));
+    // xInByteOffset = 7 - xInByteOffset
+    // Due to concern with default turned on option LsbFirst, x bits are in reverse order within each 8 bits pattern.
+    if (pipelineBuildInfo->glState.enableBitmapLsb) {
+      xInByteOffset = m_builder->CreateSub(m_builder->getInt32(0x7u), xInByteOffset);
+    }
+    // xOffset = xInByteOffset + xOffset
+    xOffset = m_builder->CreateAdd(xOffset, xInByteOffset);
+
+    Value *shouldDiscard = m_builder->CreateExtractBitField(stipplePattern, xOffset, m_builder->getInt32(1), false);
+    shouldDiscard = m_builder->CreateICmpEQ(shouldDiscard, m_builder->getInt32(0));
+    m_builder->SetInsertPoint(SplitBlockAndInsertIfThen(shouldDiscard, m_builder->GetInsertPoint(), false));
+    m_builder->CreateKill();
+  }
+
+  // 2. Patch Line Smooth.
+  if (options->getGlState().enableLineSmooth) {
+    Value *isLine = m_builder->CreateICmpEQ(primType, m_builder->getInt32(1));
+    Value *alphaScaleVal = m_builder->CreateAllocaAtFuncEntry(m_builder->getFloatTy(), "patchAlphaScale");
+    m_builder->CreateStore(ConstantFP::get(m_builder->getFloatTy(), 1.0), alphaScaleVal);
+    m_builder->SetInsertPoint(SplitBlockAndInsertIfThen(isLine, m_builder->GetInsertPoint(), false));
+
+    // Get const for line smooth
+    Value *lineSmoothConstArr[4];
+    for (uint32_t i = 0; i < 4; i++)
+      lineSmoothConstArr[i] = ConstantFP::get(m_builder->getFloatTy(), pipelineBuildInfo->getGlState().lineSmooth[i]);
+
+    // Emulate line stipple with wide AA line
+    if (options->getGlState().emulateWideLineStipple) {
+      // LineStipple (f32) is read from SPIA:LINE_STIPPLE_TEX_ENA
+      Value *lineStipple = m_builder->CreateReadBuiltInInput(lgc::BuiltInKind::BuiltInLineStipple);
+      Value *lineStippleScale = lineSmoothConstArr[2];
+      Value *lineStipplePattern = m_builder->CreateBitCast(lineSmoothConstArr[3], m_builder->getInt32Ty());
+
+      Value *result = m_builder->CreateFMul(lineStipple, lineStippleScale);
+      result = m_builder->CreateFPToSI(result, m_builder->getInt32Ty());
+      result = m_builder->CreateAnd(result, m_builder->getInt32(15));
+      result = m_builder->CreateShl(m_builder->getInt32(1), result);
+      // lineSmooth[3] is the line stipple pattern, it is integer in memory.
+      result = m_builder->CreateAnd(result, lineStipplePattern);
+      Value *shouldDiscard = m_builder->CreateICmpEQ(result, m_builder->getInt32(0));
+      m_builder->SetInsertPoint(SplitBlockAndInsertIfThen(shouldDiscard, m_builder->GetInsertPoint(), false));
+      m_builder->CreateKill();
+    }
+
+    // Primitive Coord (fp32vec2)
+    Value *primCoord = m_builder->CreateReadBuiltInInput(lgc::BuiltInKind::BuiltInPrimCoord);
+    Value *negHalfLineWidth = m_builder->CreateFNeg(lineSmoothConstArr[0]);
+    Value *lineWidth = m_builder->CreateFMul(lineSmoothConstArr[0], ConstantFP::get(m_builder->getFloatTy(), 2.0));
+    Value *alphaBias = lineSmoothConstArr[1];
+
+    primCoord = m_builder->CreateExtractElement(primCoord, 1);
+    Value *scaledVal = m_builder->CreateFma(primCoord, lineWidth, negHalfLineWidth);
+    // Recalculate alpha scale value which will be inserted into frag color's alpha channel, when doing smooth.
+    scaledVal = m_builder->CreateIntrinsic(Intrinsic::fabs, scaledVal->getType(), scaledVal);
+    scaledVal = m_builder->CreateFSub(alphaBias, scaledVal);
+    m_builder->CreateStore(scaledVal, alphaScaleVal);
+
+    m_builder->SetInsertPoint(m_retInst);
+    for (GlobalVariable &global : m_module->globals()) {
+      auto addrSpace = global.getType()->getAddressSpace();
+      if (addrSpace == SPIRAS_Output) {
+        auto outputMetaVal = mdconst::extract<Constant>(global.getMetadata(gSPIRVMD::InOut)->getOperand(0));
+        patchAlphaScaling(&global, global.getValueType(), outputMetaVal, alphaScaleVal);
+      }
+    }
+  }
+
+  // 3. Patch Point Smooth.
+  if (options->getGlState().enablePointSmooth) {
+    Value *isPoint = m_builder->CreateICmpEQ(primType, m_builder->getInt32(0));
+    Value *alphaScaleVal = m_builder->CreateAllocaAtFuncEntry(m_builder->getFloatTy(), "patchAlphaScale");
+    m_builder->CreateStore(ConstantFP::get(m_builder->getFloatTy(), 1.0), alphaScaleVal);
+    m_builder->SetInsertPoint(SplitBlockAndInsertIfThen(isPoint, m_builder->GetInsertPoint(), false));
+    // Primitive Coord (fp32vec2)
+    Value *primCoord =
+        m_builder->CreateReadBuiltInInput(lgc::BuiltInKind::BuiltInPrimCoord); // Get const for line smooth
+
+    Value *pointSmoothConstArr[2];
+    for (uint32_t i = 0; i < 2; i++)
+      pointSmoothConstArr[i] = ConstantFP::get(m_builder->getFloatTy(), pipelineBuildInfo->getGlState().pointSmooth[i]);
+
+    Value *halfPointSize = pointSmoothConstArr[0];
+    Value *alphaBias = pointSmoothConstArr[1];
+
+    Value *negHalfPointSize = m_builder->CreateFNeg(halfPointSize);
+    Value *negHalfPointSizeVal = PoisonValue::get(FixedVectorType::get(m_builder->getFloatTy(), 2));
+    negHalfPointSizeVal = m_builder->CreateInsertElement(negHalfPointSizeVal, negHalfPointSize, m_builder->getInt32(0));
+    negHalfPointSizeVal = m_builder->CreateInsertElement(negHalfPointSizeVal, negHalfPointSize, m_builder->getInt32(1));
+    Value *pointSize = m_builder->CreateFMul(halfPointSize, ConstantFP::get(m_builder->getFloatTy(), 2.0));
+    Value *pointSizeVal = PoisonValue::get(FixedVectorType::get(m_builder->getFloatTy(), 2));
+    pointSizeVal = m_builder->CreateInsertElement(pointSizeVal, pointSize, m_builder->getInt32(0));
+    pointSizeVal = m_builder->CreateInsertElement(pointSizeVal, pointSize, m_builder->getInt32(1));
+
+    Value *scaledVal = m_builder->CreateFma(primCoord, pointSizeVal, negHalfPointSizeVal);
+    Value *alphaScale = m_builder->CreateDotProduct(scaledVal, scaledVal);
+    alphaScale = m_builder->CreateSqrt(alphaScale);
+    alphaScale = m_builder->CreateFSub(halfPointSize, alphaScale);
+    Value *discard = m_builder->CreateFCmpULT(alphaScale, ConstantFP::get(m_builder->getFloatTy(), 0));
+    Instruction *InsertI = &*m_builder->GetInsertPoint();
+    Instruction *thenInst = nullptr;
+    Instruction *elseInst = nullptr;
+    SplitBlockAndInsertIfThenElse(discard, InsertI, &thenInst, &elseInst);
+    m_builder->SetInsertPoint(thenInst);
+    m_builder->CreateKill();
+    m_builder->SetInsertPoint(elseInst);
+    alphaScale = m_builder->CreateFAdd(alphaScale, alphaBias);
+    m_builder->CreateStore(alphaScale, alphaScaleVal);
+
+    m_builder->SetInsertPoint(m_retInst);
+    for (GlobalVariable &global : m_module->globals()) {
+      auto addrSpace = global.getType()->getAddressSpace();
+      if (addrSpace == SPIRAS_Output) {
+        auto outputMetaVal = mdconst::extract<Constant>(global.getMetadata(gSPIRVMD::InOut)->getOperand(0));
+        patchAlphaScaling(&global, global.getValueType(), outputMetaVal, alphaScaleVal);
+      }
+    }
+  }
 }
 
 // =====================================================================================================================

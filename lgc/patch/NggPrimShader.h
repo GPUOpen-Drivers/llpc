@@ -298,7 +298,8 @@ private:
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexIndex);
   llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexIndex);
 
-  void processVertexAttribExport(llvm::Function *&target);
+  void exportVertexAttributeThroughMemory(llvm::Function *&target);
+  void appendAttributeThroughMemoryArguments(llvm::SmallVectorImpl<llvm::Value *> &args);
 
   void processSwXfb(llvm::ArrayRef<llvm::Argument *> args);
   void processSwXfbWithGs(llvm::ArrayRef<llvm::Argument *> args);

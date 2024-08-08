@@ -711,6 +711,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.backwardPropagateNoContract = " << shaderInfo->options.backwardPropagateNoContract << "\n";
   dumpFile << "options.forwardPropagateNoContract = " << shaderInfo->options.forwardPropagateNoContract << "\n";
   dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
+  dumpFile << "options.imageSampleDrefReturnsRgba = " << shaderInfo->options.imageSampleDrefReturnsRgba << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -936,17 +937,29 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
-  dumpFile << "options.replaceSetWithResourceType = " << options->getGlState().replaceSetWithResourceType << "\n";
-  dumpFile << "options.disableSampleMask = " << options->getGlState().disableSampleMask << "\n";
-  dumpFile << "options.buildResourcesDataForShaderModule = " << options->getGlState().buildResourcesDataForShaderModule
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 73
+  const char *glStatePrefix = "options.";
+#else
+  const char *glStatePrefix = "options.glState.";
+#endif
+  dumpFile << glStatePrefix << "replaceSetWithResourceType = " << options->getGlState().replaceSetWithResourceType
            << "\n";
-  dumpFile << "options.disableTruncCoordForGather = " << options->getGlState().disableTruncCoordForGather << "\n";
-  dumpFile << "options.enableCombinedTexture = " << options->getGlState().enableCombinedTexture << "\n";
-  dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->getGlState().vertex64BitsAttribSingleLoc << "\n";
-  dumpFile << "options.enableFragColor = " << options->getGlState().enableFragColor << "\n";
-  dumpFile << "options.disableBaseVertex = " << options->getGlState().disableBaseVertex << "\n";
-  dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
-  dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
+  dumpFile << glStatePrefix << "disableSampleMask = " << options->getGlState().disableSampleMask << "\n";
+  dumpFile << glStatePrefix
+           << "buildResourcesDataForShaderModule = " << options->getGlState().buildResourcesDataForShaderModule << "\n";
+  dumpFile << glStatePrefix << "disableTruncCoordForGather = " << options->getGlState().disableTruncCoordForGather
+           << "\n";
+  dumpFile << glStatePrefix << "enableCombinedTexture = " << options->getGlState().enableCombinedTexture << "\n";
+  dumpFile << glStatePrefix << "vertex64BitsAttribSingleLoc = " << options->getGlState().vertex64BitsAttribSingleLoc
+           << "\n";
+  dumpFile << glStatePrefix << "enableFragColor = " << options->getGlState().enableFragColor << "\n";
+  dumpFile << glStatePrefix << "disableBaseVertex = " << options->getGlState().disableBaseVertex << "\n";
+  dumpFile << glStatePrefix << "enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
+  dumpFile << glStatePrefix << "disablePerCompFetch = " << options->disablePerCompFetch << "\n";
+  dumpFile << glStatePrefix << "enablePolygonStipple = " << options->getGlState().enablePolygonStipple << "\n";
+  dumpFile << glStatePrefix << "enableLineSmooth = " << options->getGlState().enableLineSmooth << "\n";
+  dumpFile << glStatePrefix << "emulateWideLineStipple = " << options->getGlState().emulateWideLineStipple << "\n";
+  dumpFile << glStatePrefix << "enablePointSmooth = " << options->getGlState().enablePointSmooth << "\n";
 }
 
 // =====================================================================================================================
@@ -1897,6 +1910,10 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().enableFragColor);
   hasher->Update(options->getGlState().disableBaseVertex);
   hasher->Update(options->enablePrimGeneratedQuery);
+  hasher->Update(options->getGlState().enablePolygonStipple);
+  hasher->Update(options->getGlState().enableLineSmooth);
+  hasher->Update(options->getGlState().emulateWideLineStipple);
+  hasher->Update(options->getGlState().enablePointSmooth);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
 }
 
@@ -1986,6 +2003,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.constantBufferBindingOffset);
       hasher->Update(options.backwardPropagateNoContract);
       hasher->Update(options.forwardPropagateNoContract);
+      hasher->Update(options.imageSampleDrefReturnsRgba);
     }
   }
 }

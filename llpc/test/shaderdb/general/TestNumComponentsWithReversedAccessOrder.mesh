@@ -1,0 +1,40 @@
+// This test is to verify we calculate correct component counts for the outputs when the component
+// accessing is from large component indices to small ones. Make sure we use the max value to finally
+// determine the correct component count for an output.
+
+// BEGIN_SHADERTEST
+// RUN: amdllpc -v gfxip=10.3 %s | FileCheck --check-prefix=SHADERTEST %s
+
+// SHADERTEST-LABEL: // LLPC mesh shader LDS region info (in dwords) and general info
+
+// SHADERTEST-LABEL:  Vertex Outputs Layout (stride = 4, exports = 1):
+// SHADERTEST-LABEL: -- location = 0, components = 4, offset = 0, export = 0
+
+// SHADERTEST-LABEL: Primitive outputs layout (stride = 3, exports = 1):
+// SHADERTEST-LABEL: -- location = 1, components = 3, offset = 0, export = 1
+
+// SHADERTEST: AMDLLPC SUCCESS
+// END_SHADERTEST
+
+#version 460 core
+
+#extension GL_EXT_mesh_shader: enable
+
+layout(local_size_x=1, local_size_y=1, local_size_z=1) in;
+layout(max_vertices = 1, max_primitives = 1, points) out;
+
+layout(location = 0) out vec4 data1[];
+layout(location = 1) perprimitiveEXT out vec3 data2[];
+
+void main() {
+  SetMeshOutputsEXT(1, 1);
+
+  data1[gl_LocalInvocationIndex].w = 0.4;
+  data1[gl_LocalInvocationIndex].z = 0.3;
+  data1[gl_LocalInvocationIndex].y = 0.2;
+  data1[gl_LocalInvocationIndex].x = 0.1;
+
+  data2[gl_LocalInvocationIndex].z = -0.3;
+  data2[gl_LocalInvocationIndex].y = -0.2;
+  data2[gl_LocalInvocationIndex].x = -0.1;
+}

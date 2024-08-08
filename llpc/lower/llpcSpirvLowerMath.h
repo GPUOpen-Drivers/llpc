@@ -92,10 +92,6 @@ public:
   virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
   virtual void visitCallInst(llvm::CallInst &callInst);
   virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
-  void emitFFmulzInst(llvm::BinaryOperator &binaryOp);
-  void emitFFmazInst(llvm::Instruction *inst);
-  std::optional<std::pair<llvm::Value *, llvm::Value *>> isMulDx9Zero(llvm::Value *lhs, llvm::Value *rhs,
-                                                                      llvm::FastMathFlags flags);
   static llvm::StringRef name() { return "Lower SPIR-V math floating point optimisation"; }
 };
 

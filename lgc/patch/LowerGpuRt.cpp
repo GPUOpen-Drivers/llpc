@@ -72,6 +72,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitLdsStackInit)
                             .add(&LowerGpuRt::visitLdsStackStore)
                             .add(&LowerGpuRt::visitGetBoxSortHeuristicMode)
+                            .add(&LowerGpuRt::visitGetRayQueryDispatchId)
                             .add(&LowerGpuRt::visitGetStaticFlags)
                             .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
@@ -79,6 +80,8 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGpurtDispatchThreadIdFlatOp)
                             .add(&LowerGpuRt::visitContinuationStackIsGlobalOp)
                             .add(&LowerGpuRt::visitWaveScanOp)
+                            .add(&LowerGpuRt::visitGetKnownSetRayFlagsOp)
+                            .add(&LowerGpuRt::visitGetKnownUnsetRayFlagsOp)
                             .build();
 
   visitor.visit(*this, module);
@@ -318,7 +321,7 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
 
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
   auto func = inst.getCalledFunction();
-  auto retType = cast<FixedVectorType>(func->getReturnType());
+  auto retType = func->getReturnType();
   Value *src0 = inst.getSrc0();
   Value *src1 = inst.getSrc1();
   uint32_t rm = cast<ConstantInt>(inst.getRoundMode())->getZExtValue();
@@ -422,6 +425,27 @@ void LowerGpuRt::visitGetBoxSortHeuristicMode(GpurtGetBoxSortHeuristicModeOp &in
 }
 
 // =====================================================================================================================
+// Visit "GpurtGetRayQueryDispatchIdOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetRayQueryDispatchId(GpurtGetRayQueryDispatchIdOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto stage = getShaderStage(m_builder->GetInsertBlock()->getParent());
+  // Local thread ID for graphics shader Stage, global thread ID for compute/raytracing shader stage
+  Value *dispatchId = nullptr;
+  if (stage != ShaderStage::Compute) {
+    auto subThreadId = m_builder->CreateReadBuiltInInput(lgc::BuiltInSubgroupLocalInvocationId);
+    Value *zero = m_builder->getInt32(0);
+    dispatchId = m_builder->CreateBuildVector({subThreadId, zero, zero});
+  } else {
+    dispatchId = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId);
+  }
+  dispatchId->takeName(&inst);
+  inst.replaceAllUsesWith(dispatchId);
+  inst.eraseFromParent();
+}
+
+// =====================================================================================================================
 // Visit "GpurtGetStaticFlagsOp" instruction
 //
 // @param inst : The dialect instruction to process
@@ -495,6 +519,30 @@ void LowerGpuRt::visitContinuationStackIsGlobalOp(GpurtContinuationStackIsGlobal
   m_builder->SetInsertPoint(&inst);
   bool isGlobal = m_pipelineState->getOptions().cpsFlags & CpsFlagStackInGlobalMem;
   inst.replaceAllUsesWith(m_builder->getInt1(isGlobal));
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetKnownSetRayFlagsOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetKnownSetRayFlagsOp(lgc::GpurtGetKnownSetRayFlagsOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto flags = lgc::gpurt::getKnownSetRayFlags(*inst.getModule());
+  inst.replaceAllUsesWith(m_builder->getInt32(flags));
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetKnownUnsetRayFlagsOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetKnownUnsetRayFlagsOp(lgc::GpurtGetKnownUnsetRayFlagsOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto flags = lgc::gpurt::getKnownUnsetRayFlags(*inst.getModule());
+  inst.replaceAllUsesWith(m_builder->getInt32(flags));
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

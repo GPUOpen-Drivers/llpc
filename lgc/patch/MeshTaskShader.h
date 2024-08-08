@@ -61,6 +61,26 @@ enum class MeshLdsRegion : unsigned {
 // Map: LDS Region -> <Region Offset, Region Size>
 typedef std::unordered_map<MeshLdsRegion, std::pair<unsigned, unsigned>> MeshLdsLayout;
 
+// Mesh shader outputs layout
+struct MeshOutputsLayout {
+  std::map<BuiltInKind, unsigned> vertexBuiltInExports; // Map from vertex built-in output ID to export slot
+  std::map<unsigned, unsigned> vertexGenericExports;    // Map from vertex output location to export slot
+                                                        // (exported as vertex attributes)
+  unsigned vertexExportCount;                           // Vertex export count
+
+  std::map<BuiltInKind, unsigned> primitiveBuiltInExports; // Map from primitive built-in output ID to export slot
+                                                           // (exported as primitive attributes)
+  std::map<unsigned, unsigned> primitiveGenericExports;    // Map from primitive output location to export slot
+  unsigned primitiveExportCount;                           // Primitive export count
+
+  unsigned vertexStride;                        // Vertex stride (in dwords)
+  std::map<unsigned, unsigned> offsetsInVertex; // Map from output location to output offset within a vertex (in dwords)
+
+  unsigned primitiveStride;                        // Primitive stride (in dwords)
+  std::map<unsigned, unsigned> offsetsInPrimitive; // Map from output location to output offset within a primitive
+                                                   // (in dwords)
+};
+
 // =====================================================================================================================
 // Represents the handler of mesh/task shader.
 class MeshTaskShader {
@@ -69,7 +89,7 @@ public:
   ~MeshTaskShader();
 
   static unsigned layoutMeshShaderLds(PipelineState *pipelineState, llvm::Function *entryPoint,
-                                      MeshLdsLayout *ldsLayout = nullptr);
+                                      MeshLdsLayout *ldsLayout = nullptr, MeshOutputsLayout *outputsLayout = nullptr);
 
   void process(llvm::Function *taskEntryPoint, llvm::Function *meshEntryPoint);
 
@@ -86,8 +106,7 @@ private:
   void lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp);
   void lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp);
   void lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuiltinInputOp);
-  void lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp);
-  void lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp);
+  void lowerWriteMeshOutput(WriteMeshOutputOp &writeMeshOutputOp);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);
@@ -130,12 +149,47 @@ private:
 
   llvm::Value *readMeshBuiltInFromLds(BuiltInKind builtIn);
   llvm::Value *convertToHwShadingRate(llvm::Value *primitiveShadingRate);
+  void updateMeshShaderInOutUsage();
 
   bool checkNeedBarrierFlag(llvm::Function *entryPoint);
 
   unsigned getMeshShaderLdsRegionStart(MeshLdsRegion region) {
     assert(m_ldsLayout.count(region) > 0);
     return m_ldsLayout[region].first;
+  }
+
+  unsigned getOutputOffsetInPrimOrVertex(unsigned location, bool inPrimitive) {
+    if (inPrimitive) {
+      assert(m_outputsLayout.offsetsInPrimitive.count(location) > 0); // Must exist
+      return m_outputsLayout.offsetsInPrimitive[location];
+    }
+
+    assert(m_outputsLayout.offsetsInVertex.count(location) > 0); // Must exist
+    return m_outputsLayout.offsetsInVertex[location];
+  }
+
+  unsigned getOutputExportSlot(unsigned location, bool primitive) {
+    if (primitive) {
+      if (m_outputsLayout.primitiveGenericExports.count(location) > 0)
+        return m_outputsLayout.primitiveGenericExports[location];
+      return InvalidValue; // Not exist
+    }
+
+    if (m_outputsLayout.vertexGenericExports.count(location) > 0)
+      return m_outputsLayout.vertexGenericExports[location];
+    return InvalidValue; // Not exist
+  }
+
+  unsigned getOutputExportSlot(BuiltInKind builtIn, bool primitive) {
+    if (primitive) {
+      if (m_outputsLayout.primitiveBuiltInExports.count(builtIn) > 0)
+        return m_outputsLayout.primitiveBuiltInExports[builtIn];
+      return InvalidValue; // Not exist
+    }
+
+    if (m_outputsLayout.vertexBuiltInExports.count(builtIn) > 0)
+      return m_outputsLayout.vertexBuiltInExports[builtIn];
+    return InvalidValue; // Not exist
   }
 
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset);
@@ -185,7 +239,8 @@ private:
 
   GfxIpVersion m_gfxIp; // Graphics IP version info
 
-  MeshLdsLayout m_ldsLayout; // Mesh shader LDS layout
+  MeshLdsLayout m_ldsLayout;         // Mesh shader LDS layout
+  MeshOutputsLayout m_outputsLayout; // Mesh shader outputs layout
 };
 
 } // namespace lgc

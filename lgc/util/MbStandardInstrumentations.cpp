@@ -31,6 +31,7 @@
 #include "lgc/MbStandardInstrumentations.h"
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Support/FormatVariadic.h"
 
 using namespace llvm;
 
@@ -215,7 +216,7 @@ void MbPrintIRInstrumentation::pushModuleDesc(StringRef PassID, Any IR) {
 MbPrintIRInstrumentation::PrintModuleDesc MbPrintIRInstrumentation::popModuleDesc(StringRef PassID) {
   assert(!ModuleDescStack.empty() && "empty ModuleDescStack");
   PrintModuleDesc ModuleDesc = ModuleDescStack.pop_back_val();
-  assert(std::get<2>(ModuleDesc).equals(PassID) && "malformed ModuleDescStack");
+  assert(std::get<2>(ModuleDesc) == PassID && "malformed ModuleDescStack");
   return ModuleDesc;
 }
 

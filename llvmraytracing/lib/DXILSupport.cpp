@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -52,8 +52,7 @@ static bool isInResources(Value *Handle, Metadata *MD) {
     return false;
   auto *ResourceMDs = cast<MDTuple>(MD);
   for (auto &Res : ResourceMDs->operands()) {
-    auto *Val =
-        mdconst::extract<Constant>(cast<MDTuple>(Res.get())->getOperand(1));
+    auto *Val = mdconst::extract<Constant>(cast<MDTuple>(Res.get())->getOperand(1));
     // Strip casts
     while (auto *Cast = dyn_cast<ConstantExpr>(Val)) {
       assert(Cast->getOpcode() == Instruction::BitCast);
@@ -77,9 +76,8 @@ static bool isInResources(Value *Handle, Metadata *MD) {
 /// check that, so we rematerialize all constant loads.
 static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
   // First, check if this is a dxil load
-  static const char *const LoadFunctions[] = {
-      "dx.op.bufferLoad", "dx.op.rawBufferLoad", "dx.op.sample",
-      "dx.op.textureLoad"};
+  static const char *const LoadFunctions[] = {"dx.op.bufferLoad", "dx.op.rawBufferLoad", "dx.op.sample",
+                                              "dx.op.textureLoad"};
 
   bool IsLoad = false;
   for (const auto *LoadFunc : LoadFunctions) {
@@ -95,10 +93,8 @@ static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
   auto *Handle = CInst->getArgOperand(1);
   // Unwrap dx.op.annotateHandle and dx.op.createHandleForLib calls.
   while (auto *Call = dyn_cast<CallInst>(Handle)) {
-    assert(
-        Call->getCalledFunction()->getName().starts_with(
-            "dx.op.annotateHandle") ||
-        Call->getCalledFunction()->getName().starts_with("dx.op.createHandle"));
+    assert(Call->getCalledFunction()->getName().starts_with("dx.op.annotateHandle") ||
+           Call->getCalledFunction()->getName().starts_with("dx.op.createHandle"));
     Handle = Call->getArgOperand(1);
   }
 
@@ -113,11 +109,9 @@ static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
     assert(isa<GlobalValue>(Handle) && "A resource should be a global value");
 
     // Search variable in SRV list
-    auto *MD =
-        Load->getModule()->getNamedMetadata("dx.resources")->getOperand(0);
+    auto *MD = Load->getModule()->getNamedMetadata("dx.resources")->getOperand(0);
     // in SRVs or CBVs
-    if (isInResources(Handle, MD->getOperand(0).get()) ||
-        isInResources(Handle, MD->getOperand(2).get()))
+    if (isInResources(Handle, MD->getOperand(0).get()) || isInResources(Handle, MD->getOperand(2).get()))
       return true;
   } else {
     // Failing the check in release mode is fine, but we still want to know
@@ -181,8 +175,7 @@ bool llvm::DXILMaterializable(Instruction &OrigI) {
           return true;
 
         // Match by id
-        unsigned int IntrId =
-            cast<ConstantInt>(CInst->getArgOperand(0))->getZExtValue();
+        unsigned int IntrId = cast<ConstantInt>(CInst->getArgOperand(0))->getZExtValue();
         if ((IntrId >= 6 && // FAbs - Dot4
              IntrId <= 56) ||
             IntrId == 58 ||   // CBufferLoad

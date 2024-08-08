@@ -69,16 +69,14 @@ MeshTaskShader::~MeshTaskShader() {
 // @param pipelineState : Pipeline state
 // @param entryPoint : Entry-point of mesh shader
 // @param ldsLayout : Mesh shader LDS layout (could be null)
+// @param outputsLayout : Mesh shader outputs layout (could be null)
 unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Function *entryPoint,
-                                             MeshLdsLayout *ldsLayout) {
+                                             MeshLdsLayout *ldsLayout, MeshOutputsLayout *outputsLayout) {
   if (!pipelineState->hasShaderStage(ShaderStage::Mesh))
     return 0; // Mesh shader absent (standalone compiler tries to compile a single task shader)
 
-  assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
-
-  auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-  (void(gfxIp));                          // Unused
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh);                           // Must be mesh shader
+  assert(pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   //
   // The LDS layout of mesh shader is something as follow (consists of two main parts):
@@ -104,6 +102,7 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
   assert(meshMode.outputPrimitives <= NggMaxThreadsPerSubgroup);
 
   const auto resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
+  const auto nextStage = pipelineState->getNextShaderStage(ShaderStage::Mesh);
 
   unsigned meshLdsSizeInDwords = 0;
   unsigned ldsOffsetInDwords = 0;
@@ -113,6 +112,24 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
     LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32, regionName, regionOffset, regionSize));
     if (regionSize == 0)
       LLPC_OUTS(" (empty)");
+    LLPC_OUTS("\n");
+  };
+
+  auto printOutputLayoutInfo = [=](unsigned location, unsigned numComponents, unsigned relativeOffset,
+                                   unsigned exportSlot, BuiltInKind forBuiltIn) {
+    if (numComponents > 4) {
+      LLPC_OUTS(format("-- location = %u-%u, components = %u, offset = %u", location, location + 1, numComponents,
+                       relativeOffset));
+    } else {
+      LLPC_OUTS(format("-- location = %u, components = %u, offset = %u", location, numComponents, relativeOffset));
+    }
+
+    if (exportSlot != InvalidValue)
+      LLPC_OUTS(format(", export = %u", exportSlot));
+
+    if (forBuiltIn != InvalidValue)
+      LLPC_OUTS(" (builtin = " << PipelineState::getBuiltInName(forBuiltIn) << ")");
+
     LLPC_OUTS("\n");
   };
 
@@ -169,21 +186,212 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
   meshLdsSizeInDwords += ldsRegionSize;
 
   // Per-vertex outputs
-  const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
+  auto &vertexOutputComponents = resUsage->inOutUsage.mesh.vertexOutputComponents;
+  unsigned vertexStride = 0;
+  for (auto &vertexOutput : vertexOutputComponents) {
+    const auto numComponents = vertexOutput.second.first;
+    vertexStride += numComponents; // Calculate total number of components of vertex outputs
+  }
+
   ldsRegionSize = vertexStride * meshMode.outputVertices;
   if (ldsLayout) {
     printLdsRegionInfo("Per-vertex Output", ldsOffsetInDwords, ldsRegionSize);
     (*ldsLayout)[MeshLdsRegion::VertexOutput] = std::make_pair(ldsOffsetInDwords, ldsRegionSize);
+
+    assert(outputsLayout);
+    outputsLayout->vertexStride = vertexStride;
+
+    unsigned offsetInVertex = 0;
+    unsigned exportSlot = 0;
+    unsigned exportCount = 0;
+
+    for (auto &vertexOutput : vertexOutputComponents) {
+      const auto location = vertexOutput.first;
+      const auto &[numComponents, forBuiltIn] = vertexOutput.second;
+
+      outputsLayout->offsetsInVertex[location] = offsetInVertex; // Map output locations to relative offsets in vertex
+      offsetInVertex += numComponents;
+
+      if (forBuiltIn == InvalidValue) {
+        // Only consider vertex generic outputs, vertex built-ins will be handled later on
+        if (nextStage == ShaderStage::Fragment) {
+          // Input/output matching must have been done in resource collecting pass, just use the location as export slot
+          outputsLayout->vertexGenericExports[location] = location;
+          exportCount = std::max(exportCount, location + 1);
+          if (numComponents > 4) {
+            outputsLayout->vertexGenericExports[location + 1] = location + 1;
+            exportCount = std::max(exportCount, location + 2);
+          }
+        } else {
+          // If next stage is missing, we try to assign continuous export slots
+          assert(!nextStage);
+
+          outputsLayout->vertexGenericExports[location] = exportSlot++;
+          ++exportCount;
+          if (numComponents > 4) {
+            outputsLayout->vertexGenericExports[location + 1] = exportSlot++;
+            ++exportCount;
+          }
+        }
+      }
+    }
+
+    // Consider those special outputs mapped from vertex built-ins
+    if (nextStage == ShaderStage::Fragment) {
+      const auto fsResUsage = pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
+      const auto &fsBuiltInUsage = fsResUsage->builtInUsage.fs;
+      auto &fsInOutUsage = fsResUsage->inOutUsage;
+
+      if (fsBuiltInUsage.clipDistance > 0 || fsBuiltInUsage.cullDistance > 0) {
+        if (fsBuiltInUsage.clipDistance > 0) {
+          assert(fsInOutUsage.builtInInputLocMap.count(BuiltInClipDistance) > 0);
+          exportSlot = fsInOutUsage.builtInInputLocMap[BuiltInClipDistance];
+          outputsLayout->vertexBuiltInExports[BuiltInClipDistance] = exportSlot;
+        }
+
+        if (fsBuiltInUsage.cullDistance > 0) {
+          assert(fsInOutUsage.builtInInputLocMap.count(BuiltInCullDistance) > 0);
+          exportSlot = fsInOutUsage.builtInInputLocMap[BuiltInCullDistance];
+          outputsLayout->vertexBuiltInExports[BuiltInCullDistance] = exportSlot;
+        }
+
+        unsigned startSlot = InvalidValue;
+        if (fsBuiltInUsage.clipDistance > 0) {
+          startSlot = outputsLayout->vertexBuiltInExports[BuiltInClipDistance];
+        } else {
+          assert(fsBuiltInUsage.cullDistance > 0);
+          startSlot = outputsLayout->vertexBuiltInExports[BuiltInCullDistance];
+        }
+        exportCount = std::max(exportCount,
+                               startSlot + ((fsBuiltInUsage.clipDistance + fsBuiltInUsage.cullDistance > 4) ? 2 : 1));
+      }
+    } else {
+      assert(!nextStage);
+
+      const auto &builtInUsage = resUsage->builtInUsage.mesh;
+      if (builtInUsage.clipDistance > 0 || builtInUsage.cullDistance > 0) {
+        unsigned startSlot = exportSlot;
+
+        if (builtInUsage.clipDistance > 0)
+          outputsLayout->vertexBuiltInExports[BuiltInClipDistance] = startSlot;
+
+        if (builtInUsage.cullDistance > 0) {
+          if (builtInUsage.clipDistance >= 4)
+            ++startSlot;
+          outputsLayout->vertexBuiltInExports[BuiltInCullDistance] = startSlot;
+        }
+
+        exportSlot += (builtInUsage.clipDistance + builtInUsage.cullDistance > 4) ? 2 : 1;
+        exportCount += (builtInUsage.clipDistance + builtInUsage.cullDistance > 4) ? 2 : 1;
+      }
+    }
+    outputsLayout->vertexExportCount = exportCount;
+
     ldsOffsetInDwords += ldsRegionSize;
   }
   meshLdsSizeInDwords += ldsRegionSize;
 
   // Per-primitive outputs
-  const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
+  auto &primitiveOutputComponents = resUsage->inOutUsage.mesh.primitiveOutputComponents;
+  unsigned primitiveStride = 0;
+  for (auto &primitiveOutput : primitiveOutputComponents) {
+    const auto numComponents = primitiveOutput.second.first;
+    primitiveStride += numComponents; // Calculate total number of components of primitive outputs
+  }
+
   ldsRegionSize = primitiveStride * meshMode.outputPrimitives;
   if (ldsLayout) {
     printLdsRegionInfo("Per-primitive Output", ldsOffsetInDwords, ldsRegionSize);
     (*ldsLayout)[MeshLdsRegion::PrimitiveOutput] = std::make_pair(ldsOffsetInDwords, ldsRegionSize);
+
+    assert(outputsLayout);
+    outputsLayout->primitiveStride = primitiveStride;
+
+    unsigned offsetInPrimitive = 0;
+    const unsigned startSlot = outputsLayout->vertexExportCount;
+    unsigned exportSlot = startSlot;
+    unsigned exportCount = 0;
+
+    for (auto &primitiveOutput : primitiveOutputComponents) {
+      const auto location = primitiveOutput.first;
+      const auto &[numComponents, forBuiltIn] = primitiveOutput.second;
+
+      outputsLayout->offsetsInPrimitive[location] =
+          offsetInPrimitive; // Map output locations to relative offsets in primitive
+      offsetInPrimitive += numComponents;
+
+      if (forBuiltIn == InvalidValue) {
+        // Only consider primitive generic outputs, primitive built-ins will be handled later on
+        if (nextStage == ShaderStage::Fragment) {
+          // Input/output matching must have been done in resource collecting pass, just use the location as export slot
+          outputsLayout->primitiveGenericExports[location] = startSlot + location;
+          exportCount = std::max(exportCount, location + 1);
+          if (numComponents > 4) {
+            outputsLayout->primitiveGenericExports[location + 1] = startSlot + location + 1;
+            exportCount = std::max(exportCount, location + 2);
+          }
+        } else {
+          // If next stage is missing, we try to assign continuous export slots
+          assert(!nextStage);
+
+          outputsLayout->primitiveGenericExports[location] = exportSlot++;
+          ++exportCount;
+          if (numComponents > 4) {
+            outputsLayout->primitiveGenericExports[location + 1] = exportSlot++;
+            ++exportCount;
+          }
+        }
+      }
+    }
+
+    // Consider those special outputs mapped from primitive built-ins
+    if (nextStage == ShaderStage::Fragment) {
+      // Built-in matching must have been done in resource collecting pass, just use the location as export slot
+      const auto fsResUsage = pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
+      const auto &fsBuiltInUsage = fsResUsage->builtInUsage.fs;
+      auto &fsInOutUsage = fsResUsage->inOutUsage;
+
+      if (fsBuiltInUsage.primitiveId) {
+        assert(fsInOutUsage.perPrimitiveBuiltInInputLocMap.count(BuiltInPrimitiveId) > 0);
+        const unsigned location = fsInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInPrimitiveId];
+        outputsLayout->primitiveBuiltInExports[BuiltInPrimitiveId] = startSlot + location;
+        exportCount = std::max(exportCount, location + 1);
+      }
+
+      if (fsBuiltInUsage.layer) {
+        assert(fsInOutUsage.perPrimitiveBuiltInInputLocMap.count(BuiltInLayer) > 0);
+        const unsigned location = fsInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInLayer];
+        outputsLayout->primitiveBuiltInExports[BuiltInLayer] = startSlot + location;
+        exportCount = std::max(exportCount, location + 1);
+      }
+
+      if (fsBuiltInUsage.viewportIndex) {
+        assert(fsInOutUsage.perPrimitiveBuiltInInputLocMap.count(BuiltInViewportIndex) > 0);
+        const unsigned location = fsInOutUsage.perPrimitiveBuiltInInputLocMap[BuiltInViewportIndex];
+        outputsLayout->primitiveBuiltInExports[BuiltInViewportIndex] = startSlot + location;
+        exportCount = std::max(exportCount, location + 1);
+      }
+    } else {
+      assert(!nextStage);
+
+      const auto &builtInUsage = resUsage->builtInUsage.mesh;
+      if (builtInUsage.primitiveId) {
+        outputsLayout->primitiveBuiltInExports[BuiltInPrimitiveId] = exportSlot++;
+        ++exportCount;
+      }
+
+      if (builtInUsage.layer) {
+        outputsLayout->primitiveBuiltInExports[BuiltInLayer] = exportSlot++;
+        ++exportCount;
+      }
+
+      if (builtInUsage.viewportIndex) {
+        outputsLayout->primitiveBuiltInExports[BuiltInViewportIndex] = exportSlot++;
+        ++exportCount;
+      }
+    }
+    outputsLayout->primitiveExportCount = exportCount;
+
     ldsOffsetInDwords += ldsRegionSize;
   }
   meshLdsSizeInDwords += ldsRegionSize;
@@ -234,6 +442,41 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
     printLdsRegionInfo("Internal Mesh LDS", 0, meshLdsSizeInDwords);
     printLdsRegionInfo("Shared Variable LDS", 0, sharedVarLdsSizeInDwords);
     printLdsRegionInfo("Total LDS", 0, meshLdsSizeInDwords + sharedVarLdsSizeInDwords);
+
+    if (!outputsLayout->offsetsInVertex.empty()) {
+      LLPC_OUTS("\nVertex Outputs Layout (stride = " << outputsLayout->vertexStride
+                                                     << ", exports = " << outputsLayout->vertexExportCount << "):\n");
+      for (auto &vertexOutput : outputsLayout->offsetsInVertex) {
+        const auto &[location, offsetInVertex] = vertexOutput;
+        const auto &[numComponents, forBuiltIn] = vertexOutputComponents[location];
+        unsigned exportSlot = InvalidValue;
+        if (forBuiltIn != InvalidValue) {
+          if (outputsLayout->vertexBuiltInExports.count(forBuiltIn) > 0)
+            exportSlot = outputsLayout->vertexBuiltInExports[forBuiltIn];
+        } else {
+          exportSlot = outputsLayout->vertexGenericExports[location];
+        }
+        printOutputLayoutInfo(location, numComponents, offsetInVertex, exportSlot, forBuiltIn);
+      }
+    }
+
+    if (!outputsLayout->offsetsInPrimitive.empty()) {
+      LLPC_OUTS("\nPrimitive outputs layout (stride = " << outputsLayout->primitiveStride << ", exports = "
+                                                        << outputsLayout->primitiveExportCount << "):\n");
+      for (auto &primitiveOutput : outputsLayout->offsetsInPrimitive) {
+        const auto &[location, offsetInPrimitive] = primitiveOutput;
+        const auto &[numComponents, forBuiltIn] = primitiveOutputComponents[location];
+        unsigned exportSlot = InvalidValue;
+        if (forBuiltIn != InvalidValue) {
+          if (outputsLayout->primitiveBuiltInExports.count(forBuiltIn) > 0)
+            exportSlot = outputsLayout->primitiveBuiltInExports[forBuiltIn];
+        } else {
+          exportSlot = outputsLayout->primitiveGenericExports[location];
+        }
+        printOutputLayoutInfo(location, numComponents, offsetInPrimitive, exportSlot, forBuiltIn);
+      }
+    }
+
     LLPC_OUTS("\n");
     LLPC_OUTS("Workgroup Size (X, Y, Z) = (" << meshMode.workgroupSizeX << ", " << meshMode.workgroupSizeY << ", "
                                              << meshMode.workgroupSizeZ << ")\n");
@@ -258,7 +501,7 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
     LLPC_OUTS("Max Vertices = " << meshMode.outputVertices << ", Max Primitives = " << meshMode.outputPrimitives
                                 << "\n");
     if (!meshSharedVars.empty()) {
-      LLPC_OUTS("Shared variables:\n");
+      LLPC_OUTS("Shared Variables:\n");
       for (auto meshSharedVar : meshSharedVars) {
         assert(meshSharedVar->getAlignment() == 4); // Must be 1 dword
         const auto sizeInBytes =
@@ -266,8 +509,8 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
         assert(sizeInBytes % 4 == 0); // Must be multiple of 4
         const auto sizeInDwords = sizeInBytes / 4;
 
-        LLPC_OUTS("Name = " << meshSharedVar->getName() << ", Type = " << getTypeName(meshSharedVar->getValueType())
-                            << ", Size (in dwords) = " << sizeInDwords << "\n");
+        LLPC_OUTS("-- name = " << meshSharedVar->getName() << ", type = " << getTypeName(meshSharedVar->getValueType())
+                               << ", size (in dwords) = " << sizeInDwords << "\n");
       }
     }
     LLPC_OUTS("\n");
@@ -403,7 +646,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //           - SetMeshPrimitiveCulled -> Write null primitive flag to LDS
   //           - GetMeshBuiltinInput -> Lower mesh built-in input
   //           - TaskPayloadPtr -> Transform task payload descriptor
-  //           - WriteMeshVertexOutput/WriteMeshPrimitiveOutput -> Write output data to LDS
+  //           - WriteMeshOutput -> Write output data to LDS
   //     }
   //
   //     Barrier (if needBarrierFlag)
@@ -463,7 +706,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Mesh);
 
   // Setup LDS layout
-  layoutMeshShaderLds(m_pipelineState, entryPoint, &m_ldsLayout);
+  layoutMeshShaderLds(m_pipelineState, entryPoint, &m_ldsLayout, &m_outputsLayout);
   m_lds = getOrCreateMeshLds(entryPoint->getParent());
 
   // Mutate mesh shader entry-point
@@ -921,6 +1164,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
     m_builder.CreateRetVoid();
   }
+
+  // Mesh shader processing is done. We can safely update its input/output usage with final results.
+  updateMeshShaderInOutUsage();
 }
 
 // =====================================================================================================================
@@ -998,7 +1244,8 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
   auto emitMeshTasksBlock = checkEmitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".emitMeshTasks");
   auto endEmitMeshTasksBlock = emitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".endEmitMeshTasks");
 
-  SyncScope::ID agentScope = m_builder.getContext().getOrInsertSyncScopeID("agent");
+  SyncScope::ID agentScope = m_builder.getContext().getOrInsertSyncScopeID("agent"); // Device level
+
   // Modify ".checkEmitMeshTasks" block
   {
     m_builder.SetInsertPoint(checkEmitMeshTasksBlock->getTerminator());
@@ -1067,9 +1314,11 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
 
-    m_builder.CreateIntrinsic(
-        Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
-        {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset, m_builder.getInt32(0)});
+    CoherentFlag coherent = {};
+
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
+                              {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset,
+                               m_builder.getInt32(coherent.u32All)});
 
     // NOTE: Only the lowest 8 bits are for us to write.
     Value *readyBit = getDrawDataReadyBit(entryPoint);
@@ -1077,7 +1326,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
 
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
                               {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
-                               drawDataRingEntryOffset, m_builder.getInt32(0)});
+                               drawDataRingEntryOffset, m_builder.getInt32(coherent.u32All)});
   }
 
   // Construct ".endEmitMeshTasks" block
@@ -1342,55 +1591,60 @@ void MeshTaskShader::lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMe
 }
 
 // =====================================================================================================================
-// Lower write mesh vertex output. Write mesh shader vertex outputs to LDS.
+// Lower write mesh vertex/primitive output. Write mesh shader vertex/primitive outputs to LDS.
 //
-// @param writeMeshVertexOutputOp : Call instruction op to write vertex output for mesh shader
-void MeshTaskShader::lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp) {
-  m_builder.SetInsertPoint(&writeMeshVertexOutputOp);
+// @param WriteMeshOutputOp : Call instruction op to write vertex/primitive output for mesh shader
+void MeshTaskShader::lowerWriteMeshOutput(WriteMeshOutputOp &writeMeshOutputOp) {
+  m_builder.SetInsertPoint(&writeMeshOutputOp);
 
-  assert(getShaderStage(writeMeshVertexOutputOp.getFunction()) == ShaderStage::Mesh);
+  assert(getShaderStage(writeMeshOutputOp.getFunction()) == ShaderStage::Mesh);
 
-  auto outputOffset = writeMeshVertexOutputOp.getOutputOffset();
-  auto vertexIndex = writeMeshVertexOutputOp.getVertexIndex();
-  auto outputValue = writeMeshVertexOutputOp.getOutputValue();
+  auto isPrimitive = writeMeshOutputOp.getIsPrimitive();
+  auto location = writeMeshOutputOp.getLocation();
+  auto locationOffset = writeMeshOutputOp.getLocationOffset();
+  auto componentIndex = writeMeshOutputOp.getComponentIndex();
+  auto primOrVertexIndex = writeMeshOutputOp.getPrimOrVertexIndex();
+  auto outputValue = writeMeshOutputOp.getOutputValue();
 
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
-  const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
+  auto &outputComponents =
+      isPrimitive
+          ? m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.mesh.primitiveOutputComponents
+          : m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.mesh.vertexOutputComponents;
 
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
-  Value *ldsOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexStride));
-  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
+  // ldsOffset = ldsStart + primOrVertexIndex * primOrVertexStride +
+  //             offsetInPrimOrVertex + locationIndex * numComponents + componentIndex
+  Value *ldsStart = m_builder.getInt32(
+      getMeshShaderLdsRegionStart(isPrimitive ? MeshLdsRegion::PrimitiveOutput : MeshLdsRegion::VertexOutput));
+  const unsigned primOrVertexStride = isPrimitive ? m_outputsLayout.primitiveStride : m_outputsLayout.vertexStride;
+  Value *primOrVertexOffset = m_builder.CreateMul(primOrVertexIndex, m_builder.getInt32(primOrVertexStride));
+
+  Value *offsetInPrimOrVertex = m_builder.getInt32(getOutputOffsetInPrimOrVertex(location, isPrimitive));
+  if (locationOffset != m_builder.getInt32(0)) {
+    auto locationIndex = locationOffset;
+
+    assert(outputComponents.count(location) > 0); // Must exist
+    unsigned numComponents = outputComponents[location].first;
+
+    if (numComponents > 4) {
+      // NOTE: Here we encounter 64-bit vec3/vec4 data types. Such types will occupy two consecutive locations and the
+      // provided location offset must be divided by 2 to get real location index.
+      locationIndex = m_builder.CreateLShr(locationOffset, 2);
+    }
+
+    offsetInPrimOrVertex = m_builder.CreateAdd(offsetInPrimOrVertex,
+                                               m_builder.CreateMul(locationIndex, m_builder.getInt32(numComponents)));
+  }
+
+  if (componentIndex != m_builder.getInt32(0))
+    offsetInPrimOrVertex = m_builder.CreateAdd(offsetInPrimOrVertex, componentIndex);
+
+  auto ldsOffset = ldsStart;
+  ldsOffset = m_builder.CreateAdd(ldsOffset, primOrVertexOffset);
+  ldsOffset = m_builder.CreateAdd(ldsOffset, offsetInPrimOrVertex);
 
   writeValueToLds(outputValue, ldsOffset);
 
-  m_callsToRemove.push_back(&writeMeshVertexOutputOp);
-}
-
-// =====================================================================================================================
-// Lower write mesh primitive output. Write mesh shader primitive outputs to LDS.
-//
-// @param writeMeshPrimitiveOutputOp : Call instruction op to write primitive output for mesh shader
-void MeshTaskShader::lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp) {
-  m_builder.SetInsertPoint(&writeMeshPrimitiveOutputOp);
-
-  assert(getShaderStage(writeMeshPrimitiveOutputOp.getFunction()) == ShaderStage::Mesh);
-
-  auto outputOffset = writeMeshPrimitiveOutputOp.getOutputOffset();
-  auto primitiveIndex = writeMeshPrimitiveOutputOp.getPrimitiveIndex();
-  auto outputValue = writeMeshPrimitiveOutputOp.getOutputValue();
-
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
-  const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
-  Value *ldsOffset = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(primitiveStride));
-  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
-
-  writeValueToLds(outputValue, ldsOffset);
-
-  m_callsToRemove.push_back(&writeMeshPrimitiveOutputOp);
+  m_callsToRemove.push_back(&writeMeshOutputOp);
 }
 
 // =====================================================================================================================
@@ -1703,8 +1957,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
                             .add<SetMeshPrimitiveIndicesOp>(&MeshTaskShader::lowerSetMeshPrimitiveIndices)
                             .add<SetMeshPrimitiveCulledOp>(&MeshTaskShader::lowerSetMeshPrimitiveCulled)
                             .add<GetMeshBuiltinInputOp>(&MeshTaskShader::lowerGetMeshBuiltinInput)
-                            .add<WriteMeshVertexOutputOp>(&MeshTaskShader::lowerWriteMeshVertexOutput)
-                            .add<WriteMeshPrimitiveOutputOp>(&MeshTaskShader::lowerWriteMeshPrimitiveOutput)
+                            .add<WriteMeshOutputOp>(&MeshTaskShader::lowerWriteMeshOutput)
                             .build();
   visitor.visit(*this, *entryPoint);
 
@@ -1720,7 +1973,6 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
 // Export primitive (primitive connectivity data, primitive payload, and primitive attributes).
 void MeshTaskShader::exportPrimitive() {
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh;
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage;
 
   Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
   Value *ldsOffset = m_builder.CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
@@ -1835,37 +2087,56 @@ void MeshTaskShader::exportPrimitive() {
   // Primitive attribute export follows vertex attribute export
   SmallVector<ExportInfo, 32> primAttrExports;
 
-  unsigned startSlot = inOutUsage.mesh.vertexGenericOutputExportCount;
-  for (auto &vertexBuiltIn : inOutUsage.mesh.vertexBuiltInExportSlots) {
-    const unsigned exportSlot = vertexBuiltIn.second;
-    startSlot = std::max(startSlot, exportSlot + 1);
-  }
-
   // Export primitive attributes (from generic outputs)
   ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
-  auto primitiveStride = 4 * inOutUsage.perPrimitiveOutputMapLocCount;
-  auto ldsOffsetBase = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(primitiveStride));
-  ldsOffsetBase = m_builder.CreateAdd(ldsStart, ldsOffsetBase);
+  auto primitiveOffset =
+      m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(m_outputsLayout.primitiveStride));
 
-  for (unsigned exportSlot = 0; exportSlot < inOutUsage.mesh.primitiveGenericOutputExportCount; ++exportSlot) {
-    auto ldsOffset = m_builder.CreateAdd(ldsOffsetBase, m_builder.getInt32(4 * exportSlot));
-    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), ldsOffset);
+  auto &primitiveOutputComponents =
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.mesh.primitiveOutputComponents;
+  for (auto &primitiveOutput : primitiveOutputComponents) {
+    const auto location = primitiveOutput.first;
+    const auto &[numComponents, forBuiltIn] = primitiveOutput.second;
+    assert(numComponents > 0);
 
-    std::array<Value *, 4> exportValues;
-    for (unsigned j = 0; j < 4; ++j)
-      exportValues[j] = m_builder.CreateExtractElement(exportValue, j);
+    if (forBuiltIn != InvalidValue)
+      continue; // Skip those special outputs mapped from primitive built-ins. They will be handled later on.
 
-    primAttrExports.push_back({startSlot + exportSlot, exportValues});
-    ++inOutUsage.primExpCount;
+    auto offsetInPrimitive = m_builder.getInt32(getOutputOffsetInPrimOrVertex(location, true));
+
+    auto ldsOffset = ldsStart;
+    ldsOffset = m_builder.CreateAdd(ldsOffset, primitiveOffset);
+    ldsOffset = m_builder.CreateAdd(ldsOffset, offsetInPrimitive);
+
+    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder.getFloatTy(), numComponents), ldsOffset);
+
+    SmallVector<Value *, 8> exporteValues;
+    for (unsigned i = 0; i < numComponents; ++i)
+      exporteValues.push_back(m_builder.CreateExtractElement(exportValue, i));
+
+    // Do array padding
+    if (numComponents <= 4) {
+      while (exporteValues.size() < 4) // <4 x float>
+        exporteValues.push_back(nullptr);
+    } else {
+      while (exporteValues.size() < 8) // <8 x float>
+        exporteValues.push_back(nullptr);
+    }
+
+    unsigned exportSlot = getOutputExportSlot(location, true);
+    assert(exportSlot != InvalidValue);
+    primAttrExports.push_back({exportSlot, exporteValues[0], exporteValues[1], exporteValues[2], exporteValues[3]});
+    if (numComponents > 4)
+      primAttrExports.push_back(
+          {exportSlot + 1, exporteValues[4], exporteValues[5], exporteValues[6], exporteValues[7]});
   }
 
   // Export primitive attributes (from built-ins as generic ones)
   if (builtInUsage.primitiveId) {
-    if (inOutUsage.mesh.primitiveBuiltInExportSlots.count(BuiltInPrimitiveId) > 0) {
+    const unsigned exportSlot = getOutputExportSlot(BuiltInPrimitiveId, true);
+    if (exportSlot != InvalidValue) {
       assert(primitiveId);
-      const unsigned exportSlot = inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInPrimitiveId];
-      primAttrExports.push_back({startSlot + exportSlot, primitiveId});
-      ++inOutUsage.primExpCount;
+      primAttrExports.push_back({exportSlot, primitiveId});
     }
   }
 
@@ -1886,11 +2157,10 @@ void MeshTaskShader::exportPrimitive() {
   }
 
   if (exportLayer) {
-    if (inOutUsage.mesh.primitiveBuiltInExportSlots.count(BuiltInLayer) > 0) {
+    const unsigned exportSlot = getOutputExportSlot(BuiltInLayer, true);
+    if (exportSlot != InvalidValue) {
       assert(fsLayer);
-      const unsigned exportSlot = inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInLayer];
-      primAttrExports.push_back({startSlot + exportSlot, fsLayer});
-      ++inOutUsage.primExpCount;
+      primAttrExports.push_back({exportSlot, fsLayer});
     }
   }
 
@@ -1911,11 +2181,10 @@ void MeshTaskShader::exportPrimitive() {
   }
 
   if (exportViewportIndex) {
-    if (inOutUsage.mesh.primitiveBuiltInExportSlots.count(BuiltInViewportIndex) > 0) {
+    const unsigned exportSlot = getOutputExportSlot(BuiltInViewportIndex, true);
+    if (exportSlot != InvalidValue) {
       assert(fsViewportIndex);
-      const unsigned exportSlot = inOutUsage.mesh.primitiveBuiltInExportSlots[BuiltInViewportIndex];
-      primAttrExports.push_back({startSlot + exportSlot, fsViewportIndex});
-      ++inOutUsage.primExpCount;
+      primAttrExports.push_back({exportSlot, fsViewportIndex});
     }
   }
 
@@ -1926,7 +2195,6 @@ void MeshTaskShader::exportPrimitive() {
 // Export vertex (vertex position data and vertex attributes).
 void MeshTaskShader::exportVertex() {
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh;
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage;
 
   // Export vertex position data
   SmallVector<ExportInfo, 8> posExports;
@@ -2002,21 +2270,46 @@ void MeshTaskShader::exportVertex() {
 
   // Export vertex attributes (from generic outputs)
   Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
-  auto vertexStride = 4 * inOutUsage.outputMapLocCount;
-  auto ldsOffsetBase = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(vertexStride));
-  ldsOffsetBase = m_builder.CreateAdd(ldsStart, ldsOffsetBase);
+  auto vertexOffset =
+      m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(m_outputsLayout.vertexStride));
 
-  for (unsigned exportSlot = 0; exportSlot < inOutUsage.mesh.vertexGenericOutputExportCount; ++exportSlot) {
-    auto ldsOffset = m_builder.CreateAdd(ldsOffsetBase, m_builder.getInt32(4 * exportSlot));
-    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), ldsOffset);
+  auto &vertexOutputComponents =
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.mesh.vertexOutputComponents;
+  for (auto &vertexOutput : vertexOutputComponents) {
+    const auto location = vertexOutput.first;
+    const auto &[numComponents, forBuiltIn] = vertexOutput.second;
+    assert(numComponents > 0);
 
-    std::array<Value *, 4> exportValues = {m_builder.CreateExtractElement(exportValue, static_cast<uint64_t>(0)),
-                                           m_builder.CreateExtractElement(exportValue, 1),
-                                           m_builder.CreateExtractElement(exportValue, 2),
-                                           m_builder.CreateExtractElement(exportValue, 3)};
+    if (forBuiltIn != InvalidValue)
+      continue; // Skip those special outputs mapped from vertex built-ins. They will be handled later on.
 
-    vertAttrExports.push_back({exportSlot, exportValues});
-    ++inOutUsage.expCount;
+    auto offsetInVertex = m_builder.getInt32(getOutputOffsetInPrimOrVertex(location, false));
+
+    auto ldsOffset = ldsStart;
+    ldsOffset = m_builder.CreateAdd(ldsOffset, vertexOffset);
+    ldsOffset = m_builder.CreateAdd(ldsOffset, offsetInVertex);
+
+    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder.getFloatTy(), numComponents), ldsOffset);
+
+    SmallVector<Value *, 8> exporteValues;
+    for (unsigned i = 0; i < numComponents; ++i)
+      exporteValues.push_back(m_builder.CreateExtractElement(exportValue, i));
+
+    // Do array padding
+    if (numComponents <= 4) {
+      while (exporteValues.size() < 4) // <4 x float>
+        exporteValues.push_back(nullptr);
+    } else {
+      while (exporteValues.size() < 8) // <8 x float>
+        exporteValues.push_back(nullptr);
+    }
+
+    unsigned exportSlot = getOutputExportSlot(location, false);
+    assert(exportSlot != InvalidValue);
+    vertAttrExports.push_back({exportSlot, exporteValues[0], exporteValues[1], exporteValues[2], exporteValues[3]});
+    if (numComponents > 4)
+      vertAttrExports.push_back(
+          {exportSlot + 1, exporteValues[4], exporteValues[5], exporteValues[6], exporteValues[7]});
   }
 
   // Export vertex attributes (from built-ins as generic ones)
@@ -2057,24 +2350,20 @@ void MeshTaskShader::exportVertex() {
     }
 
     if (exportClipCullDistance) {
-      unsigned exportSlot = InvalidValue;
-      if (inOutUsage.mesh.vertexBuiltInExportSlots.count(BuiltInClipDistance) > 0) {
-        exportSlot = inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInClipDistance];
-      } else {
-        assert(inOutUsage.mesh.vertexBuiltInExportSlots.count(BuiltInCullDistance) > 0);
-        exportSlot = inOutUsage.mesh.vertexBuiltInExportSlots[BuiltInCullDistance];
+      unsigned exportSlot = getOutputExportSlot(BuiltInClipDistance, false);
+      if (exportSlot == InvalidValue) {
+        // If ClipDistance doesn't exist, check CullDistance once again
+        exportSlot = getOutputExportSlot(BuiltInCullDistance, false);
       }
       assert(exportSlot != InvalidValue);
 
       vertAttrExports.push_back(
           {exportSlot, {clipCullDistances[0], clipCullDistances[1], clipCullDistances[2], clipCullDistances[3]}});
-      ++inOutUsage.expCount;
 
       if (clipCullDistances.size() > 4) {
         // Do the second exporting
         vertAttrExports.push_back(
             {exportSlot + 1, {clipCullDistances[4], clipCullDistances[5], clipCullDistances[6], clipCullDistances[7]}});
-        ++inOutUsage.expCount;
       }
     }
   }
@@ -2102,7 +2391,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
   const uint64_t numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
 
   Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
-  SyncScope::ID agentScope = m_builder.getContext().getOrInsertSyncScopeID("agent");
+  SyncScope::ID agentScope = m_builder.getContext().getOrInsertSyncScopeID("agent"); // Device level
 
   //
   // Record numMeshThreads
@@ -2196,7 +2485,8 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
       exportDone = true; // Last export
 
     if (m_gfxIp.major >= 11) {
-      if (kind == ExportKind::Pos || kind == ExportKind::Prim) {
+      if (m_pipelineState->exportAttributeByExportInstruction() || kind == ExportKind::Pos ||
+          kind == ExportKind::Prim) {
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp_row, valueTy,
                                   {
                                       m_builder.getInt32(target + exports[i].slot), // tgt
@@ -2210,6 +2500,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
                                   });
       } else {
         assert(kind == ExportKind::VertAttr || kind == ExportKind::PrimAttr);
+        assert(!m_pipelineState->exportAttributeByExportInstruction());
 
         Value *valueToStore = PoisonValue::get(FixedVectorType::get(valueTy, 4));
         for (unsigned j = 0; j < 4; ++j) {
@@ -2260,32 +2551,14 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
 void MeshTaskShader::prepareAttribRingAccess() {
   assert(m_gfxIp.major >= 11); // Must be GFX11+
 
-  // The allocated numbers of vertex/primitive attributes are something as follow:
-  //   1. Generic vertex attributes
-  //   2. Vertex attributes mapped from vertex builtins
-  //   3. Generic primitive attributes
-  //   4. Primitive attributes mapped from primitive builtins
-  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.mesh;
-  unsigned vertAttribCount = inOutUsage.vertexGenericOutputExportCount;
-  for (auto &vertexBuiltIn : inOutUsage.vertexBuiltInExportSlots) {
-    const unsigned exportSlot = vertexBuiltIn.second;
-    vertAttribCount = std::max(vertAttribCount, exportSlot + 1);
-  }
-
-  unsigned primAttribCount = inOutUsage.primitiveGenericOutputExportCount;
-  for (auto &primitiveBuiltIn : inOutUsage.primitiveBuiltInExportSlots) {
-    const unsigned exportSlot = primitiveBuiltIn.second;
-    primAttribCount = std::max(primAttribCount, exportSlot + 1);
-  }
-
-  unsigned attribCount = vertAttribCount + primAttribCount;
+  unsigned attribCount = m_outputsLayout.vertexExportCount + m_outputsLayout.primitiveExportCount;
   if (attribCount == 0)
     return; // No attribute export
 
   // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and PRIM_EXPORT_COUNT.
   // When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even though this is not what we
   // want. Hence, we should reserve param0 as a dummy vertex attribute.
-  if (vertAttribCount == 0) {
+  if (m_outputsLayout.vertexExportCount == 0) {
     m_hasNoVertexAttrib = true;
     ++attribCount; // Count in this dummy vertex attribute
   }
@@ -2569,19 +2842,25 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
     break;
   }
 
-  Value *ldsOffset = nullptr;
+  // ldsOffset = ldsStart + primOrVertexIndex * primOrVertexStride + offsetInPrimOrVertex
+  Value *primOrVertexOffset = nullptr;
   if (region == MeshLdsRegion::VertexOutput) {
-    auto vertexStride = 4 * inOutUsage.outputMapLocCount;
-    ldsOffset = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(vertexStride));
+    primOrVertexOffset =
+        m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(m_outputsLayout.vertexStride));
   } else {
     assert(region == MeshLdsRegion::PrimitiveOutput);
-    auto primitiveStride = 4 * inOutUsage.perPrimitiveOutputMapLocCount;
-    ldsOffset = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(primitiveStride));
+    primOrVertexOffset =
+        m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(m_outputsLayout.primitiveStride));
   }
-  ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(4 * location));
 
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(region));
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(
+      region == MeshLdsRegion::PrimitiveOutput ? MeshLdsRegion::PrimitiveOutput : MeshLdsRegion::VertexOutput));
+  Value *offsetInPrimOrVertex =
+      m_builder.getInt32(getOutputOffsetInPrimOrVertex(location, region == MeshLdsRegion::PrimitiveOutput));
+
+  auto ldsOffset = ldsStart;
+  ldsOffset = m_builder.CreateAdd(ldsOffset, primOrVertexOffset);
+  ldsOffset = m_builder.CreateAdd(ldsOffset, offsetInPrimOrVertex);
 
   return readValueFromLds(readTy, ldsOffset);
 }
@@ -2671,6 +2950,49 @@ Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
   hwShadingRate = m_builder.CreateOr(hwShadingRate, hwXRate);
 
   return hwShadingRate;
+}
+
+// =====================================================================================================================
+// Update input/output usage in resource usage for mesh shader. The info will be used to build register metadata later
+// on.
+void MeshTaskShader::updateMeshShaderInOutUsage() {
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage;
+
+  inOutUsage.expCount = m_outputsLayout.vertexExportCount;
+  inOutUsage.primExpCount = m_outputsLayout.primitiveExportCount;
+
+  // For part pipeline, below info will be used to build the metadata ".preraster_output_semantic" to correctly map
+  // output locations specified by API mesh shader to HW export slots. The export slots will be used to fill the
+  // register field SPI_PS_INPUT_CNTL.OFFSET during pipeline linking.
+  if (m_pipelineState->isUnlinked()) {
+    inOutUsage.outputLocInfoMap.clear();
+    for (auto &genericExport : m_outputsLayout.vertexGenericExports) {
+      const auto &[location, exportSlot] = genericExport;
+      InOutLocationInfo locInfo = {};
+      locInfo.setLocation(location);
+      InOutLocationInfo newLocInfo = {};
+      newLocInfo.setLocation(exportSlot);
+      inOutUsage.outputLocInfoMap[locInfo] = newLocInfo;
+    }
+
+    inOutUsage.builtInOutputLocMap.clear();
+    for (auto &builtInExport : m_outputsLayout.vertexBuiltInExports) {
+      const auto &[builtIn, exportSlot] = builtInExport;
+      inOutUsage.builtInOutputLocMap[builtIn] = exportSlot;
+    }
+
+    inOutUsage.perPrimitiveOutputLocMap.clear();
+    for (auto &genericExport : m_outputsLayout.primitiveGenericExports) {
+      const auto &[location, exportSlot] = genericExport;
+      inOutUsage.perPrimitiveOutputLocMap[location] = exportSlot;
+    }
+
+    inOutUsage.perPrimitiveBuiltInOutputLocMap.clear();
+    for (auto &builtInExport : m_outputsLayout.primitiveBuiltInExports) {
+      const auto &[builtIn, exportSlot] = builtInExport;
+      inOutUsage.perPrimitiveBuiltInOutputLocMap[builtIn] = exportSlot;
+    }
+  }
 }
 
 // =====================================================================================================================

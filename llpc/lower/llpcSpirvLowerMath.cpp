@@ -39,7 +39,6 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/Debug.h"
@@ -53,7 +52,6 @@
 
 using namespace lgc;
 using namespace llvm;
-using namespace PatternMatch;
 using namespace SPIRV;
 using namespace Llpc;
 
@@ -532,115 +530,6 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       return;
     }
   }
-
-  // Replace mul with amdgcn_fmul_legacy intrinsic when detect patterns like:
-  // ((b==0.0 ? 0.0 : a) * (a==0.0 ? 0.0 : b))
-  if (opCode == Instruction::FMul) {
-    emitFFmulzInst(binaryOp);
-  }
-}
-
-// =====================================================================================================================
-// Replace mul with amdgcn_fmul_legacy intrinsic when detect patterns like:
-// ((b==0.0 ? 0.0 : a) * (a==0.0 ? 0.0 : b))
-// @param binaryOp : Binary operator instruction
-void SpirvLowerMathFloatOp::emitFFmulzInst(BinaryOperator &binaryOp) {
-  auto src1 = binaryOp.getOperand(0);
-  auto src2 = binaryOp.getOperand(1);
-  FastMathFlags fastMathFlags = binaryOp.getFastMathFlags();
-  auto matchValue = isMulDx9Zero(src1, src2, fastMathFlags);
-  if (matchValue != std::nullopt) {
-    IRBuilder<> builder(*m_context);
-    builder.SetInsertPoint(&binaryOp);
-    builder.setFastMathFlags(binaryOp.getFastMathFlags());
-    Value *transformSrc1 = matchValue->first;
-    Value *transformSrc2 = matchValue->second;
-    Value *fmulzResult = builder.CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, {transformSrc1, transformSrc2});
-
-    m_changed = true;
-    binaryOp.replaceAllUsesWith(fmulzResult);
-    binaryOp.dropAllReferences();
-    binaryOp.eraseFromParent();
-  }
-}
-
-// =====================================================================================================================
-// Replace fma with amdgcn_fma_legacy intrinsic when detect patterns like:
-// fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
-// @param inst : Instruction to be replaced if needed
-void SpirvLowerMathFloatOp::emitFFmazInst(Instruction *inst) {
-  assert(inst);
-  CallInst *fmaCallInst = dyn_cast<CallInst>(inst);
-  Value *src1 = fmaCallInst->getArgOperand(0);
-  Value *src2 = fmaCallInst->getArgOperand(1);
-  FastMathFlags fastMathFlags = inst->getFastMathFlags();
-  auto matchValue = isMulDx9Zero(src1, src2, fastMathFlags);
-  if (matchValue != std::nullopt) {
-    IRBuilder<> builder(*m_context);
-    builder.SetInsertPoint(inst);
-    builder.setFastMathFlags(inst->getFastMathFlags());
-    Value *transformSrc1 = matchValue->first;
-    Value *transformSrc2 = matchValue->second;
-    Value *src3 = fmaCallInst->getArgOperand(2);
-    Value *ffmazResult =
-        builder.CreateIntrinsic(Intrinsic::amdgcn_fma_legacy, {}, {transformSrc1, transformSrc2, src3});
-
-    m_changed = true;
-    inst->replaceAllUsesWith(ffmazResult);
-    inst->dropAllReferences();
-    inst->eraseFromParent();
-  }
-}
-
-// =====================================================================================================================
-// Checks whether a multiply of lhs with rhs using the given fast-math flags can be transformed into a multiply
-// with DX9 zero semantics. If so, returns a pair of operands for the new multiply.
-// @param lhs : left operand for the operation
-// @param rhs:  right operand for the operation
-// @param fastMathFlags: fastmath flags for the opreration
-std::optional<std::pair<Value *, Value *>> SpirvLowerMathFloatOp::isMulDx9Zero(Value *lhs, Value *rhs,
-                                                                               FastMathFlags fastMathFlags) {
-  Value *lhsCmpValue = nullptr;
-  Value *lhsFalseValue = nullptr;
-  Value *rhsCmpValue = nullptr;
-  Value *rhsFalseValue = nullptr;
-  FCmpInst::Predicate pred = FCmpInst::FCMP_OEQ;
-
-  // If the fast math flags might have INFs, when a = intf then a == 0 ? 0.0 : b is b and a * b = inf * 0 = nan
-  // This is incorrect so it needs to add related check here
-  if (!fastMathFlags.noInfs())
-    return std::nullopt;
-
-  // Only transform for float32.
-  if (!(lhs->getType()->isFloatTy() && rhs->getType()->isFloatTy()))
-    return std::nullopt;
-
-  // Detect whether A = (b==0.0 ? 0.0 : a) and parse out b and a
-  bool lhsMatch =
-      match(lhs, m_Select(m_FCmp(pred, m_Value(lhsCmpValue), m_AnyZeroFP()), m_Zero(), m_Value(lhsFalseValue)));
-  // Detect whether B = (a'==0.0 ? 0.0 : b') and output a' and b'
-  bool rhsMatch =
-      match(rhs, m_Select(m_FCmp(pred, m_Value(rhsCmpValue), m_AnyZeroFP()), m_Zero(), m_Value(rhsFalseValue)));
-
-  // If b == b' && a == a' then use fmul_legacy(a,b) instead of fmul(A,B)
-  if (lhsMatch && rhsMatch && (lhsCmpValue == rhsFalseValue) && (rhsCmpValue == lhsFalseValue)) {
-    return std::make_pair(lhsFalseValue, rhsFalseValue);
-  }
-  if (lhsMatch && (lhsCmpValue == rhs)) {
-    if (auto *constLhsFalseValue = dyn_cast<ConstantFP>(lhsFalseValue);
-        constLhsFalseValue && !constLhsFalseValue->isZero()) {
-      // Detect pattern: ((b==0.0 ? 0.0 : a) * b) when a is constant but not zero.
-      return std::make_pair(lhsFalseValue, rhs);
-    }
-  }
-  if (rhsMatch && (lhs == rhsCmpValue)) {
-    if (auto *constRhsFalseValue = dyn_cast<ConstantFP>(rhsFalseValue);
-        constRhsFalseValue && !constRhsFalseValue->isZero()) {
-      // Detect pattern: (a * (a==0.0 ? 0.0 : b)) when b is constant but not zero.
-      return std::make_pair(lhs, rhsFalseValue);
-    }
-  }
-  return std::nullopt;
 }
 
 // =====================================================================================================================
@@ -655,13 +544,6 @@ void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
   if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::fabs) {
     // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
     flushDenormIfNeeded(&callInst);
-  }
-
-  // Replace fma with amdgcn_fma_legacy intrinsic when detect patterns like:
-  // fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
-  auto mangledName = callee->getName();
-  if (mangledName.starts_with("lgc.create.fma")) {
-    emitFFmazInst(&callInst);
   }
 }
 

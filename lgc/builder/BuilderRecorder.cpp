@@ -1070,7 +1070,7 @@ Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeT
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                  unsigned binding, const Twine &instName) {
-  return record(BuilderOpcode::GetDescPtr, getDescPtrTy(concreteType),
+  return record(BuilderOpcode::GetDescPtr, getDescPtrTy(),
                 {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
                  getInt64(descSet), getInt32(binding)},
                 instName);

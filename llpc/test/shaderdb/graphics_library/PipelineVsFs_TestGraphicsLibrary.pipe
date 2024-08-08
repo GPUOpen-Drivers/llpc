@@ -16,7 +16,7 @@ colorExport=PipelineLibCes_TestColorExport.pipe
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
 ; SHADERTEST-NEXT:    [[TMP2:%.*]] = call <4 x float> @lgc.input.import.generic__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison)
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = call i32 @lgc.special.user.data.BaseVertex(i32 268435459) #[[ATTR3:[0-9]+]]
-; SHADERTEST-NEXT:    [[TMP4:%.*]] = call i32 @lgc.shader.input.VertexId(i32 17) #[[ATTR3]]
+; SHADERTEST-NEXT:    [[TMP4:%.*]] = call i32 @lgc.shader.input.VertexId(i32 18) #[[ATTR3]]
 ; SHADERTEST-NEXT:    [[VERTEXINDEX:%.*]] = add i32 [[TMP3]], [[TMP4]]
 ; SHADERTEST-NEXT:    [[DOTFR:%.*]] = freeze i32 [[VERTEXINDEX]]
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = icmp slt i32 [[DOTFR]], 3
@@ -55,7 +55,7 @@ colorExport=PipelineLibCes_TestColorExport.pipe
 ; SHADERTEST-NEXT:    [[TMP6:%.*]] = extractelement <4 x float> [[TMP0]], i64 3
 ; SHADERTEST-NEXT:    [[TMP7:%.*]] = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float [[TMP3]], float [[TMP4]])
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float [[TMP5]], float [[TMP6]])
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.compr.v2f16(i32 immarg 0, i32 immarg 15, <2 x half> [[TMP7]], <2 x half> [[TMP8]], i1 immarg true, i1 immarg true) #[[ATTR2:[0-9]+]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.compr.v2f16(i32 0, i32 15, <2 x half> [[TMP7]], <2 x half> [[TMP8]], i1 true, i1 true)
 ; SHADERTEST-NEXT:    call void @llvm.amdgcn.endpgm()
 ; SHADERTEST-NEXT:    unreachable
 ;

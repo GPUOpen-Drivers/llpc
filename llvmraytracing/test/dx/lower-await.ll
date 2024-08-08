@@ -40,7 +40,7 @@ define void @simple_await(i64 %dummyRetAddr) !continuation.registercount !1 {
 ; CLEANED-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANED-NEXT:    store i64 [[DUMMYRETADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANED-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await.resume.0)
-; CLEANED-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CLEANED-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CLEANED-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
@@ -70,7 +70,7 @@ define void @simple_await_entry() !continuation.entry !0 !continuation.registerc
 ; CLEANED-SAME: ) !continuation.registercount [[META1]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] !continuation.state [[META1]] {
 ; CLEANED-NEXT:  AllocaSpillBB:
 ; CLEANED-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await_entry.resume.0)
-; CLEANED-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CLEANED-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CLEANED-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
@@ -106,7 +106,7 @@ define void @await_with_arg(i64 %dummyRetAddr, i32 %i) !continuation.registercou
 ; CLEANED-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_ARG_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANED-NEXT:    store i64 [[DUMMYRETADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANED-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @await_with_arg.resume.0)
-; CLEANED-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun_with_arg to i64), i64 [[TMP0]], i32 [[I]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CLEANED-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun_with_arg to i64), i32 -1, {} poison, i64 [[TMP0]], i32 [[I]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CLEANED-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun_with_arg(i32 %i), !continuation.registercount !1,  !continuation.returnedRegistercount !1
@@ -142,7 +142,7 @@ define i32 @await_with_ret_value(i64 %dummyRetAddr) !continuation.registercount 
 ; CLEANED-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANED-NEXT:    store i64 [[DUMMYRETADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANED-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @await_with_ret_value.resume.0)
-; CLEANED-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CLEANED-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CLEANED-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
@@ -177,7 +177,7 @@ define void @wait_await(i64 %dummyRetAddr) !continuation.registercount !1 {
 ; CLEANED-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[WAIT_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CLEANED-NEXT:    store i64 [[DUMMYRETADDR]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANED-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @wait_await.resume.0)
-; CLEANED-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 ptrtoint (ptr @async_fun_with_waitmask to i64), i64 -1, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
+; CLEANED-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun_with_waitmask to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]], !waitmask [[META9:![0-9]+]]
 ; CLEANED-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun_with_waitmask(i64 -1), !continuation.wait.await !0, !continuation.registercount !1, !continuation.returnedRegistercount !1

@@ -10,8 +10,8 @@
  *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
- *  The above copyright notice and this permission notice shall be included in
- *all copies or substantial portions of the Software.
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
  *
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -33,7 +33,6 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
-
 #include <bitset>
 
 #define GET_INCLUDES
@@ -50,8 +49,7 @@ constexpr const char CpsMetadata[] = "lgc.cps";
 // type. Note that this does not include any padding except for pointers.
 unsigned lgc::cps::getArgumentDwordCount(const DataLayout &DL, Type *type) {
   if (type->isSingleValueType()) {
-    unsigned numComponents =
-        type->isVectorTy() ? cast<FixedVectorType>(type)->getNumElements() : 1;
+    unsigned numComponents = type->isVectorTy() ? cast<FixedVectorType>(type)->getNumElements() : 1;
 
     // One VGPR lane can store 32 bit, e. g. 1 dword.
     // Note that this will not take into account that we could possibly store
@@ -77,8 +75,7 @@ unsigned lgc::cps::getArgumentDwordCount(const DataLayout &DL, Type *type) {
   }
 
   if (type->isArrayTy())
-    return getArgumentDwordCount(DL, type->getArrayElementType()) *
-           type->getArrayNumElements();
+    return getArgumentDwordCount(DL, type->getArrayElementType()) * type->getArrayNumElements();
 
   if (auto *structTy = dyn_cast<StructType>(type)) {
     unsigned memberDwordCount = 0;
@@ -93,8 +90,7 @@ unsigned lgc::cps::getArgumentDwordCount(const DataLayout &DL, Type *type) {
 
 // =====================================================================================================================
 // Helper to determine how many dwords are occupied by a given set of types.
-unsigned lgc::cps::getArgumentDwordCount(const DataLayout &DL,
-                                         ArrayRef<Type *> types) {
+unsigned lgc::cps::getArgumentDwordCount(const DataLayout &DL, ArrayRef<Type *> types) {
   unsigned currentDwordUsage = 0;
 
   for (Type *type : types)
@@ -108,9 +104,7 @@ unsigned lgc::cps::getArgumentDwordCount(const DataLayout &DL,
 // Returns
 //    0, if we reached the maximum given by MaxArgumentDwords
 //    std::nullopt, if we exceeded it.
-std::optional<unsigned>
-lgc::cps::getRemainingArgumentDwords(const DataLayout &DL,
-                                     ArrayRef<Type *> arguments) {
+std::optional<unsigned> lgc::cps::getRemainingArgumentDwords(const DataLayout &DL, ArrayRef<Type *> arguments) {
   const unsigned currentDwordUsage = getArgumentDwordCount(DL, arguments);
 
   if (currentDwordUsage > MaxArgumentDwords)
@@ -134,8 +128,7 @@ void lgc::cps::setCpsFunctionLevel(Function &fn, CpsLevel level) {
 
   LLVMContext &context = fn.getContext();
   MDNode *node = MDNode::get(
-      context, {ConstantAsMetadata::get(ConstantInt::get(
-                   Type::getInt32Ty(context), static_cast<unsigned>(level)))});
+      context, {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), static_cast<unsigned>(level)))});
   fn.setMetadata(CpsMetadata, node);
 }
 
@@ -147,29 +140,25 @@ lgc::cps::CpsLevel lgc::cps::getCpsLevelFromFunction(const Function &fn) {
   MDNode *node = fn.getMetadata(fn.getContext().getMDKindID(CpsMetadata));
   if (!node) {
     // Expect that we have set the CPS metadata.
-    llvm::report_fatal_error(
-        "Cannot call lgc::cps::getCpsLevelFromFunction on non-CPS function!");
+    llvm::report_fatal_error("Cannot call lgc::cps::getCpsLevelFromFunction on non-CPS function!");
   }
 
   const ConstantAsMetadata *c = cast<ConstantAsMetadata>(node->getOperand(0));
   unsigned level = cast<ConstantInt>(c->getValue())->getZExtValue();
-  assert(level < static_cast<unsigned>(CpsLevel::Count) &&
-         "Invalid CPS level!");
+  assert(level < static_cast<unsigned>(CpsLevel::Count) && "Invalid CPS level!");
   return static_cast<CpsLevel>(level);
 }
 
 // =====================================================================================================================
 // Transform a shader type into the corresponding CPS level.
-lgc::cps::CpsLevel
-lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage stage) {
+lgc::cps::CpsLevel lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage stage) {
   if (stage == RayTracingShaderStage::RayGeneration)
     return CpsLevel::RayGen;
 
   if (stage == RayTracingShaderStage::Traversal)
     return CpsLevel::Traversal;
 
-  if (stage == RayTracingShaderStage::ClosestHit ||
-      stage == RayTracingShaderStage::Miss ||
+  if (stage == RayTracingShaderStage::ClosestHit || stage == RayTracingShaderStage::Miss ||
       stage == RayTracingShaderStage::Callable)
     return CpsLevel::ClosestHit_Miss_Callable;
 
@@ -188,9 +177,7 @@ lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage stage) {
 uint8_t lgc::cps::getPotentialCpsReturnLevels(RayTracingShaderStage stage) {
   std::bitset<8> CpsLevels;
 
-  auto SetLevel = [&CpsLevels](CpsLevel Level) -> void {
-    CpsLevels.set(static_cast<uint8_t>(Level));
-  };
+  auto SetLevel = [&CpsLevels](CpsLevel Level) -> void { CpsLevels.set(static_cast<uint8_t>(Level)); };
 
   switch (stage) {
   case RayTracingShaderStage::RayGeneration:
@@ -227,8 +214,7 @@ uint8_t lgc::cps::getPotentialCpsReturnLevels(RayTracingShaderStage stage) {
 // =====================================================================================================================
 // Push the state passed to a lgc::cps::jump op to the stack and return the new
 // continuation stack pointer. Do nothing if there is no state to push.
-void lgc::cps::pushStateToCpsStack(llvm_dialects::Builder &builder,
-                                   lgc::cps::JumpOp &jumpOp) {
+void lgc::cps::pushStateToCpsStack(llvm_dialects::Builder &builder, lgc::cps::JumpOp &jumpOp) {
   Value *State = jumpOp.getState();
 
   Type *StateType = State->getType();
@@ -238,8 +224,8 @@ void lgc::cps::pushStateToCpsStack(llvm_dialects::Builder &builder,
   const DataLayout &DL = jumpOp.getModule()->getDataLayout();
   builder.SetInsertPoint(&jumpOp);
 
-  Value *NewCsp = builder.create<lgc::cps::AllocOp>(
-      builder.getInt32(static_cast<unsigned>(DL.getTypeStoreSize(StateType))));
+  Value *NewCsp =
+      builder.create<lgc::cps::AllocOp>(builder.getInt32(static_cast<unsigned>(DL.getTypeStoreSize(StateType))));
   builder.CreateStore(State, NewCsp);
 }
 
@@ -248,13 +234,11 @@ void lgc::cps::pushStateToCpsStack(llvm_dialects::Builder &builder,
 // corresponding state size. Returns the popped state if eligible. If nothing
 // can to be popped, return nullptr. Assume that the builder has its insertion
 // point set after the CSP initializer.
-Value *lgc::cps::popStateFromCpsStack(llvm_dialects::Builder &builder,
-                                      const DataLayout &DL, Type *stateType) {
+Value *lgc::cps::popStateFromCpsStack(llvm_dialects::Builder &builder, const DataLayout &DL, Type *stateType) {
   if (stateType->isEmptyTy())
     return nullptr;
 
-  ConstantInt *StateSize =
-      builder.getInt32(static_cast<unsigned>(DL.getTypeStoreSize(stateType)));
+  ConstantInt *StateSize = builder.getInt32(static_cast<unsigned>(DL.getTypeStoreSize(stateType)));
   Value *StatePtr = builder.create<lgc::cps::PeekOp>(StateSize);
   Value *NewState = builder.CreateLoad(stateType, StatePtr);
   builder.create<lgc::cps::FreeOp>(StateSize);
@@ -266,9 +250,8 @@ Value *lgc::cps::popStateFromCpsStack(llvm_dialects::Builder &builder,
 // Lower lgc.cps.as.continuation.reference operations into an integer
 // representation of the pointer or a passed relocation. Return the new
 // reference.
-Value *lgc::cps::lowerAsContinuationReference(
-    IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCrOp,
-    Value *Relocation) {
+Value *lgc::cps::lowerAsContinuationReference(IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCrOp,
+                                              Value *Relocation) {
   Builder.SetInsertPoint(&AsCrOp);
   Value *Reference = nullptr;
 

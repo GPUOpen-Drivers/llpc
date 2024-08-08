@@ -485,6 +485,10 @@ struct PipelineOptions {
                                           ///  loading it from userdata
   bool bindlessTextureMode;               ///< For OGL only, true if bindless textures are used
   bool bindlessImageMode;                 ///< For OGL only, true if bindless images are used
+  bool enablePolygonStipple;              ///< For OGL only, enable polygon stipple pattern.
+  bool enableLineSmooth;                  ///< For OGL only, enable line smooth mode.
+  bool emulateWideLineStipple;            ///< For OGL only, enable line AA stipple.
+  bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
   const auto &getGlState() const { return *this; }
 #else
   struct GLState {
@@ -499,12 +503,17 @@ struct PipelineOptions {
     bool disableBaseVertex;                 ///< For OGL only, force the BaseVertex builtin to 0 instead of
     bool bindlessTextureMode;               ///< For OGL only, true if bindless textures are used
     bool bindlessImageMode;                 ///< For OGL only, true if bindless images are used
+    bool enablePolygonStipple;              ///< For OGL only, enable polygon stipple pattern.
+    bool enableLineSmooth;                  ///< For OGL only, enable line smooth mode.
+    bool emulateWideLineStipple;            ///< For OGL only, enable line AA stipple.
+    bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
   } glState;
   const auto &getGlState() const { return glState; }
 #endif
   unsigned reserved20;
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
   bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
+  bool reserved21;
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -878,6 +887,9 @@ struct PipelineShaderOptions {
 
   /// Binding ID offset of default uniform block
   unsigned constantBufferBindingOffset;
+
+  /// Let dmask bits be fully enabled when call 'image.sample.c', for depth compare mode swizzling workaround.
+  bool imageSampleDrefReturnsRgba;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1088,9 +1100,14 @@ enum DispatchDimSwizzleMode : unsigned {
   FlattenWidthHeight, ///< Flatten width and height to x, and depth to y
 };
 
+/// Enumerates modes of raytracing compiling. This only takes effect when the pipeline is compiled in indirect mode.
 enum class LlpcRaytracingMode : unsigned {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 74
   None = 0, // Not goto any raytracing compiling path
-  Legacy,   // LLpc Legacy compiling path
+#else
+  Auto = 0,  // Automatically select the raytracing compiling path
+#endif
+  Legacy, // LLpc Legacy compiling path
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
   Gpurt2, // Raytracing lowering at the end of spirvLower.
 #else
@@ -1323,6 +1340,8 @@ struct GraphicsPipelineBuildInfo {
     bool enableColorClampVs;                      ///< Enable clamp vertex output color
     bool enableColorClampFs;                      ///< Enable clamp fragment output color
     bool enableFlatShade;                         ///< Whether enable flat shade.
+    float lineSmooth[4];                          ///< Line smooth pattern
+    float pointSmooth[2];                         ///< Point smooth pattern
   } glState;
   const auto &getGlState() const { return glState; }
 #endif

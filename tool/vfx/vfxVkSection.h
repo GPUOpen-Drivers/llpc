@@ -256,6 +256,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, backwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, constantBufferBindingOffset, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, imageSampleDrefReturnsRgba, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -426,6 +427,45 @@ private:
   SubState m_state;
 };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
+// =====================================================================================================================
+// Represents the sub section GLState
+class SectionGlState : public Section {
+public:
+  typedef Vkgc::PipelineOptions::GLState SubState;
+
+  SectionGlState() : Section(getAddrTable(), SectionTypeUnset, "glState") { memset(&m_state, 0, sizeof(m_state)); }
+
+  void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, replaceSetWithResourceType, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, disableSampleMask, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, buildResourcesDataForShaderModule, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, disableTruncCoordForGather, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableCombinedTexture, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, vertex64BitsAttribSingleLoc, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableFragColor, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, disableBaseVertex, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, bindlessTextureMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, bindlessImageMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enablePolygonStipple, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableLineSmooth, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, emulateWideLineStipple, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enablePointSmooth, MemberTypeBool, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+};
+#endif
+
 // =====================================================================================================================
 // Represents the sub section pipeline option
 class SectionPipelineOption : public Section {
@@ -438,6 +478,9 @@ public:
 
   void getSubState(SubState &state) {
     m_extendedRobustness.getSubState(m_state.extendedRobustness);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
+    m_glState.getSubState(m_state.glState);
+#endif
     state = m_state;
   };
   SubState &getSubStateRef() { return m_state; };
@@ -474,6 +517,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableInterpModePatch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, pageMigrationEnabled, MemberTypeBool, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 73
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, replaceSetWithResourceType, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableSampleMask, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, buildResourcesDataForShaderModule, MemberTypeBool, false);
@@ -482,6 +526,15 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, vertex64BitsAttribSingleLoc, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableFragColor, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableBaseVertex, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, bindlessTextureMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, bindlessImageMode, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePolygonStipple, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableLineSmooth, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, emulateWideLineStipple, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePointSmooth, MemberTypeBool, false);
+#else
+      INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_glState, MemberTypeGlState, true);
+#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
       return addrTableInitializer;
@@ -491,6 +544,9 @@ private:
 
   SubState m_state;
   SectionExtendedRobustness m_extendedRobustness;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
+  SectionGlState m_glState;
+#endif
 };
 
 // =====================================================================================================================

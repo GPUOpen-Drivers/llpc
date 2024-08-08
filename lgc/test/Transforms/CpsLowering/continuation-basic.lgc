@@ -53,7 +53,7 @@ define void @test({i32} %state, i32 %arg, ptr %table) !lgc.cps !0 !lgc.shadersta
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp ne i32 [[TMP31]], 0
 ; CHECK-NEXT:    [[TMP33:%.*]] = select i1 [[TMP32]], i32 [[TMP31]], i32 [[TMP29]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP33]], i1 true)
-; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP18]], i32 [[TMP34]])
+; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP18]], i32 [[TMP34]])
 ; CHECK-NEXT:    [[TMP36:%.*]] = icmp eq i32 [[TMP18]], [[TMP35]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP36]])
 ; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP35]])

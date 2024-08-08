@@ -30,13 +30,14 @@
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
+#include "compilerutils/ArgPromotion.h"
 #include "compilerutils/CompilerUtils.h"
+#include "compilerutils/TypesMetadata.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
@@ -44,6 +45,7 @@
 #include "lgc/LgcRtDialect.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/IR/ValueSymbolTable.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
 using namespace lgc;
@@ -62,10 +64,101 @@ SpirvProcessGpuRtLibrary::SpirvProcessGpuRtLibrary() {
 PreservedAnalyses SpirvProcessGpuRtLibrary::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-gpurt\n");
   SpirvLower::init(&module);
-  for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
-    Function *func = &*funcIt++;
-    processLibraryFunction(func);
+
+  // Process each function.
+  SmallVector<std::pair<Function *, SmallBitVector>> argPromotionsFuncs;
+  auto rtipVersion = m_context->getPipelineContext()->getRayTracingState()->rtIpVersion;
+  unsigned rtip = rtipVersion.major * 10 + rtipVersion.minor;
+  SmallVector<Function *> maybeRtFuncs;
+  for (Function &func : module) {
+    if (func.isDeclaration() || !func.hasName())
+      continue;
+    // We have a function definition that was not left anonymous by being overridden by an earlier
+    // RTIP-suffixed version of the same function.
+
+    // For rayQuery functions, we detect which ones we want to keep, and we select the correct RTIP variant.
+    // TODO: Use the same scheme for ray-tracing functions so we no longer need the GPURT-provided function
+    // name table that the driver passes in to the compiler.
+    // Detect a rayQuery function. If it needs pointer args promoting, set a bit vector for that.
+    StringRef funcName = func.getName();
+    SmallBitVector argPromotions(/*size=*/8);
+    bool isRqFunc = false;
+    if (funcName.starts_with("TraceRayInline"))
+      argPromotions.set(1, 8);
+    else if (funcName.starts_with("RayQueryProceed"))
+      argPromotions.set(1, 3);
+    else if (funcName.starts_with("FetchTrianglePositionFromRayQuery"))
+      argPromotions.set(1);
+    else {
+      StringRef rqFuncName = funcName;
+      isRqFunc = rqFuncName.consume_front("_RayQuery_");
+      if (isRqFunc && rqFuncName.starts_with("CommitProceduralPrimitiveHit"))
+        argPromotions.set(1);
+    }
+    isRqFunc |= argPromotions.any();
+
+    if (!isRqFunc) {
+      // This is not a rayQuery function. Add to the list for processing after this loop.
+      maybeRtFuncs.push_back(&func);
+      continue;
+    }
+
+    // This is a rayQuery function, and we have the args requiring promotion in the argPromotions bit vector.
+    // Parse off the RTIP suffix if any, e.g. "2_0", into a two-digit decimal number, e.g. 20.
+    // Ignore BVH8 funcs.
+    if (funcName.ends_with("BVH8"))
+      continue;
+    StringRef funcSuffix = funcName.take_back(3);
+    unsigned funcRtip = 0;
+    if (funcSuffix.size() == 3 && isdigit(funcSuffix[0]) && funcSuffix[1] == '_' && isdigit(funcSuffix[2])) {
+      funcRtip = (funcSuffix[0] - '0') * 10 + (funcSuffix[2] - '0');
+      funcName = funcName.drop_back(funcSuffix.size());
+    }
+    // If this function has an RTIP suffix but it is wrong, ignore it (leaving it as internal linkage so it gets
+    // removed later).
+    if (funcRtip != 0 && funcRtip != rtip)
+      continue;
+
+    if (funcRtip != 0) {
+      // We have a function with the correct RTIP suffix. We want to rename it without the RTIP suffix.
+      // If there is another function of the same name without the RTIP suffix, take its name and make the
+      // other function internal so it gets removed later. (This works whether we saw that function first or
+      // this RTIP-suffixed one.)
+      if (Function *otherFunc = module.getFunction(funcName)) {
+        otherFunc->setLinkage(GlobalValue::InternalLinkage);
+        func.takeName(otherFunc);
+      } else {
+        // No other function. Set name the normal way. Note use of str() to copy the unsuffixed name out
+        // before setName() frees it.
+        func.setName(funcName.str());
+      }
+    }
+    // Set external linkage on this function.
+    func.setLinkage(GlobalValue::WeakAnyLinkage);
+
+    if (argPromotions.any()) {
+      // Add this function to the list that need arg promotion.
+      // We don't do the arg promotion here as it invalidates the module iterator.
+      // Also, we might end up not needing to do it for a non-RTIP-suffixed function that gets overridden
+      // by an RTIP-suffixed function later in the loop.
+      argPromotionsFuncs.push_back({&func, argPromotions});
+    }
   }
+
+  // Promote args on functions as required. Skip overridden non-RTIP-suffixed ones that have gone back to
+  // being internal linkage.
+  for (const std::pair<Function *, SmallBitVector> &argPromotionsFunc : argPromotionsFuncs) {
+    Function *func = argPromotionsFunc.first;
+    if (func->getLinkage() == GlobalValue::InternalLinkage)
+      continue;
+    Function *promotedFunc = CompilerUtils::promotePointerArguments(func, argPromotionsFunc.second);
+    promotedFunc->setLinkage(GlobalValue::WeakAnyLinkage);
+  }
+
+  // Process ray-tracing (i.e. non-rayQuery) functions in a separate loop; processLibraryFunction() may do
+  // arg promotion, so we cannot do it in the same loop.
+  for (Function *func : maybeRtFuncs)
+    processLibraryFunction(func);
 
   return PreservedAnalyses::none();
 }
@@ -139,64 +232,6 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   auto funcName = func->getName();
 
-  StringRef traceRayFuncName = m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
-
-  const StringRef rayQueryInitializeFuncName =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
-  const StringRef rayQueryProceedFuncName =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED);
-
-  const StringRef fetchTrianglePositionFromNodePointerFuncName =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER);
-  const StringRef fetchTrianglePositionFromRayQueryFuncName =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY);
-
-  const StringRef getInstanceIndex =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX);
-
-  const StringRef getInstanceId =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
-
-  const StringRef getInstanceNodeAddr =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_GET_INSTANCE_NODE);
-
-  const StringRef getObjToWorldTrans =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM);
-
-  const StringRef getWorldToObjTrans =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM);
-
-  assert(!traceRayFuncName.empty());
-  assert(!rayQueryInitializeFuncName.empty());
-  assert(!rayQueryProceedFuncName.empty());
-  assert(!fetchTrianglePositionFromNodePointerFuncName.empty());
-  assert(!fetchTrianglePositionFromRayQueryFuncName.empty());
-  assert(!getInstanceIndex.empty());
-  assert(!getInstanceId.empty());
-  assert(!getInstanceNodeAddr.empty());
-  assert(!getObjToWorldTrans.empty());
-  assert(!getWorldToObjTrans.empty());
-
-  // Set external linkage for library entry functions
-  if (funcName.starts_with(traceRayFuncName) || funcName.starts_with(rayQueryInitializeFuncName) ||
-      funcName.starts_with(rayQueryProceedFuncName) ||
-      funcName.starts_with(fetchTrianglePositionFromNodePointerFuncName) ||
-      funcName.starts_with(fetchTrianglePositionFromRayQueryFuncName) || funcName.starts_with(getInstanceIndex) ||
-      funcName.starts_with(getInstanceId) || funcName.starts_with(getInstanceNodeAddr) ||
-      funcName.starts_with(getObjToWorldTrans) || funcName.starts_with(getWorldToObjTrans)) {
-    func->setLinkage(GlobalValue::WeakAnyLinkage);
-    return;
-  }
-
-  // Drop dummy entry function.
-  static const char *LibraryEntryFuncName = "libraryEntry";
-  if (funcName.starts_with(LibraryEntryFuncName)) {
-    func->dropAllReferences();
-    func->eraseFromParent();
-    func = nullptr;
-    return;
-  }
-
   // Special handling for _AmdContStackStore* and _AmdContStackLoad* to accept arbitrary type
   if (funcName.starts_with("_AmdContStackStore")) {
     m_builder->SetInsertPoint(clearBlock(func));
@@ -229,6 +264,19 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     }
     ContHelper::handleGetSetting(*func, contSettings);
     return;
+  } else if (funcName.starts_with("_AmdValueI32Count")) {
+    ContHelper::handleValueI32Count(*func, *m_builder);
+    return;
+  } else if (funcName.starts_with("_AmdValueGetI32") || funcName.starts_with("_AmdValueSetI32")) {
+    // The intrinsic handling require first argument to be a pointer, the rest to be values.
+    SmallBitVector promotionMask(func->arg_size(), true);
+    promotionMask.reset(0);
+    auto newFunc = CompilerUtils::promotePointerArguments(func, promotionMask);
+    if (funcName.starts_with("_AmdValueGetI32"))
+      ContHelper::handleValueGetI32(*newFunc, *m_builder);
+    else
+      ContHelper::handleValueSetI32(*newFunc, *m_builder);
+    return;
   }
 
   // Create implementation for intrinsic functions.
@@ -256,16 +304,18 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   // automatically.
   bool isAmdIntrinsic = funcName.starts_with("_Amd") && !funcName.contains(".");
   if (funcName.starts_with("_cont_") || isAmdIntrinsic) {
-    func->setLinkage(GlobalValue::WeakAnyLinkage);
+    // This function is provided by GPURT to the compiler.
+    if (!isAmdIntrinsic)
+      func->setLinkage(GlobalValue::WeakAnyLinkage);
 
     // Skip _AmdAwaitTraversal function resulting from calls to _AmdWaitAwaitTraversal.
-    if (!func->hasMetadata(ContHelper::MDTypesName) && !func->arg_empty())
+    if (!func->hasMetadata(TypedFuncTy::MDTypesName) && !func->arg_empty())
       return;
 
     SmallBitVector promotionMask(func->arg_size());
     for (unsigned argNo = 0; argNo < func->arg_size(); argNo++) {
       auto *arg = func->getArg(argNo);
-      ContArgTy argTy = ContArgTy::get(func, arg);
+      TypedArgTy argTy = TypedArgTy::get(arg);
       auto funcName = func->getName();
 
       if (!argTy.isPointerTy())
@@ -279,10 +329,10 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
         promotionMask.set(argNo);
     }
 
-    auto *newFunc = promotePointerArguments(func, promotionMask);
+    auto *newFunc = CompilerUtils::promotePointerArguments(func, promotionMask);
 
-    // Delete function body of _Amd* intrinsics that survive here, they will be handled in LowerRaytracingPipeline.
-    if (funcName.starts_with("_Amd"))
+    // This function is provided by the compiler to GPURT. It will be substituted by LowerRaytracingPipeline.
+    if (isAmdIntrinsic)
       newFunc->deleteBody();
 
     if (newFunc->getName().starts_with("_AmdWaitAwait")) {
@@ -831,9 +881,7 @@ void SpirvProcessGpuRtLibrary::createGetStaticId(llvm::Function *func) {
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
-  // TODO: currently return 0 to indicate that there is no known set
-  // We will probably need to analyse the traceRay ray flags for actual value
-  m_builder->CreateRet(m_builder->getInt32(0));
+  m_builder->CreateRet(m_builder->create<GpurtGetKnownSetRayFlagsOp>());
 }
 
 // =====================================================================================================================
@@ -841,9 +889,7 @@ void SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func) {
-  // TODO: return 0 to indicate there is no knownUnset bits
-  // We will probably need to analyse the traceRay ray flags for actual value
-  m_builder->CreateRet(m_builder->getInt32(0));
+  m_builder->CreateRet(m_builder->create<GpurtGetKnownUnsetRayFlagsOp>());
 }
 
 // =====================================================================================================================

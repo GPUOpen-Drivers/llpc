@@ -11,7 +11,7 @@ declare i32 @inline_fun()
 
 define i32 @main() {
 ; CHECK-LABEL: define i32 @main() {
-; CHECK-NEXT:    [[RESULT_I:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_MYSTRUCT_0:%.*]], ptr @"glob.cloned.{{.*}}", i64 0, i32 1), align 4
+; CHECK-NEXT:    [[RESULT_I:%.*]] = load i32, ptr getelementptr inbounds (i8, ptr @"glob.cloned.{{.*}}", i64 4), align 4
 ; CHECK-NEXT:    ret i32 [[RESULT_I]]
 ;
   %result = call i32 @inline_fun()

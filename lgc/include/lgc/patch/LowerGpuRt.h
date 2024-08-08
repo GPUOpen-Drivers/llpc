@@ -33,6 +33,12 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/PassManager.h"
 
+namespace llvm {
+class Value;
+class Type;
+class Instruction;
+} // namespace llvm
+
 namespace lgc {
 class Builder;
 class PipelineState;
@@ -45,6 +51,7 @@ class GpurtStackReadOp;
 class GpurtLdsStackInitOp;
 class GpurtLdsStackStoreOp;
 class GpurtGetBoxSortHeuristicModeOp;
+class GpurtGetRayQueryDispatchIdOp;
 class GpurtGetStaticFlagsOp;
 class GpurtGetTriangleCompressionModeOp;
 class GpurtGetFlattenedGroupThreadIdOp;
@@ -52,6 +59,8 @@ class GpurtFloatWithRoundModeOp;
 class GpurtDispatchThreadIdFlatOp;
 class GpurtContinuationStackIsGlobalOp;
 class GpurtWaveScanOp;
+class GpurtGetKnownSetRayFlagsOp;
+class GpurtGetKnownUnsetRayFlagsOp;
 
 class LowerGpuRt : public llvm::PassInfoMixin<LowerGpuRt> {
 public:
@@ -72,6 +81,7 @@ private:
   void visitLdsStackInit(lgc::GpurtLdsStackInitOp &inst);
   void visitLdsStackStore(lgc::GpurtLdsStackStoreOp &inst);
   void visitGetBoxSortHeuristicMode(lgc::GpurtGetBoxSortHeuristicModeOp &inst);
+  void visitGetRayQueryDispatchId(lgc::GpurtGetRayQueryDispatchIdOp &inst);
   void visitGetStaticFlags(lgc::GpurtGetStaticFlagsOp &inst);
   void visitGetTriangleCompressionMode(lgc::GpurtGetTriangleCompressionModeOp &inst);
   void visitGetFlattenedGroupThreadId(lgc::GpurtGetFlattenedGroupThreadIdOp &inst);
@@ -79,6 +89,8 @@ private:
   void visitGpurtDispatchThreadIdFlatOp(lgc::GpurtDispatchThreadIdFlatOp &inst);
   void visitContinuationStackIsGlobalOp(lgc::GpurtContinuationStackIsGlobalOp &inst);
   void visitWaveScanOp(lgc::GpurtWaveScanOp &inst);
+  void visitGetKnownSetRayFlagsOp(lgc::GpurtGetKnownSetRayFlagsOp &inst);
+  void visitGetKnownUnsetRayFlagsOp(lgc::GpurtGetKnownUnsetRayFlagsOp &inst);
   llvm::Value *m_stack = nullptr;                        // Stack array to hold stack value
   llvm::Type *m_stackTy = nullptr;                       // Stack type
   PipelineState *m_pipelineState = nullptr;              // Pipeline state

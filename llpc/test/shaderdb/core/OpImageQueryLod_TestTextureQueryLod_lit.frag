@@ -37,7 +37,7 @@ void main()
 ; SHADERTEST: select reassoc nnan nsz arcp contract afn i1 [[ZERO]], <2 x float> [[LOD2]], <2 x float> [[LOD1]]
 
 ; 2D
-; SHADERTEST: [[LOD1:%[0-9]*]] = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32 384, {{.*}}, {{.*}}, <2 x float> <float 5.000000e-01, float 5.000000e-01>)
+; SHADERTEST: [[LOD1:%[0-9]*]] = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.image.get.lod.v2f32(i32 1, i32  896, {{.*}}, {{.*}}, <2 x float> <float 5.000000e-01, float 5.000000e-01>)
 ; SHADERTEST: [[DPX:%[0-9]*]] = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.derivative.v2f32(<2 x float> <float 5.000000e-01, float 5.000000e-01>, i1 false, i1 true)
 ; SHADERTEST: [[ABSDPX:%[0-9]*]] = call reassoc nnan nsz arcp contract afn <2 x float> @llvm.fabs.v2f32(<2 x float> [[DPX]])
 ; SHADERTEST: [[DPY:%[0-9]*]] = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.derivative.v2f32(<2 x float> <float 5.000000e-01, float 5.000000e-01>, i1 true, i1 true)
