@@ -37,6 +37,10 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.1 | Add alphaFunc to GraphicPipelineBuildInfo.                                                            |
+//  |     75.0 | BuildRayTracingPipeline now will not generate kernel entry for pipeline library anymore.              |
+//  |     74.2 | Add enableMapClipDistMask to GraphicsPipelineBuildInfo.                                               |
+//  |     74.1 | Add AdvancedBlendInternalBinding to InternalBinding. Add enableRov to AdvancedBlendInfo.              |
 //  |     74.0 | Replace LlpcRaytracingMode::None with LlpcRaytracingMode::Auto. Now LLPC can choose continuations mode|
 //  |          | automatically. Add isCps to RayTracingPipelineBuildOut to notify client continuations mode is chosen. |
 //  |     73.2 | Add imageSampleDrefReturnsRgba to ShaderOptions                                                       |
@@ -186,7 +190,7 @@
 #pragma once
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 74
+#define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0

@@ -21,7 +21,7 @@ define void @main() !lgc.rt.shaderstage !10 {
 ; CHECK-NEXT:    store i32 123, ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], [8 x i32] poison, [30 x i32] [[TMP2]]), !continuation.registercount [[META0]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], [8 x i32] poison, [30 x i32] [[TMP2]]), !continuation.registercount [[META0]]
 ; CHECK-NEXT:    unreachable
 ;
 entry:

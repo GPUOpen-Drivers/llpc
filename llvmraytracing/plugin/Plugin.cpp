@@ -38,9 +38,3 @@ llvm::PassPluginLibraryInfo getRaytracingPluginPluginInfo() {
   return {LLVM_PLUGIN_API_VERSION, "Raytracing", LLVM_VERSION_STRING,
           [](llvm::PassBuilder &PB) { llvm::ContHelper::RegisterPasses(PB, true); }};
 }
-
-#ifndef LLVM_RAYTRACINGPLUGIN_LINK_INTO_TOOLS
-extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
-  return getRaytracingPluginPluginInfo();
-}
-#endif

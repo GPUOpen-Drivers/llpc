@@ -40,7 +40,7 @@ namespace Llpc {
 class LowerAdvancedBlend : public SpirvLower, public llvm::PassInfoMixin<LowerAdvancedBlend> {
 
 public:
-  LowerAdvancedBlend(unsigned binding = 0);
+  LowerAdvancedBlend(unsigned binding, bool enableRov);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   static llvm::StringRef name() { return "Lower SPIR-V advanced blend shader"; }
 
@@ -49,5 +49,6 @@ private:
   void processFsOutputs(llvm::Module &module);
 
   unsigned m_binding; // The binding point for the multi-sample
+  bool m_enableRov;   // Enable raster-order-view
 };
 } // namespace Llpc

@@ -70,6 +70,7 @@ private:
   bool needEmulateBitmap();
   bool needLowerFragColor();
   bool needEmulateSmoothStipple();
+  bool needLowerAlphaTest();
   MDTuple *createInOutMd(const ShaderInOutMetadata &md);
   MDTuple *createBuiltInInOutMd(lgc::BuiltInKind builtIn);
   void createClipDistance();
@@ -94,6 +95,7 @@ private:
   void lowerFrontSecondaryColor();
   void lowerBackSecondaryColor();
   void lowerFragColor();
+  void lowerAlphaTest();
 
   llvm::SmallVector<llvm::CallInst *> m_emitCalls; // "Call" instructions to emit vertex (geometry shader).
   llvm::ReturnInst *m_retInst;                     // "Return" of the entry point.

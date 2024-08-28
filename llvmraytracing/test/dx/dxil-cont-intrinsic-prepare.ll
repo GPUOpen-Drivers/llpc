@@ -39,9 +39,6 @@ declare !pointeetys !3 void @"\01?_AmdAwait@@YA?AUDispatchSystemData@@UTraversal
 ; Function Attrs: nounwind
 declare i64 @_AmdGetResumePointAddr() #3
 
-; Function Attrs: nounwind
-declare void @_AmdComplete() #3
-
 ; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
 declare !pointeetys !5 void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture) #4
 
@@ -81,7 +78,7 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; CHECK-NEXT:    [[A:%.*]] = getelementptr inbounds [[STRUCT_TRAVERSALDATA]], ptr [[TMP1]], i32 0, i32 2
 ; CHECK-NEXT:    store i64 [[ADDR]], ptr [[A]], align 4
 ; CHECK-NEXT:    [[TMP8:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP9:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[_AMDAWAIT:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i64 3, [[STRUCT_TRAVERSALDATA]] [[TMP8]])
+; CHECK-NEXT:    [[TMP9:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @[[_AMDAWAIT:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i64 3, [[STRUCT_TRAVERSALDATA]] [[TMP8]])
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], ptr [[TMP2]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP2]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP10]], align 4

@@ -10,7 +10,7 @@ declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 define void @main() !lgc.rt.shaderstage !1 {
 ; CHECK-LABEL: define void @main(
-; CHECK-SAME: ) !lgc.rt.shaderstage [[META3:![0-9]+]] {
+; CHECK-SAME: ) !lgc.rt.shaderstage [[META2:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    store i32 2, ptr @debug_global, align 4
 ; CHECK-NEXT:    ret void

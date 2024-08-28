@@ -108,6 +108,7 @@ private:
   std::vector<OutputImportGenericOp *> m_importedOutputCalls; // The output import calls
   std::vector<GenericLocationOp *> m_inputCalls;              // The input import calls
   std::vector<llvm::CallInst *> m_outputCalls;                // The output export calls
+  llvm::DenseSet<unsigned> m_outputCallLocations;             // The output export calls' location
 
   ResourceUsage *m_resUsage; // Pointer to shader resource usage
   std::unique_ptr<InOutLocationInfoMapManager>

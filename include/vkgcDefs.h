@@ -228,7 +228,8 @@ enum InternalBinding : unsigned {
   ReverseThreadGroupControlBinding = 7,     ///< Binding ID of internal buffer for reverseThreadGroup
   RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer
   PixelOpInternalBinding = 9,               ///< Binding ID of pixel operand image buffer.
-  SpecConstInternalBufferBindingId = 10,    ///< Binding ID of internal buffer for specialized constant.
+  AdvancedBlendInternalBinding = 10,        ///< Binding ID of advanced blending coherent.
+  SpecConstInternalBufferBindingId = 11,    ///< Binding ID of internal buffer for specialized constant.
   SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
   ConstantBuffer0Binding = 24, ///< Binding ID of default uniform block
   ConstantBuffer0BindingEnd = ConstantBuffer0Binding + ShaderStageGfxCount,
@@ -694,6 +695,18 @@ enum class NggSubgroupSizingType : unsigned {
   OptimizeForPrims, ///< Subgroup size is optimized for primitive thread utilization
   Explicit,         ///< Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and
                     ///  primsPerSubgroup
+};
+
+/// Represents alpha test function
+enum AlphaTestFunc : uint32_t {
+  Always,   ///< GL_ALWAYS
+  Never,    ///< GL_NEVER
+  Less,     ///< GL_LESS
+  LEqual,   ///< GL_LEQUAL
+  Equal,    ///< GL_EQUAL
+  GEqual,   ///< GL_GEQUAL
+  Greater,  ///< GL_GREATER
+  NotEqual, ///< GL_NOTEQUAL
 };
 
 /// Represents NGG tuning options
@@ -1214,9 +1227,6 @@ struct ApiXfbOutData {
   XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo items
   unsigned numXfbOutInfo;     ///< Count of XfbOutInfo items
   bool forceDisableStreamOut; ///< Force to disable stream out XFB outputs
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
-  bool forceEnablePrimStats; ///< Force to enable counting generated primitives
-#endif
 };
 
 /// Represents the tessellation level passed from driver API
@@ -1227,6 +1237,7 @@ struct TessellationLevel {
 
 struct AdvancedBlendInfo {
   bool enableAdvancedBlend; ///< Whether enable advanced blending
+  bool enableRov;           ///< Whether enable advanced blending with raster-order-view support
   unsigned binding;         ///< The binding point of the texture resource attached to the framebuffer
 };
 
@@ -1342,6 +1353,8 @@ struct GraphicsPipelineBuildInfo {
     bool enableFlatShade;                         ///< Whether enable flat shade.
     float lineSmooth[4];                          ///< Line smooth pattern
     float pointSmooth[2];                         ///< Point smooth pattern
+    bool enableMapClipDistMask;                   ///< Whether to remap the clip distances.
+    AlphaTestFunc alphaTestFunc;                  ///< AlphaTestFunc type
   } glState;
   const auto &getGlState() const { return glState; }
 #endif

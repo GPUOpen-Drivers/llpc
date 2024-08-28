@@ -707,21 +707,17 @@ Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, 
                                             createDppUpdate(identity, result, DppCtrl::DppRowSr8, 0xF, 0xC, 0));
   }
 
-  Value *const threadMask = createThreadMask();
-
   if (clusterSize >= 32) {
-    Value *const maskedPermLane =
-        createThreadMaskedSelect(threadMask, 0xFFFF0000FFFF0000,
-                                 createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+    Value *permLaneX = createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false);
+    Value *const maskedPermLane = createInverseBallotSelect(0xFFFF0000FFFF0000, permLaneX, identity);
+
     // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
     result = createGroupArithmeticOperation(groupArithOp, result, maskedPermLane);
   }
 
   if (clusterSize == 64) {
-
     Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
-
-    Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
+    Value *const maskedBroadcast = createInverseBallotSelect(0xFFFFFFFF00000000, broadcast31, identity);
 
     // Combine broadcast of 31 with the top two rows only.
     result = createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast);
@@ -767,8 +763,6 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 
   Value *shiftRight = nullptr;
 
-  Value *const threadMask = createThreadMask();
-
   // Shift right within each row:
   // 0b0110,0101,0100,0011,0010,0001,0000,1111 = 0x6543210F
   // 0b1110,1101,1100,1011,1010,1001,1000,0111 = 0xEDCBA987
@@ -785,9 +779,8 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 
   // Exchange first column value cross rows(row 1<--> row 0, row 3<-->row2)
   // Only first column value from each row join permlanex
-  shiftRight =
-      createThreadMaskedSelect(threadMask, 0x0001000100010001,
-                               createPermLaneX16(shiftRight, shiftRight, 0, UINT32_MAX, true, false), shiftRight);
+  Value *permLaneX = createPermLaneX16(shiftRight, shiftRight, 0, UINT32_MAX, true, false);
+  shiftRight = createInverseBallotSelect(0x0001000100010001, permLaneX, shiftRight);
 
   if (clusterSize >= 2) {
     // The DPP operation has all rows active and all banks in the rows active (0xF).
@@ -820,9 +813,8 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
   }
 
   if (clusterSize >= 32) {
-    Value *const maskedPermLane =
-        createThreadMaskedSelect(threadMask, 0xFFFF0000FFFF0000,
-                                 createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false), identity);
+    Value *permLaneX = createPermLaneX16(result, result, UINT32_MAX, UINT32_MAX, true, false);
+    Value *const maskedPermLane = createInverseBallotSelect(0xFFFF0000FFFF0000, permLaneX, identity);
 
     // Use a permute lane to cross rows (row 1 <-> row 0, row 3 <-> row 2).
     result = createGroupArithmeticOperation(groupArithOp, result, maskedPermLane);
@@ -830,8 +822,7 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 
   if (clusterSize >= 64) {
     Value *const broadcast31 = CreateSubgroupBroadcast(result, getInt32(31), instName);
-
-    Value *const maskedBroadcast = createThreadMaskedSelect(threadMask, 0xFFFFFFFF00000000, broadcast31, identity);
+    Value *const maskedBroadcast = createInverseBallotSelect(0xFFFFFFFF00000000, broadcast31, identity);
 
     // Combine broadcast of 31 with the top two rows only.
     result = createGroupArithmeticOperation(groupArithOp, result, maskedBroadcast);
@@ -901,9 +892,6 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
     { previousLaneValue = CreateSubgroupShuffle(result, previousLaneIndex, instName); }
 
     // Don't accumulate if there is no valid lane found in previous cluster or current lane is no need for accumulate.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 479645
-    Value *isAccumulateLane = CreateICmpNE(CreateAnd(laneIndex, getInt32(clusterSize)), getInt32(0));
-#else
     // TODO: Check amdgcn_inverse_ballot version.
     const unsigned long long halfMasks[] = {
         0x5555555555555555ull, 0x3333333333333333ull, 0x0f0f0f0f0f0f0f0full,
@@ -912,7 +900,6 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
 
     Value *isAccumulateLane = CreateIntrinsic(getInt1Ty(), Intrinsic::amdgcn_inverse_ballot,
                                               ConstantInt::get(clusterMask->getType(), ~halfMasks[log2ClusterSize]));
-#endif
 
     previousLaneValue = CreateSelect(CreateAnd(isAccumulateLane, isPreviousLaneValid), previousLaneValue, identity);
     result = createGroupArithmeticOperation(groupArithOp, result, previousLaneValue);
@@ -1412,6 +1399,23 @@ Value *BuilderImpl::createThreadMaskedSelect(Value *const threadMask, uint64_t a
   Value *const andMaskVal = getIntN(getShaderSubgroupSize(), andMask);
   Value *const zero = getIntN(getShaderSubgroupSize(), 0);
   return CreateSelect(CreateICmpNE(CreateAnd(threadMask, andMaskVal), zero), value1, value2);
+}
+
+// =====================================================================================================================
+// Create a masked operation - using inverse ballot select between the first value and the second value if the current
+// thread is active.
+//
+// @param selectMask : The lane select mask.
+// @param value1 : The first value to select.
+// @param value2 : The second value to select.
+Value *BuilderImpl::createInverseBallotSelect(uint64_t selectMask, Value *const value1, Value *const value2) {
+  CallInst *inverseBallot =
+      (getShaderWaveSize() == 64)
+          ? CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, getInt64Ty(), getInt64(selectMask))
+          : CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, getInt32Ty(), getInt32(selectMask & 0xffffffff));
+  // Add "convergent" to avoid IR optimization to merge this intrinsic out.
+  inverseBallot->addFnAttr(Attribute::Convergent);
+  return CreateSelect(inverseBallot, value1, value2);
 }
 
 // =====================================================================================================================

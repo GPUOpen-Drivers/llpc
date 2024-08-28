@@ -38,7 +38,16 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/IRBuilder.h"
 
+namespace llvm {
+
+class PassBuilder;
+
+} // namespace llvm
+
 namespace CompilerUtils {
+
+// Register compiler utils passes.
+void RegisterPasses(llvm::PassBuilder &PB);
 
 // Create an LLVM function call to the named function. The callee is built
 // automatically based on return type and its parameters.

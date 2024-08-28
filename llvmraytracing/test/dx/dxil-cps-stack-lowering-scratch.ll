@@ -170,7 +170,7 @@ attributes #6 = { nounwind willreturn memory(inaccessiblemem: read) }
 ; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i32 0
 ; CPS-STACK-LOWERING-CPS-NEXT:    store i32 [[RETURN_ADDR]], ptr addrspace(21) [[TMP4]], align 4
 ; CPS-STACK-LOWERING-CPS-NEXT:    store [1 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP5:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[CONTINUATIONS_GETSYSTEMDATA_S_STRUCT_DISPATCHSYSTEMDATAS:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]]()
+; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP5:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @[[CONTINUATIONS_GETSYSTEMDATA_S_STRUCT_DISPATCHSYSTEMDATAS:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]]()
 ; CPS-STACK-LOWERING-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], 0
 ; CPS-STACK-LOWERING-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; CPS-STACK-LOWERING-CPS-NEXT:    [[TMP6:%.*]] = add i32 [[TMP1]], 9

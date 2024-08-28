@@ -118,3 +118,15 @@ if (LLPC_BUILD_PHOENIX2)
   target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_PHOENIX2 CHIP_HDR_PHOENIX2)
 endif()
 #endif
+#if VKI_BUILD_STRIX1
+option(LLPC_BUILD_STRIX1 "LLPC support for STRIX1?" ON)
+if (LLPC_BUILD_STRIX1)
+  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_STRIX1 CHIP_HDR_STRIX1)
+endif()
+#endif
+#if VKI_BUILD_GFX115
+option(LLPC_BUILD_GFX115 "LLPC support for GFX11.5?" ON)
+if (LLPC_BUILD_GFX115)
+  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_GFX115 CHIP_HDR_GFX115)
+endif()
+#endif

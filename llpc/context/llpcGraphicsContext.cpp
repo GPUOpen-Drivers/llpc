@@ -255,6 +255,9 @@ Options GraphicsContext::computePipelineOptions() const {
   options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
   options.vbAddressLowBitsKnown = pipelineInfo->getGlState().vbAddressLowBitsKnown;
   options.dynamicTopology = pipelineInfo->dynamicTopology;
+  options.enableMapClipDistMask = pipelineInfo->getGlState().enableMapClipDistMask;
+  options.clipPlaneMask = pipelineInfo->rsState.usrClipPlaneMask;
+
   // Only set NGG options for a GFX10+ graphics pipeline.
   const auto &nggState = pipelineInfo->nggState;
   if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG

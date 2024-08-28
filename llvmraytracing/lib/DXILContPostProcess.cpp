@@ -92,6 +92,7 @@ private:
   bool handleIntrinsicCalls(llvm::ModuleAnalysisManager &AnalysisManager);
   bool lowerCpsOps();
   void lowerJumpOp(lgc::cps::JumpOp &JumpOp);
+  void lowerAsContinuationReferenceOp(lgc::cps::AsContinuationReferenceOp &AsCrOp);
   bool handleAmdInternals();
   bool cleanupIncomingPayloadMetadata(Function &F);
   bool cleanupOutgoingPayloadMetadata();
@@ -186,23 +187,10 @@ void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
 
     if (auto *Jump = dyn_cast<lgc::cps::JumpOp>(ContinueCall)) {
       ReturnAddrArgNum = 3;
-      ReturnAddr = *Jump->getTail().begin();
-    } else {
-      if (!isa<lgc::ilcps::ContinueOp, lgc::ilcps::WaitContinueOp>(ContinueCall))
-        report_fatal_error("The BB must end in a continue call after a "
-                           "GetResumePointAddr");
-
-      if (auto *WaitContinue = dyn_cast<lgc::ilcps::WaitContinueOp>(ContinueCall)) {
-        ReturnAddr = WaitContinue->getReturnAddr();
-        ReturnAddrArgNum = 2;
-      } else {
-        ReturnAddr = cast<lgc::ilcps::ContinueOp>(ContinueCall)->getReturnAddr();
-      }
-
-      // Move up computation of the resume address
-
-      assert((ReturnAddr->getType() == Builder.getInt64Ty()) && "Unexpected return addr type!");
+      ReturnAddr = Jump->getRcr();
     }
+
+    assert((ReturnAddr->getType() == Builder.getInt64Ty()) && "Unexpected return addr type!");
 
     SmallVector<Instruction *> MoveInstrs;
     if (auto *I = dyn_cast<Instruction>(ReturnAddr)) {
@@ -504,11 +492,7 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
   static const auto CpsVisitor = llvm_dialects::VisitorBuilder<CpsVisitorState>()
                                      .add<lgc::cps::AsContinuationReferenceOp>(
                                          [](CpsVisitorState &State, lgc::cps::AsContinuationReferenceOp &AsCrOp) {
-                                           State.Builder.SetInsertPoint(&AsCrOp);
-                                           auto *AddrWithMD =
-                                               State.Builder.CreateCall(State.GetAddrAndMD, {AsCrOp.getFn()});
-                                           AsCrOp.replaceAllUsesWith(AddrWithMD);
-                                           AsCrOp.eraseFromParent();
+                                           State.Self.lowerAsContinuationReferenceOp(AsCrOp);
                                            State.Changed = true;
                                          })
                                      .add<lgc::cps::JumpOp>([](CpsVisitorState &State, lgc::cps::JumpOp &JumpOp) {
@@ -566,22 +550,74 @@ void DXILContPostProcessPassImpl::lowerJumpOp(lgc::cps::JumpOp &JumpOp) {
   Value *RCR = Builder.CreateZExt(JumpOp.getTarget(), Builder.getInt64Ty());
 
   CallInst *ContinueOp = nullptr;
-  Value *ReturnAddr = *JumpOp.getTail().begin();
-  SmallVector<Value *, 2> TailArgs{JumpOp.getTail().begin() + 1, JumpOp.getTail().end()};
 
+  SmallVector<Value *> TailArgs{JumpOp.getTail()};
+  Value *RetAddr = Builder.CreateZExt(JumpOp.getRcr(), Builder.getInt64Ty());
   if (auto WaitMask = ContHelper::tryGetWaitMask(JumpOp)) {
-    ContinueOp = Builder.create<lgc::ilcps::WaitContinueOp>(
-        RCR, Builder.getInt64(WaitMask.value()), PoisonValue::get(Builder.getInt32Ty()),
-        Builder.CreateZExt(ReturnAddr, Builder.getInt64Ty()), TailArgs);
+    ContinueOp = Builder.create<lgc::ilcps::WaitContinueOp>(RCR, Builder.getInt64(WaitMask.value()),
+                                                            PoisonValue::get(Builder.getInt32Ty()), RetAddr, TailArgs);
     ContHelper::removeWaitMask(JumpOp);
   } else {
-    ContinueOp = Builder.create<lgc::ilcps::ContinueOp>(RCR, PoisonValue::get(Builder.getInt32Ty()),
-                                                        Builder.CreateZExt(ReturnAddr, Builder.getInt64Ty()), TailArgs);
+    ContinueOp = Builder.create<lgc::ilcps::ContinueOp>(RCR, PoisonValue::get(Builder.getInt32Ty()), RetAddr, TailArgs);
   }
 
   ContinueOp->copyMetadata(JumpOp);
-  ContHelper::removeIsWaitAwaitMetadata(*ContinueOp);
   JumpOp.eraseFromParent();
+}
+
+void DXILContPostProcessPassImpl::lowerAsContinuationReferenceOp(lgc::cps::AsContinuationReferenceOp &AsCrOp) {
+  Builder.SetInsertPoint(&AsCrOp);
+  Value *AddrWithMD = Builder.CreateCall(getContinuationGetAddrAndMD(*Mod), {AsCrOp.getFn()});
+
+  if (AsCrOp.getType()->isIntegerTy(32)) {
+    // If we are using 32-bit compact VPC, extract metadata and encode it into VPC.
+    auto Vpc = Builder.CreateTruncOrBitCast(AddrWithMD, Builder.getInt32Ty());
+    Vpc = Builder.CreateAnd(Vpc, 0xFFFFFFC0);
+
+    // Encode shader priority.
+    auto RtStage =
+        lgc::rt::getLgcRtShaderStage(cast<Function>(AsCrOp.getFn())).value_or(lgc::rt::RayTracingShaderStage::Count);
+
+    auto GetPriorityFromRtStage = [](lgc::rt::RayTracingShaderStage RtStage) {
+      // Shader priorities for continuation scheduling. Higher values mean higher scheduling precedence.
+      // Reserve priority 0 as invalid value.
+      enum SchedulingPriority : unsigned {
+        SchedulingPriorityInvalid = 0,
+        SchedulingPriorityRgs = 1,
+        SchedulingPriorityChs = 2,
+        SchedulingPriorityMiss = 2,
+        SchedulingPriorityTraversal = 3,
+        SchedulingPriorityAhs = 4,
+        SchedulingPriorityIs = 5,
+        SchedulingPriorityCallable = 6,
+        SchedulingPriorityMaxValid = 7
+      };
+      switch (RtStage) {
+      case lgc::rt::RayTracingShaderStage::RayGeneration:
+        return SchedulingPriorityRgs;
+      case lgc::rt::RayTracingShaderStage::ClosestHit:
+        return SchedulingPriorityChs;
+      case lgc::rt::RayTracingShaderStage::Miss:
+        return SchedulingPriorityMiss;
+      case lgc::rt::RayTracingShaderStage::Traversal:
+        return SchedulingPriorityTraversal;
+      case lgc::rt::RayTracingShaderStage::AnyHit:
+        return SchedulingPriorityAhs;
+      case lgc::rt::RayTracingShaderStage::Intersection:
+        return SchedulingPriorityIs;
+      case lgc::rt::RayTracingShaderStage::Callable:
+        return SchedulingPriorityCallable;
+      default:
+        report_fatal_error("Unknown ray tracing shader stage for resume function");
+      }
+    };
+
+    Vpc = Builder.CreateOr(Vpc, Builder.getInt32(GetPriorityFromRtStage(RtStage)));
+    AddrWithMD = Vpc;
+  }
+
+  AsCrOp.replaceAllUsesWith(AddrWithMD);
+  AsCrOp.eraseFromParent();
 }
 
 bool DXILContPostProcessPassImpl::handleAmdInternals() {
@@ -633,9 +669,6 @@ PreservedAnalyses DXILContPostProcessPassImpl::run(ModuleAnalysisManager &Analys
     if (FuncName.starts_with("_AmdGetResumePointAddr")) {
       Changed = true;
       lowerGetResumePointAddr(F);
-    } else if (FuncName.starts_with("_AmdComplete")) {
-      Changed = true;
-      llvm::forEachCall(F, [&](llvm::CallInst &CInst) { llvm::terminateShader(Builder, &CInst); });
     }
   }
 

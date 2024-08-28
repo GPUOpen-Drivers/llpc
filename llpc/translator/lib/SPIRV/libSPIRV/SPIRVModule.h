@@ -188,7 +188,7 @@ public:
   virtual SPIRVTypeRuntimeArray *addRuntimeArray(SPIRVType *) = 0;
   virtual SPIRVTypeStruct *addStructType(const std::vector<SPIRVType *> &vecTypes) = 0;
   virtual SPIRVTypeBool *addBoolType() = 0;
-  virtual SPIRVTypeFloat *addFloatType(unsigned) = 0;
+  virtual SPIRVTypeFloat *addFloatType(unsigned, unsigned) = 0;
   virtual SPIRVTypeFunction *addFunctionType(SPIRVType *, const std::vector<SPIRVType *> &) = 0;
   virtual SPIRVTypeImage *addImageType(SPIRVType *, const SPIRVTypeImageDescriptor &) = 0;
   virtual SPIRVTypeSampler *addSamplerType() = 0;

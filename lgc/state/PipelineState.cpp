@@ -1572,7 +1572,7 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
       // Per programming guide, it's recommended to use wave64 for fragment shader.
       waveSize = 64;
     } else if (hasShaderStage(ShaderStage::Geometry)) {
-      // Legacy (non-NGG) hardware path for GS does not support wave32.
+      // Legacy (non-NGG) HW path for GS does not support wave32 mode.
       waveSize = 64;
       if (getTargetInfo().getGfxIpVersion().major >= 11)
         waveSize = 32;
@@ -1588,8 +1588,14 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
       waveSize = 64;
 
     unsigned waveSizeOption = getShaderOptions(checkingStage).waveSize;
-    if (waveSizeOption != 0)
+    if (waveSizeOption != 0) {
       waveSize = waveSizeOption;
+
+      if (checkingStage == ShaderStage::Geometry && getTargetInfo().getGfxIpVersion().major == 10) {
+        // Legacy (non-GS) HW path for GS does not support wave32 mode. Ignore the settings.
+        waveSize = 64;
+      }
+    }
 
     // Note: the conditions below override the tuning option.
     // If workgroup size is not larger than 32, use wave size 32.
@@ -2112,7 +2118,6 @@ void PipelineState::setXfbStateMetadata(Module *module) {
         xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
         m_xfbStateMetadata.enableXfb = true;
       }
-      m_xfbStateMetadata.enablePrimStats = !m_xfbStateMetadata.enableXfb;
     }
   }
 }

@@ -35,6 +35,7 @@
 #include "lgc/Builder.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PalMetadata.h"
@@ -178,24 +179,25 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
       }
 
       // Translate 'ret' into lgc.cps.jump for continufy stages.
-      if (!currentRtStage.has_value())
-        continue;
-      // Skip the 'ret' in RGS.
-      if (currentRtStage.value() == (int32_t)RtStage::RayGeneration)
-        continue;
       Instruction *term = block.getTerminator();
       if (auto *retInst = dyn_cast<ReturnInst>(term)) {
         builder.SetInsertPoint(term);
-        auto *retValue = retInst->getReturnValue();
-        // %rcr, %shader-index
-        SmallVector<Value *> tailArgs = {PoisonValue::get(builder.getInt32Ty()),
-                                         PoisonValue::get(builder.getInt32Ty())};
-        // return value
-        if (retValue)
-          tailArgs.push_back(retValue);
 
-        builder.create<JumpOp>(fnPtr->getArg(1), getReturnedLevels(currentRtStage.value()),
-                               PoisonValue::get(StructType::get(context, {})) /* state */, tailArgs);
+        if (!currentRtStage.has_value() || currentRtStage.value() == (int32_t)RtStage::RayGeneration) {
+          builder.create<lgc::cps::CompleteOp>();
+        } else {
+          Value *poisonI32 = PoisonValue::get(builder.getInt32Ty());
+          auto *retValue = retInst->getReturnValue();
+          // %rcr, %shader-index
+          SmallVector<Value *> tailArgs = {poisonI32};
+          // return value
+          if (retValue)
+            tailArgs.push_back(retValue);
+
+          builder.create<JumpOp>(fnPtr->getArg(1), getReturnedLevels(currentRtStage.value()),
+                                 PoisonValue::get(StructType::get(context, {})) /* state */, poisonI32, tailArgs);
+        }
+
         builder.CreateUnreachable();
         term->eraseFromParent();
       }

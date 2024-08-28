@@ -29,28 +29,29 @@
  ***********************************************************************************************************************
  */
 #include "llpcContext.h"
+#include "LowerAccessChain.h"
 #include "LowerAdvancedBlend.h"
+#include "LowerCfgMerges.h"
+#include "LowerGlobals.h"
+#include "LowerTranslator.h"
 #include "ProcessGfxRuntimeLibrary.h"
+#include "ProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
-#include "gfxruntime/GfxRuntimeLibrary.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
 #include "llpcSpirvLower.h"
-#include "llpcSpirvLowerAccessChain.h"
-#include "llpcSpirvLowerCfgMerges.h"
-#include "llpcSpirvLowerGlobal.h"
-#include "llpcSpirvLowerTranslator.h"
-#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "llpcTimerProfiler.h"
+#include "vkgcMetroHash.h"
+#include "gfxruntime/GfxRuntimeLibrary.h"
 #include "llvmraytracing/ContinuationsDialect.h"
 #include "llvmraytracing/GpurtContext.h"
-#include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/LgcRtqDialect.h"
 #include "lgc/PassManager.h"
@@ -84,6 +85,7 @@ using namespace lgc::rt;
 using namespace lgc::rtq;
 using namespace llvm;
 using namespace lgc::cps;
+using namespace lgc::ilcps;
 
 namespace Llpc {
 
@@ -91,8 +93,9 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcRtqDialect,
-                                                         LgcCpsDialect, continuations::ContinuationsDialect>(*this);
+  m_dialectContext =
+      llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcRtqDialect, LgcCpsDialect,
+                                          LgcIlCpsDialect, continuations::ContinuationsDialect>(*this);
 
   reset();
 }
@@ -278,11 +281,11 @@ void Context::ensureGpurtLibrary() {
                                 "// LLPC SPIRV-to-LLVM translation results\n"));
   }
 
-  lowerPassMgr->addPass(SpirvLowerCfgMerges());
-  lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
+  lowerPassMgr->addPass(LowerCfgMerges());
+  lowerPassMgr->addPass(ProcessGpuRtLibrary());
   lowerPassMgr->addPass(AlwaysInlinerPass());
-  lowerPassMgr->addPass(SpirvLowerAccessChain());
-  lowerPassMgr->addPass(SpirvLowerGlobal());
+  lowerPassMgr->addPass(LowerAccessChain());
+  lowerPassMgr->addPass(LowerGlobals());
 
   // Run some basic optimization to simplify the code. This should be more efficient than optimizing them after they are
   // inlined into the caller.
@@ -340,11 +343,11 @@ void Context::ensureGfxRuntimeLibrary() {
                                 "// LLPC SPIRV-to-LLVM translation results\n"));
   }
 
-  lowerPassMgr->addPass(SpirvLowerCfgMerges());
+  lowerPassMgr->addPass(LowerCfgMerges());
   lowerPassMgr->addPass(ProcessGfxRuntimeLibrary());
   lowerPassMgr->addPass(AlwaysInlinerPass());
-  lowerPassMgr->addPass(SpirvLowerAccessChain());
-  lowerPassMgr->addPass(SpirvLowerGlobal());
+  lowerPassMgr->addPass(LowerAccessChain());
+  lowerPassMgr->addPass(LowerGlobals());
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
   lowerPassMgr->run(*gfxRuntime);

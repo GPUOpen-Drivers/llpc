@@ -43,7 +43,7 @@ def ContinuationReference : TgConstant<(or I32, I64)>, Type;
 
 // =====================================================================================================================
 def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
-    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, value:$state, varargs:$tail);
+    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, value:$state, ContinuationReference:$rcr, varargs:$tail);
     let results = (outs);
 
     let summary = "Jump to a CPS function.";
@@ -52,6 +52,7 @@ def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
             * target, the continuation reference
             * levels, a bitmask of levels in which target may run
             * state, which is pushed to the continuation stack before jumping,
+            * rcr, a continuation reference the called function can potentially return to
             * an arbitrary set of arguments appended to the tail of the argument list.
     }];
 }
@@ -70,6 +71,18 @@ def AwaitOp : LgcCpsOp<"await", [NoUnwind, WillReturn]> {
             * levels, a bitmask of levels in which target may run
             * an arbitrary set of arguments appended to the tail of the argument list.
     }];
+}
+
+def CompleteOp : LgcCpsOp<"complete", [NoReturn]> {
+  let arguments = (ins);
+  let results = (outs);
+
+  let summary =
+    "represents lane termination for a shader";
+
+  let description = [{
+    Describes the lane termination for a shader (e. g. to end RGS).
+  }];
 }
 
 // =====================================================================================================================

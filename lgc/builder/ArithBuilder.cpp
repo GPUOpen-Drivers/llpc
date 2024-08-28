@@ -91,6 +91,8 @@ Value *BuilderImpl::CreateCubeFaceIndex(Value *coord, const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFpTruncWithRounding(Value *value, Type *destTy, RoundingMode roundingMode,
                                               const Twine &instName) {
+  assert(!destTy->getScalarType()->isBFloatTy() && "HW doesn't support roundingMode instrunctions for BFloat16");
+
   if (value->getType()->getScalarType()->isDoubleTy())
     value = CreateFPTrunc(value, BuilderBase::getConditionallyVectorizedTy(getFloatTy(), destTy));
 
@@ -869,6 +871,13 @@ Value *BuilderImpl::CreateFaceForward(Value *n, Value *i, Value *nref, const Twi
 // @param n : Input value "N"
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateReflect(Value *i, Value *n, const Twine &instName) {
+  // The reflect function is defined as: reflect(I, N) = I - 2 * dot(I, N) * N
+  // For scalars this is: reflect(I, N) = I - 2 * (I * N) * N
+  // Applying reassociation could transform (I * N) * N into I * (N * N)
+  // which can cause spurious overflow or underflow if N is very large or very small.
+  // Prevent this by disabling reassociation.
+  getFastMathFlags().setAllowReassoc(false);
+
   Value *dot = CreateDotProduct(n, i);
   dot = CreateFMul(dot, ConstantFP::get(dot->getType(), 2.0));
   if (auto vecTy = dyn_cast<FixedVectorType>(n->getType()))

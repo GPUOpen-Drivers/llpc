@@ -45,12 +45,12 @@
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
-#include "compilerutils/TypesMetadata.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDialect.h"
 #include "llpcPipelineContext.h"
 #include "llpcRayTracingContext.h"
+#include "compilerutils/TypesMetadata.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcRtDialect.h"
@@ -6244,8 +6244,17 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       return mapValue(bv, getBuilder()->create<CooperativeMatrixConvertOp>(
                               matrixType, co, val, basicSrcElemTy, basicDstElemTy, srcLayout, dstLayout, "fConvert"));
     }
-    if (val->getType()->getScalarType()->getPrimitiveSizeInBits() <= destTy->getScalarType()->getPrimitiveSizeInBits())
+    unsigned valTypeBitWide = val->getType()->getScalarType()->getPrimitiveSizeInBits();
+    unsigned destTypeBitWide = destTy->getScalarType()->getPrimitiveSizeInBits();
+    if (valTypeBitWide < destTypeBitWide)
       return mapValue(bv, getBuilder()->CreateFPExt(val, destTy));
+    else if (valTypeBitWide == destTypeBitWide) {
+      assert(val->getType()->getScalarType()->isBFloatTy() || val->getType()->getScalarType()->isHalfTy());
+      val = getBuilder()->CreateFPExt(
+          val, destTy->isVectorTy()
+                   ? FixedVectorType::get(getBuilder()->getFloatTy(), cast<FixedVectorType>(destTy)->getNumElements())
+                   : getBuilder()->getFloatTy());
+    }
 
     RoundingMode rm = RoundingMode::Dynamic;
     SPIRVFPRoundingModeKind rounding;
@@ -8779,6 +8788,13 @@ bool SPIRVToLLVM::transMetadata() {
           meshMode.workgroupSizeZ = overrideShaderGroupSizeZ;
         }
 
+        if (bf->getExecutionMode(ExecutionModeDerivativeGroupQuadsNV))
+          meshMode.derivativeMode = DerivativeMode::Quads;
+        else if (bf->getExecutionMode(ExecutionModeDerivativeGroupLinearNV))
+          meshMode.derivativeMode = DerivativeMode::Linear;
+        else
+          meshMode.derivativeMode = DerivativeMode::None;
+
         Pipeline::setMeshShaderMode(*m_m, meshMode);
       } else if (execModel == ExecutionModelFragment) {
         FragmentShaderMode fragmentMode = {};
@@ -8820,6 +8836,11 @@ bool SPIRVToLLVM::transMetadata() {
             bf->getExecutionMode(ExecutionModePixelInterlockUnorderedEXT) ||
             bf->getExecutionMode(ExecutionModeSampleInterlockOrderedEXT) ||
             bf->getExecutionMode(ExecutionModeSampleInterlockUnorderedEXT))
+          fragmentMode.enablePops = true;
+        auto llpcContext = static_cast<Llpc::Context *>(m_context);
+        auto pipelineBuildInfo =
+            static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+        if (pipelineBuildInfo->advancedBlendInfo.enableRov)
           fragmentMode.enablePops = true;
 
         fragmentMode.waveOpsRequireHelperLanes = m_maximallyReconverges && m_hasDemoteToHelper;
@@ -8869,14 +8890,13 @@ bool SPIRVToLLVM::transMetadata() {
         ComputeShaderMode computeMode = {};
 
         if (bf->getExecutionMode(ExecutionModeDerivativeGroupQuadsNV))
-          computeMode.derivatives = DerivativeMode::Quads;
+          computeMode.derivativeMode = DerivativeMode::Quads;
         else if (bf->getExecutionMode(ExecutionModeDerivativeGroupLinearNV))
-          computeMode.derivatives = DerivativeMode::Linear;
+          computeMode.derivativeMode = DerivativeMode::Linear;
         else
-          computeMode.derivatives = DerivativeMode::None;
-
+          computeMode.derivativeMode = DerivativeMode::None;
         if (bf->getExecutionMode(ExecutionModeQuadDerivativesKHR))
-          computeMode.derivatives = DerivativeMode::Quads;
+          computeMode.derivativeMode = DerivativeMode::Quads;
 
         unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
         unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
@@ -10904,10 +10924,6 @@ void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
   auto llpcContext = static_cast<Llpc::Context *>(m_context);
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
   bool needXfbMetadata = hasXfbOuts && !pipelineBuildInfo->getGlState().apiXfbOutData.forceDisableStreamOut;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
-  needXfbMetadata |= pipelineBuildInfo->apiXfbOutData.forceEnablePrimStats;
-#endif
-
   if (!needXfbMetadata)
     return;
 

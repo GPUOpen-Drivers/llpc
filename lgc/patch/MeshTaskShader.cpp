@@ -32,6 +32,7 @@
 #include "ShaderMerger.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/util/Debug.h"
+#include "lgc/util/WorkgroupLayout.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
@@ -307,8 +308,18 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
     assert(outputsLayout);
     outputsLayout->primitiveStride = primitiveStride;
 
+    bool hasDummyVertexAttrib = false;
+    if (!pipelineState->exportAttributeByExportInstruction()) {
+      if (outputsLayout->vertexExportCount == 0) {
+        // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
+        // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
+        // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute.
+        hasDummyVertexAttrib = true;
+      }
+    }
+
     unsigned offsetInPrimitive = 0;
-    const unsigned startSlot = outputsLayout->vertexExportCount;
+    const unsigned startSlot = hasDummyVertexAttrib ? 1 : outputsLayout->vertexExportCount;
     unsigned exportSlot = startSlot;
     unsigned exportCount = 0;
 
@@ -1513,7 +1524,19 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
     break;
   }
   case BuiltInLocalInvocationId: {
-    input = getMeshLocalInvocationId();
+    // Insert a call that later on might get lowered to code to reconfigure the workgroup.
+    auto &mode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+    unsigned workgroupSizeX = mode.workgroupSizeX;
+    unsigned workgroupSizeY = mode.workgroupSizeY;
+    unsigned workgroupSizeZ = mode.workgroupSizeZ;
+    SwizzleWorkgroupLayout layout = calculateWorkgroupLayout(m_pipelineState, ShaderStage::Mesh);
+    if ((layout.microLayout == WorkgroupLayout::Quads) || (layout.macroLayout == WorkgroupLayout::SexagintiQuads)) {
+      input = getMeshLocalInvocationId(true /* foldXY = true */);
+      input = reconfigWorkgroupLayout(input, m_pipelineState, ShaderStage::Mesh, layout.macroLayout, layout.microLayout,
+                                      workgroupSizeX, workgroupSizeY, workgroupSizeZ, false, m_builder);
+    } else {
+      input = getMeshLocalInvocationId();
+    }
     break;
   }
   case BuiltInGlobalInvocationId: {
@@ -2510,15 +2533,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
 
         // ringOffset = attribRingBaseOffset + 32 * exportSlot * 16
         //            = attribRingBaseOffset + exportSlot * 512
-        unsigned exportSlot = exports[i].slot;
-        if (kind == ExportKind::PrimAttr && m_hasNoVertexAttrib) {
-          // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
-          // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
-          // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute and all
-          // primitive attributes are moved after it.
-          ++exportSlot;
-        }
-        auto locationOffset = m_builder.getInt32(exportSlot * SizeOfVec4);
+        auto locationOffset = m_builder.getInt32(exports[i].slot * SizeOfVec4);
 
         CoherentFlag coherent = {};
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
@@ -2558,10 +2573,8 @@ void MeshTaskShader::prepareAttribRingAccess() {
   // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and PRIM_EXPORT_COUNT.
   // When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even though this is not what we
   // want. Hence, we should reserve param0 as a dummy vertex attribute.
-  if (m_outputsLayout.vertexExportCount == 0) {
-    m_hasNoVertexAttrib = true;
+  if (m_outputsLayout.vertexExportCount == 0)
     ++attribCount; // Count in this dummy vertex attribute
-  }
 
   // attribRingBase[14:0]
   auto entryPoint = m_builder.GetInsertBlock()->getParent();
@@ -2688,8 +2701,9 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
 // =====================================================================================================================
 // Get the built-in LocalInvocationId of mesh shader.
 //
+// @param foldXY : Specify whether the locationId.x and locationId.y should be folded.
 // @returns : Value of the built-in LocalInvocationId
-Value *MeshTaskShader::getMeshLocalInvocationId() {
+Value *MeshTaskShader::getMeshLocalInvocationId(bool foldXY) {
   auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
 
@@ -2734,8 +2748,18 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
     diff = m_builder.CreateSub(localInvocationIndex, diff);
     localInvocationIdY = m_builder.CreateUDiv(diff, workgroupSizeX, "localInvocationIdY");
 
-    localInvocationIdX = m_builder.CreateMul(workgroupSizeX, localInvocationIdY);
-    localInvocationIdX = m_builder.CreateSub(diff, localInvocationIdX, "localInvocationIdX");
+    if (foldXY) {
+      localInvocationIdX = diff;
+      // Unused dimensions need zero-initializing.
+      if (meshMode.workgroupSizeZ <= 1) {
+        if (meshMode.workgroupSizeY <= 1)
+          localInvocationIdY = m_builder.getInt32(0);
+        localInvocationIdZ = m_builder.getInt32(0);
+      }
+    } else {
+      localInvocationIdX = m_builder.CreateMul(workgroupSizeX, localInvocationIdY);
+      localInvocationIdX = m_builder.CreateSub(diff, localInvocationIdX, "localInvocationIdX");
+    }
   }
 
   Value *localInvocationId = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
@@ -2962,17 +2986,20 @@ void MeshTaskShader::updateMeshShaderInOutUsage() {
   inOutUsage.primExpCount = m_outputsLayout.primitiveExportCount;
 
   // For part pipeline, below info will be used to build the metadata ".preraster_output_semantic" to correctly map
-  // output locations specified by API mesh shader to HW export slots. The export slots will be used to fill the
-  // register field SPI_PS_INPUT_CNTL.OFFSET during pipeline linking.
+  // output semantic locations specified by API mesh shader to HW export slots. The export slots will be used to fill
+  // the register field SPI_PS_INPUT_CNTL.OFFSET during pipeline linking.
   if (m_pipelineState->isUnlinked()) {
-    inOutUsage.outputLocInfoMap.clear();
-    for (auto &genericExport : m_outputsLayout.vertexGenericExports) {
-      const auto &[location, exportSlot] = genericExport;
-      InOutLocationInfo locInfo = {};
-      locInfo.setLocation(location);
-      InOutLocationInfo newLocInfo = {};
-      newLocInfo.setLocation(exportSlot);
-      inOutUsage.outputLocInfoMap[locInfo] = newLocInfo;
+    for (auto it = inOutUsage.outputLocInfoMap.begin(); it != inOutUsage.outputLocInfoMap.end();) {
+      // Revisit each entry of vertex outputs. If it is recorded and processed by mesh shader, update the mapping
+      // location to HW export slot. Otherwise, remove this entry.
+      const unsigned mappingLocation = it->second.getLocation();
+      if (m_outputsLayout.vertexGenericExports.count(mappingLocation) > 0) {
+        const unsigned exportSlot = m_outputsLayout.vertexGenericExports[mappingLocation];
+        it->second.setLocation(exportSlot);
+        it++;
+      } else {
+        inOutUsage.outputLocInfoMap.erase(it++);
+      }
     }
 
     inOutUsage.builtInOutputLocMap.clear();
@@ -2981,10 +3008,17 @@ void MeshTaskShader::updateMeshShaderInOutUsage() {
       inOutUsage.builtInOutputLocMap[builtIn] = exportSlot;
     }
 
-    inOutUsage.perPrimitiveOutputLocMap.clear();
-    for (auto &genericExport : m_outputsLayout.primitiveGenericExports) {
-      const auto &[location, exportSlot] = genericExport;
-      inOutUsage.perPrimitiveOutputLocMap[location] = exportSlot;
+    for (auto it = inOutUsage.perPrimitiveOutputLocMap.begin(); it != inOutUsage.perPrimitiveOutputLocMap.end();) {
+      // Revisit each entry of primitive outputs. If it is recorded and processed by mesh shader, update the mapping
+      // location to HW export slot. Otherwise, remove this entry.
+      const unsigned mappingLocation = it->second;
+      if (m_outputsLayout.primitiveGenericExports.count(mappingLocation) > 0) {
+        const unsigned exportSlot = m_outputsLayout.primitiveGenericExports[mappingLocation];
+        it->second = exportSlot;
+        it++;
+      } else {
+        inOutUsage.perPrimitiveOutputLocMap.erase(it++);
+      }
     }
 
     inOutUsage.perPrimitiveBuiltInOutputLocMap.clear();

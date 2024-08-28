@@ -149,7 +149,7 @@ attributes #1 = { alwaysinline }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP22]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP23]], [16 x i32] poison, [1 x i32] [[TMP20]]), !continuation.registercount [[META14]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP23]], [16 x i32] poison, [1 x i32] [[TMP20]]), !continuation.registercount [[META14]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
@@ -192,7 +192,7 @@ attributes #1 = { alwaysinline }
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT3]], 0
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT1:%.*]] = insertvalue [1 x i32] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    call void @lgc.cps.free(i32 8)
-; CLEANUP-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR_RELOAD]], i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]], [16 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT1]]), !continuation.registercount [[META14]]
+; CLEANUP-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR_RELOAD]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]], [16 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT1]]), !continuation.registercount [[META14]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;

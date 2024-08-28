@@ -16,9 +16,7 @@ declare !pointeetys !4 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 declare !pointeetys !6 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
-declare void @lgc.ilcps.continue(...)
-
-declare void @lgc.ilcps.waitContinue(...)
+declare void @lgc.cps.jump(...)
 
 declare i64 @lgc.cps.as.continuation.reference__i64(...) #3
 
@@ -35,12 +33,12 @@ define void @_cont_Traversal(%struct.TraversalData %data) #1 !lgc.rt.shaderstage
 6:                                                ; preds = %0
   %7 = load %struct.SystemData, ptr %5, align 4
   %8 = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @_cont_Traversal)
-  call void (...) @lgc.ilcps.waitContinue(i64 1, i64 -1, i32 0, i64 %8, %struct.SystemData %7)
+  call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i64 %8, %struct.SystemData %7), !waitmask !9
   unreachable
 
 9:                                                ; preds = %0
   %10 = load %struct.SystemData, ptr %5, align 4
-  call void (...) @lgc.ilcps.waitContinue(i64 0, i64 -1, i32 2, i64 poison, %struct.SystemData %10)
+  call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, %struct.SystemData %10), !waitmask !9
   unreachable
 }
 
@@ -57,6 +55,7 @@ attributes #2 = { nounwind }
 !6 = !{%struct.TraversalData poison}
 !7 = !{i32 6}
 !8 = !{i32 4} ; PRESERVED_REGCOUNT
+!9 = !{i32 -1}
 ; MAXPAYLOADSIZE-LABEL: define void @_cont_Traversal(
 ; MAXPAYLOADSIZE-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META2:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.state [[META4:![0-9]+]] {
 ; MAXPAYLOADSIZE-NEXT:  AllocaSpillBB:
@@ -104,9 +103,6 @@ attributes #2 = { nounwind }
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_INSERT:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] poison, i32 [[DOTFCA_0_0_0_EXTRACT136]], 0, 0
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT140:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT137]], 1
 ; MAXPAYLOADSIZE-NEXT:    [[TMP3:%.*]] = call i64 @continuation.getAddrAndMD(ptr @_cont_Traversal)
-; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_1_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT124:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [30 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [30 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [30 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
@@ -143,9 +139,6 @@ attributes #2 = { nounwind }
 ; MAXPAYLOADSIZE:       5:
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_INSERT143:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT136]], 0, 0
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT146:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT143]], float [[DOTFCA_0_1_EXTRACT137]], 1
-; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_0_INSERT127:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_1_INSERT130:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT127]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT133:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT130]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_0_INSERT3:%.*]] = insertvalue [30 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT6:%.*]] = insertvalue [30 x i32] [[DOTFCA_0_INSERT3]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; MAXPAYLOADSIZE-NEXT:    [[DOTFCA_2_INSERT9:%.*]] = insertvalue [30 x i32] [[DOTFCA_1_INSERT6]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
@@ -202,9 +195,6 @@ attributes #2 = { nounwind }
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_INSERT:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] poison, i32 [[DOTFCA_0_0_0_EXTRACT32]], 0, 0
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT36:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT33]], 1
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[TMP3:%.*]] = call i64 @continuation.getAddrAndMD(ptr @_cont_Traversal)
-; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_1_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT20:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [4 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
@@ -215,9 +205,6 @@ attributes #2 = { nounwind }
 ; PRESERVEDPAYLOADSIZE:       5:
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_INSERT39:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT32]], 0, 0
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT42:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT39]], float [[DOTFCA_0_1_EXTRACT33]], 1
-; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_0_0_INSERT23:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_1_INSERT26:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT23]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT29:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT26]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_0_INSERT3:%.*]] = insertvalue [4 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_1_INSERT6:%.*]] = insertvalue [4 x i32] [[DOTFCA_0_INSERT3]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; PRESERVEDPAYLOADSIZE-NEXT:    [[DOTFCA_2_INSERT9:%.*]] = insertvalue [4 x i32] [[DOTFCA_1_INSERT6]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2

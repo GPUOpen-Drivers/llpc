@@ -117,7 +117,7 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[TMP5]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP7]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP11]], ptr [[TMP9]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP12]], ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP10]], ptr [[HITATTRS]], align 4
@@ -140,7 +140,7 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP26]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP27]], [19 x i32] poison, [8 x i32] [[TMP24]]), !continuation.registercount [[META10]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP27]], [19 x i32] poison, [8 x i32] [[TMP24]]), !continuation.registercount [[META10]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %ptr = getelementptr inbounds %struct.RayPayload, %struct.RayPayload* %payload, i32 0, i32 0

@@ -43,6 +43,7 @@
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/MathExtras.h"
@@ -71,7 +72,6 @@ private:
     MDNode *MD = nullptr;
     // The continuation state on the CPS stack
     Value *NewContState = nullptr;
-    SmallVector<CallInst *> NewReturnContinues;
     /// Cleaned entry function, used to replace metadata
     Function *NewStart = nullptr;
 
@@ -88,7 +88,6 @@ private:
   void handleFunctionEntry(ContinuationData &Data, Function *F, bool IsEntry);
   void handleContinue(ContinuationData &Data, Instruction *Ret);
   void handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun);
-  void handleReturn(ContinuationData &Data, lgc::ilcps::ReturnOp &ContRet);
 
   Module &M;
   LLVMContext &Context;
@@ -436,18 +435,63 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(Function *StartFunc
       ContFrame->replaceAllUsesWith(PoisonValue::get(ContFrame->getType()));
     }
 
-    // Handle the function returns
+    // Handle the function returns.
+    // Treat returns and existing jumps separately, since otherwise we could accidentally free.
+    // returns originate from coro passes, indicating functions ending at suspend points, while
+    // lgc.cps.complete ends the lane. Leave existing jumps to resume functions as they are.
+
+    // We want to free the continuation stack when we end the original shader with a jump (a), but not at jumps that
+    // correspond to a suspend point (b). This collects the already existing jumps (a) into the PreExistingJumps vector.
+    // The jumps that correspond to a suspend point, (b), are introduced when lowering existing return instructions.
+    // To avoid that we accidentally iterate over these newly introduced jumps, we keep the existing rets (which will be
+    // translated to (b)) and existing jumps (a) separately. Before this pass, ret instructions mark a suspend point.
+    // However, after this shader, ret instructions mark the end of the thread. Finally, we have lgc.cps.complete, which
+    // is used to mark the lane termination, e. g. the end of RGS. These are translated to ret instructions as part of
+    // this pass.
+    // Note: Technically, it is not required to free the CPS stack at complete calls, but for consistency reasons, we do
+    // it anyway.
+    SmallVector<ReturnInst *> PreExistingRets;
+    SmallVector<lgc::cps::JumpOp *> PreExistingJumps;
     for (auto &BB : make_early_inc_range(*NewFunc)) {
       auto *I = BB.getTerminator();
       if (I->getOpcode() == Instruction::Ret) {
-        handleContinue(FuncData, I);
+        PreExistingRets.push_back(cast<ReturnInst>(I));
       } else if (I->getOpcode() == Instruction::Unreachable && BB.size() > 1) {
-        if (auto *Call = dyn_cast<CallInst>(--I->getIterator())) {
-          if (auto *ContRet = dyn_cast<lgc::ilcps::ReturnOp>(Call))
-            handleReturn(FuncData, *ContRet);
+        CallInst *PrevInst = cast<CallInst>(&*(--I->getIterator()));
+        if (auto *Jump = dyn_cast<lgc::cps::JumpOp>(PrevInst)) {
+          PreExistingJumps.push_back(Jump);
+          continue;
+        }
+
+        // Transform a lane-terminating lgc.cps.complete into a ret instruction.
+        // If this a non-terminating lgc.cps.jump, this will just free the stack.
+        if (isa<lgc::cps::CompleteOp>(PrevInst)) {
+          B.SetInsertPoint(PrevInst);
+
+          uint32_t NeededStackSize = FuncData.getContStateStackBytes();
+          if (NeededStackSize > 0)
+            B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
+
+          llvm::terminateShader(B, PrevInst);
+        } else {
+          LLVM_DEBUG(PrevInst->dump());
+          llvm_unreachable("Unexpected instruction!");
         }
       }
     }
+
+    // First, handle the pre-existing jumps, (a).
+    for (auto *Jump : PreExistingJumps) {
+      B.SetInsertPoint(Jump);
+
+      uint32_t NeededStackSize = FuncData.getContStateStackBytes();
+      if (NeededStackSize > 0)
+        B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
+    }
+
+    // Then, insert the new jumps for pre-existing returns / suspend points, (b).
+    for (auto *Ret : PreExistingRets)
+      handleContinue(FuncData, Ret);
 
     for (auto *I : InstsToRemove)
       I->eraseFromParent();
@@ -557,21 +601,14 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &
 
   auto *ContinuationReference = B.create<lgc::cps::AsContinuationReferenceOp>(I64, ResumeFun);
 
-  bool IsWait = ContHelper::isWaitAwaitCall(*Call);
-
-  // The jump call tail argument list needs to start with the return address.
   Value *JumpAddr = B.CreatePointerCast(Call->getCalledOperand(), I64);
-  SmallVector<Value *> TailArgs{Call->arg_begin() + (IsWait ? 1 : 0), Call->arg_end()};
-  TailArgs.insert(TailArgs.begin(), ContinuationReference);
+  SmallVector<Value *> TailArgs{Call->args()};
 
-  CallInst *Jump =
-      B.create<lgc::cps::JumpOp>(JumpAddr, -1, PoisonValue::get(StructType::get(B.getContext())), TailArgs);
+  CallInst *Jump = B.create<lgc::cps::JumpOp>(JumpAddr, -1, PoisonValue::get(StructType::get(B.getContext())),
+                                              ContinuationReference, TailArgs);
 
   Jump->copyMetadata(*Call);
-  ContHelper::removeIsWaitAwaitMetadata(*Jump);
 
-  if (IsWait)
-    ContHelper::setWaitMask(*Jump, cast<ConstantInt>(Call->getArgOperand(0))->getSExtValue());
   assert(ContHelper::OutgoingRegisterCount::tryGetValue(Jump) && "Missing registercount metadata!");
 
   // Remove instructions at the end of the block
@@ -580,42 +617,6 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &
     if (&I == Unreachable)
       break;
     I.eraseFromParent();
-  }
-}
-
-/// Transform
-///   call void (i64, ...) @lgc.ilcps.return(i64 %returnaddr, <return
-///   value>) unreachable
-/// to
-///   <decrement CSP>
-///   call void @lgc.ilcps.continue(i64 %returnaddr, <return value>)
-///   unreachable
-void LegacyCleanupContinuationsPassImpl::handleReturn(ContinuationData &Data, lgc::ilcps::ReturnOp &ContRet) {
-  LLVM_DEBUG(dbgs() << "Converting return to continue: " << ContRet << "\n");
-  bool IsEntry = isa<UndefValue>(ContRet.getReturnAddr());
-  B.SetInsertPoint(&ContRet);
-
-  uint32_t NeededStackSize = Data.getContStateStackBytes();
-  if (NeededStackSize > 0)
-    B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
-
-  if (IsEntry) {
-    assert(ContRet.getArgs().empty() && "Entry functions ignore the return value");
-
-    llvm::terminateShader(B, &ContRet);
-  } else {
-    // Create the call to lgc.ilcps.continue, but with the same argument list
-    // as for lgc.ilcps.return. The CSP is being set during
-    // DXILContPostProcess.
-    // Append the dummy return address as well.
-    SmallVector<Value *, 2> RetTail{ContRet.getArgs()};
-    auto *ContinueOp = B.create<lgc::ilcps::ContinueOp>(ContRet.getReturnAddr(), PoisonValue::get(B.getInt32Ty()),
-                                                        PoisonValue::get(B.getInt64Ty()), RetTail);
-    Data.NewReturnContinues.push_back(ContinueOp);
-
-    ContinueOp->copyMetadata(ContRet);
-    assert(ContHelper::OutgoingRegisterCount::tryGetValue(ContinueOp) && "Missing registercount metadata!");
-    ContRet.eraseFromParent();
   }
 }
 

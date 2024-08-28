@@ -99,7 +99,6 @@ private:
 
   void processTaskShader(llvm::Function *entryPoint);
   void processMeshShader(llvm::Function *entryPoint);
-
   void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
   void lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp);
   void lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp);
@@ -143,7 +142,7 @@ private:
   llvm::Value *getMeshFlatWorkgroupId();
   llvm::Value *getMeshNumWorkgroups();
   llvm::Value *getMeshWorkgroupId();
-  llvm::Value *getMeshLocalInvocationId();
+  llvm::Value *getMeshLocalInvocationId(bool foldXY = false);
   llvm::Value *getMeshLocalInvocationIndex();
   llvm::Value *getMeshGlobalInvocationId();
 
@@ -224,7 +223,6 @@ private:
   llvm::Value *m_shaderRingEntryIndex = nullptr;   // Shader ring entry index of current workgroup
   llvm::Value *m_payloadRingEntryOffset = nullptr; // Entry offset (in bytes) of the payload ring
 
-  bool m_hasNoVertexAttrib = false;              // Whether mesh shader has vertex attribute export or not
   llvm::Value *m_attribRingBufDesc = nullptr;    // Attribute ring buffer descriptor
   llvm::Value *m_attribRingBaseOffset = nullptr; // Subgroup's attribute ring base offset (in bytes)
 

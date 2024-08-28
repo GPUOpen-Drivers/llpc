@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 #include "PrepareContinuations.h"
-#include "compilerutils/CompilerUtils.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
+#include "compilerutils/CompilerUtils.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"

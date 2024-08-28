@@ -57,28 +57,28 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !poi
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP44]], ptr [[TMP12]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = load i32, ptr [[TMP13]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP67]], ptr [[TMP14]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = load i32, ptr [[TMP13]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP51]], ptr [[TMP14]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 5
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 5
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP68:%.*]] = load i32, ptr [[TMP15]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP68]], ptr [[TMP16]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = load i32, ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP67]], ptr [[TMP16]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 6
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 6
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP69:%.*]] = load i32, ptr [[TMP17]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP69]], ptr [[TMP18]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP68:%.*]] = load i32, ptr [[TMP17]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP68]], ptr [[TMP18]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 7
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 7
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = load i32, ptr [[TMP19]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP70]], ptr [[TMP20]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP69:%.*]] = load i32, ptr [[TMP19]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP69]], ptr [[TMP20]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = load i32, ptr [[TMP21]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP31]], ptr [[TMP22]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 9
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 9
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP71:%.*]] = load i32, ptr [[TMP23]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP71]], ptr [[TMP24]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = load i32, ptr [[TMP23]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP70]], ptr [[TMP24]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i32 10
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 10
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = load i32, ptr [[TMP25]], align 4
@@ -122,11 +122,11 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !poi
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = bitcast ptr [[TMP46]] to ptr
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.start.p0(i64 4, ptr [[TMP47]]) #[[ATTR0]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr inbounds [[STRUCT_OUTERPAYLOAD]], ptr [[TMP2]], i32 0, i32 0, i32 14
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = load float, ptr [[TMP48]], align 4, !tbaa [[TBAA27:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP71:%.*]] = load float, ptr [[TMP48]], align 4, !tbaa [[TBAA27:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = getelementptr inbounds [[STRUCT_INNERPAYLOAD]], ptr [[TMP46]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP51]], ptr [[TMP50]], align 4, !tbaa [[TBAA27]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP73:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP45]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP73]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP71]], ptr [[TMP50]], align 4, !tbaa [[TBAA27]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP73:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP45]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP73]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP52]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP54]], align 4
@@ -233,7 +233,7 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !poi
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP94:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP95:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP94]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP143:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP95]], [10 x i32] poison, [30 x i32] [[TMP143]]), !continuation.registercount [[META23]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP95]], [10 x i32] poison, [30 x i32] [[TMP143]]), !continuation.registercount [[META23]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A", align 4
@@ -934,7 +934,7 @@ define void @Callable(%struct.OuterPayload* noalias %outerPayload) #0 !pointeety
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP484]], ptr [[TMP482]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP382:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP486:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP382]], [10 x i32] poison, [30 x i32] [[TMP486]]), !continuation.registercount [[META23]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP382]], [10 x i32] poison, [30 x i32] [[TMP486]]), !continuation.registercount [[META23]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %1 = alloca %struct.OuterPayload, align 8

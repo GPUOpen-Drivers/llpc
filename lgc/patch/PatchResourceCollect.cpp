@@ -443,6 +443,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   unsigned inVertsPerPrim = 0;
   bool useAdjacency = false;
 
+  unsigned gsVsVertexItemSize[MaxGsStreams] = {};
+
   if (hasGs) {
     switch (geometryMode.inputPrimitive) {
     case InputPrimitives::Points:
@@ -533,8 +535,14 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         m_pipelineState,
         m_pipelineShaders->getEntryPoint(hasTs ? ShaderStage::TessEval : ShaderStage::Vertex)); // In dwords
 
-    const unsigned gsVsRingItemSize =
-        hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
+    // NOTE: Make gsVsVertexItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
+    unsigned gsVsVertexItemTotalSize = 0;
+    for (int i = 0; i < MaxGsStreams; ++i) {
+      gsVsVertexItemSize[i] = (4 * gsResUsage->inOutUsage.gs.outLocCount[i]) | 1;
+      gsVsVertexItemTotalSize += gsVsVertexItemSize[i];
+    }
+
+    const unsigned gsVsRingItemSize = hasGs ? std::max(1u, gsVsVertexItemTotalSize * geometryMode.outputVertices) : 0;
 
     const auto &ldsGeneralUsage = NggPrimShader::layoutPrimShaderLds(m_pipelineState);
     const bool needsLds = ldsGeneralUsage.needsLds;
@@ -728,6 +736,10 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
     gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsVsRingItemSize;
 
+    for (int i = 0; i < MaxGsStreams; ++i) {
+      gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] = gsVsVertexItemSize[i];
+    }
+
     gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
     gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut = enableMaxVertOut;
     gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
@@ -742,8 +754,13 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
     const unsigned esGsRingItemSize = (4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount)) | 1;
 
-    const unsigned gsVsRingItemSize =
-        4 * std::max(1u, (gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices));
+    unsigned gsVsVertexItemTotalSize = 0;
+    for (int i = 0; i < MaxGsStreams; ++i) {
+      gsVsVertexItemSize[i] = (4 * gsResUsage->inOutUsage.gs.outLocCount[i]);
+      gsVsVertexItemTotalSize += gsVsVertexItemSize[i];
+    }
+
+    const unsigned gsVsRingItemSize = std::max(1u, (gsVsVertexItemTotalSize * geometryMode.outputVertices));
 
     // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
     const unsigned gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
@@ -898,6 +915,10 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
     gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
 
+    for (int i = 0; i < MaxGsStreams; ++i) {
+      gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] = gsVsVertexItemSize[i];
+    }
+
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10 && hasTs && !gsOnChip) {
       unsigned esVertsNum = EsVertsOffchipGsOrTess;
       unsigned onChipGsLdsMagicSize = (esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords;
@@ -945,7 +966,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   if (hasGs) {
     LLPC_OUTS("GS stream item sizes (in dwords):\n");
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      unsigned streamItemSize = gsResUsage->inOutUsage.gs.outLocCount[i] * geometryMode.outputVertices * 4;
+      unsigned streamItemSize =
+          gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] * geometryMode.outputVertices;
       LLPC_OUTS("    stream[" << i << "] = " << streamItemSize);
 
       if (m_pipelineState->enableXfb()) {
@@ -2837,6 +2859,18 @@ void PatchResourceCollect::clearUnusedOutput() {
         ++locInfoMapIt;
     }
   }
+
+  // Remove unused output for unlinked vs shader
+  if (m_pipelineState->isUnlinked() && m_shaderStage == ShaderStage::Vertex) {
+    SmallVector<InOutLocationInfo, 4> unusedLocInfos;
+    for (auto &locInfoPair : outputLocInfoMap) {
+      if ((!m_outputCallLocations.contains(locInfoPair.first.getLocation())) &&
+          (locInfoPair.first.getLocation() >= MaxInOutLocCount))
+        unusedLocInfos.push_back(locInfoPair.first);
+    }
+    for (auto &locInfo : unusedLocInfos)
+      outputLocInfoMap.erase(locInfo);
+  }
 }
 
 // =====================================================================================================================
@@ -3692,11 +3726,19 @@ void PatchResourceCollect::clearUndefinedOutput() {
     }
   }
   m_outputCalls.clear();
+  m_outputCallLocations.clear();
   // Check if all used channels are undefined in a location in a stream
   for (auto &locCandidate : locCandidateInfoMap) {
     auto candidateCalls = locCandidate.second.candidateCalls;
     if (locCandidate.second.usedMask != locCandidate.second.undefMask) {
       m_outputCalls.insert(m_outputCalls.end(), candidateCalls.begin(), candidateCalls.end());
+      for (auto call : candidateCalls) {
+        assert(call->arg_size());
+        Value *locArg = call->arg_begin()->get();
+        ConstantInt &locConst = cast<ConstantInt, Value>(*locArg);
+        unsigned locVal = locConst.getZExtValue();
+        m_outputCallLocations.insert(locVal);
+      }
       continue;
     }
 

@@ -36,7 +36,7 @@ declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemD
 
 declare %struct.TraversalData @_AmdAwaitAnyHit(i64, %struct.TraversalData, float, i32) #0
 
-declare void @lgc.ilcps.continue(...) #0
+declare void @lgc.cps.jump(...) #0
 
 declare void @_AmdContStackSetPtr(i32) #0
 
@@ -111,7 +111,7 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !poi
 define void @_cont_KernelEntry() #0 !lgc.rt.shaderstage !69 {
   %cspInit = ptrtoint ptr @debug_global to i32
   call void @_AmdContStackSetPtr(i32 %cspInit)
-  call void (...) @lgc.ilcps.continue(i64 0, i32 poison, i64 undef, %struct.DispatchSystemData poison)
+  call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 undef, %struct.DispatchSystemData poison)
   ret void
 }
 
@@ -421,7 +421,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[CSPINIT:%.*]] = ptrtoint ptr @debug_global to i32
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_AmdContStackSetPtr(i32 [[CSPINIT]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.continue(i64 0, i32 poison, i64 undef, [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison), !continuation.registercount [[META22]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 undef, [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison), !continuation.registercount [[META22]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
 ;
 ;
@@ -452,8 +452,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.start.p0(i64 16, ptr [[TMP5]]) #[[ATTR1:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store <4 x float> zeroinitializer, ptr [[TMP6]], align 4, !tbaa [[TBAA37:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], 0
@@ -476,7 +476,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP17]], ptr [[TMP18]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 -1, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [8 x i32] poison, [10 x i32] [[TMP41]]), !continuation.registercount [[META33:![0-9]+]], !continuation.wait.await [[META13]], !continuation.returnedRegistercount [[META33]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [8 x i32] poison, [10 x i32] [[TMP41]]), !continuation.registercount [[META33:![0-9]+]], !waitmask [[META40:![0-9]+]], !continuation.returnedRegistercount [[META33]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] } @await(ptr [[TMP42]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] } [[TMP43]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [10 x i32] [[TMP24]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
@@ -506,19 +506,20 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP29]], i8 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP30]], i8 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP40]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP40]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = extractelement <4 x float> [[TMP28]], i64 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = extractelement <4 x float> [[TMP28]], i64 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = extractelement <4 x float> [[TMP28]], i64 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = extractelement <4 x float> [[TMP28]], i64 3
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP32]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP33]], float [[TMP34]], float [[TMP35]], float [[TMP36]], i8 15)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.end.p0(i64 16, ptr [[TMP5]]) #[[ATTR1]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @MyClosestHitShader(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META40:![0-9]+]] !continuation.registercount [[META33]] !continuation [[META41:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META41:![0-9]+]] !continuation.registercount [[META33]] !continuation [[META42:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
@@ -582,12 +583,12 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP44]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP45]], [21 x i32] poison, [10 x i32] [[TMP47]]), !continuation.registercount [[META33]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP45]], [21 x i32] poison, [10 x i32] [[TMP47]]), !continuation.registercount [[META33]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.TraversalData @MyAnyHitShader(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META42:![0-9]+]] !continuation.registercount [[META33]] !continuation [[META43:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META43:![0-9]+]] !continuation.registercount [[META33]] !continuation [[META44:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = alloca [[STRUCT_HITDATA]], align 8
@@ -684,7 +685,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP58]], ptr [[ADDR_I1]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP60:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP68:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_TRAVERSALDATA]] [[TMP60]], [8 x i32] poison, [10 x i32] [[TMP68]]), !continuation.registercount [[META33]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TMP60]], [8 x i32] poison, [10 x i32] [[TMP68]]), !continuation.registercount [[META33]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE:       59:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store <4 x float> [[TMP25]], ptr [[TMP24]], align 4
@@ -716,12 +717,12 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP79]], ptr [[ADDR_I2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP81:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP78:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_TRAVERSALDATA]] [[TMP81]], [8 x i32] poison, [10 x i32] [[TMP78]]), !continuation.registercount [[META33]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TMP81]], [8 x i32] poison, [10 x i32] [[TMP78]]), !continuation.registercount [[META33]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.TraversalData @MyIntersectionShader(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META44:![0-9]+]] !continuation.registercount [[META32:![0-9]+]] !continuation [[META45:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META45:![0-9]+]] !continuation.registercount [[META32:![0-9]+]] !continuation [[META46:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 4
@@ -772,18 +773,18 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE:       22:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_TRAVERSALDATA]] [[TMP21]], [8 x i32] poison, [30 x i32] [[TMP24]]), !continuation.registercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TMP21]], [8 x i32] poison, [30 x i32] [[TMP24]]), !continuation.registercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE:       25:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP7]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_TRAVERSALDATA]] [[TMP23]], [8 x i32] poison, [30 x i32] [[TMP27]]), !continuation.registercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TMP23]], [8 x i32] poison, [30 x i32] [[TMP27]]), !continuation.registercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.TraversalData @MyIntersectionShaderLargeAttrs(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META44]] !continuation.registercount [[META32]] !continuation [[META46:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META45]] !continuation.registercount [[META32]] !continuation [[META47:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_LARGEINTERSECTIONATTRIBUTES:%.*]], align 4
@@ -867,18 +868,18 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE:       36:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_TRAVERSALDATA]] [[TMP31]], [8 x i32] poison, [30 x i32] [[TMP38]]), !continuation.registercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TMP31]], [8 x i32] poison, [30 x i32] [[TMP38]]), !continuation.registercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE:       39:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP7]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_TRAVERSALDATA]] [[TMP33]], [8 x i32] poison, [30 x i32] [[TMP41]]), !continuation.registercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TMP33]], [8 x i32] poison, [30 x i32] [[TMP41]]), !continuation.registercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @MyMissShader(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META47:![0-9]+]] !continuation.registercount [[META33]] !continuation [[META48:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META48:![0-9]+]] !continuation.registercount [[META33]] !continuation [[META49:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
@@ -921,37 +922,37 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP27]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP28]], [21 x i32] poison, [10 x i32] [[TMP29]]), !continuation.registercount [[META33]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP28]], [21 x i32] poison, [10 x i32] [[TMP29]]), !continuation.registercount [[META33]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define i1 @_cont_IsEndSearch(
-; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR0:[0-9]+]] {
+; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR1:[0-9]+]] {
 ; DXILCONTPOSTPROCESS-NEXT:    [[ISEND:%.*]] = call i1 @opaqueIsEnd()
 ; DXILCONTPOSTPROCESS-NEXT:    ret i1 [[ISEND]]
 ;
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(
-; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-NEXT:    [[ADDR:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[VAL:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], ptr [[ADDR]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    ret [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL]]
 ;
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @_cont_SetTriangleHitAttributes(
-; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[VAL:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[VAL:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-NEXT:    [[ADDR:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL]], ptr [[ADDR]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    ret void
 ;
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define i32 @_cont_GetLocalRootIndex(
-; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-NEXT:    ret i32 5
 ;
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @_cont_KernelEntry(
-; DXILCONTPOSTPROCESS-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation [[META36:![0-9]+]] {
+; DXILCONTPOSTPROCESS-SAME: ) #[[ATTR1]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation [[META36:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSPINIT:%.*]] = ptrtoint ptr @debug_global to i32
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -961,7 +962,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define %struct.HitData @_cont_GetCandidateState(
-; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES:%.*]] = load [[STRUCT_HITDATA:%.*]], ptr [[RESPTR]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    ret [[STRUCT_HITDATA]] [[RES]]
@@ -983,8 +984,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP4]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
@@ -1049,8 +1050,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP10]], i8 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA1]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP11]], i8 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP9]])
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP21]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP9]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP21]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 2
@@ -2122,32 +2123,32 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; DXILCONTPOSTPROCESS-GLOBAL-LABEL: define i1 @_cont_IsEndSearch(
-; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR0:[0-9]+]] {
+; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR1:[0-9]+]] {
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[ISEND:%.*]] = call i1 @opaqueIsEnd()
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    ret i1 [[ISEND]]
 ;
 ;
 ; DXILCONTPOSTPROCESS-GLOBAL-LABEL: define %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(
-; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[ADDR:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[VAL:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], ptr [[ADDR]], align 4
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    ret [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL]]
 ;
 ;
 ; DXILCONTPOSTPROCESS-GLOBAL-LABEL: define void @_cont_SetTriangleHitAttributes(
-; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[VAL:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[VAL:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[ADDR:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL]], ptr [[ADDR]], align 4
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    ret void
 ;
 ;
 ; DXILCONTPOSTPROCESS-GLOBAL-LABEL: define i32 @_cont_GetLocalRootIndex(
-; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    ret i32 5
 ;
 ;
 ; DXILCONTPOSTPROCESS-GLOBAL-LABEL: define void @_cont_KernelEntry(
-; DXILCONTPOSTPROCESS-GLOBAL-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation [[META36:![0-9]+]] {
+; DXILCONTPOSTPROCESS-GLOBAL-SAME: ) #[[ATTR1]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation [[META36:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP1:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP2:%.*]] = inttoptr i64 [[TMP1]] to ptr addrspace(22)
@@ -2159,7 +2160,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; DXILCONTPOSTPROCESS-GLOBAL-LABEL: define %struct.HitData @_cont_GetCandidateState(
-; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-GLOBAL-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[RESPTR:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[RES:%.*]] = load [[STRUCT_HITDATA:%.*]], ptr [[RESPTR]], align 4
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    ret [[STRUCT_HITDATA]] [[RES]]
@@ -2183,8 +2184,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP4:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP5]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP5:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP5]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP7:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP6]])
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT20]], 0
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
@@ -2251,8 +2252,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP12]], i8 0
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP13:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA1]])
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP13]], i8 1
-; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP11]])
-; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP23]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
+; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP23:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP11]])
+; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP15:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP23]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP16:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 0
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP17:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 1
 ; DXILCONTPOSTPROCESS-GLOBAL-NEXT:    [[TMP18:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 2
@@ -3357,10 +3358,10 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @_cont_KernelEntry(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[CSPINIT:%.*]] = ptrtoint ptr @debug_global to i32
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_AmdContStackSetPtr(i32 [[CSPINIT]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.ilcps.continue(i64 0, i32 poison, i64 undef, [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison), !continuation.registercount [[META22]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 undef, [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
 ;
 ;
@@ -3379,7 +3380,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR3:[0-9]+]] !lgc.rt.shaderstage [[META22]] !lgc.cps [[META36:![0-9]+]] !continuation [[META37:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR3:[0-9]+]] !lgc.rt.shaderstage [[META22:![0-9]+]] !lgc.cps [[META36:![0-9]+]] !continuation [[META37:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
@@ -3391,8 +3392,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.start.p0(i64 16, ptr [[TMP5]]) #[[ATTR1:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> zeroinitializer, ptr [[TMP6]], align 4, !tbaa [[TBAA38:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], 0
@@ -3415,7 +3416,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP20]], ptr [[TMP18]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa21i32a10i32s(i32 4, i32 8, i64 -1, i32 5, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [6 x i32] poison, [10 x i32] [[TMP21]]), !continuation.registercount [[META33:![0-9]+]], !continuation.wait.await [[META13:![0-9]+]], !continuation.returnedRegistercount [[META33]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa21i32a10i32s(i32 4, i32 8, i32 5, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [8 x i32] poison, [10 x i32] [[TMP21]]), !waitmask [[META41:![0-9]+]], !continuation.returnedRegistercount [[META33:![0-9]+]], !continuation.registercount [[META33]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] } [[TMP22]], 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [10 x i32] [[TMP23]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_RAYPAYLOAD]] poison, ptr [[TMP4]], align 4
@@ -3444,19 +3445,20 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP37]], i8 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP38:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP38]], i8 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP39:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP40:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP39]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP39:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP40:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP39]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP41:%.*]] = extractelement <4 x float> [[TMP36]], i64 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP42:%.*]] = extractelement <4 x float> [[TMP36]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP43:%.*]] = extractelement <4 x float> [[TMP36]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP44:%.*]] = extractelement <4 x float> [[TMP36]], i64 3
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP40]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP41]], float [[TMP42]], float [[TMP43]], float [[TMP44]], i8 15)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.end.p0(i64 16, ptr [[TMP5]]) #[[ATTR1]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyClosestHitShader(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META41:![0-9]+]] !lgc.cps [[META42:![0-9]+]] !continuation [[META43:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META42:![0-9]+]] !lgc.cps [[META43:![0-9]+]] !continuation [[META44:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
@@ -3524,7 +3526,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyAnyHitShader(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[HIT_ATTRS:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META42]] !lgc.cps [[META44:![0-9]+]] !continuation [[META45:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[HIT_ATTRS:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META43]] !lgc.cps [[META45:![0-9]+]] !continuation [[META46:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_HITDATA]], align 8
@@ -3657,7 +3659,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyIntersectionShader(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META46:![0-9]+]] !continuation [[META47:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META47:![0-9]+]] !continuation [[META48:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 4
@@ -3680,7 +3682,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } (...) @lgc.cps.await__sl_s_struct.TraversalDatasa8i32a30i32s(i32 3, i32 16, i32 5, float [[RES_I1]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP7]], [20 x i32] poison, [30 x i32] [[TMP8]]), !continuation.registercount [[META32:![0-9]+]], !continuation.returnedRegistercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } (...) @lgc.cps.await__sl_s_struct.TraversalDatasa8i32a30i32s(i32 3, i32 16, i32 5, float [[RES_I1]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP7]], [20 x i32] poison, [30 x i32] [[TMP8]]), !continuation.returnedRegistercount [[META32:![0-9]+]], !continuation.registercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = extractvalue { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP9]], 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [30 x i32] [[TMP10]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = extractvalue { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP9]], 0
@@ -3718,7 +3720,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyIntersectionShaderLargeAttrs(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META46]] !continuation [[META48:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META47]] !continuation [[META49:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_LARGEINTERSECTIONATTRIBUTES:%.*]], align 4
@@ -3755,7 +3757,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = load [[STRUCT_LARGEINTERSECTIONATTRIBUTES]], ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } (...) @lgc.cps.await__sl_s_struct.TraversalDatasa8i32a30i32s(i32 3, i32 16, i32 5, float [[RES_I1]], i32 0, [[STRUCT_LARGEINTERSECTIONATTRIBUTES]] [[TMP7]], [15 x i32] poison, [30 x i32] [[TMP8]]), !continuation.registercount [[META32]], !continuation.returnedRegistercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } (...) @lgc.cps.await__sl_s_struct.TraversalDatasa8i32a30i32s(i32 3, i32 16, i32 5, float [[RES_I1]], i32 0, [[STRUCT_LARGEINTERSECTIONATTRIBUTES]] [[TMP7]], [15 x i32] poison, [30 x i32] [[TMP8]]), !continuation.returnedRegistercount [[META32]], !continuation.registercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = extractvalue { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP9]], 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [30 x i32] [[TMP10]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = extractvalue { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP9]], 0
@@ -3812,7 +3814,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyMissShader(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META44]] !lgc.cps [[META42]] !continuation [[META49:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META45]] !lgc.cps [[META43]] !continuation [[META50:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
@@ -3884,10 +3886,10 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @_cont_KernelEntry(
-; CLEANUP-CPS-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] {
+; CLEANUP-CPS-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:    [[CSPINIT:%.*]] = ptrtoint ptr @debug_global to i32
 ; CLEANUP-CPS-NEXT:    call void @_AmdContStackSetPtr(i32 [[CSPINIT]])
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.ilcps.continue(i64 0, i32 poison, i64 undef, [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison), !continuation.registercount [[META22]]
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 undef, [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison)
 ; CLEANUP-CPS-NEXT:    ret void
 ;
 ;
@@ -3906,14 +3908,14 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @MyRayGen(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR3:[0-9]+]] !lgc.rt.shaderstage [[META22]] !lgc.cps [[META36:![0-9]+]] !continuation [[META37:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR3:[0-9]+]] !lgc.rt.shaderstage [[META22:![0-9]+]] !lgc.cps [[META36:![0-9]+]] !continuation [[META37:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT20:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
 ; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CLEANUP-CPS-NEXT:    [[TMP1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; CLEANUP-CPS-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; CLEANUP-CPS-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
-; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CLEANUP-CPS-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
+; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP4]])
 ; CLEANUP-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT20]], 0
 ; CLEANUP-CPS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
@@ -3938,7 +3940,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_7_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_6_INSERT]], i32 [[TMP8]], 7
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_8_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_7_INSERT]], i32 [[TMP9]], 8
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_9_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_8_INSERT]], i32 [[TMP10]], 9
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 -1, {} poison, i64 -1, i64 [[TMP6]], i32 5, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [6 x i32] poison, [10 x i32] [[DOTFCA_9_INSERT]]), !continuation.registercount [[META33:![0-9]+]], !continuation.wait.await [[META13:![0-9]+]], !continuation.returnedRegistercount [[META33]]
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 5, {} poison, i64 [[TMP6]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [8 x i32] poison, [10 x i32] [[DOTFCA_9_INSERT]]), !waitmask [[META38:![0-9]+]], !continuation.returnedRegistercount [[META33:![0-9]+]], !continuation.registercount [[META33]]
 ; CLEANUP-CPS-NEXT:    unreachable
 ;
 ;
@@ -3976,8 +3978,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; CLEANUP-CPS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] }, ptr [[TMP4]], i32 0, i32 0
 ; CLEANUP-CPS-NEXT:    [[TMP15:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[TMP14]])
 ; CLEANUP-CPS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP15]], i8 1
-; CLEANUP-CPS-NEXT:    [[TMP16:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP11]])
-; CLEANUP-CPS-NEXT:    [[TMP17:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP16]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
+; CLEANUP-CPS-NEXT:    [[TMP16:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP11]])
+; CLEANUP-CPS-NEXT:    [[TMP17:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP16]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
 ; CLEANUP-CPS-NEXT:    [[TMP18:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 0
 ; CLEANUP-CPS-NEXT:    [[TMP19:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 1
 ; CLEANUP-CPS-NEXT:    [[TMP20:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 2
@@ -3987,7 +3989,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @MyClosestHitShader(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META38:![0-9]+]] !lgc.cps [[META39:![0-9]+]] !continuation [[META40:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META39:![0-9]+]] !lgc.cps [[META40:![0-9]+]] !continuation [[META41:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 0
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_1_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 1
@@ -4052,7 +4054,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @MyAnyHitShader(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[HIT_ATTRS:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META39]] !lgc.cps [[META41:![0-9]+]] !continuation [[META42:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[HIT_ATTRS:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META40]] !lgc.cps [[META42:![0-9]+]] !continuation [[META43:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
 ; CLEANUP-CPS-NEXT:    [[TMP0:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; CLEANUP-CPS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA]], align 8
@@ -4281,7 +4283,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @MyIntersectionShader(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META43:![0-9]+]] !continuation [[META44:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META44:![0-9]+]] !continuation [[META45:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
 ; CLEANUP-CPS-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
 ; CLEANUP-CPS-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[MYINTERSECTIONSHADER_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
@@ -4372,7 +4374,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_28_INSERT89:%.*]] = insertvalue [30 x i32] [[DOTFCA_27_INSERT86]], i32 [[PAYLOAD_FCA_28_EXTRACT]], 28
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_29_INSERT92:%.*]] = insertvalue [30 x i32] [[DOTFCA_28_INSERT89]], i32 [[PAYLOAD_FCA_29_EXTRACT]], 29
 ; CLEANUP-CPS-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @MyIntersectionShader.resume.0)
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 3, i32 16, {} poison, i64 [[TMP0]], i32 5, float [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT327]], [20 x i32] poison, [30 x i32] [[DOTFCA_29_INSERT92]]), !continuation.registercount [[META32:![0-9]+]], !continuation.returnedRegistercount [[META32]]
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 3, i32 16, {} poison, i64 [[TMP0]], i32 5, float [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT327]], [20 x i32] poison, [30 x i32] [[DOTFCA_29_INSERT92]]), !continuation.returnedRegistercount [[META32:![0-9]+]], !continuation.registercount [[META32]]
 ; CLEANUP-CPS-NEXT:    unreachable
 ; CLEANUP-CPS:       accepthit.i:
 ; CLEANUP-CPS-NEXT:    [[DOTSROA_0_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> undef, i32 0
@@ -4474,7 +4476,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define dso_local void @MyIntersectionShader.resume.0(
-; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_TRAVERSALDATA:%.*]], [8 x i32], [30 x i32] } [[TMP3:%.*]]) !lgc.rt.shaderstage [[META36]] !lgc.cps [[META43]] !continuation [[META44]] {
+; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_TRAVERSALDATA:%.*]], [8 x i32], [30 x i32] } [[TMP3:%.*]]) !lgc.rt.shaderstage [[META36]] !lgc.cps [[META44]] !continuation [[META45]] {
 ; CLEANUP-CPS-NEXT:  entryresume.0:
 ; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
 ; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP3]], 2
@@ -4611,7 +4613,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @MyIntersectionShaderLargeAttrs(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META43]] !continuation [[META45:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META36]] !lgc.cps [[META44]] !continuation [[META46:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
 ; CLEANUP-CPS-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
 ; CLEANUP-CPS-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[MYINTERSECTIONSHADERLARGEATTRS_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
@@ -4708,7 +4710,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_28_INSERT89:%.*]] = insertvalue [30 x i32] [[DOTFCA_27_INSERT86]], i32 [[PAYLOAD_FCA_28_EXTRACT]], 28
 ; CLEANUP-CPS-NEXT:    [[DOTFCA_29_INSERT92:%.*]] = insertvalue [30 x i32] [[DOTFCA_28_INSERT89]], i32 [[PAYLOAD_FCA_29_EXTRACT]], 29
 ; CLEANUP-CPS-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @MyIntersectionShaderLargeAttrs.resume.0)
-; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 3, i32 16, {} poison, i64 [[TMP0]], i32 5, float [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT]], i32 0, [[STRUCT_LARGEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_6_INSERT]], [15 x i32] poison, [30 x i32] [[DOTFCA_29_INSERT92]]), !continuation.registercount [[META32]], !continuation.returnedRegistercount [[META32]]
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 3, i32 16, {} poison, i64 [[TMP0]], i32 5, float [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT]], i32 0, [[STRUCT_LARGEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_6_INSERT]], [15 x i32] poison, [30 x i32] [[DOTFCA_29_INSERT92]]), !continuation.returnedRegistercount [[META32]], !continuation.registercount [[META32]]
 ; CLEANUP-CPS-NEXT:    unreachable
 ; CLEANUP-CPS:       accepthit.i:
 ; CLEANUP-CPS-NEXT:    [[TMP1:%.*]] = bitcast i32 100 to float
@@ -4806,7 +4808,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define dso_local void @MyIntersectionShaderLargeAttrs.resume.0(
-; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_TRAVERSALDATA:%.*]], [8 x i32], [30 x i32] } [[TMP3:%.*]]) !lgc.rt.shaderstage [[META36]] !lgc.cps [[META43]] !continuation [[META45]] {
+; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], { [[STRUCT_TRAVERSALDATA:%.*]], [8 x i32], [30 x i32] } [[TMP3:%.*]]) !lgc.rt.shaderstage [[META36]] !lgc.cps [[META44]] !continuation [[META46]] {
 ; CLEANUP-CPS-NEXT:  entryresume.0:
 ; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
 ; CLEANUP-CPS-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_TRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP3]], 2
@@ -4943,7 +4945,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CLEANUP-CPS-LABEL: define void @MyMissShader(
-; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META41]] !lgc.cps [[META39]] !continuation [[META46:![0-9]+]] {
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR3]] !lgc.rt.shaderstage [[META42]] !lgc.cps [[META40]] !continuation [[META47:![0-9]+]] {
 ; CLEANUP-CPS-NEXT:  AllocaSpillBB:
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 0
 ; CLEANUP-CPS-NEXT:    [[PAYLOAD_FCA_1_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 1
@@ -4990,32 +4992,32 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; DXILCONTPOSTPROCESS-CPS-LABEL: define i1 @_cont_IsEndSearch(
-; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR0:[0-9]+]] {
+; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR1:[0-9]+]] {
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[ISEND:%.*]] = call i1 @opaqueIsEnd()
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    ret i1 [[ISEND]]
 ;
 ;
 ; DXILCONTPOSTPROCESS-CPS-LABEL: define %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(
-; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[ADDR:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[VAL:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], ptr [[ADDR]], align 4
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    ret [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL]]
 ;
 ;
 ; DXILCONTPOSTPROCESS-CPS-LABEL: define void @_cont_SetTriangleHitAttributes(
-; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[VAL:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[VAL:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[ADDR:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL]], ptr [[ADDR]], align 4
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    ret void
 ;
 ;
 ; DXILCONTPOSTPROCESS-CPS-LABEL: define i32 @_cont_GetLocalRootIndex(
-; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    ret i32 5
 ;
 ;
 ; DXILCONTPOSTPROCESS-CPS-LABEL: define void @_cont_KernelEntry(
-; DXILCONTPOSTPROCESS-CPS-SAME: ) #[[ATTR0]] !lgc.rt.shaderstage [[META35:![0-9]+]] {
+; DXILCONTPOSTPROCESS-CPS-SAME: ) #[[ATTR1]] !lgc.rt.shaderstage [[META35:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[CSPINIT:%.*]] = ptrtoint ptr @debug_global to i32
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -5025,7 +5027,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; DXILCONTPOSTPROCESS-CPS-LABEL: define %struct.HitData @_cont_GetCandidateState(
-; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR0]] {
+; DXILCONTPOSTPROCESS-CPS-SAME: ptr [[DATA:%.*]]) #[[ATTR1]] {
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[RESPTR:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[DATA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[RES:%.*]] = load [[STRUCT_HITDATA:%.*]], ptr [[RESPTR]], align 4
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    ret [[STRUCT_HITDATA]] [[RES]]
@@ -5047,8 +5049,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP4:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP5:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
-; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP4]])
-; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP3:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP4]])
+; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP3]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP8:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP7]])
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_EXTRACT20]], 0
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], 0
@@ -5074,7 +5076,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[DOTFCA_8_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_7_INSERT]], i32 [[TMP12]], 8
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[DOTFCA_9_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_8_INSERT]], i32 [[TMP13]], 9
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP14:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-CPS-NEXT:    call void (...) @lgc.ilcps.continue(i64 4, i32 [[TMP14]], i64 -1, i64 [[TMP9]], i32 5, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [6 x i32] poison, [10 x i32] [[DOTFCA_9_INSERT]])
+; DXILCONTPOSTPROCESS-CPS-NEXT:    call void (...) @lgc.ilcps.waitContinue(i64 4, i64 -1, i32 [[TMP14]], i64 [[TMP9]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [8 x i32] poison, [10 x i32] [[DOTFCA_9_INSERT]])
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    unreachable
 ;
 ;
@@ -5114,8 +5116,8 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds { [[STRUCT_DISPATCHSYSTEMDATA]], [21 x i32], [10 x i32] }, ptr [[TMP4]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP16:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[TMP15]])
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP16]], i8 1
-; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP17:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP12]])
-; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP18:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP17]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
+; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP17:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP12]])
+; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP18:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP17]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 4098, i32 1033 })
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP19:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 0
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP20:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 1
 ; DXILCONTPOSTPROCESS-CPS-NEXT:    [[TMP21:%.*]] = extractelement <4 x float> [[DOTSROA_0_12_VEC_INSERT]], i64 2

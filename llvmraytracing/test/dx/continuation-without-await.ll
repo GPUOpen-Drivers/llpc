@@ -153,7 +153,10 @@ attributes #2 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [1 x i32] } [[TMP6]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP18]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
+; LOWERRAYTRACINGPIPELINE:       .split:
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @main_no_call(
@@ -162,7 +165,8 @@ attributes #2 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @called(
@@ -197,7 +201,7 @@ attributes #2 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr [[TMP24]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = load [3 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP27]], [8 x i32] poison, [3 x i32] [[TMP28]]), !continuation.registercount [[META17]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP27]], [8 x i32] poison, [3 x i32] [[TMP28]]), !continuation.registercount [[META17]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
@@ -253,7 +257,7 @@ attributes #2 = { nounwind }
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [3 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [3 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; CLEANUP-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [3 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
-; CLEANUP-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR]], i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT5]], [8 x i32] poison, [3 x i32] [[DOTFCA_2_INSERT]]), !continuation.registercount [[META17]]
+; CLEANUP-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT5]], [8 x i32] poison, [3 x i32] [[DOTFCA_2_INSERT]]), !continuation.registercount [[META17]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;

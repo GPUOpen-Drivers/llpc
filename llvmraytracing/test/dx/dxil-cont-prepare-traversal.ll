@@ -98,11 +98,11 @@ attributes #2 = { nounwind }
 ; PREPARE-NEXT:    [[ADDR:%.*]] = zext i32 [[A4]] to i64
 ; PREPARE-NEXT:    [[TMP7:%.*]] = load [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP5]], align 4
 ; PREPARE-NEXT:    [[TMP10:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @_cont_Traversal)
-; PREPARE-NEXT:    call void (...) @lgc.ilcps.waitContinue(i64 [[ADDR]], i64 -1, i32 poison, i64 [[TMP10]], [[STRUCT_SYSTEMDATA]] [[TMP7]])
+; PREPARE-NEXT:    call void (...) @lgc.cps.jump(i64 [[ADDR]], i32 -1, {} poison, i64 [[TMP10]], [[STRUCT_SYSTEMDATA]] [[TMP7]]), !waitmask [[META1:![0-9]+]]
 ; PREPARE-NEXT:    unreachable
 ; PREPARE:       9:
 ; PREPARE-NEXT:    [[TMP9:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[TMP5]], align 4
-; PREPARE-NEXT:    call void (...) @lgc.ilcps.waitContinue(i64 0, i64 -1, i32 poison, i64 2, [[STRUCT_SYSTEMDATA]] [[TMP9]])
+; PREPARE-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 2, [[STRUCT_SYSTEMDATA]] [[TMP9]]), !waitmask [[META1]]
 ; PREPARE-NEXT:    unreachable
 ;
 ;
@@ -177,9 +177,6 @@ attributes #2 = { nounwind }
 ; ALL-NEXT:    [[DOTFCA_1_LOAD:%.*]] = load float, ptr [[DOTFCA_1_GEP]], align 4
 ; ALL-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT]], float [[DOTFCA_1_LOAD]], 1
 ; ALL-NEXT:    [[TMP12:%.*]] = call i64 @continuation.getAddrAndMD(ptr @_cont_Traversal)
-; ALL-NEXT:    [[DOTFCA_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; ALL-NEXT:    [[DOTFCA_0_1_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; ALL-NEXT:    [[DOTFCA_1_INSERT125:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; ALL-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [30 x i32] poison, i32 1, 0
 ; ALL-NEXT:    [[DOTFCA_1_INSERT1:%.*]] = insertvalue [30 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; ALL-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [30 x i32] [[DOTFCA_1_INSERT1]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
@@ -220,9 +217,6 @@ attributes #2 = { nounwind }
 ; ALL-NEXT:    [[DOTFCA_1_GEP4:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[TMP5]], i32 0, i32 1
 ; ALL-NEXT:    [[DOTFCA_1_LOAD5:%.*]] = load float, ptr [[DOTFCA_1_GEP4]], align 4
 ; ALL-NEXT:    [[DOTFCA_1_INSERT6:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT3]], float [[DOTFCA_1_LOAD5]], 1
-; ALL-NEXT:    [[DOTFCA_0_0_0_INSERT128:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; ALL-NEXT:    [[DOTFCA_0_1_INSERT131:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT128]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; ALL-NEXT:    [[DOTFCA_1_INSERT134:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT131]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; ALL-NEXT:    [[DOTFCA_0_INSERT3:%.*]] = insertvalue [30 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; ALL-NEXT:    [[DOTFCA_1_INSERT7:%.*]] = insertvalue [30 x i32] [[DOTFCA_0_INSERT3]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; ALL-NEXT:    [[DOTFCA_2_INSERT9:%.*]] = insertvalue [30 x i32] [[DOTFCA_1_INSERT7]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2

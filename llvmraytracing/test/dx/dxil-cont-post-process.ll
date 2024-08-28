@@ -7,7 +7,6 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 @debug_global = external global i1
 
-declare void @_AmdComplete() #0
 declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 

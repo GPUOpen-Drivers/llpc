@@ -408,8 +408,12 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
       copyMetadata(newAtomicCmpXchg, &atomicCmpXchgInst);
       return newAtomicCmpXchg;
     };
+    // The index should be used when a strided pointer is converted to offset mode.
+    Value *index = nullptr;
+    if (atomicCmpXchgInst.getPointerOperand()->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER)
+      index = values[2];
     Value *result =
-        createGlobalPointerAccess(bufferDesc, baseIndex, storeType, atomicCmpXchgInst, createAtomicCmpXchgFunc);
+        createGlobalPointerAccess(bufferDesc, baseIndex, index, storeType, atomicCmpXchgInst, createAtomicCmpXchgFunc);
 
     // Record the atomic instruction so we remember to delete it later.
     m_typeLowering.eraseInstruction(&atomicCmpXchgInst);
@@ -502,7 +506,12 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
         copyMetadata(newAtomicRmw, &atomicRmwInst);
         return newAtomicRmw;
       };
-      Value *result = createGlobalPointerAccess(bufferDesc, baseIndex, storeType, atomicRmwInst, createAtomicRmwFunc);
+      // The index should be used when a strided pointer is converted to offset mode.
+      Value *index = nullptr;
+      if (atomicRmwInst.getPointerOperand()->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER)
+        index = values[2];
+      Value *result =
+          createGlobalPointerAccess(bufferDesc, baseIndex, index, storeType, atomicRmwInst, createAtomicRmwFunc);
 
       // Record the atomic instruction so we remember to delete it later.
       m_typeLowering.eraseInstruction(&atomicRmwInst);
@@ -1517,7 +1526,11 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       }
       return result;
     };
-    return createGlobalPointerAccess(bufferDesc, baseIndex, type, inst, createLoadStoreFunc);
+    // The index should be used when a strided pointer is converted to offset mode.
+    Value *index = nullptr;
+    if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER)
+      index = pointerValues[2];
+    return createGlobalPointerAccess(bufferDesc, baseIndex, index, type, inst, createLoadStoreFunc);
   }
 
   switch (ordering) {
@@ -1802,14 +1815,27 @@ Instruction *BufferOpLowering::makeLoop(Value *const loopStart, Value *const loo
 //
 // @param bufferDesc: The buffer descriptor
 // @param offset: The offset on the global memory
+// @param strideIndex: The index of strided load
 // @param type: The accessed data type
 // @param inst: The instruction to be executed on the buffer
 // @param callback: The callback function to perform the specific global access
-Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Value *const offset, Type *const type,
-                                                   Instruction &inst, const function_ref<Value *(Value *)> callback) {
+Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Value *const offset,
+                                                   Value *const strideIndex, Type *const type, Instruction &inst,
+                                                   const function_ref<Value *(Value *)> callback) {
   // The 2nd element (NUM_RECORDS) in the buffer descriptor is byte bound.
   Value *bound = m_builder.CreateExtractElement(bufferDesc, 2);
-  Value *inBound = m_builder.CreateICmpULT(offset, bound);
+  Value *newOffset = offset;
+
+  // index is for strided load which we need to handle the stride of the SRD.
+  if (strideIndex) {
+    Value *desc1 = m_builder.CreateExtractElement(bufferDesc, 1);
+    Value *stride =
+        m_builder.CreateAnd(m_builder.CreateLShr(desc1, m_builder.getInt32(16)), m_builder.getInt32(0x3fff));
+    bound = m_builder.CreateMul(bound, stride);
+    newOffset = m_builder.CreateAdd(m_builder.CreateMul(strideIndex, stride), newOffset);
+  }
+
+  Value *inBound = m_builder.CreateICmpULT(newOffset, bound);
 
   // If null descriptor or extended robust buffer access is allowed, we will create a branch to perform normal global
   // access based on the valid check.
@@ -1831,15 +1857,10 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
   }
   // Global pointer access
   Value *baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
-  Value *newOffset = nullptr;
-  if (m_pipelineState.getOptions().enableExtendedRobustBufferAccess) {
-    // No need to check out-of-bind if the extended robustness check is already done
-    newOffset = offset;
-  } else {
-    // NOTE: The offset of out-of-bound overridden as 0 may causes unexpected result when the extended robustness access
-    // is disabled.
-    newOffset = m_builder.CreateSelect(inBound, offset, m_builder.getInt32(0));
-  }
+  // NOTE: The offset of out-of-bound overridden as 0 may cause unexpected result when the extended robustness access
+  // is disabled.
+  if (!m_pipelineState.getOptions().enableExtendedRobustBufferAccess)
+    newOffset = m_builder.CreateSelect(inBound, newOffset, m_builder.getInt32(0));
 
   // Add on the index to the address.
   Value *pointer = m_builder.CreateGEP(m_builder.getInt8Ty(), baseAddr, newOffset);

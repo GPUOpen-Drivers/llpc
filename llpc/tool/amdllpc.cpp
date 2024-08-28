@@ -719,6 +719,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs, bool
       compileInfo.rayTracePipelineInfo.indirectStageMask = 0xFFFFFFFF;
       compileInfo.rayTracePipelineInfo.pipelineLibStageMask = 0xFFFFFFFF;
       compileInfo.rayTracePipelineInfo.hasPipelineLibrary = true;
+      compileInfo.rayTracePipelineInfo.libraryMode = LibraryMode::Library;
 
       standaloneRtShaders.resize(compileInfo.shaderModuleDatas.size());
       memset(&standaloneRtShaders[0], 0, sizeof(PipelineShaderInfo) * standaloneRtShaders.size());

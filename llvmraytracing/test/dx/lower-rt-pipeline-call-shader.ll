@@ -113,7 +113,10 @@ attributes #0 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP9]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
+; LOWERRAYTRACINGPIPELINE:       .split:
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define i32 @_cont_GetLocalRootIndex(
@@ -143,7 +146,10 @@ attributes #0 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP5]], 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP7]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br label [[DOTSPLIT:%.*]]
+; LOWERRAYTRACINGPIPELINE-CPS:       .split:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ;
 ; POSTPROCESS-CPS-LABEL: define i32 @_cont_GetLocalRootIndex(

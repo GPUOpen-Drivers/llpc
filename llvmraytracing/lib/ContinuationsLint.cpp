@@ -31,7 +31,6 @@
 
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcCpsDialect.h"
-#include "lgc/LgcIlCpsDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/Analysis.h"
 #include "llvm/IR/PassManager.h"
@@ -62,7 +61,7 @@ public:
 private:
   Module &Mod;
 
-  using JumpVecTy = SmallVector<CallInst *>;
+  using JumpVecTy = SmallVector<lgc::cps::JumpOp *>;
   JumpVecTy AllJumps;
   void collectJumps();
   void checkJumpTargets();
@@ -115,10 +114,10 @@ void ContinuationsLintPassImpl::run() {
 }
 
 void ContinuationsLintPassImpl::collectJumps() {
-  static const auto Visitor = llvm_dialects::VisitorBuilder<JumpVecTy>()
-                                  .addSet<lgc::ilcps::ContinueOp, lgc::ilcps::WaitContinueOp, lgc::cps::JumpOp>(
-                                      [](JumpVecTy &Jumps, Instruction &Op) { Jumps.push_back(cast<CallInst>(&Op)); })
-                                  .build();
+  static const auto Visitor =
+      llvm_dialects::VisitorBuilder<JumpVecTy>()
+          .add<lgc::cps::JumpOp>([](JumpVecTy &Jumps, lgc::cps::JumpOp &Op) { Jumps.push_back(&Op); })
+          .build();
 
   Visitor.visit(AllJumps, Mod);
 }
@@ -126,13 +125,7 @@ void ContinuationsLintPassImpl::collectJumps() {
 // Check that every possible jump candidate has a valid jump target
 void ContinuationsLintPassImpl::checkJumpTargets() {
   for (auto *JumpCandidate : AllJumps) {
-    Value *JumpTarget = nullptr;
-    if (auto *Continue = dyn_cast<lgc::ilcps::ContinueOp>(JumpCandidate))
-      JumpTarget = Continue->getShaderAddr();
-    else if (auto *WaitContinue = dyn_cast<lgc::ilcps::WaitContinueOp>(JumpCandidate))
-      JumpTarget = WaitContinue->getShaderAddr();
-    else if (auto *Jump = dyn_cast<lgc::cps::JumpOp>(JumpCandidate))
-      JumpTarget = Jump->getTarget();
+    Value *JumpTarget = JumpCandidate->getTarget();
 
     assert(JumpTarget);
 

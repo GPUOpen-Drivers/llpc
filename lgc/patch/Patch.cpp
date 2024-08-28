@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/Patch.h"
+#include "LowerPopsInterlock.h"
 #include "LowerRayQueryWrapper.h"
 #include "PatchNullFragShader.h"
 #include "llvmraytracing/Continuations.h"
@@ -36,10 +37,8 @@
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
-#include "lgc/patch/CombineCooperativeMatrix.h"
 #include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
-#include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/LowerDesc.h"
 #include "lgc/patch/LowerGpuRt.h"
@@ -65,6 +64,11 @@
 #include "lgc/patch/PatchWorkarounds.h"
 #include "lgc/patch/TcsPassthroughShader.h"
 #include "lgc/patch/VertexFetch.h"
+#if LLPC_BUILD_STRIX1
+#include "lgc/patch/WorkaroundDsSubdwordWrite.h"
+#endif
+#include "lgc/patch/CombineCooperativeMatrix.h"
+#include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -207,12 +211,17 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(LowerDebugPrintf());
   passMgr.addPass(LowerDesc());
   passMgr.addPass(PatchEntryPointMutate());
+  passMgr.addPass(createModuleToFunctionPassAdaptor(LowerPopsInterlock()));
   passMgr.addPass(PatchInitializeWorkgroupMemory());
   passMgr.addPass(PatchInOutImportExport());
 
   // Patch invariant load and loop metadata.
   passMgr.addPass(createModuleToFunctionPassAdaptor(PatchInvariantLoads()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
+
+#if LLPC_BUILD_STRIX1
+  passMgr.addPass(WorkaroundDsSubdwordWrite());
+#endif
 
   if (patchTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);

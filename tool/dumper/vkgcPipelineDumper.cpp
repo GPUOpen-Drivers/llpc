@@ -1018,6 +1018,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
   dumpFile << "dynamicSampleInfo = " << pipelineInfo->rsState.dynamicSampleInfo << "\n";
   dumpFile << "rasterStream = " << pipelineInfo->rsState.rasterStream << "\n";
+  dumpFile << "enableMapClipDistMask = " << pipelineInfo->glState.enableMapClipDistMask << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
@@ -1058,6 +1059,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableColorClampVs = " << pipelineInfo->glState.enableColorClampVs << "\n";
   dumpFile << "enableColorClampFs = " << pipelineInfo->glState.enableColorClampFs << "\n";
   dumpFile << "enableFlatShade = " << pipelineInfo->glState.enableFlatShade << "\n";
+  dumpFile << "alphaTestFunc = " << pipelineInfo->glState.alphaTestFunc << "\n";
 
   dumpFile << "originUpperLeft = " << pipelineInfo->getGlState().originUpperLeft << "\n";
   if (pipelineInfo->clientMetadataSize > 0) {
@@ -1085,9 +1087,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   }
 
   dumpFile << "forceDisableStreamOut = " << pipelineInfo->getGlState().apiXfbOutData.forceDisableStreamOut << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
-  dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
-#endif
   const auto pXfbOutInfos = pipelineInfo->getGlState().apiXfbOutData.pXfbOutInfos;
   for (unsigned idx = 0; idx < pipelineInfo->getGlState().apiXfbOutData.numXfbOutInfo; ++idx) {
     dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
@@ -1100,6 +1099,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   }
   dumpFile << "vbAddressLowBitsKnown = " << pipelineInfo->getGlState().vbAddressLowBitsKnown << "\n";
   dumpFile << "advancedBlendInfo.enableAdvancedBlend = " << pipelineInfo->advancedBlendInfo.enableAdvancedBlend << "\n";
+  dumpFile << "advancedBlendInfo.enableRov = " << pipelineInfo->advancedBlendInfo.enableRov << "\n";
   dumpFile << "advancedBlendInfo.binding = " << pipelineInfo->advancedBlendInfo.binding << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
@@ -1581,11 +1581,14 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   }
 
   hasher.Update(pipeline->advancedBlendInfo.enableAdvancedBlend);
+  hasher.Update(pipeline->advancedBlendInfo.enableRov);
   hasher.Update(pipeline->advancedBlendInfo.binding);
 
   hasher.Update(pipeline->glState.enableColorClampVs);
   hasher.Update(pipeline->glState.enableColorClampFs);
   hasher.Update(pipeline->glState.enableFlatShade);
+  hasher.Update(pipeline->glState.enableMapClipDistMask);
+  hasher.Update(pipeline->glState.alphaTestFunc);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1809,9 +1812,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(*pipeline->iaState.tessLevel);
 
   hasher->Update(pipeline->getGlState().apiXfbOutData.forceDisableStreamOut);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
-  hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
-#endif
   for (unsigned i = 0; i < pipeline->getGlState().apiXfbOutData.numXfbOutInfo; i++) {
     hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].isBuiltIn);
     hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].location);
@@ -1932,10 +1932,9 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(shaderInfo->options.clientHash);
     } else {
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
-      hasher->Update(stage);
       if (isCacheHash) {
         hasher->Update(static_cast<const uint8_t *>(voidPtrInc(moduleData, ShaderModuleCacheHashOffset)),
-                       sizeof(moduleData->hash));
+                       sizeof(moduleData->cacheHash));
       } else
         hasher->Update(moduleData->hash);
     }

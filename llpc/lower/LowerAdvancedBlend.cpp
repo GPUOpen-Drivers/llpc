@@ -29,11 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "LowerAdvancedBlend.h"
+#include "LowerInternalLibraryIntrinsic.h"
 #include "SPIRVInternal.h"
-#include "compilerutils/CompilerUtils.h"
 #include "llpcContext.h"
-#include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "vkgcDefs.h"
+#include "compilerutils/CompilerUtils.h"
 #include "lgc/Builder.h"
 #include "lgc/RuntimeContext.h"
 
@@ -45,11 +45,12 @@ using namespace Llpc;
 
 namespace Llpc {
 static const char *AdvancedBlendInternal = "AmdAdvancedBlendInternal";
+static const char *AdvancedBlendInternalRov = "AmdAdvancedBlendInternalRov";
 static const char *AdvancedBlendModeName = "_mode";
 static const char *AdvancedBlendIsMsaaName = "_isMsaa";
 
 // =====================================================================================================================
-LowerAdvancedBlend::LowerAdvancedBlend(unsigned binding) : m_binding(binding) {
+LowerAdvancedBlend::LowerAdvancedBlend(unsigned binding, bool enableRov) : m_binding(binding), m_enableRov(enableRov) {
 }
 
 // =====================================================================================================================
@@ -85,33 +86,53 @@ void LowerAdvancedBlend::processFsOutputs(Module &module) {
     if (global.getType()->getAddressSpace() == SPIRAS_Uniform && global.getName().ends_with(AdvancedBlendIsMsaaName))
       isMsaaUniform = &global;
   }
-  // Prepare arguments of AmdAdvancedBlend(inColor, imageDescMs, imageDesc, fmaskDesc, mode, isMsaa) from shaderLibrary
+
   m_builder->SetInsertPointPastAllocas(m_entryPoint);
+  SmallVector<Value *> args;
+  args.push_back(nullptr); // placeholder for inColor
 
-  // Get the parameters and store them into the allocated parameter points
-  unsigned bindings[2] = {m_binding, m_binding + 1};
-  Value *imageDesc[2] = {};
-  for (unsigned id = 0; id < 2; ++id) {
+  if (!m_enableRov) {
+    // Prepare arguments of AmdAdvancedBlendInternal(inColor, imageDescMs, imageDesc, fmaskDesc, mode, isMsaa)
+    // Get the parameters and store them into the allocated parameter points
+    unsigned bindings[2] = {m_binding, m_binding + 1};
+    Value *imageDesc[2] = {};
+    for (unsigned id = 0; id < 2; ++id) {
+      unsigned descSet =
+          PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
+      imageDesc[id] = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorResource,
+                                                  ResourceNodeType::DescriptorResource, descSet, bindings[id]);
+      imageDesc[id] = m_builder->CreatePtrToInt(imageDesc[id], m_builder->getInt64Ty());
+      args.push_back(imageDesc[id]);
+    }
+
+    unsigned descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
+    Value *fmaskDesc = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorFmask, ResourceNodeType::DescriptorFmask,
+                                                   descSet, m_binding);
+    fmaskDesc = m_builder->CreatePtrToInt(fmaskDesc, m_builder->getInt64Ty());
+    args.push_back(fmaskDesc);
+  } else {
+    // Prepare arguments of AmdAdvancedBlendInternalRov(inColor, rovDesc, mode, isMsaa)
     unsigned descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
-    imageDesc[id] = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorResource,
-                                                ResourceNodeType::DescriptorResource, descSet, bindings[id]);
-    imageDesc[id] = m_builder->CreatePtrToInt(imageDesc[id], m_builder->getInt64Ty());
+    Value *rovDesc =
+        m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorResource, ResourceNodeType::DescriptorResource, descSet,
+                                    Vkgc::InternalBinding::AdvancedBlendInternalBinding);
+    rovDesc = m_builder->CreatePtrToInt(rovDesc, m_builder->getInt64Ty());
+    args.push_back(rovDesc);
   }
-
-  unsigned descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
-  Value *fmaskDesc = m_builder->CreateGetDescPtr(ResourceNodeType::DescriptorFmask, ResourceNodeType::DescriptorFmask,
-                                                 descSet, m_binding);
-  fmaskDesc = m_builder->CreatePtrToInt(fmaskDesc, m_builder->getInt64Ty());
 
   assert(modeUniform && isMsaaUniform);
   modeUniform = m_builder->CreateLoad(m_builder->getInt32Ty(), modeUniform);
+  cast<Instruction>(modeUniform)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+  args.push_back(modeUniform);
 
-  isMsaaUniform =
-      m_builder->CreateTrunc(m_builder->CreateLoad(m_builder->getInt32Ty(), isMsaaUniform), m_builder->getInt1Ty());
+  isMsaaUniform = m_builder->CreateLoad(m_builder->getInt32Ty(), isMsaaUniform);
+  cast<Instruction>(isMsaaUniform)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+  args.push_back(isMsaaUniform);
 
   // Link the gfxruntime library module
   GfxRuntimeContext &gfxRuntimeContext = GfxRuntimeContext::get(*m_context);
-  auto *advancedBlendFunc = (*gfxRuntimeContext.theModule).getFunction(AdvancedBlendInternal);
+  auto *advancedBlendFunc =
+      (*gfxRuntimeContext.theModule).getFunction(m_enableRov ? AdvancedBlendInternalRov : AdvancedBlendInternal);
 
   CompilerUtils::CrossModuleInliner inliner;
 
@@ -121,12 +142,10 @@ void LowerAdvancedBlend::processFsOutputs(Module &module) {
       auto storeInst = cast<StoreInst>(user);
       assert(storeInst);
       Value *srcVal = storeInst->getValueOperand();
+      args[0] = srcVal;
       m_builder->SetInsertPoint(storeInst);
 
-      Value *blendColor = inliner
-                              .inlineCall(*m_builder, advancedBlendFunc,
-                                          {srcVal, imageDesc[0], imageDesc[1], fmaskDesc, modeUniform, isMsaaUniform})
-                              .returnValue;
+      Value *blendColor = inliner.inlineCall(*m_builder, advancedBlendFunc, args).returnValue;
 
       storeInst->setOperand(0, blendColor);
     }

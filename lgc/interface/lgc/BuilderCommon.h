@@ -119,6 +119,9 @@ public:
 
   // Get the LGC type of a cooperative matrix with the given element type and layout.
   llvm::Type *getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
+
+  // Whether the type of a cooperative matrix is specified bit width.
+  static bool isTypeNCooperativeMatrix(CooperativeMatrixElementType elemType, unsigned bitWidth);
 };
 
 } // namespace lgc

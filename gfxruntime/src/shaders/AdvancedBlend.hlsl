@@ -50,13 +50,14 @@ float4 AmdExtFragCoord() DUMMY_FLOAT4_FUNC
 int AmdExtSampleId() DUMMY_INT_FUNC
 
 float4 AmdAdvancedBlendTexelLoad(int64_t imageDesc, int2 iCoord, int lod) DUMMY_FLOAT4_FUNC
-float4 AmdAdvancedBlendTexelLoadFmask(int64_t imageDesc, int64_t fmaskDesc, int2 iCoord, int lod) DUMMY_FLOAT4_FUNC
+float4 AmdAdvancedBlendTexelLoadMsaa(int64_t imageDesc, int64_t fmaskDesc, int2 iCoord, int sampleId) DUMMY_FLOAT4_FUNC
 
-float4 AmdAdvancedBlendCoherentTexelLoad(float4 color, int2 iCoord, int sampleId) DUMMY_FLOAT4_FUNC
-void AmdAdvancedBlendCoherentTexelStore(float4 color, int2 iCoord, int sampleId) DUMMY_VOID_FUNC
-    // clang-format on
+float4 AmdAdvancedBlendCoherentTexelLoad(int64_t desc, int2 iCoord, int sampleId) DUMMY_FLOAT4_FUNC
+void AmdAdvancedBlendCoherentTexelStore(float4 texel, int64_t desc, int2 iCoord, int sampleId) DUMMY_VOID_FUNC
 
-    // clang-format off
+float4 AmdAdvancedBlendCoherentTexelLoadMsaa(int64_t desc, int2 iCoord, int sampleId) DUMMY_FLOAT4_FUNC
+void AmdAdvancedBlendCoherentTexelStoreMsaa(float4 texel, int64_t desc, int2 iCoord, int sampleId) DUMMY_VOID_FUNC
+
 enum BlendEquationEnum {
   Multiply = 1,
   Screen,
@@ -224,24 +225,7 @@ float AmdAdvancedBlendDivide(float dividend, float divisor) {
   }
 }
 
-export float4 AmdAdvancedBlendInternal(float4 inColor, int64_t imageDescMs, int64_t imageDesc, int64_t fmaskDesc,
-                                       int mode, bool isMsaa) {
-  float4 srcColor = inColor;
-  if (mode == 0) {
-    return srcColor;
-  }
-  float4 fragCoord = AmdExtFragCoord();
-  int2 iCoord = int2(fragCoord.x, fragCoord.y);
-  float4 dstColor;
-  if (isMsaa) {
-    dstColor = AmdAdvancedBlendTexelLoadFmask(imageDescMs, fmaskDesc, iCoord, 0);
-  } else {
-    dstColor = AmdAdvancedBlendTexelLoad(imageDesc, iCoord, 0);
-  }
-  // TODO: Uncomment them once ROV is support in LLPC
-  // int sampleId = AmdExtSampleId();
-  // dstColor = AmdAdvancedBlendCoherentTexelLoad(dstColor, iCoord, sampleId);
-
+float4 AmdAdvancedBlending(int mode, float4 srcColor, float4 dstColor) {
   if (srcColor.a == 0.0f) {
     srcColor.r = 0.0f;
     srcColor.g = 0.0f;
@@ -262,7 +246,7 @@ export float4 AmdAdvancedBlendInternal(float4 inColor, int64_t imageDescMs, int6
   }
   float p0 = srcColor.a * dstColor.a;
   float p1 = srcColor.a * (1.0f - dstColor.a);
-  float p2 = (1.0f - srcColor.a) * dstColor.a;
+  float p2 = dstColor.a * (1.0f - srcColor.a);
 
   float4 blendingOutput;
   blendingOutput.r = (srcColor.r * p1) + (dstColor.r * p2);
@@ -348,7 +332,47 @@ export float4 AmdAdvancedBlendInternal(float4 inColor, int64_t imageDescMs, int6
   blendingOutput.r += tempColor.r * p0;
   blendingOutput.g += tempColor.g * p0;
   blendingOutput.b += tempColor.b * p0;
-  // AmdAdvancedBlendCoherentTexelStore(blendingOutput, iCoord, sampleId);
+
+  return blendingOutput;
+}
+
+export float4 AmdAdvancedBlendInternal(float4 inColor, int64_t imageDescMs, int64_t imageDesc, int64_t fmaskDesc,
+                                       int mode, int isMsaa) {
+  if (mode == 0) {
+    return inColor;
+  }
+  float4 srcColor = inColor;
+  float4 fragCoord = AmdExtFragCoord();
+  int2 iCoord = int2(fragCoord.x, fragCoord.y);
+  float4 dstColor;
+  if (isMsaa == 1)
+    dstColor = AmdAdvancedBlendTexelLoadMsaa(imageDescMs, fmaskDesc, iCoord, 0);
+  else
+    dstColor = AmdAdvancedBlendTexelLoad(imageDesc, iCoord, 0);
+
+  float4 blendingOutput = AmdAdvancedBlending(mode, srcColor, dstColor);
+  return blendingOutput;
+}
+
+export float4 AmdAdvancedBlendInternalRov(float4 inColor, int64_t rovDesc, int mode, int isMsaa) {
+  if (mode == 0) {
+    return inColor;
+  }
+
+  float4 fragCoord = AmdExtFragCoord();
+  int2 iCoord = int2(fragCoord.x, fragCoord.y);
+  float4 blendingOutput;
+  if (isMsaa == 1) {
+    int sampleId = AmdExtSampleId();
+    float4 dstColor = AmdAdvancedBlendCoherentTexelLoadMsaa(rovDesc, iCoord, sampleId);
+    blendingOutput = AmdAdvancedBlending(mode, inColor, dstColor);
+    AmdAdvancedBlendCoherentTexelStoreMsaa(blendingOutput, rovDesc, iCoord, sampleId);
+  } else {
+    float4 dstColor = AmdAdvancedBlendCoherentTexelLoad(rovDesc, iCoord, 0);
+    blendingOutput = AmdAdvancedBlending(mode, inColor, dstColor);
+    AmdAdvancedBlendCoherentTexelStore(blendingOutput, rovDesc, iCoord, 0);
+  }
+
   return blendingOutput;
 }
 

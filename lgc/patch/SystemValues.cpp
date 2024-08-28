@@ -270,14 +270,14 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
       // Geometry shader, using GS-VS ring for output.
       Value *desc = loadDescFromDriverTable(SiDrvTableGsRingOuT0Offs + streamId * 4, builder);
 
-      unsigned outLocStart = 0;
+      unsigned streamItemOffset = 0;
       for (int i = 0; i < streamId; ++i)
-        outLocStart += resUsage->inOutUsage.gs.outLocCount[i];
+        streamItemOffset += resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] *
+                            m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices;
 
       // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(unsigned)
       // streamOffset = (streamSize[0] + ... + streamSize[streamId - 1]) * 64 * outputVertices
-      unsigned baseAddr = outLocStart * m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices *
-                          sizeof(unsigned) * 4 * 64;
+      unsigned baseAddr = streamItemOffset * 4 * 64;
 
       // Patch GS-VS ring buffer descriptor base address for GS output
       Value *gsVsOutRingBufDescElem0 = builder.CreateExtractElement(desc, (uint64_t)0);
@@ -295,7 +295,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
 
       // Calculate and set stride in SRD dword1
       unsigned gsVsStride = m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices *
-                            resUsage->inOutUsage.gs.outLocCount[streamId] * sizeof(unsigned) * 4;
+                            resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[streamId] * 4;
 
       SqBufRsrcWord1 strideSetValue = {};
       strideSetValue.bits.stride = gsVsStride;

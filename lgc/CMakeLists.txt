@@ -143,6 +143,7 @@ target_sources(LLVMlgc PRIVATE
     patch/FragColorExport.cpp
     patch/LowerDebugPrintf.cpp
     patch/LowerDesc.cpp
+    patch/LowerPopsInterlock.cpp
     patch/LowerSubgroupOps.cpp
     patch/MeshTaskShader.cpp
     patch/NggPrimShader.cpp
@@ -173,6 +174,9 @@ target_sources(LLVMlgc PRIVATE
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
     patch/RegisterMetadataBuilder.cpp
+#if VKI_BUILD_STRIX1
+    patch/WorkaroundDsSubdwordWrite.cpp
+#endif
     patch/CombineCooperativeMatrix.cpp
     patch/LowerCooperativeMatrix.cpp
     patch/LowerGpuRt.cpp
@@ -207,6 +211,7 @@ target_sources(LLVMlgc PRIVATE
     util/ModuleBunch.cpp
     util/PassManager.cpp
     util/StartStopTimer.cpp
+    util/WorkgroupLayout.cpp
 )
 
 # lgc/interface/lgc

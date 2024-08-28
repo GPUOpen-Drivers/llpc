@@ -360,6 +360,12 @@ def GpurtGetRayStaticIdOp : GpurtOp<"get.ray.static.id", [Memory<[(read Inaccess
   let summary = "get current ray static ID";
 }
 
+def GpurtInitStaticIdOp : GpurtOp<"init.static.id", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "Initialize (generate) a ray static ID";
+}
+
 def GpurtContinuationStackIsGlobalOp : GpurtOp<"continuation.stack.is.global", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I1:$result);

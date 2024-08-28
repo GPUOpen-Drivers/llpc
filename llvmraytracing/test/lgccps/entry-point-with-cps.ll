@@ -6,6 +6,8 @@
 ; Details of the output are likely to differ from the final production pass,
 ; especially instruction order and value names.
 
+declare void @lgc.cps.complete()
+
 define spir_func void @raygen({} %state, i32 %rcr) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 0} {
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 0)
   %fn = load ptr, ptr addrspace(4) %pushconst
@@ -21,7 +23,8 @@ define spir_func void @raygen({} %state, i32 %rcr) !lgc.shaderstage !{i32 7} !lg
   store [2 x i32] %r, ptr addrspace(1) %dst
 
   ; Note: RGS returns, meaning end of thread.
-  ret void
+  call void @lgc.cps.complete()
+  unreachable
 }
 
 define spir_func void @chs({} %state, i32 %rcr, i32 %x) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 1} {
@@ -54,7 +57,8 @@ main:
 
 exit:
   ; Note: Entry kernel also returns
-  ret void
+  call void @lgc.cps.complete()
+  unreachable
 }
 
 declare ptr addrspace(4) @lgc.user.data(i32)
@@ -152,7 +156,7 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP6:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP5]])
 ; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = call [2 x i32] @lgc.ilcps.getReturnValue__a2i32()
 ; LOWER-AWAIT-NEXT:    store [2 x i32] [[TMP7]], ptr addrspace(1) [[DST]], align 4
-; LOWER-AWAIT-NEXT:    call void (...) @lgc.ilcps.return(i32 poison)
+; LOWER-AWAIT-NEXT:    call void @lgc.cps.complete()
 ; LOWER-AWAIT-NEXT:    unreachable
 ;
 ;
@@ -190,6 +194,6 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP5:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP4]])
 ; LOWER-AWAIT-NEXT:    br label [[EXIT]]
 ; LOWER-AWAIT:       exit:
-; LOWER-AWAIT-NEXT:    call void (...) @lgc.ilcps.return(i32 poison)
+; LOWER-AWAIT-NEXT:    call void @lgc.cps.complete()
 ; LOWER-AWAIT-NEXT:    unreachable
 ;

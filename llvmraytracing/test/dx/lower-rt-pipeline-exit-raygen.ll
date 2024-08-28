@@ -88,5 +88,6 @@ attributes #0 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="fa
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.ilcps.waitContinue(i64 [[ADDR_I]], i64 -1, [[STRUCT_SYSTEMDATA]] [[SYSTEMDATA_I]]) #[[ATTR3:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE:       _cont_ExitRayGen.exit:
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;

@@ -16,9 +16,7 @@ declare !pointeetys !4 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 declare !pointeetys !6 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
-declare void @lgc.ilcps.continue(...)
-
-declare void @lgc.ilcps.waitContinue(...)
+declare void @lgc.cps.jump(...)
 
 declare i64 @lgc.cps.as.continuation.reference__i64(...) #3
 
@@ -35,12 +33,12 @@ define void @_cont_Traversal(%struct.TraversalData %data) #1 !lgc.rt.shaderstage
 6:                                                ; preds = %0
   %7 = load %struct.SystemData, ptr %5, align 4
   %8 = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @_cont_Traversal)
-  call void (...) @lgc.ilcps.waitContinue(i64 1, i64 -1, i32 0, i64 %8, %struct.SystemData %7)
+  call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i64 %8, %struct.SystemData %7), !waitmask !9
   unreachable
 
 9:                                                ; preds = %0
   %10 = load %struct.SystemData, ptr %5, align 4
-  call void (...) @lgc.ilcps.waitContinue(i64 0, i64 -1, i32 2, i64 poison, %struct.SystemData %10)
+  call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, %struct.SystemData %10), !waitmask !9
   unreachable
 }
 
@@ -57,6 +55,7 @@ attributes #2 = { nounwind }
 !6 = !{%struct.TraversalData poison}
 !7 = !{i32 6}
 !8 = !{i32 0}
+!9 = !{i32 -1}
 ; EMPTYPAYLOAD-LABEL: define %struct.TraversalData @_cont_Traversal(
 ; EMPTYPAYLOAD-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [0 x i32] [[PADDING:%.*]], [0 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META4:![0-9]+]] {
 ; EMPTYPAYLOAD-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_TRAVERSALDATA]], align 8
@@ -72,13 +71,11 @@ attributes #2 = { nounwind }
 ; EMPTYPAYLOAD:       7:
 ; EMPTYPAYLOAD-NEXT:    [[TMP8:%.*]] = load [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP6]], align 4
 ; EMPTYPAYLOAD-NEXT:    [[TMP9:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @_cont_Traversal)
-; EMPTYPAYLOAD-NEXT:    [[TMP10:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i64 [[TMP9]], [[STRUCT_SYSTEMDATA]] [[TMP8]]), !continuation.registercount [[META0]], !waitmask [[META5:![0-9]+]]
+; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i64 [[TMP9]], [[STRUCT_SYSTEMDATA]] [[TMP8]]), !waitmask [[META5:![0-9]+]], !continuation.registercount [[META0]]
 ; EMPTYPAYLOAD-NEXT:    unreachable
-; EMPTYPAYLOAD:       11:
+; EMPTYPAYLOAD:       10:
 ; EMPTYPAYLOAD-NEXT:    [[TMP13:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[TMP6]], align 4
-; EMPTYPAYLOAD-NEXT:    [[TMP14:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, [[STRUCT_SYSTEMDATA]] [[TMP13]]), !continuation.registercount [[META0]], !waitmask [[META5]]
+; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, [[STRUCT_SYSTEMDATA]] [[TMP13]]), !waitmask [[META5]], !continuation.registercount [[META0]]
 ; EMPTYPAYLOAD-NEXT:    unreachable
 ;
 ;
@@ -99,18 +96,12 @@ attributes #2 = { nounwind }
 ; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_0_0_INSERT:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] poison, i32 [[DOTFCA_0_0_0_EXTRACT15]], 0, 0
 ; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_1_INSERT19:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT16]], 1
 ; EMPTYPAYLOAD-ALL-NEXT:    [[TMP3:%.*]] = call i64 @continuation.getAddrAndMD(ptr @_cont_Traversal)
-; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_0_1_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; EMPTYPAYLOAD-ALL-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CSP]], align 4
 ; EMPTYPAYLOAD-ALL-NEXT:    call void (...) @lgc.ilcps.waitContinue(i64 1, i64 -1, i32 [[TMP6]], i64 [[TMP3]], [[STRUCT_SYSTEMDATA]] [[DOTFCA_1_INSERT19]])
 ; EMPTYPAYLOAD-ALL-NEXT:    unreachable
 ; EMPTYPAYLOAD-ALL:       5:
 ; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_0_0_INSERT22:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT15]], 0, 0
 ; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_1_INSERT25:%.*]] = insertvalue [[STRUCT_SYSTEMDATA]] [[DOTFCA_0_0_INSERT22]], float [[DOTFCA_0_1_EXTRACT16]], 1
-; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_0_0_0_INSERT6:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_0_0_EXTRACT]], 0, 0, 0
-; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_0_1_INSERT9:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_0_0_INSERT6]], float [[DOTFCA_0_1_EXTRACT]], 0, 1
-; EMPTYPAYLOAD-ALL-NEXT:    [[DOTFCA_1_INSERT12:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[DOTFCA_0_1_INSERT9]], i32 [[DOTFCA_1_EXTRACT]], 1
 ; EMPTYPAYLOAD-ALL-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CSP]], align 4
 ; EMPTYPAYLOAD-ALL-NEXT:    call void (...) @lgc.ilcps.waitContinue(i64 0, i64 -1, i32 [[TMP10]], i64 poison, [[STRUCT_SYSTEMDATA]] [[DOTFCA_1_INSERT25]])
 ; EMPTYPAYLOAD-ALL-NEXT:    unreachable

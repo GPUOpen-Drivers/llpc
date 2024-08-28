@@ -91,7 +91,8 @@ define void @main() {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[TMP2]], i32 2, {} poison, i32 [[RET_ADDR_I]], i32 999, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], {} poison, [0 x i32] poison, [0 x i32] poison)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE-CPS:       _cont_CallShader.exit:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ; JUMP-INLINER-CPS-LABEL: define void @main(
 ; JUMP-INLINER-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8:![0-9]+]] !lgc.cps [[META15:![0-9]+]] !continuation [[META16:![0-9]+]] {
@@ -112,7 +113,8 @@ define void @main() {
 ; JUMP-INLINER-CPS:       Callable.exit:
 ; JUMP-INLINER-CPS-NEXT:    unreachable
 ; JUMP-INLINER-CPS:       _cont_CallShader.exit:
-; JUMP-INLINER-CPS-NEXT:    ret void
+; JUMP-INLINER-CPS-NEXT:    call void @lgc.cps.complete()
+; JUMP-INLINER-CPS-NEXT:    unreachable
 ;
   %params = alloca %struct.TheirParams, align 4
   call void @dx.op.callShader.struct.TheirParams(i32 159, i32 1, %struct.TheirParams* nonnull %params)

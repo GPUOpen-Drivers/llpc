@@ -57,6 +57,25 @@ private:
   uint16_t val;
 };
 
+class BFloat16 {
+public:
+  BFloat16(uint16_t v) : val(v) {}
+  BFloat16() {}
+  static bool isNan(const BFloat16 &val) { return ((val.val & 0x7F80) == 0x7F80) && ((val.val & 0x7F) != 0); }
+  // Returns true if the given value is any kind of infinity.
+  static bool isInfinity(const BFloat16 &val) { return ((val.val & 0x7F80) == 0x7F80) && ((val.val & 0x7F) == 0); }
+  BFloat16(const BFloat16 &other) { val = other.val; }
+  uint16_t get_value() const { return val; }
+
+  // Returns the maximum normal value.
+  static BFloat16 max() { return BFloat16(0x7f7f); }
+  // Returns the lowest normal value.
+  static BFloat16 lowest() { return BFloat16(0xff7f); }
+
+private:
+  uint16_t val;
+};
+
 // To specialize this type, you must override uint_type to define
 // an unsigned integer that can fit your floating point type.
 // You must also add a isNan function that returns true if
@@ -94,6 +113,17 @@ template <> struct FloatProxyTraits<Float16> {
   static Float16 max() { return Float16::max(); }
   // Returns the lowest normal value.
   static Float16 lowest() { return Float16::lowest(); }
+};
+
+template <> struct FloatProxyTraits<BFloat16> {
+  typedef uint16_t uint_type;
+  static bool isNan(BFloat16 f) { return BFloat16::isNan(f); }
+  // Returns true if the given value is any kind of infinity.
+  static bool isInfinity(BFloat16 f) { return BFloat16::isInfinity(f); }
+  // Returns the maximum normal value.
+  static BFloat16 max() { return BFloat16::max(); }
+  // Returns the lowest normal value.
+  static BFloat16 lowest() { return BFloat16::lowest(); }
 };
 
 // Since copying a floating point number (especially if it is NaN)
@@ -211,6 +241,19 @@ template <> struct HexFloatTraits<FloatProxy<Float16>> {
   static const uint_type num_exponent_bits = 5;
   static const uint_type num_fraction_bits = 10;
   static const uint_type exponent_bias = 15;
+};
+
+// Traits for IEEE brain float.
+// 1 sign bit, 8 exponent bits, 7 fractional bits.
+template <> struct HexFloatTraits<FloatProxy<BFloat16>> {
+  typedef uint16_t uint_type;
+  typedef int16_t int_type;
+  typedef uint16_t underlying_type;
+  typedef uint16_t native_type;
+  static const uint_type num_used_bits = 16;
+  static const uint_type num_exponent_bits = 8;
+  static const uint_type num_fraction_bits = 7;
+  static const uint_type exponent_bias = 127;
 };
 
 enum round_direction { kRoundToZero, kRoundToNearestEven, kRoundToPositiveInfinity, kRoundToNegativeInfinity };

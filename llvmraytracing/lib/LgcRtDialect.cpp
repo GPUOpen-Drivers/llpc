@@ -223,6 +223,13 @@ Constant *lgc::rt::getPaqFromSize(LLVMContext &context, size_t size) {
 }
 
 // ==============================================================================================
+// Get size in bytes from PAQ (payload access qualifier).
+// Currently the PAQ is defined as always being a single word giving the size in bytes.
+size_t lgc::rt::getSizeFromPaq(Constant *paq) {
+  return cast<ConstantInt>(paq->getAggregateElement(0U))->getZExtValue();
+}
+
+// ==============================================================================================
 // Get arg size (in bytes) metadata for a ray-tracing callable shader function.
 // We don't allow for the metadata not existing -- that would cause an assert in
 // this code. We assume that the language reader correctly called

@@ -33,11 +33,11 @@
 
 namespace lgc {
 
-// Max spirv builtIn value
+// Max SPIR-V built-in value
 static constexpr unsigned BuiltInInternalBase = 0x10000000;
 
-// Max builtIn value for PS semantic (unsigned 16-bit)
-static constexpr unsigned MaxBuiltInSemantic = 0x0000000F;
+// Mask to indicate a SPIR-V built-in used in PS semantic (unsigned 16-bit)
+static constexpr unsigned BuiltInSemanticMask = 0x8000;
 
 // Define built-in kind enum.
 enum BuiltInKind : unsigned {

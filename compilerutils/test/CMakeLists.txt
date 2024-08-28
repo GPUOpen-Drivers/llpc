@@ -1,4 +1,4 @@
-set(COMPILERUTILS_TEST_DEPENDS cross-module-inline FileCheck count not)
+set(COMPILERUTILS_TEST_DEPENDS cross-module-inline FileCheck count not opt)
 add_custom_target(compilerutils-test-depends DEPENDS ${COMPILERUTILS_TEST_DEPENDS})
 set_target_properties(compilerutils-test-depends PROPERTIES FOLDER "Tests")
 

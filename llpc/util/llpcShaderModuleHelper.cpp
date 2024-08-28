@@ -150,6 +150,7 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           shaderModuleUsage.useFragCoord = true;
           break;
         }
+        case BuiltInViewportIndex:
         case BuiltInPointCoord:
         case BuiltInLayer:
         case BuiltInClipDistance:

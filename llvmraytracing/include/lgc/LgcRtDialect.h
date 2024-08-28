@@ -103,6 +103,9 @@ void setShaderPaq(llvm::Function *func, llvm::Constant *paq);
 // that that is the only information we have on the payload.
 llvm::Constant *getPaqFromSize(llvm::LLVMContext &context, size_t size);
 
+// Get size in bytes from PAQ (payload access qualifier).
+size_t getSizeFromPaq(llvm::Constant *paq);
+
 // Get arg size (in bytes) metadata for a ray-tracing callable shader function.
 size_t getShaderArgSize(llvm::Function *func);
 

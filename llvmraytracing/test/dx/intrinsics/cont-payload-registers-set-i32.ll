@@ -21,7 +21,7 @@ declare !pointeetys !17 i1 @_cont_ReportHit(%struct.TraversalData* %data, float 
 
 !continuation.maxPayloadRegisterCount = !{!18}
 
-declare void @lgc.ilcps.waitContinue(...)
+declare void @lgc.cps.jump(...)
 
 define void @_cont_Traversal(%struct.TraversalData %data) #1 !lgc.rt.shaderstage !3 {
 ; ALL-LABEL: define void @_cont_Traversal(
@@ -34,7 +34,6 @@ define void @_cont_Traversal(%struct.TraversalData %data) #1 !lgc.rt.shaderstage
 ; ALL-NEXT:    [[PAYLOAD_FCA_2_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 2
 ; ALL-NEXT:    [[PAYLOAD_FCA_3_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 3
 ; ALL-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_TRAVERSALDATA]] [[TMP0]], 0
-; ALL-NEXT:    [[DOTFCA_0_INSERT2:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; ALL-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [4 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; ALL-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
 ; ALL-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
@@ -52,17 +51,17 @@ define void @_cont_Traversal(%struct.TraversalData %data) #1 !lgc.rt.shaderstage
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_TRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = getelementptr [4 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 3
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 42, ptr [[TMP1]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = load [[STRUCT_TRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load [4 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, [[STRUCT_SYSTEMDATA:%.*]] poison, [8 x i32] poison, [4 x i32] [[TMP3]]), !continuation.registercount [[META0]], !waitmask [[META4:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = load [4 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, [[STRUCT_SYSTEMDATA:%.*]] poison, [8 x i32] poison, [4 x i32] [[TMP2]]), !waitmask [[META4:![0-9]+]], !continuation.registercount [[META0]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 entry:
   call void @_AmdContPayloadRegistersSetI32(i32 3, i32 42)
-  call void (...) @lgc.ilcps.waitContinue(i64 0, i64 -1, i32 2, i64 poison, %struct.SystemData poison)
+  call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, %struct.SystemData poison), !waitmask !2
   unreachable
 }
 
+!2 = !{i32 -1}
 !3 = !{i32 6}
 !4 = !{i32 8, i32 7, i32 6, i32 16, i32 7, i32 8, i32 5, !5}
 !5 = !{i32 0}

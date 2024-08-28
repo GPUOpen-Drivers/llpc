@@ -31,6 +31,7 @@
 
 #include "llvmraytracing/Continuations.h"
 #include "compilerutils/CompilerUtils.h"
+#include "compilerutils/DxilToLlvm.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "lgc/LgcCpsDialect.h"
@@ -547,6 +548,11 @@ void ContHelper::addDxilContinuationPasses(ModulePassManager &MPM, Module *Gpurt
 
   MPM.addPass(DXILContPreHookPass());
 
+  // Fixup DXIL vs LLVM incompatibilities. This needs to run first.
+  // If we add more LLVM processing separate from continuation passes,
+  // we potentially should do it earlier as part of the module loading.
+  MPM.addPass(CompilerUtils::DxilToLlvmPass());
+
   // Translate dx.op intrinsic calls to lgc.rt dialect intrinsic calls
   MPM.addPass(DXILContLgcRtOpConverterPass());
 
@@ -564,6 +570,8 @@ void ContHelper::addDxilContinuationPasses(ModulePassManager &MPM, Module *Gpurt
 }
 
 void ContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
+  MPM.addPass(CompilerUtils::DxilToLlvmPass());
+
   MPM.addPass(llvm::DXILContIntrinsicPreparePass());
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
 
@@ -841,46 +849,38 @@ static bool replaceEnqueueIntrinsic(Function &F) {
   bool IsWaitEnqueue = FuncName.contains("WaitEnqueue");
   llvm_dialects::Builder B{F.getContext()};
 
-  auto CreateContinue = [&B](const CallInst &CInst, SmallVectorImpl<Value *> &TailArgs,
-                             std::optional<Value *> ReturnAddr) -> CallInst * {
-    Value *ShaderAddr = CInst.getArgOperand(0);
-    TailArgs.append(CInst.arg_begin() + 2, CInst.arg_end());
-    return B.create<lgc::ilcps::ContinueOp>(ShaderAddr, PoisonValue::get(B.getInt32Ty()),
-                                            ReturnAddr.value_or(CInst.getArgOperand(1)), TailArgs);
-  };
-
-  auto CreateWaitContinue = [&B](const CallInst &CInst, SmallVectorImpl<Value *> &TailArgs,
-                                 std::optional<Value *> ReturnAddr) -> CallInst * {
-    Value *ShaderAddr = CInst.getArgOperand(0);
-    TailArgs.append(CInst.arg_begin() + 3, CInst.arg_end());
-    Value *WaitMask = CInst.getArgOperand(1);
-    return B.create<lgc::ilcps::WaitContinueOp>(ShaderAddr, WaitMask, PoisonValue::get(B.getInt32Ty()),
-                                                ReturnAddr.value_or(CInst.getArgOperand(2)), TailArgs);
-  };
-
   llvm::forEachCall(F, [&](CallInst &CInst) {
     B.SetInsertPoint(&CInst);
-    SmallVector<Value *, 2> TailArgs;
     CallInst *NewCall = nullptr;
+    Value *WaitMask = nullptr;
+    Value *RetAddr = nullptr;
     if (IsEnqueueCall) {
       // Add the current function as return address to the call.
       // Used when Traversal calls AnyHit or Intersection.
-      auto *RetAddr = B.create<lgc::cps::AsContinuationReferenceOp>(B.getInt64Ty(), CInst.getFunction());
-      if (IsWaitEnqueue) {
-        // Handle WaitEnqueueCall.
-        NewCall = CreateWaitContinue(CInst, TailArgs, RetAddr);
-      } else {
-        // Handle EnqueueCall.
-        NewCall = CreateContinue(CInst, TailArgs, RetAddr);
-      }
+      RetAddr = B.create<lgc::cps::AsContinuationReferenceOp>(B.getInt64Ty(), CInst.getFunction());
+      // Handle WaitEnqueueCall.
+      if (IsWaitEnqueue)
+        WaitMask = CInst.getArgOperand(1);
 
     } else if (IsWaitEnqueue) {
       // Handle WaitEnqueue.
-      NewCall = CreateWaitContinue(CInst, TailArgs, std::nullopt);
+      WaitMask = CInst.getArgOperand(1);
+      RetAddr = CInst.getArgOperand(2);
     } else {
-      // Handle Enqueue.
-      NewCall = CreateContinue(CInst, TailArgs, std::nullopt);
+      RetAddr = CInst.getArgOperand(1);
     }
+
+    SmallVector<Value *> TailArgs;
+    TailArgs.append(CInst.arg_begin() + (WaitMask ? 3 : 2), CInst.arg_end());
+
+    // For DX, these arguments are unused right now and are just here to fulfill the `JumpOp`s requirements as being
+    // defined in the LgcCpsDialect.
+    const uint32_t DummyLevelsArg = -1;
+    Value *DummyContState = PoisonValue::get(StructType::get(B.getContext()));
+    NewCall = B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyContState, RetAddr, TailArgs);
+
+    if (WaitMask)
+      ContHelper::setWaitMask(*NewCall, cast<ConstantInt>(WaitMask)->getSExtValue());
 
     // NOTE: Inlining ExitRayGen in LowerRaytracingPipeline can cause continue
     // ops whose name is suffixed .cloned.*, which don't get picked up by the
@@ -943,6 +943,14 @@ static void handleGetUninitialized(Function &Func) {
     // a bitfield that should not be invalidated.
     Value *Freeze = B.CreateFreeze(Poison);
     CInst.replaceAllUsesWith(Freeze);
+    CInst.eraseFromParent();
+  });
+}
+
+void ContHelper::handleComplete(Function &Func) {
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    llvm_dialects::Builder B{&CInst};
+    B.create<lgc::cps::CompleteOp>();
     CInst.eraseFromParent();
   });
 }
@@ -1079,7 +1087,7 @@ void llvm::terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall) {
   assert(OldTerminator != CompleteCall && "terminateShader: Invalid terminator instruction provided!");
 
   // If there is some code after the call to _AmdComplete or the intended
-  // lgc.ilcps.return that aborts the shader, do the following:
+  // lgc.cps.return that aborts the shader, do the following:
   // - Split everything after the completion call into a separate block
   // - Remove the newly inserted unconditional branch to the split block
   // - Remove the complete call.
@@ -1132,6 +1140,9 @@ bool llvm::earlyDriverTransform(Module &M) {
     } else if (Name.starts_with("_AmdGetSetting")) {
       Changed = true;
       ContHelper::handleGetSetting(F, GpurtSettings);
+    } else if (Name.starts_with("_AmdComplete")) {
+      Changed = true;
+      ContHelper::handleComplete(F);
     }
   }
 

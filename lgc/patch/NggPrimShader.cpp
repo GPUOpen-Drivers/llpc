@@ -132,7 +132,7 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     unsigned vertexItemSizes[MaxGsStreams] = {};
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
     for (unsigned i = 0; i < MaxGsStreams; ++i)
-      vertexItemSizes[i] = 4 * resUsage->inOutUsage.gs.outLocCount[i];
+      vertexItemSizes[i] = resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i];
 
     unsigned gsVsRingItemSizes[MaxGsStreams] = {};
     const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
@@ -3126,8 +3126,8 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
   if (m_hasGs) {
     auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
     unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
-    unsigned esGsBytesPerWave = waveSize * sizeof(unsigned) * calcFactor.esGsRingItemSize;
-    esGsOffset = m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(esGsBytesPerWave));
+    esGsOffset =
+        m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(waveSize * calcFactor.esGsRingItemSize));
   }
 
   Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
@@ -7831,7 +7831,8 @@ Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexIndex
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage;
 
   // vertexOffset = gsVsRingStart + streamBases[stream] + vertexIndex * vertexItemSize (in dwords)
-  const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[streamId];
+  const unsigned vertexItemSize = inOutUsage.gs.calcFactor.gsVsVertexItemSize[streamId];
+
   auto vertexOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexItemSize));
   vertexOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(m_gsStreamBases[streamId]));
 

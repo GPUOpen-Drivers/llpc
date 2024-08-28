@@ -6,10 +6,10 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 %struct.DispatchSystemData = type { i32 }
 
-declare void @lgc.ilcps.continue(...)
+declare void @lgc.cps.jump(...)
 
 define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !0 !continuation.entry !1 !continuation !2 {
-  call void (...) @lgc.ilcps.continue(i64 undef, i32 undef, i64 undef), !continuation.registercount !0
+  call void (...) @lgc.cps.jump(i64 undef), !continuation.registercount !0
   unreachable
 }
 

@@ -46,7 +46,7 @@ define void @Intersection() #0 {
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @lgc.rt.instance.id()
 ; CHECK-NEXT:    [[TMP4:%.*]] = call i32 @lgc.rt.hit.kind()
 ; CHECK-NEXT:    [[TMP5:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = call i1 (...) @lgc.rt.report.hit(float 4.000000e+00, i32 0, ptr [[TMP5]], i32 8), !cont.payload.type [[META25:![0-9]+]]
+; CHECK-NEXT:    [[TMP6:%.*]] = call i1 (...) @lgc.rt.report.hit(float 4.000000e+00, i32 0, ptr [[TMP5]], i32 8), !cont.payload.type [[META20:![0-9]+]]
 ; CHECK-NEXT:    ret void
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)  ; RayTMin()
@@ -64,7 +64,7 @@ define void @main() {
 ; CHECK-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @lgc.rt.shader.index()
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP1]])
-; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr [[PARAMS]], i32 256), !cont.payload.type [[META26:![0-9]+]]
+; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr [[PARAMS]], i32 256), !cont.payload.type [[META18:![0-9]+]]
 ; CHECK-NEXT:    ret void
 ;
   %params = alloca %struct.TheirParams, align 4
@@ -81,10 +81,10 @@ define void @mainTrace() {
 ; CHECK-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
-; CHECK-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP6]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; CHECK-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
+; CHECK-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP6]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; CHECK-NEXT:    [[TMP8:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP7]])
-; CHECK-NEXT:    call void (...) @lgc.rt.trace.ray(i64 [[TMP8]], i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, ptr [[TMP4]], [1 x i32] [i32 272]), !cont.payload.type [[META27:![0-9]+]]
+; CHECK-NEXT:    call void (...) @lgc.rt.trace.ray(i64 [[TMP8]], i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, ptr [[TMP4]], [1 x i32] [i32 272]), !cont.payload.type [[META17:![0-9]+]]
 ; CHECK-NEXT:    ret void
 ;
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
@@ -99,11 +99,11 @@ define void @mainTrace() {
 
 define void @called(%struct.MyParams* %arg) !pointeetys !38 {
 ; CHECK-LABEL: define void @called(
-; CHECK-SAME: ptr [[ARG:%.*]]) !pointeetys [[META28:![0-9]+]] !lgc.rt.shaderstage [[META30:![0-9]+]] !cont.payload.type [[META31:![0-9]+]] {
+; CHECK-SAME: ptr [[ARG:%.*]]) !pointeetys [[META21:![0-9]+]] !lgc.rt.shaderstage [[META22:![0-9]+]] !cont.payload.type [[META21]] {
 ; CHECK-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS2:%.*]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @lgc.rt.shader.index()
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP1]])
-; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr [[PARAMS]], i32 260), !cont.payload.type [[META32:![0-9]+]]
+; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr [[PARAMS]], i32 260), !cont.payload.type [[META19:![0-9]+]]
 ; CHECK-NEXT:    ret void
 ;
   %params = alloca %struct.TheirParams2, align 4

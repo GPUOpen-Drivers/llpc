@@ -37,7 +37,8 @@ define void @main() {
 ; LOWERRAYTRACINGPIPELINE-MINCOUNT-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-MINCOUNT-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-MINCOUNT-NEXT:    store i32 11, ptr @debug_global, align 4
-; LOWERRAYTRACINGPIPELINE-MINCOUNT-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-MINCOUNT-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-MINCOUNT-NEXT:    unreachable
 ;
 entry:
   %val = call i32 @_AmdContPayloadRegistersI32Count()

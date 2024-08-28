@@ -37,6 +37,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
+#include "lgc/util/WorkgroupLayout.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
@@ -442,12 +443,9 @@ void PatchInOutImportExport::processShader() {
     }
   }
 
-  if (m_shaderStage == ShaderStage::Compute) {
-    // In a compute shader, process lgc.reconfigure.local.invocation.id calls.
-    // This does not particularly have to be done here; it could be done anywhere after BuilderImpl.
+  if (m_shaderStage == ShaderStage::Compute || m_shaderStage == ShaderStage::Task) {
+    auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
     for (Function &func : *m_module) {
-      auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-
       // Different with above, this will force the threadID swizzle which will rearrange thread ID within a group into
       // blocks of 8*4, not to reconfig workgroup automatically and will support to be swizzled in 8*4 block
       // split.
@@ -455,7 +453,7 @@ void PatchInOutImportExport::processShader() {
         unsigned workgroupSizeX = mode.workgroupSizeX;
         unsigned workgroupSizeY = mode.workgroupSizeY;
         unsigned workgroupSizeZ = mode.workgroupSizeZ;
-        SwizzleWorkgroupLayout layout = calculateWorkgroupLayout();
+        SwizzleWorkgroupLayout layout = calculateWorkgroupLayout(m_pipelineState, m_shaderStage);
         while (!func.use_empty()) {
           CallInst *reconfigCall = cast<CallInst>(*func.user_begin());
           Value *localInvocationId = reconfigCall->getArgOperand(0);
@@ -464,9 +462,9 @@ void PatchInOutImportExport::processShader() {
             if ((layout.microLayout == WorkgroupLayout::Quads) ||
                 (layout.macroLayout == WorkgroupLayout::SexagintiQuads)) {
               BuilderBase builder(reconfigCall);
-              localInvocationId =
-                  reconfigWorkgroupLayout(localInvocationId, layout.macroLayout, layout.microLayout, workgroupSizeX,
-                                          workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, builder);
+              localInvocationId = reconfigWorkgroupLayout(
+                  localInvocationId, m_pipelineState, m_shaderStage, layout.macroLayout, layout.microLayout,
+                  workgroupSizeX, workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, builder);
             }
           }
           reconfigCall->replaceAllUsesWith(localInvocationId);
@@ -1308,6 +1306,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           usePointSize || useLayer || useViewportIndex || useShadingRate || enableMultiView || useEdgeFlag;
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
       unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+
+      unsigned clipPlaneMask = m_pipelineState->getOptions().clipPlaneMask;
+      bool needMapClipDistMask = ((clipPlaneMask != 0) && m_pipelineState->getOptions().enableMapClipDistMask);
+      assert(!m_pipelineState->getOptions().enableMapClipDistMask || ((clipPlaneMask & 0xF) == 0));
+
       Value *args[] = {
           builder.getInt32(pos),  // tgt
           builder.getInt32(0xF),  // en
@@ -1319,19 +1322,22 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           builder.getInt1(false)  // vm
       };
 
-      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
+      if (!needMapClipDistMask) {
+        builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
+        pos++;
+      }
 
       if (clipCullDistance.size() > 4) {
         // Do the second exporting
         Value *args[] = {
-            builder.getInt32(pos + 1), // tgt
-            builder.getInt32(0xF),     // en
-            clipCullDistance[4],       // src0
-            clipCullDistance[5],       // src1
-            clipCullDistance[6],       // src2
-            clipCullDistance[7],       // src3
-            builder.getInt1(false),    // done
-            builder.getInt1(false)     // vm
+            builder.getInt32(pos),  // tgt
+            builder.getInt32(0xF),  // en
+            clipCullDistance[4],    // src0
+            clipCullDistance[5],    // src1
+            clipCullDistance[6],    // src2
+            clipCullDistance[7],    // src3
+            builder.getInt1(false), // done
+            builder.getInt1(false)  // vm
         };
         builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
       }
@@ -1863,6 +1869,11 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   unsigned startChannel = 0;
   if (compIdx) {
     startChannel = cast<ConstantInt>(compIdx)->getZExtValue();
+    if (bitWidth == 64) {
+      // NOTE: For 64-bit input, the component index is always 64-bit based while subsequent interpolation operations
+      // is dword-based. We have to change the start channel accordingly.
+      startChannel *= 2;
+    }
     assert((startChannel + numChannels) <= (bitWidth == 64 ? 8 : 4));
   }
 
@@ -2917,7 +2928,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
   auto &builtInUsage = resUsage->builtInUsage.vs;
-  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition:
@@ -2929,6 +2940,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if (builtInId == BuiltInPointSize && (isa<UndefValue>(output) || isa<PoisonValue>(output))) {
       // NOTE: gl_PointSize is always declared as a field of gl_PerVertex. We have to check the output
       // value to determine if it is actually referenced in shader.
+      builtInOutLocMap.erase(BuiltInPointSize);
       builtInUsage.pointSize = false;
       return;
     }
@@ -2959,10 +2971,13 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if ((isa<UndefValue>(output) || isa<PoisonValue>(output))) {
       // NOTE: gl_{Clip,Cull}Distance[] is always declared as a field of gl_PerVertex. We have to check the output
       // value to determine if it is actually referenced in shader.
-      if (builtInId == BuiltInClipDistance)
+      if (builtInId == BuiltInClipDistance) {
+        builtInOutLocMap.erase(BuiltInClipDistance);
         builtInUsage.clipDistance = 0;
-      else
+      } else {
+        builtInOutLocMap.erase(BuiltInCullDistance);
         builtInUsage.cullDistance = 0;
+      }
       return;
     }
 
@@ -3193,7 +3208,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   auto &builtInUsage = resUsage->builtInUsage.tes;
-  const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition:
@@ -3211,15 +3226,19 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
       // value to determine if it is actually referenced in shader.
       switch (builtInId) {
       case BuiltInPosition:
+        builtInOutLocMap.erase(BuiltInPosition);
         builtInUsage.position = false;
         return;
       case BuiltInPointSize:
+        builtInOutLocMap.erase(BuiltInPointSize);
         builtInUsage.pointSize = false;
         return;
       case BuiltInClipDistance:
+        builtInOutLocMap.erase(BuiltInClipDistance);
         builtInUsage.clipDistance = 0;
         return;
       case BuiltInCullDistance:
+        builtInOutLocMap.erase(BuiltInCullDistance);
         builtInUsage.cullDistance = 0;
         return;
       default:
@@ -4075,13 +4094,10 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, un
   assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
 
-  esGsOffset = builder.CreateLShr(esGsOffset, builder.getInt32(2));
-
   Value *ringOffset = builder.CreateMul(m_threadId, builder.getInt32(calcFactor.esGsRingItemSize));
-
   ringOffset = builder.CreateAdd(ringOffset, esGsOffset);
-
   ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(location * 4 + compIdx));
+
   return ringOffset;
 }
 
@@ -4148,8 +4164,8 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
   unsigned streamBase = 0;
   for (int i = 0; i < MaxGsStreams; ++i) {
     streamBases[i] = streamBase;
-    streamBase += (resUsage->inOutUsage.gs.outLocCount[i] *
-                   m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices * 4);
+    streamBase += (resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] *
+                   m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices);
   }
 
   if (m_pipelineState->isGsOnChip()) {
@@ -4166,8 +4182,8 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
         builder.CreateMul(m_threadId, builder.getInt32(resUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize));
 
     // VertexSize is stream output vertexSize x 4 (in dwords)
-    unsigned vertexSize = resUsage->inOutUsage.gs.outLocCount[streamId] * 4;
-    auto vertexItemOffset = builder.CreateMul(vertexIdx, builder.getInt32(vertexSize));
+    unsigned vertexItemSize = resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[streamId];
+    auto vertexItemOffset = builder.CreateMul(vertexIdx, builder.getInt32(vertexItemSize));
     ringOffset = builder.CreateAdd(esGsLdsSize, gsVsOffset);
     ringOffset = builder.CreateAdd(ringOffset, ringItemOffset);
     ringOffset = builder.CreateAdd(ringOffset, vertexItemOffset);
@@ -4176,7 +4192,6 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
     ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(attribOffset));
   } else {
     // ringOffset = ((location * 4 + compIdx) * maxVertices + vertexIdx) * 4 (in bytes);
-
     unsigned outputVertices = m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices;
 
     ringOffset = builder.CreateAdd(vertexIdx, builder.getInt32((location * 4 + compIdx) * outputVertices));
@@ -4869,140 +4884,6 @@ Value *PatchInOutImportExport::getSubgroupLocalInvocationId(BuilderBase &builder
 }
 
 // =====================================================================================================================
-// Do automatic workgroup size reconfiguration in a compute shader, to allow ReconfigWorkgroupLayout
-// to apply optimizations.
-SwizzleWorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout() {
-  auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-  SwizzleWorkgroupLayout resultLayout = {WorkgroupLayout::Unknown, WorkgroupLayout::Unknown};
-
-  if (m_shaderStage == ShaderStage::Compute) {
-    auto &resUsage = *m_pipelineState->getShaderResourceUsage(ShaderStage::Compute);
-    if (resUsage.builtInUsage.cs.foldWorkgroupXY) {
-      llvm_unreachable("Should never be called!");
-    }
-
-    if (mode.derivatives == DerivativeMode::Quads) {
-      resultLayout.microLayout = WorkgroupLayout::Quads;
-    } else if (mode.derivatives == DerivativeMode::Linear) {
-      resultLayout.microLayout = WorkgroupLayout::Linear;
-    }
-
-    if (m_pipelineState->getOptions().forceCsThreadIdSwizzling) {
-      if ((mode.workgroupSizeX >= 16) && (mode.workgroupSizeX % 8 == 0) && (mode.workgroupSizeY % 4 == 0)) {
-        resultLayout.macroLayout = WorkgroupLayout::SexagintiQuads;
-      }
-    }
-
-    // If no configuration has been specified, apply a reconfigure if the compute shader uses images and the
-    // pipeline option was enabled.
-    if (m_pipelineState->getOptions().reconfigWorkgroupLayout) {
-      if ((mode.workgroupSizeX % 2) == 0 && (mode.workgroupSizeY % 2) == 0) {
-        if (mode.workgroupSizeX % 8 == 0) {
-          // It can be reconfigured into 8 X N
-          if (resultLayout.macroLayout == WorkgroupLayout::Unknown) {
-            resultLayout.macroLayout = WorkgroupLayout::SexagintiQuads;
-          }
-        } else {
-          // If our local size in the X & Y dimensions are multiples of 2, we can reconfigure.
-          if (resultLayout.microLayout == WorkgroupLayout::Unknown) {
-            resultLayout.microLayout = WorkgroupLayout::Quads;
-          }
-        }
-      }
-    }
-  }
-  return resultLayout;
-}
-
-// =====================================================================================================================
-// Reconfigure the workgroup for optimization purposes.
-// @param localInvocationId : This is a v3i32 shader input (three VGPRs set up in hardware).
-// @param macroLayout : Swizzle the thread id into macroLayout from macro level
-// @param microLayout : Swizzle the thread id into microLayout from micro level
-// @param workgroupSizeX : WorkgroupSize X for thread Id numbers
-// @param workgroupSizeY : WorkgroupSize Y for thread Id numbers
-// @param workgroupSizeZ : WorkgroupSize Z for thread Id numbers
-// @param isHwLocalInvocationId : identify whether the localInvocationId is builtInLocalInvcocationId or
-// BuiltInUnswizzledLocalInvocationId
-// @param builder : the builder to use
-Value *PatchInOutImportExport::reconfigWorkgroupLayout(Value *localInvocationId, WorkgroupLayout macroLayout,
-                                                       WorkgroupLayout microLayout, unsigned workgroupSizeX,
-                                                       unsigned workgroupSizeY, unsigned workgroupSizeZ,
-                                                       bool isHwLocalInvocationId, BuilderBase &builder) {
-  Value *apiX = builder.getInt32(0);
-  Value *apiY = builder.getInt32(0);
-  Value *newLocalInvocationId = PoisonValue::get(localInvocationId->getType());
-  unsigned bitsX = 0;
-  unsigned bitsY = 0;
-  auto &resUsage = *m_pipelineState->getShaderResourceUsage(ShaderStage::Compute);
-  resUsage.builtInUsage.cs.foldWorkgroupXY = true;
-
-  Value *tidXY = builder.CreateExtractElement(localInvocationId, builder.getInt32(0), "tidXY");
-  Value *apiZ = builder.getInt32(0);
-  if (workgroupSizeZ > 1) {
-    apiZ = builder.CreateExtractElement(localInvocationId, builder.getInt32(1), "tidZ");
-  }
-  // For BuiltInUnswizzledLocalInvocationId, it shouldn't swizzle and return the localInvocation<apiX,apiY,apiZ> without
-  // foldXY.
-  if (isHwLocalInvocationId) {
-    apiX = builder.CreateURem(tidXY, builder.getInt32(workgroupSizeX));
-    apiY = builder.CreateUDiv(tidXY, builder.getInt32(workgroupSizeX));
-  } else {
-    // Micro-tiling with quad:2x2, the thread-id will be marked as {<0,0>,<1,0>,<0,1>,<1,1>}
-    // for each quad. Each 4 threads will be wrapped in the same tid.
-    if (microLayout == WorkgroupLayout::Quads) {
-      apiX = builder.CreateAnd(tidXY, builder.getInt32(1));
-      apiY = builder.CreateAnd(builder.CreateLShr(tidXY, builder.getInt32(1)), builder.getInt32(1));
-      tidXY = builder.CreateLShr(tidXY, builder.getInt32(2));
-      bitsX = 1;
-      bitsY = 1;
-    }
-
-    // Macro-tiling with 8xN block
-    if (macroLayout == WorkgroupLayout::SexagintiQuads) {
-      unsigned bits = 3 - bitsX;
-      Value *subTileApiX = builder.CreateAnd(tidXY, builder.getInt32((1 << bits) - 1));
-      subTileApiX = builder.CreateShl(subTileApiX, builder.getInt32(bitsX));
-      apiX = builder.CreateOr(apiX, subTileApiX);
-
-      // 1. Folding 4 threads as one tid if micro-tiling with quad before.
-      //    After the folding, each 4 hwThreadIdX share the same tid after tid>>=bits.
-      //    For example: hwThreadId.X = 0~3, the tid will be 0; <apiX,apiY> will be {<0,0>,<1,0>,<0,1>,<1,1>}
-      //                 hwThreadId.X = 4~7, the tid will be 1; <apiX,apiY> will be {<0,0>,<1,0>,<0,1>,<1,1>}
-      // 2. Folding 8 threads as one tid without any micro-tiling before.
-      //    After the folding, each 8 hwThreadIdX share the same tid after tid>>=bits and only apiX are calculated.
-      //    For example: hwThreadId.X = 0~7, tid = hwThreadId.X/8 = 0; <apiX> will be {0,1,...,7}
-      //                 hwThreadId.X = 8~15, tid = hwThreadId.X/8 = 1; <apiX> will be {0,1,...,7}
-      tidXY = builder.CreateLShr(tidXY, builder.getInt32(bits));
-      bitsX = 3;
-
-      // 1. Unfolding 4 threads, it needs to set walkY = workgroupSizeY/2 as these threads are wrapped in 2X2 size.
-      // 2. Unfolding 8 threads, it needs to set walkY = workgroupSizeY/2 as these threads are wrapped in 1x8 size.
-      // After unfolding these threads, it needs '| apiX and | apiY' to calculated each thread's coordinate
-      // in the unfolded wrap threads.
-      unsigned walkY = workgroupSizeY >> bitsY;
-      Value *tileApiY = builder.CreateShl(builder.CreateURem(tidXY, builder.getInt32(walkY)), builder.getInt32(bitsY));
-      apiY = builder.CreateOr(apiY, tileApiY);
-      Value *tileApiX = builder.CreateShl(builder.CreateUDiv(tidXY, builder.getInt32(walkY)), builder.getInt32(bitsX));
-      apiX = builder.CreateOr(apiX, tileApiX);
-    } else {
-      // Update the coordinates for each 4 wrap-threads then unfold each thread to calculate the coordinate by '| apiX
-      // and | apiY'
-      unsigned walkX = workgroupSizeX >> bitsX;
-      Value *tileApiX = builder.CreateShl(builder.CreateURem(tidXY, builder.getInt32(walkX)), builder.getInt32(bitsX));
-      apiX = builder.CreateOr(apiX, tileApiX);
-      Value *tileApiY = builder.CreateShl(builder.CreateUDiv(tidXY, builder.getInt32(walkX)), builder.getInt32(bitsY));
-      apiY = builder.CreateOr(apiY, tileApiY);
-    }
-  }
-
-  newLocalInvocationId = builder.CreateInsertElement(newLocalInvocationId, apiX, uint64_t(0));
-  newLocalInvocationId = builder.CreateInsertElement(newLocalInvocationId, apiY, uint64_t(1));
-  newLocalInvocationId = builder.CreateInsertElement(newLocalInvocationId, apiZ, uint64_t(2));
-  return newLocalInvocationId;
-}
-
-// =====================================================================================================================
 // Creates the LGC intrinsic "lgc.swizzle.thread.group" to swizzle thread group for optimization purposes.
 //
 void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
@@ -5098,8 +4979,8 @@ void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
   Value *nativeWorkgroupId = argIt++;
   nativeWorkgroupId->setName("nativeWorkgroupId");
 
-  static constexpr unsigned tileDims[] = {InvalidValue, 4, 8, 16};
-  static constexpr unsigned tileBits[] = {InvalidValue, 2, 3, 4};
+  static constexpr unsigned tileDims[] = {InvalidValue, 4, 8, 16, 32, 64};
+  static constexpr unsigned tileBits[] = {InvalidValue, 2, 3, 4, 5, 6};
   static_assert((sizeof(tileDims) / sizeof(unsigned)) == static_cast<unsigned>(ThreadGroupSwizzleMode::Count),
                 "The length of tileDims is not as expected.");
   static_assert((sizeof(tileBits) / sizeof(unsigned)) == static_cast<unsigned>(ThreadGroupSwizzleMode::Count),

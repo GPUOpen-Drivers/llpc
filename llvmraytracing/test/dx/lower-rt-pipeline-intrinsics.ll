@@ -130,7 +130,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds i32, ptr [[TMP21]], i32 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP91:%.*]] = load i32, ptr [[TMP27]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP91]], ptr [[TMP22]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP31]], ptr [[TMP11]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP11]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP25]], ptr [[HITATTRS]], align 4
@@ -152,35 +152,35 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = call float @_cont_RayTMin(ptr [[TMP53]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP55:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP41]], ptr [[TMP8]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP57:%.*]] = call float @_cont_RayTCurrent(ptr [[TMP55]], ptr [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP58:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP59:%.*]] = call i32 @_cont_RayFlags(ptr [[TMP58]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP60:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP61]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP62:%.*]] = call i32 @_cont_InstanceIndex(ptr [[TMP60]], ptr [[TMP4]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP63:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP64]], ptr [[TMP5]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP65:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP63]], ptr [[TMP5]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP66:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP67]], ptr [[TMP6]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP68:%.*]] = call i32 @_cont_PrimitiveIndex(ptr [[TMP66]], ptr [[TMP6]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP69:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP70]], ptr [[TMP9]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP71:%.*]] = call <3 x float> @_cont_ObjectRayOrigin3(ptr [[TMP69]], ptr [[TMP9]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[K:%.*]] = extractelement <3 x float> [[TMP71]], i8 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP72:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP73:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP73:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP73]], ptr [[TMP10]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP74:%.*]] = call <3 x float> @_cont_ObjectRayDirection3(ptr [[TMP72]], ptr [[TMP10]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[L:%.*]] = extractelement <3 x float> [[TMP74]], i8 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP75:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP76:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP76:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP76]], ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP77:%.*]] = call [4 x <3 x float>] @_cont_ObjectToWorld4x3(ptr [[TMP75]], ptr [[TMP2]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [4 x <3 x float>] [[TMP77]], ptr [[TMP13]], align 4
@@ -188,14 +188,14 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[COL_GEP_LOAD2:%.*]] = load <3 x float>, ptr [[COL_GEP1]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[M:%.*]] = extractelement <3 x float> [[COL_GEP_LOAD2]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP78:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP82:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP82:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP82]], ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP80:%.*]] = call [4 x <3 x float>] @_cont_WorldToObject4x3(ptr [[TMP78]], ptr [[TMP3]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [4 x <3 x float>] [[TMP80]], ptr [[TMP12]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[COL_GEP:%.*]] = getelementptr [4 x <3 x float>], ptr [[TMP12]], i32 0, i8 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[COL_GEP_LOAD:%.*]] = load <3 x float>, ptr [[COL_GEP]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[N:%.*]] = extractelement <3 x float> [[COL_GEP_LOAD]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP83:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP83:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP83]], ptr [[TMP7]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP84:%.*]] = call i32 @_cont_HitKind(ptr [[SYSTEM_DATA_ALLOCA]], ptr [[TMP7]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP85:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP14]], i32 0
@@ -216,7 +216,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP97:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP98:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP97]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP81:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP98]], [17 x i32] poison, [10 x i32] [[TMP81]]), !continuation.registercount [[META20]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP98]], [17 x i32] poison, [10 x i32] [[TMP81]]), !continuation.registercount [[META20]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @ClosestHit(
@@ -250,7 +250,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x i32> [[DOTFCA_0_0_EXTRACT]], ptr [[DOTFCA_0_0_GEP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT19:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP11]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_021_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT19]], i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = bitcast float [[DOTSROA_021_0_VEC_EXTRACT]] to i32
@@ -272,7 +272,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = call float @_cont_RayTMin(ptr [[TMP22]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT29:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP25]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP30:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP7]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT29]], ptr [[DOTFCA_0_GEP30]], align 4
@@ -283,7 +283,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP28:%.*]] = call i32 @_cont_RayFlags(ptr [[TMP27]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT45:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP30]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP46:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP3]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT45]], ptr [[DOTFCA_0_GEP46]], align 4
@@ -292,7 +292,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_1_EXTRACT47]], ptr [[DOTFCA_1_GEP48]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP31:%.*]] = call i32 @_cont_InstanceIndex(ptr [[TMP29]], ptr [[TMP3]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP32:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP33:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP33:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT41:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP33]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP42:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP4]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT41]], ptr [[DOTFCA_0_GEP42]], align 4
@@ -301,7 +301,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_1_EXTRACT43]], ptr [[DOTFCA_1_GEP44]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP34:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP32]], ptr [[TMP4]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP35:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP36:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP36:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT37:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP36]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP38:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP5]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT37]], ptr [[DOTFCA_0_GEP38]], align 4
@@ -310,7 +310,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_1_EXTRACT39]], ptr [[DOTFCA_1_GEP40]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP37:%.*]] = call i32 @_cont_PrimitiveIndex(ptr [[TMP35]], ptr [[TMP5]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP38:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP39:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP39:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT25:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP39]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP26:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP8]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT25]], ptr [[DOTFCA_0_GEP26]], align 4
@@ -320,7 +320,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP40:%.*]] = call <3 x float> @_cont_ObjectRayOrigin3(ptr [[TMP38]], ptr [[TMP8]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[K:%.*]] = extractelement <3 x float> [[TMP40]], i8 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP41:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP42:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP42:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT22:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP42]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP23:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP9]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT22]], ptr [[DOTFCA_0_GEP23]], align 4
@@ -330,7 +330,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP43:%.*]] = call <3 x float> @_cont_ObjectRayDirection3(ptr [[TMP41]], ptr [[TMP9]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[L:%.*]] = extractelement <3 x float> [[TMP43]], i8 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP44:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP45:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP45:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT53:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP45]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP54:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP1]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT53]], ptr [[DOTFCA_0_GEP54]], align 4
@@ -344,7 +344,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_EXTRACT:%.*]] = extractvalue [4 x <3 x float>] [[TMP46]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[M:%.*]] = extractelement <3 x float> [[DOTFCA_0_EXTRACT]], i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP47:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP48:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP48:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT49:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP48]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP50:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP2]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT49]], ptr [[DOTFCA_0_GEP50]], align 4
@@ -357,7 +357,7 @@ define void @ClosestHit(%struct.RayPayload* %0, %struct.BuiltInTriangleIntersect
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_EXTRACT13:%.*]] = extractvalue [4 x <3 x float>] [[TMP49]], 2
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_EXTRACT14:%.*]] = extractvalue [4 x <3 x float>] [[TMP49]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[N:%.*]] = extractelement <3 x float> [[DOTFCA_0_EXTRACT10]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP50:%.*]] = call [[STRUCT_HITDATA]] [[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP50:%.*]] = call [[STRUCT_HITDATA]] @[[_CONT_GETCOMMITTEDSTATE]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT33:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP50]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP34:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP6]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT33]], ptr [[DOTFCA_0_GEP34]], align 4

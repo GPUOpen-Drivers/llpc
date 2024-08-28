@@ -74,10 +74,9 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   if (printfFuncs.empty())
     return PreservedAnalyses::all();
 
-  bool hasPrintfDesc =
-      pipelineState
-          ->findResourceNode(ResourceNodeType::DescriptorBuffer, InternalDescriptorSetId, PrintfBufferBindingId)
-          .second != nullptr;
+  const ResourceNode *node = nullptr;
+  std::tie(m_topNode, node) = pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer,
+                                                              InternalDescriptorSetId, PrintfBufferBindingId);
 
   static const auto lowerDebugfPrintOpVisitor = llvm_dialects::VisitorBuilder<LowerDebugPrintf>()
                                                     .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -88,9 +87,10 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   for (auto func : printfFuncs) {
     // Create printbuffer Descriptor at the beginning of the function which contains DebugPrintf dialect ops
     builder.SetInsertPointPastAllocas(func);
-    m_debugPrintfBuffer = hasPrintfDesc ? builder.CreateBufferDesc(InternalDescriptorSetId, PrintfBufferBindingId,
-                                                                   builder.getInt32(0), 2, true)
-                                        : nullptr;
+    m_debugPrintfBuffer =
+        (m_topNode != nullptr)
+            ? builder.CreateBufferDesc(InternalDescriptorSetId, PrintfBufferBindingId, builder.getInt32(0), 2, true)
+            : nullptr;
 
     lowerDebugfPrintOpVisitor.visit(*this, *func);
   }
@@ -252,6 +252,7 @@ void LowerDebugPrintf::setupElfsPrintfStrings() {
   auto printfStrings =
       document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::PrintfStrings].getMap(true);
   printfStrings[".version"] = 1;
+  printfStrings[".user_data_offset"] = m_topNode->offsetInDwords;
   auto formatStrings = printfStrings[".strings"].getArray(true);
   unsigned i = 0;
   for (auto it = m_elfInfos.begin(); it != m_elfInfos.end(); ++it, ++i) {

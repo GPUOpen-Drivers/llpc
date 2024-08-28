@@ -31,7 +31,7 @@ define i32 @get(%struct.Payload* %pl) !pointeetys !0 {
 
 define void @set(%struct.Payload* %pl, i32 %val) !pointeetys !0 {
 ; CHECK-LABEL: define void @set
-; CHECK-SAME: (ptr [[PL:%.*]], i32 [[VAL:%.*]]) !pointeetys [[META3:![0-9]+]] {
+; CHECK-SAME: (ptr [[PL:%.*]], i32 [[VAL:%.*]]) !pointeetys [[META1]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[PL]], i32 2
 ; CHECK-NEXT:    store i32 [[VAL]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    ret void

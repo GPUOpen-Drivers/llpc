@@ -33,6 +33,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/ADT/SmallSet.h"
 
 #define DEBUG_TYPE "lgc-register-metadata-builder"
 
@@ -129,60 +130,43 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     if (hwStageMask & (Util::Abi::HwShaderGs | Util::Abi::HwShaderVs))
       buildPaSpecificRegisters();
 
+    // Build output semantics for part pipeline
     if (lastVertexProcessingStage && m_pipelineState->isUnlinked()) {
-      // Fill ".preraster_output_semantic"
+      // We collect output semantics for generic outputs and necessary built-ins that will be exported to PS as generic
+      // outputs (ClipDistance, CullDistance, Layer, ViewportIndex, PrimitiveId).
+      std::map<unsigned, unsigned> outputSemantics;
       auto resUsage = m_pipelineState->getShaderResourceUsage(lastVertexProcessingStage.value());
-      auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
-      auto &perPrimitiveOutputLocMap = resUsage->inOutUsage.perPrimitiveOutputLocMap;
-      auto &builtInOutputLocMap = resUsage->inOutUsage.builtInOutputLocMap;
-      auto &perPrimitiveBuiltInOutputLocMap = resUsage->inOutUsage.perPrimitiveBuiltInOutputLocMap;
 
-      // Collect semantic info for generic input and builtIns {ClipDistance, CulDistance, Layer,
-      // ViewportIndex, PrimitiveId} that exports via generic output as well.
-      if (!outputLocInfoMap.empty() || !perPrimitiveOutputLocMap.empty() || !builtInOutputLocMap.empty() ||
-          !perPrimitiveBuiltInOutputLocMap.empty()) {
-        auto preRasterOutputSemanticNode =
+      for (auto locMap : resUsage->inOutUsage.outputLocInfoMap)
+        outputSemantics[locMap.first.getLocation()] = locMap.second.getLocation();
+
+      for (auto locMap : resUsage->inOutUsage.perPrimitiveOutputLocMap)
+        outputSemantics[locMap.first] = locMap.second;
+
+      for (auto locMap : resUsage->inOutUsage.builtInOutputLocMap) {
+        if (locMap.first == BuiltInClipDistance || locMap.first == BuiltInCullDistance ||
+            locMap.first == BuiltInLayer || locMap.first == BuiltInViewportIndex ||
+            locMap.first == BuiltInPrimitiveId) {
+          outputSemantics[BuiltInSemanticMask | locMap.first] = locMap.second;
+        }
+      }
+
+      for (auto locMap : resUsage->inOutUsage.perPrimitiveBuiltInOutputLocMap) {
+        if (locMap.first == BuiltInLayer || locMap.first == BuiltInViewportIndex ||
+            locMap.first == BuiltInPrimitiveId) {
+          outputSemantics[BuiltInSemanticMask | locMap.first] = locMap.second;
+        }
+      }
+
+      // Fill the PAL metadata ".preraster_output_semantic" used by later pipeline linking.
+      if (!outputSemantics.empty()) {
+        auto prerasterOutputSemantics =
             getPipelineNode()[Util::Abi::PipelineMetadataKey::PrerasterOutputSemantic].getArray(true);
-        unsigned elemIdx = 0;
-
-        for (auto locInfoPair : outputLocInfoMap) {
-          auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
-          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
-              MaxBuiltInSemantic + locInfoPair.first.getLocation();
-          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] =
-              locInfoPair.second.getLocation();
-          ++elemIdx;
-        }
-
-        for (auto locInfoPair : perPrimitiveOutputLocMap) {
-          auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
-          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
-              MaxBuiltInSemantic + locInfoPair.first;
-          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locInfoPair.second;
-          ++elemIdx;
-        }
-
-        for (auto locPair : builtInOutputLocMap) {
-          if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
-              locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex ||
-              locPair.first == BuiltInPrimitiveId) {
-            assert(locPair.first < MaxBuiltInSemantic);
-            auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
-            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
-            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locPair.second;
-            ++elemIdx;
-          }
-        }
-
-        for (auto locPair : perPrimitiveBuiltInOutputLocMap) {
-          if (locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex ||
-              locPair.first == BuiltInPrimitiveId) {
-            assert(locPair.first < MaxBuiltInSemantic);
-            auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
-            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
-            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locPair.second;
-            ++elemIdx;
-          }
+        unsigned element = 0;
+        for (auto outputSemantic : outputSemantics) {
+          auto prerasterOutputSemantic = prerasterOutputSemantics[element++].getMap(true);
+          prerasterOutputSemantic[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = outputSemantic.first;
+          prerasterOutputSemantic[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = outputSemantic.second;
         }
       }
     }
@@ -327,7 +311,7 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   const unsigned itemCount = 4;
   unsigned gsVsRingOffset = 0;
   for (unsigned i = 0; i < itemCount; ++i) {
-    unsigned itemSize = sizeof(unsigned) * gsInOutUsage.gs.outLocCount[i];
+    unsigned itemSize = gsInOutUsage.gs.calcFactor.gsVsVertexItemSize[i];
     itemSizeArrayNode[i] = itemSize;
     if (i < itemCount - 1) {
       gsVsRingOffset += itemSize * maxVertOut;
@@ -576,9 +560,17 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       // SPI_SHADER_GS_MESHLET_DIM
       auto spiShaderGsMeshletDim =
           getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderGsMeshletDim].getMap(true);
-      spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadX] = meshMode.workgroupSizeX - 1;
-      spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadY] = meshMode.workgroupSizeY - 1;
-      spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadZ] = meshMode.workgroupSizeZ - 1;
+
+      if (meshBuiltInUsage.foldWorkgroupXY) {
+        spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadX] =
+            meshMode.workgroupSizeX * meshMode.workgroupSizeY - 1;
+        spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadY] = meshMode.workgroupSizeZ - 1;
+        spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadZ] = 0;
+      } else {
+        spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadX] = meshMode.workgroupSizeX - 1;
+        spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadY] = meshMode.workgroupSizeY - 1;
+        spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::NumThreadZ] = meshMode.workgroupSizeZ - 1;
+      }
       // NOTE: If row export for mesh shader is enabled, the thread group size is set according to dimensions of work
       // group. Otherwise, it is set according to actual primitive amplification factor.
       const unsigned threadGroupSize = m_pipelineState->enableMeshRowExport()
@@ -596,9 +588,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     }
   } else {
     maxVertsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, NggMaxThreadsPerSubgroup);
-    // VGT_GS_VERT_ITEMSIZE
-    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize] =
-        4 * gsInOutUsage.outputMapLocCount;
 
     // VGT_GS_INSTANCE_CNT
     if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId) {
@@ -612,9 +601,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     }
 
     if (m_gfxIp.major <= 11) {
-      // VGT_GSVS_RING_ITEMSIZE
-      getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsvsRingItemsize] = calcFactor.gsVsRingItemSize;
-
       // VGT_ESGS_RING_ITEMSIZE
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtEsgsRingItemsize] =
           (m_hasGs ? calcFactor.esGsRingItemSize : 1);
@@ -966,32 +952,38 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::UsesUavs] = resUsage->resourceWrite;
   }
 
-  // Fill .ps_input_semantic for partial pipeline
+  // Build input semantics for part pipeline
   if (m_pipelineState->isUnlinked()) {
-    // Collect semantic info for generic input and builtIns {ClipDistance, CulDistance, Layer,
-    // ViewportIndex, PrimitiveId} that exports via generic output as well.
-    auto &inputLocInfoMap = resUsage->inOutUsage.inputLocInfoMap;
-    auto &builtInInputLocMap = resUsage->inOutUsage.builtInInputLocMap;
+    // We collect input semantics for generic inputs and necessary built-ins that will be exported from last vertex
+    // processing stage as generic inputs (ClipDistance, CullDistance, Layer, ViewportIndex, PrimitiveId).
+    SmallSet<unsigned, MaxInOutLocCount> inputSemantics;
 
-    if (!inputLocInfoMap.empty() || !builtInInputLocMap.empty()) {
-      auto psInputSemanticNode = getPipelineNode()[Util::Abi::PipelineMetadataKey::PsInputSemantic].getArray(true);
-      unsigned elemIdx = 0;
-      for (auto locInfoPair : inputLocInfoMap) {
-        auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
-        psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] =
-            MaxBuiltInSemantic + locInfoPair.first.getLocation();
-        ++elemIdx;
+    for (auto locMap : resUsage->inOutUsage.inputLocInfoMap)
+      inputSemantics.insert(locMap.first.getLocation());
+
+    for (auto locMap : resUsage->inOutUsage.perPrimitiveInputLocMap)
+      inputSemantics.insert(locMap.first);
+
+    for (auto locMap : resUsage->inOutUsage.builtInInputLocMap) {
+      if (locMap.first == BuiltInClipDistance || locMap.first == BuiltInCullDistance || locMap.first == BuiltInLayer ||
+          locMap.first == BuiltInViewportIndex || locMap.first == BuiltInPrimitiveId) {
+        inputSemantics.insert(BuiltInSemanticMask | locMap.first);
       }
+    }
 
-      for (auto locPair : builtInInputLocMap) {
-        if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
-            locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex ||
-            locPair.first == BuiltInPrimitiveId) {
-          assert(locPair.first < MaxBuiltInSemantic);
-          auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
-          psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] = locPair.first;
-          ++elemIdx;
-        }
+    for (auto locMap : resUsage->inOutUsage.perPrimitiveBuiltInInputLocMap) {
+      if (locMap.first == BuiltInLayer || locMap.first == BuiltInViewportIndex || locMap.first == BuiltInPrimitiveId) {
+        inputSemantics.insert(BuiltInSemanticMask | locMap.first);
+      }
+    }
+
+    // Fill the PAL metadata ".ps_input_semantic" used by later pipeline linking.
+    if (!inputSemantics.empty()) {
+      auto psInputSemantics = getPipelineNode()[Util::Abi::PipelineMetadataKey::PsInputSemantic].getArray(true);
+      unsigned element = 0;
+      for (auto inputSemantic : inputSemantics) {
+        auto psInputSemantic = psInputSemantics[element++].getMap(true);
+        psInputSemantic[Util::Abi::PsInputSemanticMetadataKey::Semantic] = inputSemantic;
       }
     }
   }
@@ -1027,19 +1019,20 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStageEnum shaderStage) {
   const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
 
   unsigned workgroupSizes[3] = {};
+  bool foldWorkgroupXY = false;
   if (shaderStage == ShaderStage::Compute) {
     const auto &builtInUsage = resUsage->builtInUsage.cs;
-    if (builtInUsage.foldWorkgroupXY) {
-      workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
-      workgroupSizes[1] = computeMode.workgroupSizeZ;
-      workgroupSizes[2] = 1;
-    } else {
-      workgroupSizes[0] = computeMode.workgroupSizeX;
-      workgroupSizes[1] = computeMode.workgroupSizeY;
-      workgroupSizes[2] = computeMode.workgroupSizeZ;
-    }
-  } else {
+    foldWorkgroupXY = builtInUsage.foldWorkgroupXY;
+  } else if (shaderStage == ShaderStage::Task) {
     assert(shaderStage == ShaderStage::Task);
+    const auto &builtInUsage = resUsage->builtInUsage.task;
+    foldWorkgroupXY = builtInUsage.foldWorkgroupXY;
+  }
+  if (foldWorkgroupXY) {
+    workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
+    workgroupSizes[1] = computeMode.workgroupSizeZ;
+    workgroupSizes[2] = 1;
+  } else {
     workgroupSizes[0] = computeMode.workgroupSizeX;
     workgroupSizes[1] = computeMode.workgroupSizeY;
     workgroupSizes[2] = computeMode.workgroupSizeZ;
@@ -1316,11 +1309,12 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutMiscSideBusEna] = true;
   }
 
+  unsigned clipPlaneMask = m_pipelineState->getOptions().clipPlaneMask;
+  bool needMapClipDistMask = ((clipPlaneMask != 0) && m_pipelineState->getOptions().enableMapClipDistMask);
   if (clipDistanceCount > 0 || cullDistanceCount > 0) {
     auto paClVsOutCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PaClVsOutCntl].getMap(true);
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutCcDist0VecEna] = true;
-
-    if (clipDistanceCount + cullDistanceCount > 4)
+    if ((clipDistanceCount + cullDistanceCount > 4) && !needMapClipDistMask)
       paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutCcDist1VecEna] = true;
 
     unsigned clipDistanceMask = (1 << clipDistanceCount) - 1;
@@ -1335,6 +1329,14 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       // Note: Point primitives are only affected by the cull mask, so enable culling also based on clip distances
       cullDistEna[i] = ((clipDistanceMask | cullDistanceMask) >> i) & 0x1;
     }
+
+    // Map CLIP_DIST_4/5/6/7 to CLIP_DIST_0/1/2/3 accordingly.
+    if (needMapClipDistMask) {
+      for (unsigned i = 0; i < 4; ++i) {
+        clipDistEna[i] = clipDistEna[i + 4];
+      }
+    }
+
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_0] = clipDistEna[0];
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_1] = clipDistEna[1];
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_2] = clipDistEna[2];
@@ -1384,7 +1386,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
 
   if (clipDistanceCount + cullDistanceCount > 0) {
     ++availPosCount;
-    if (clipDistanceCount + cullDistanceCount > 4)
+    if ((clipDistanceCount + cullDistanceCount > 4) && !needMapClipDistMask)
       ++availPosCount;
   }
   auto arrayNode = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderPosFormat].getArray(true);

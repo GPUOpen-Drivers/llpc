@@ -2046,11 +2046,16 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
       // Functions that don't access memory.
       func->setDoesNotAccessMemory();
       break;
+    case BuilderOpcode::ImageSample:
+    case BuilderOpcode::ImageSampleConvert:
+      // Function read and write memory if return is void.
+      if (!resultTy || resultTy->isVoidTy())
+        break;
+      // Otherwise treat as read only; intentional fall-through.
+      LLVM_FALLTHROUGH;
     case BuilderOpcode::ImageGather:
     case BuilderOpcode::ImageLoad:
     case BuilderOpcode::ImageLoadWithFmask:
-    case BuilderOpcode::ImageSample:
-    case BuilderOpcode::ImageSampleConvert:
     case BuilderOpcode::LoadPushConstantsPtr:
     case BuilderOpcode::ReadBaryCoord:
     case BuilderOpcode::ReadBuiltInInput:

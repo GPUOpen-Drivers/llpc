@@ -47,6 +47,7 @@ enum class CooperativeMatrixElementType : unsigned {
   Int16,         // 16-bit integer
   Int32,         // 32 bit integer
   Float16Packed, // packed 16-bit floating-point
+  BFloat16,      // 16-bit brain floating-point
 };
 
 // Layout is virtual concept, eg: 16bit and 32bit for matrixC will share the same layout initially.
