@@ -278,8 +278,6 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:       .vgt_gs_out_prim_type:
 ; CHECK-NEXT:         .outprim_type:   PointList
 ; CHECK-NEXT:       .vgt_gs_per_vs:  0x2
-; CHECK-NEXT:       .vgt_gs_vert_itemsize: 0
-; CHECK-NEXT:       .vgt_gsvs_ring_itemsize: 0
 ; CHECK-NEXT:       .vgt_reuse_off:  false
 ; CHECK-NEXT:       .vgt_shader_stages_en:
 ; CHECK-NEXT:         .es_stage_en:    0x2

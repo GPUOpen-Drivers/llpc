@@ -61,6 +61,8 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
+    set(LLVM_RAM_PER_TABLEGEN_JOB 10000 CACHE STRING Force)
+    set(LLVM_RAM_PER_LINK_JOB 5000 CACHE STRING Force)
     if (NOT WIN32)
         # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
 #if _WIN32
@@ -215,22 +217,22 @@ if(ICD_BUILD_LLPC)
 # llpc/lower
     target_sources(llpcinternal PRIVATE
         lower/llpcSpirvLower.cpp
-        lower/llpcSpirvLowerAccessChain.cpp
-        lower/llpcSpirvLowerCfgMerges.cpp
-        lower/llpcSpirvLowerConstImmediateStore.cpp
-        lower/llpcSpirvLowerGlobal.cpp
-        lower/llpcSpirvLowerInstMetaRemove.cpp
-        lower/llpcSpirvLowerMath.cpp
-        lower/llpcSpirvLowerMemoryOp.cpp
+        lower/LowerAccessChain.cpp
+        lower/LowerCfgMerges.cpp
+        lower/LowerConstImmediateStore.cpp
+        lower/LowerGlobals.cpp
+        lower/LowerInstMetaRemove.cpp
+        lower/LowerMath.cpp
+        lower/LowerMemoryOp.cpp
         lower/LowerPostInline.cpp
-        lower/llpcSpirvLowerRayTracing.cpp
-        lower/llpcSpirvLowerTerminator.cpp
-        lower/llpcSpirvLowerTranslator.cpp
+        lower/LowerRayTracing.cpp
+        lower/LowerTerminator.cpp
+        lower/LowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp
-        lower/llpcSpirvProcessGpuRtLibrary.cpp
-        lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
+        lower/ProcessGpuRtLibrary.cpp
+        lower/LowerInternalLibraryIntrinsic.cpp
         lower/LowerGLCompatibility.cpp
-        lower/llpcSpirvLowerCooperativeMatrix.cpp
+        lower/LowerCooperativeMatrix.cpp
         lower/PrepareContinuations.cpp
         lower/LowerAdvancedBlend.cpp
         lower/ProcessGfxRuntimeLibrary.cpp

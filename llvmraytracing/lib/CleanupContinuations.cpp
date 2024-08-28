@@ -49,7 +49,7 @@
 // the compiler backend.
 // 1. Replace returning handle with lgc.cps.jump() with the right continuation
 //    reference.
-// 2. Replace @lgc.ilcps.return with simple `ret`, which means thread
+// 2. Replace @lgc.cps.complete with simple `ret`, which means thread
 //    termination.
 // 3. Edit function signatures, like removing coroutine frame pointer argument,
 //    adding needed ones (state, rcr, returned_values) for resume function.
@@ -181,6 +181,8 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc, bo
     CpsStack = Builder->create<cps::AllocOp>(Builder->getInt32(CpsInfo.ContStateBytes));
     CpsStack->setName("cont.state.stack.segment");
   } else {
+    // We don't expect stack size metadata on resume functions.
+    ContHelper::StackSize::reset(NewFunc);
     CpsStack = Builder->create<cps::PeekOp>(Builder->getInt32(CpsInfo.ContStateBytes));
   }
 
@@ -276,10 +278,7 @@ void CleanupContinuationsPass::removeContFreeCall(Function *F, Function *ContFre
   }
 }
 
-/// Insert cps.free() before the original function exits.
-/// Note: we skip the cps.free() insertion before calls to
-/// @lgc.ilcps.return. Because this is not useful any more as it means the
-/// thread termination.
+/// Insert cps.free() before the original function exits and lgc.cps.complete calls.
 void CleanupContinuationsPass::freeCpsStack(Function *F, ContinuationData &CpsInfo) {
   struct VisitState {
     ContinuationData &CpsInfo;
@@ -290,9 +289,9 @@ void CleanupContinuationsPass::freeCpsStack(Function *F, ContinuationData &CpsIn
   static const auto Visitor =
       llvm_dialects::VisitorBuilder<VisitState>()
           .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-          .add<cps::JumpOp>([](auto &State, auto &Jump) {
-            if (Jump.getFunction() == State.F && State.CpsInfo.ContStateBytes) {
-              State.Builder->SetInsertPoint(&Jump);
+          .addSet<cps::JumpOp, cps::CompleteOp>([](auto &State, auto &Instruction) {
+            if (Instruction.getFunction() == State.F && State.CpsInfo.ContStateBytes) {
+              State.Builder->SetInsertPoint(&Instruction);
               State.Builder->template create<cps::FreeOp>(State.Builder->getInt32(State.CpsInfo.ContStateBytes));
             }
           })
@@ -364,16 +363,15 @@ void CleanupContinuationsPass::processContinuations() {
         if (isa<ReturnInst>(I)) {
           handleContinue(FuncData.second, I);
         } else if (I->getOpcode() == Instruction::Unreachable) {
-          // We should only possibly have 'lgc.ilcps.return' or
-          // 'lgc.cps.jump' call before unreachable.
+          // We should only have 'lgc.cps.complete' or 'lgc.cps.jump' calls before unreachable.
           auto *Call = cast<CallInst>(--I->getIterator());
-          if (isa<lgc::ilcps::ReturnOp>(Call)) {
+          if (isa<cps::CompleteOp>(Call)) {
             Builder->SetInsertPoint(Call);
             Builder->CreateRetVoid();
             Call->eraseFromParent();
             I->eraseFromParent();
           } else {
-            assert(isa<cps::JumpOp>(*Call));
+            assert(isa<cps::JumpOp>(Call));
           }
         }
       }
@@ -445,31 +443,27 @@ void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data, Call
 
   SmallVector<Value *> TailArgs;
   uint32_t SkipCount = 2;
+  Value *ResumeAddr = nullptr;
+  const bool IsWait = ContHelper::isWaitAwaitCall(*Call);
   // WaitMask and %rcr (aka. return continuation reference) for the callee.
   if (cps::isCpsFunction(*cast<Function>(ResumeFun))) {
-    // Ensure the first argument stays the wait mask. This comes after the CR
-    // and the levels.
-    if (ContHelper::isWaitAwaitCall(*Call)) {
-      TailArgs.push_back(Call->getArgOperand(2));
-      ++SkipCount;
-    }
-
-    auto *ResumeCR = Builder->create<cps::AsContinuationReferenceOp>(ContinuationReferenceType, ResumeFun);
-
-    TailArgs.push_back(ResumeCR);
+    ResumeAddr = Builder->create<cps::AsContinuationReferenceOp>(ContinuationReferenceType, ResumeFun);
+    if (IsWait)
+      SkipCount = 3;
   } else {
     // For entry-point compute kernel, pass a poison %rcr.
-    TailArgs.push_back(PoisonValue::get(Builder->getInt32Ty()));
+    ResumeAddr = PoisonValue::get(Builder->getInt32Ty());
   }
   // Skip continuation.reference, levels and potentially the wait mask.
   TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), SkipCount)));
   auto *CR = Call->getArgOperand(0);
-  Value *Level = Call->getArgOperand(ContHelper::isWaitAwaitCall(*Call) ? 2 : 1);
+
+  Value *Level = Call->getArgOperand(IsWait ? 2 : 1);
   unsigned LevelImm = cast<ConstantInt>(Level)->getZExtValue();
 
-  // TODO: Continuation state are passed through stack for now.
+  // TODO: Continuation state is passed through stack for now.
   auto *State = PoisonValue::get(StructType::get(Builder->getContext(), {}));
-  auto *JumpCall = Builder->create<cps::JumpOp>(CR, LevelImm, State, TailArgs);
+  auto *JumpCall = Builder->create<cps::JumpOp>(CR, LevelImm, State, ResumeAddr, TailArgs);
   // Replace this instruction with a call to cps.jump.
   JumpCall->copyMetadata(*Call);
 
@@ -537,11 +531,8 @@ void CleanupContinuationsPass::lowerGetResumePoint(Module &Mod) {
       // call.
       auto JumpCall = findDominatedContinueCall(GetResumeCall);
       assert(JumpCall && "Should find a dominated call to lgc.cps.jump");
-      // For wait calls, skip the wait mask.
-      uint32_t SkipCount = ContHelper::isWaitAwaitCall(*(JumpCall.value())) ? 1 : 0;
-
       lgc::cps::JumpOp *Jump = cast<cps::JumpOp>(*JumpCall);
-      Value *ResumeFn = *(Jump->getTail().begin() + SkipCount);
+      Value *ResumeFn = Jump->getRcr();
       assert(ResumeFn && isa<cps::AsContinuationReferenceOp>(ResumeFn));
       // We can always move this as.continuation.reference call.
       cast<Instruction>(ResumeFn)->moveBefore(GetResumeCall);

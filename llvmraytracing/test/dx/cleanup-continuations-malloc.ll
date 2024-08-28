@@ -7,6 +7,8 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare void @await.void(%continuation.token*)
 declare %continuation.token* @async_fun()
+declare void @lgc.cps.jump(...)
+declare void @lgc.cps.complete()
 
 define <4 x i32> @simple_await(i64 %dummyRet, <4 x i32> %arg) !continuation.registercount !1 {
 ; CHECK-LABEL: define void @simple_await(
@@ -15,15 +17,16 @@ define <4 x i32> @simple_await(i64 %dummyRet, <4 x i32> %arg) !continuation.regi
 ; CHECK-NEXT:    [[CONT_STATE_STACK_SEGMENT:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 24)
 ; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 0
 ; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
-; CHECK-NEXT:    store i64 [[DUMMYRET]], ptr addrspace(32) [[RETURNADDR_SPILL_ADDR]], align 4
+; CHECK-NEXT:    [[DUMMYRET_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
+; CHECK-NEXT:    store i64 [[DUMMYRET]], ptr addrspace(32) [[DUMMYRET_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @simple_await.resume.0)
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 ptrtoint (ptr @async_fun to i64), i32 -1, {} poison, i64 [[TMP0]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; CHECK-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
   call void @await.void(%continuation.token* %tok)
-  ret <4 x i32> %arg, !continuation.registercount !1
+  call void (...) @lgc.cps.jump(i64 %dummyRet, i32 -1, {} poison, i64 poison, <4 x i32> %arg), !continuation.registercount !1
+  unreachable
 }
 
 define void @simple_await_entry(i64 %dummyRet, <4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !continuation.entry !0 !continuation.registercount !1 {
@@ -42,7 +45,8 @@ define void @simple_await_entry(i64 %dummyRet, <4 x i32> %arg, <4 x i32> addrspa
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
   call void @await.void(%continuation.token* %tok)
   store <4 x i32> %arg, <4 x i32> addrspace(1)* %mem
-  ret void, !continuation.registercount !1
+  call void @lgc.cps.complete(), !continuation.registercount !1
+  unreachable
 }
 
 !continuation.stackAddrspace = !{!2}

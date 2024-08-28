@@ -20,14 +20,15 @@ define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwin
 
 define void @main() !lgc.rt.shaderstage !24 {
 ; CHECK-LABEL: define void @main(
-; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META13:![0-9]+]] !lgc.cps [[META10:![0-9]+]] !continuation [[META14:![0-9]+]] {
+; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META12:![0-9]+]] !lgc.cps [[META10:![0-9]+]] !continuation [[META13:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CHECK-NEXT:    store i32 0, ptr @debug_global, align 4
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:    call void @lgc.cps.complete()
+; CHECK-NEXT:    unreachable
 ;
 entry:
   %val = call i32 @lgc.rt.shader.index()
@@ -37,7 +38,7 @@ entry:
 
 define void @callable(%struct.Payload* %payload) !pointeetys !22 !lgc.rt.shaderstage !25 {
 ; CHECK-LABEL: define void @callable(
-; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META15:![0-9]+]] !lgc.cps [[META16:![0-9]+]] !continuation [[META17:![0-9]+]] {
+; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META14:![0-9]+]] !lgc.cps [[META15:![0-9]+]] !continuation [[META16:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [1 x i32], align 4

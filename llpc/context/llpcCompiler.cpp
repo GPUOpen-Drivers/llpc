@@ -31,6 +31,9 @@
 #include "llpcCompiler.h"
 #include "LLVMSPIRVLib.h"
 #include "LowerAdvancedBlend.h"
+#include "LowerCfgMerges.h"
+#include "LowerRayTracing.h"
+#include "LowerTranslator.h"
 #include "PrepareContinuations.h"
 #include "SPIRVEntry.h"
 #include "SPIRVFunction.h"
@@ -47,9 +50,6 @@
 #include "llpcRayTracingContext.h"
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
-#include "llpcSpirvLowerCfgMerges.h"
-#include "llpcSpirvLowerRayTracing.h"
-#include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcThreading.h"
 #include "llpcTimerProfiler.h"
@@ -1869,7 +1869,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       }
 
       if (shaderIndex == ShaderStageFragment && enableAdvancedBlend) {
-        lowerPassMgr->addPass(LowerAdvancedBlend(pipelineInfo->advancedBlendInfo.binding));
+        lowerPassMgr->addPass(
+            LowerAdvancedBlend(pipelineInfo->advancedBlendInfo.binding, pipelineInfo->advancedBlendInfo.enableRov));
         if (EnableOuts()) {
           lowerPassMgr->addPass(PrintModulePass(
               outs(), "\n"
@@ -2694,6 +2695,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     summary.knownUnsetRayFlags &= knownFlags.Zero.getZExtValue();
 
     pipelineOut->hasTraceRay = summary.hasTraceRayModule;
+    pipelineOut->hasKernelEntry = summary.hasKernelEntry;
 
     std::string summaryMsgpack = summary.encodeMsgpack();
     void *allocBuf = nullptr;
@@ -3106,7 +3108,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     // SPIR-V translation, then dump the result.
     lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
-    lowerPassMgr->addPass(SpirvLowerCfgMerges());
+    lowerPassMgr->addPass(LowerCfgMerges());
     lowerPassMgr->addPass(AlwaysInlinerPass());
 
     // Run the passes.
@@ -3133,7 +3135,6 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
   const bool isContinuationsMode = rtContext.isContinuationsMode();
 
-  // TODO: Do not build launch kernel for library.
   std::unique_ptr<Module> entry = std::move(modules.back());
   modules.pop_back();
   shaderInfo = shaderInfo.drop_back();
@@ -3326,10 +3327,24 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   }
 
   // Build entry module at very last.
-  Result result = buildRayTracingPipelineElf(mainContext, std::move(entry), pipelineElfs[0], shaderProps,
-                                             moduleCallsTraceRay, 0, pipeline, timerProfiler);
-  if (result != Result::Success)
-    return result;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 75
+  const bool needEntry = true;
+#else
+  const bool needEntry = rtContext.getRayTracingPipelineBuildInfo()->libraryMode != LibraryMode::Library;
+#endif
+  if (needEntry) {
+    Result result = buildRayTracingPipelineElf(mainContext, std::move(entry), pipelineElfs[0], shaderProps,
+                                               moduleCallsTraceRay, 0, pipeline, timerProfiler);
+    if (result != Result::Success)
+      return result;
+
+    rtContext.getRayTracingLibrarySummary().hasKernelEntry = true;
+
+  } else {
+    // Do not build launch kernel for library.
+    assert(indirectStageMask == ShaderStageAllRayTracingBit);
+    pipelineElfs.erase(pipelineElfs.begin());
+  }
 
   return hasError ? Result::ErrorInvalidShader : Result::Success;
 }
@@ -3594,15 +3609,15 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     auto shaderHashCode = MetroHash::compact64(&hash);
     if (stage == ShaderStageFragment) {
       fragmentHasher.Update(shaderHashCode);
+      // NOTE: In the case of the same fragment shader and fragment state, if fragment use generic builtIn or
+      // barycentric, we still need to consider previous shader, because previous shader will affect the inputs of
+      // fragment.
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
-      if (moduleData && moduleData->usage.useBarycentric) {
-        // If fragment uses barycentrics, we still need to care about the previous stage, because the primitive type
-        // might be specified there.
-        if ((preStage != ShaderStageInvalid) && (preStage != ShaderStageVertex)) {
-          auto preShaderInfo = pipelineContext->getPipelineShaderInfo(preStage);
-          moduleData = reinterpret_cast<const ShaderModuleData *>(preShaderInfo->pModuleData);
-          fragmentHasher.Update(moduleData->cacheHash);
-        }
+      if (moduleData && (moduleData->usage.useBarycentric || moduleData->usage.useGenericBuiltIn)) {
+        assert(preStage != ShaderStageInvalid);
+        auto preShaderInfo = pipelineContext->getPipelineShaderInfo(preStage);
+        moduleData = reinterpret_cast<const ShaderModuleData *>(preShaderInfo->pModuleData);
+        fragmentHasher.Update(moduleData->cacheHash);
       }
     } else
       nonFragmentHasher.Update(shaderHashCode);

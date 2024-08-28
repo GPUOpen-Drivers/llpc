@@ -424,36 +424,7 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
   }
 
   if (!(m_shaderStage == ShaderStage::Geometry && isOutput)) {
-    // Not GS output
-    bool keepAllLocations = false;
-    if (getPipelineState()->isUnlinked()) {
-      if (isOutput) {
-        // Keep all locations if the next stage of the output is fragment shader or is unspecified
-        if (m_shaderStage != ShaderStage::Fragment) {
-          auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
-          keepAllLocations = nextStage == ShaderStage::Fragment || !nextStage;
-        }
-      } else {
-        // Keep all locations if it is the input of fragment shader
-        keepAllLocations = m_shaderStage == ShaderStage::Fragment;
-      }
-    }
-
     if (inOutLocInfoMap) {
-      // Handle per-vertex input/output
-      if (keepAllLocations) {
-        // If keeping all locations, add location map entries whose locations are before this input/output
-        for (unsigned i = 0; i < location; ++i) {
-          InOutLocationInfo origLocationInfo;
-          origLocationInfo.setLocation(i);
-          if (inOutLocInfoMap->count(origLocationInfo) == 0) {
-            // Add this location map entry only if it doesn't exist
-            auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-            newLocationInfo.setData(InvalidValue);
-          }
-        }
-      }
-
       // Add location map entries for this input/output
 
       // NOTE: For TCS input/output, TES input, and mesh shader output, their components could be separately indexed.
@@ -507,16 +478,6 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     }
 
     if (perPatchInOutLocMap) {
-      // Handle per-patch input/output
-      if (keepAllLocations) {
-        // If keeping all locations, add location map entries whose locations are before this input/output
-        for (unsigned i = 0; i < location; ++i) {
-          // Add this location map entry only if it doesn't exist
-          if (perPatchInOutLocMap->count(i) == 0)
-            (*perPatchInOutLocMap)[i] = InvalidValue;
-        }
-      }
-
       // Add location map entries for this input/output
       for (unsigned i = 0; i < locationCount; ++i)
         (*perPatchInOutLocMap)[location + i] =
@@ -525,16 +486,6 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     }
 
     if (perPrimitiveInOutLocMap) {
-      // Handle per-primitive input/output
-      if (keepAllLocations) {
-        // If keeping all locations, add location map entries whose locations are before this input/output
-        for (unsigned i = 0; i < location; ++i) {
-          // Add this location map entry only if it doesn't exist
-          if (perPrimitiveInOutLocMap->count(i) == 0)
-            (*perPrimitiveInOutLocMap)[i] = InvalidValue;
-        }
-      }
-
       // Add location map entries for this input/output
       for (unsigned i = 0; i < locationCount; ++i)
         (*perPrimitiveInOutLocMap)[location + i] =
@@ -1453,7 +1404,7 @@ Value *BuilderImpl::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
       localInvocationId = CreateInsertElement(localInvocationId, getInt32(0), 2);
     }
 
-    if (m_shaderStage == ShaderStage::Compute) {
+    if (m_shaderStage == ShaderStage::Compute || m_shaderStage == ShaderStage::Task) {
       // Reconfigure the workgroup layout later if it's necessary.
       if (!getPipelineState()->isComputeLibrary()) {
         // Insert a call that later on might get lowered to code to reconfigure the workgroup.

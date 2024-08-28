@@ -176,6 +176,8 @@ struct ResourceUsage {
       struct {
         // Statement
         unsigned meshLinearDispatch : 1; // Mesh linear dispatch from task shader when group count Y/Z are both ones
+        // Workgroup layout
+        unsigned foldWorkgroupXY : 1; // The layout of the workgroup
       } task;
 
       // Vertex shader
@@ -281,6 +283,7 @@ struct ResourceUsage {
         unsigned localInvocationIndex : 1; // Whether gl_LocalInvocationIndex is used
         unsigned subgroupId : 1;           // Whether gl_SubgroupID is used
         unsigned numSubgroups : 1;         // Whether gl_NumSubgroups is used
+        unsigned foldWorkgroupXY : 1;      // Whether the workgroup is folded
         // Output
         unsigned pointSize : 1;            // Whether gl_PointSize is used
         unsigned position : 1;             // Whether gl_Position is used
@@ -446,16 +449,17 @@ struct ResourceUsage {
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
       struct {
-        unsigned esGsRingItemSize;     // Size of each vertex written to the ES -> GS Ring, in dwords.
-        unsigned gsVsRingItemSize;     // Size of each primitive written to the GS -> VS Ring, in dwords.
-        unsigned esVertsPerSubgroup;   // Number of vertices ES exports.
-        unsigned gsPrimsPerSubgroup;   // Number of prims GS exports.
-        unsigned esGsLdsSize;          // ES -> GS ring LDS size (GS in)
-        unsigned gsOnChipLdsSize;      // Total LDS size for GS on-chip mode.
-        unsigned inputVertices;        // Number of GS input vertices
-        unsigned primAmpFactor;        // GS primitive amplification factor
-        bool enableMaxVertOut;         // Whether to allow each GS instance to emit maximum vertices (NGG)
-        unsigned rayQueryLdsStackSize; // Ray query LDS stack size
+        unsigned esGsRingItemSize;                 // Size of each vertex written to the ES -> GS Ring, in dwords.
+        unsigned gsVsRingItemSize;                 // Size of each primitive written to the GS -> VS Ring, in dwords.
+        unsigned gsVsVertexItemSize[MaxGsStreams]; // Size of vertex item in the GS -> VS Ring, in dwords.
+        unsigned esVertsPerSubgroup;               // Number of vertices ES exports.
+        unsigned gsPrimsPerSubgroup;               // Number of prims GS exports.
+        unsigned esGsLdsSize;                      // ES -> GS ring LDS size (GS in)
+        unsigned gsOnChipLdsSize;                  // Total LDS size for GS on-chip mode.
+        unsigned inputVertices;                    // Number of GS input vertices
+        unsigned primAmpFactor;                    // GS primitive amplification factor
+        bool enableMaxVertOut;                     // Whether to allow each GS instance to emit maximum vertices (NGG)
+        unsigned rayQueryLdsStackSize;             // Ray query LDS stack size
       } calcFactor = {};
 
       unsigned outLocCount[MaxGsStreams] = {};

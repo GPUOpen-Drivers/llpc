@@ -182,12 +182,6 @@ private:
 
   llvm::Value *getSubgroupLocalInvocationId(BuilderBase &builder);
 
-  SwizzleWorkgroupLayout calculateWorkgroupLayout();
-
-  llvm::Value *reconfigWorkgroupLayout(llvm::Value *localInvocationId, WorkgroupLayout macroLayout,
-                                       WorkgroupLayout microLayout, unsigned workgroupSizeX, unsigned workgroupSizeY,
-                                       unsigned workgroupSizeZ, bool isHwLocalInvocationId, BuilderBase &builder);
-
   void createSwizzleThreadGroupFunction();
 
   void exportShadingRate(llvm::Value *shadingRate, BuilderBase &builder);

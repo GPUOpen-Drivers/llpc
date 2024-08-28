@@ -871,6 +871,7 @@ private:
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionAdvancedBlendInfo, enableAdvancedBlend, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionAdvancedBlendInfo, enableRov, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionAdvancedBlendInfo, binding, MemberTypeInt, false);
       return addrTableInitializer;
     }();
@@ -939,6 +940,8 @@ public:
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampVs, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampFs, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableFlatShade, MemberTypeBool, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableMapClipDistMask, MemberTypeBool, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, alphaTestFunc, MemberTypeInt, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
                                      Vkgc::MaxColorTargets, true);
 
@@ -965,10 +968,6 @@ public:
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, vbAddressLowBitsKnown, MemberTypeBool, false);
 #endif
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_forceDisableStreamOut, MemberTypeBool, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
-      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, apiXfbOutData, forceEnablePrimStats, MemberTypeBool,
-                                         false);
-#endif
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionGraphicsState, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_advancedBlendInfo, MemberTypeAdvancedBlendInfo, true);
       return addrTableInitializer;

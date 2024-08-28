@@ -29,7 +29,7 @@
 // a resume point.
 //
 // This pass introduces a global for the return address, which is saved at the
-// start of a function and used in a `@lgc.ilcps.return(i64)` call in the
+// start of a function and used in a `@lgc.cps.jump` call in the
 // end.
 //
 //===----------------------------------------------------------------------===//
@@ -106,7 +106,6 @@ void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
   auto &Context = Mod.getContext();
   auto *I8Ptr = Type::getInt8Ty(Context)->getPointerTo();
   auto *I32 = Type::getInt32Ty(Context);
-  auto *I64 = Type::getInt64Ty(Context);
 
   Type *TokenTy = StructType::create(Context, "continuation.token")->getPointerTo();
 
@@ -125,9 +124,6 @@ void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
 
     // Lgc.cps dialect will handle stack pointer and return address in
     // DXILContPostProcessPass.
-    bool IsTraversal = lgc::rt::getLgcRtShaderStage(F) == lgc::rt::RayTracingShaderStage::Traversal;
-    bool IsLegacyNonEntry = !ContHelper::isLegacyEntryFunction(F) && !IsLgcCpsMode && !IsTraversal;
-
     for (auto const &Arg : F->args())
       AllArgTypes.push_back(Arg.getType());
 
@@ -222,45 +218,6 @@ void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
         CI->replaceAllUsesWith(RetVal);
       }
       CI->eraseFromParent();
-    }
-
-    // Save the return address at the start of the function for legacy path.
-    // For lgc.cps, we don't need to save any value, so just not passing any
-    // argument.
-    Value *SavedRetAddr = nullptr;
-    if (!IsLgcCpsMode) {
-      if (IsLegacyNonEntry)
-        SavedRetAddr = NewFunc->getArg(0); // Return addr
-      else
-        SavedRetAddr = UndefValue::get(I64);
-    } else {
-      // We omit the "return address" later, make sure the
-      // dialects verifier doesn't fail since we disallow `nullptr` arguments
-      // right now.
-      SavedRetAddr = PoisonValue::get(I32);
-    }
-
-    // Convert returns to lgc.ilcps.return calls
-    for (auto &BB : *NewFunc) {
-      auto *I = BB.getTerminator();
-      if (I->getOpcode() == Instruction::Ret) {
-        // Replace this instruction with a call to lgc.ilcps.return
-        B.SetInsertPoint(I);
-        SmallVector<Value *, 1> RetVals;
-
-        if (!IsLgcCpsMode) {
-          if (I->getNumOperands() != 0)
-            RetVals.push_back(I->getOperand(0));
-        }
-
-        auto *ContRetOp = B.create<lgc::ilcps::ReturnOp>(SavedRetAddr, RetVals);
-        // DXILCont passes use annotations on the ret to pass information
-        // on the shader exit to later passes. Copy such metadata to the ContRet
-        // so later passes can pick it up from there.
-        ContRetOp->copyMetadata(*I);
-        B.CreateUnreachable();
-        I->eraseFromParent();
-      }
     }
   }
 }

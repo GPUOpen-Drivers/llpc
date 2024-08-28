@@ -25,6 +25,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.reflect.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.reflect.v4f32(<4 x float>
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST: = fmul nnan nsz arcp contract afn float
+; SHADERTEST-NEXT: = fmul nnan nsz arcp contract afn float
+; SHADERTEST-NEXT: = fmul nnan nsz arcp contract afn float
+; SHADERTEST-NEXT: = fsub nnan nsz arcp contract afn float
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

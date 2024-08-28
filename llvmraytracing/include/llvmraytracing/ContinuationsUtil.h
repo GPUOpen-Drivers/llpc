@@ -198,8 +198,6 @@ private:
   // Flags set for continuations.
   // This is exposed to gpurt code via the ContinuationsGetFlags intrinsic.
   static constexpr const char *MDFlagsName = "continuation.flags";
-  // Marks an await as a waiting one with a wait mask.
-  static constexpr const char *MDIsWaitAwaitName = "continuation.wait.await";
 
   static std::optional<uint32_t> extractZExtI32Constant(MDNode *Node) {
     if (Node) {
@@ -399,8 +397,11 @@ public:
   }
 
   static void setPayloadTypeMetadata(Instruction *I, Type *T) {
-    I->setMetadata(ContHelper::MDContPayloadTyName,
-                   MDNode::get(I->getContext(), {ConstantAsMetadata::get(PoisonValue::get(T))}));
+    I->setMetadata(ContHelper::MDContPayloadTyName, getPayloadTypeMetadata(T));
+  }
+
+  static MDNode *getPayloadTypeMetadata(Type *T) {
+    return MDNode::get(T->getContext(), {ConstantAsMetadata::get(PoisonValue::get(T))});
   }
 
   static std::optional<int32_t> tryGetWaitMask(const CallInst &CI) {
@@ -411,19 +412,12 @@ public:
     CI.setMetadata(MDWaitMaskName, getI32MDConstant(CI.getContext(), WaitMask));
   }
 
+  // Queries whether an awaited call should wait on a wait mask.
+  static bool isWaitAwaitCall(const CallInst &CI) { return CI.getMetadata(MDWaitMaskName) != nullptr; }
+
   static void removeWaitMask(CallInst &CI) { CI.setMetadata(MDWaitMaskName, nullptr); }
 
   static bool isLgcCpsModule(Module &Mod) { return Mod.getNamedMetadata(MDLgcCpsModuleName) != nullptr; }
-
-  // Specifies that an awaited call should wait on a wait mask.
-  static void setIsWaitAwaitCall(CallInst &CI) {
-    CI.setMetadata(ContHelper::MDIsWaitAwaitName, MDTuple::get(CI.getContext(), {}));
-  }
-
-  // Queries whether an awaited call should wait on a wait mask.
-  static bool isWaitAwaitCall(const CallInst &CI) { return CI.getMetadata(MDIsWaitAwaitName) != nullptr; }
-
-  static void removeIsWaitAwaitMetadata(CallInst &CI) { CI.setMetadata(ContHelper::MDIsWaitAwaitName, nullptr); }
 
   /// Returns true if a call to the given function should be rematerialized
   /// in a shader of the specified kind.
@@ -453,6 +447,9 @@ public:
   // using the GpuRt version flags intrinsic. If the intrinsic is not found,
   // returns true, enabling new behavior (e.g. for tests).
   static bool getGpurtVersionFlag(Module &GpurtModule, GpuRtVersionFlag Flag);
+
+  // Handles the _AmdComplete intrinsic.
+  static void handleComplete(Function &Func);
 
   // Handles _AmdGetSetting_* intrinsics.
   static void handleGetSetting(Function &F, ArrayRef<ContSetting> Settings);

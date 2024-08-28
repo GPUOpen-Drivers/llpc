@@ -51,8 +51,13 @@ private:
   };
   void processLibraryFunction(llvm::Function *&func);
   void createTexelLoad(llvm::Function *func);
-  void createTexelLoadFmask(llvm::Function *func);
+  void createTexelLoadMsaa(llvm::Function *func);
   void createCoherentTexelLoad(llvm::Function *func);
   void createCoherentTexelStore(llvm::Function *func);
+  void createCoherentTexelLoadMsaa(llvm::Function *func);
+  void createCoherentTexelStoreMsaa(llvm::Function *func);
+
+  void loadTexel(llvm::Function *func, bool isMsaa, bool enableRov);
+  void storeTexel(llvm::Function *func, bool isMsaa, bool enableRov);
 };
 } // namespace Llpc

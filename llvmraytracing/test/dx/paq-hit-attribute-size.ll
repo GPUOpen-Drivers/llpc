@@ -75,7 +75,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-1-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-1-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-1-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-1-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-1-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
 ; CHECK-MAX-1-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-1-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP4]], align 4
 ; CHECK-MAX-1-NEXT:    store i32 [[TMP20]], ptr [[ORIGHITATTRS]], align 4
@@ -104,7 +104,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-1-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP34]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP33]])
 ; CHECK-MAX-1-NEXT:    [[TMP35:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-1-NEXT:    [[TMP36:%.*]] = load [4 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-1-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP35]], [2 x i32] poison, [4 x i32] [[TMP36]]), !continuation.registercount [[META15]]
+; CHECK-MAX-1-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP35]], [2 x i32] poison, [4 x i32] [[TMP36]]), !continuation.registercount [[META15]]
 ; CHECK-MAX-1-NEXT:    unreachable
 ;
 ; CHECK-MAX-2-LABEL: define %struct.AnyHitSystemData @AnyHit1DWords(
@@ -135,7 +135,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-2-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-2-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-2-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-2-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-2-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
 ; CHECK-MAX-2-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-2-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP4]], align 4
 ; CHECK-MAX-2-NEXT:    store i32 [[TMP20]], ptr [[ORIGHITATTRS]], align 4
@@ -164,7 +164,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-2-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP34]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP33]])
 ; CHECK-MAX-2-NEXT:    [[TMP35:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-2-NEXT:    [[TMP36:%.*]] = load [4 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-2-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP35]], [2 x i32] poison, [4 x i32] [[TMP36]]), !continuation.registercount [[META18]]
+; CHECK-MAX-2-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP35]], [2 x i32] poison, [4 x i32] [[TMP36]]), !continuation.registercount [[META18]]
 ; CHECK-MAX-2-NEXT:    unreachable
 ;
 ; CHECK-MAX-4-LABEL: define %struct.AnyHitSystemData @AnyHit1DWords(
@@ -195,7 +195,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-4-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-4-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-4-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-4-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
 ; CHECK-MAX-4-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_4_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-4-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -225,7 +225,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-4-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP35]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP34]])
 ; CHECK-MAX-4-NEXT:    [[TMP36:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP37:%.*]] = load [6 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-4-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP36]], [4 x i32] poison, [6 x i32] [[TMP37]]), !continuation.registercount [[META19]]
+; CHECK-MAX-4-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP36]], [4 x i32] poison, [6 x i32] [[TMP37]]), !continuation.registercount [[META19]]
 ; CHECK-MAX-4-NEXT:    unreachable
 ;
 ; CHECK-MAX-8-LABEL: define %struct.AnyHitSystemData @AnyHit1DWords(
@@ -256,7 +256,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-8-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-8-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
 ; CHECK-MAX-8-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-8-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -286,7 +286,7 @@ define void @AnyHit1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWord
 ; CHECK-MAX-8-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP35]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP34]])
 ; CHECK-MAX-8-NEXT:    [[TMP36:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP37:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-8-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP36]], [8 x i32] poison, [10 x i32] [[TMP37]]), !continuation.registercount [[META20]]
+; CHECK-MAX-8-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP36]], [8 x i32] poison, [10 x i32] [[TMP37]]), !continuation.registercount [[META20]]
 ; CHECK-MAX-8-NEXT:    unreachable
 ;
   ret void
@@ -325,7 +325,7 @@ define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWord
 ; CHECK-MAX-2-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-2-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-2-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-2-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-2-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[TMP18]])
 ; CHECK-MAX-2-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-2-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP4]], align 4
 ; CHECK-MAX-2-NEXT:    store i32 [[TMP20]], ptr [[ORIGHITATTRS]], align 4
@@ -362,7 +362,7 @@ define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWord
 ; CHECK-MAX-2-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP40]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP39]])
 ; CHECK-MAX-2-NEXT:    [[TMP41:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-2-NEXT:    [[TMP42:%.*]] = load [4 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-2-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP41]], [2 x i32] poison, [4 x i32] [[TMP42]]), !continuation.registercount [[META18]]
+; CHECK-MAX-2-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP41]], [2 x i32] poison, [4 x i32] [[TMP42]]), !continuation.registercount [[META18]]
 ; CHECK-MAX-2-NEXT:    unreachable
 ;
 ; CHECK-MAX-4-LABEL: define %struct.AnyHitSystemData @AnyHit2DWords(
@@ -393,7 +393,7 @@ define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWord
 ; CHECK-MAX-4-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-4-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-4-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-4-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[TMP18]])
 ; CHECK-MAX-4-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_4_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-4-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -431,7 +431,7 @@ define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWord
 ; CHECK-MAX-4-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP41]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP40]])
 ; CHECK-MAX-4-NEXT:    [[TMP42:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP43:%.*]] = load [6 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-4-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP42]], [4 x i32] poison, [6 x i32] [[TMP43]]), !continuation.registercount [[META19]]
+; CHECK-MAX-4-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP42]], [4 x i32] poison, [6 x i32] [[TMP43]]), !continuation.registercount [[META19]]
 ; CHECK-MAX-4-NEXT:    unreachable
 ;
 ; CHECK-MAX-8-LABEL: define %struct.AnyHitSystemData @AnyHit2DWords(
@@ -462,7 +462,7 @@ define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWord
 ; CHECK-MAX-8-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-8-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[TMP18]])
 ; CHECK-MAX-8-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-8-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -500,7 +500,7 @@ define void @AnyHit2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWord
 ; CHECK-MAX-8-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP41]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP40]])
 ; CHECK-MAX-8-NEXT:    [[TMP42:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP43:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-8-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP42]], [8 x i32] poison, [10 x i32] [[TMP43]]), !continuation.registercount [[META20]]
+; CHECK-MAX-8-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP42]], [8 x i32] poison, [10 x i32] [[TMP43]]), !continuation.registercount [[META20]]
 ; CHECK-MAX-8-NEXT:    unreachable
 ;
   ret void
@@ -543,7 +543,7 @@ define void @AnyHit4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWord
 ; CHECK-MAX-4-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-4-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-4-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-4-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[TMP18]])
 ; CHECK-MAX-4-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_4_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-4-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -596,7 +596,7 @@ define void @AnyHit4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWord
 ; CHECK-MAX-4-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP52]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP51]])
 ; CHECK-MAX-4-NEXT:    [[TMP53:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-4-NEXT:    [[TMP54:%.*]] = load [6 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-4-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP53]], [4 x i32] poison, [6 x i32] [[TMP54]]), !continuation.registercount [[META19]]
+; CHECK-MAX-4-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP53]], [4 x i32] poison, [6 x i32] [[TMP54]]), !continuation.registercount [[META19]]
 ; CHECK-MAX-4-NEXT:    unreachable
 ;
 ; CHECK-MAX-8-LABEL: define %struct.AnyHitSystemData @AnyHit4DWords(
@@ -627,7 +627,7 @@ define void @AnyHit4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWord
 ; CHECK-MAX-8-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-8-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[TMP18]])
 ; CHECK-MAX-8-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-8-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -680,7 +680,7 @@ define void @AnyHit4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWord
 ; CHECK-MAX-8-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP52]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP51]])
 ; CHECK-MAX-8-NEXT:    [[TMP53:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP54:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-8-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP53]], [8 x i32] poison, [10 x i32] [[TMP54]]), !continuation.registercount [[META20]]
+; CHECK-MAX-8-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP53]], [8 x i32] poison, [10 x i32] [[TMP54]]), !continuation.registercount [[META20]]
 ; CHECK-MAX-8-NEXT:    unreachable
 ;
   ret void
@@ -727,7 +727,7 @@ define void @AnyHit8DWords(%struct.MyPayload* %payload, %struct.Attributes8DWord
 ; CHECK-MAX-8-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
 ; CHECK-MAX-8-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[_CONT_GETTRIANGLEHITATTRIBUTES:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
+; CHECK-MAX-8-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[TMP18]])
 ; CHECK-MAX-8-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP4]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; CHECK-MAX-8-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP4]], align 4
@@ -812,7 +812,7 @@ define void @AnyHit8DWords(%struct.MyPayload* %payload, %struct.Attributes8DWord
 ; CHECK-MAX-8-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP76]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP75]])
 ; CHECK-MAX-8-NEXT:    [[TMP77:%.*]] = load [[STRUCT_ANYHITSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-MAX-8-NEXT:    [[TMP78:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-MAX-8-NEXT:    call void (...) @lgc.ilcps.return(i64 [[RETURNADDR]], [[STRUCT_ANYHITSYSTEMDATA]] [[TMP77]], [8 x i32] poison, [10 x i32] [[TMP78]]), !continuation.registercount [[META20]]
+; CHECK-MAX-8-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITSYSTEMDATA]] [[TMP77]], [8 x i32] poison, [10 x i32] [[TMP78]]), !continuation.registercount [[META20]]
 ; CHECK-MAX-8-NEXT:    unreachable
 ;
   ret void

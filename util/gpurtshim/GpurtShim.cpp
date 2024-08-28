@@ -31,8 +31,8 @@
  ***********************************************************************************************************************
  */
 
-#include "gpurt/gpurt.h"
 #include "vkgcGpurtShim.h"
+#include "gpurt/gpurt.h"
 #include <cassert>
 
 using namespace Vkgc;

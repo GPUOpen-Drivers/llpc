@@ -195,7 +195,7 @@ public:
   SPIRVTypeRuntimeArray *addRuntimeArray(SPIRVType *) override;
   SPIRVTypeStruct *addStructType(const std::vector<SPIRVType *> &vecTypes) override;
   SPIRVTypeBool *addBoolType() override;
-  SPIRVTypeFloat *addFloatType(unsigned BitWidth) override;
+  SPIRVTypeFloat *addFloatType(unsigned BitWidth, unsigned Encoding) override;
   SPIRVTypeFunction *addFunctionType(SPIRVType *, const std::vector<SPIRVType *> &) override;
   SPIRVTypeInt *addIntegerType(unsigned BitWidth) override;
   SPIRVTypePointer *addPointerType(SPIRVStorageClassKind, SPIRVType *) override;
@@ -682,8 +682,8 @@ SPIRVTypeInt *SPIRVModuleImpl::addIntegerType(unsigned BitWidth) {
   return addType(Ty);
 }
 
-SPIRVTypeFloat *SPIRVModuleImpl::addFloatType(unsigned BitWidth) {
-  SPIRVTypeFloat *T = addType(new SPIRVTypeFloat(this, getId(), BitWidth));
+SPIRVTypeFloat *SPIRVModuleImpl::addFloatType(unsigned BitWidth, unsigned Encoding) {
+  SPIRVTypeFloat *T = addType(new SPIRVTypeFloat(this, getId(), BitWidth, Encoding));
   return T;
 }
 

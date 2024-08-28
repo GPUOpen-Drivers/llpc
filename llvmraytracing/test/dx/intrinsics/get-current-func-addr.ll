@@ -18,7 +18,7 @@ define void @MyRayGen() {
 ; CHECK-CPS-LABEL: define void @MyRayGen() {
 ; CHECK-CPS-NEXT:  AllocaSpillBB:
 ; CHECK-CPS-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @MyRayGen)
-; CHECK-CPS-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0:%.*]] to i64
+; CHECK-CPS-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
 ; CHECK-CPS-NEXT:    call void @Use(i64 [[TMP1]])
 ; CHECK-CPS-NEXT:    ret void
 ;
@@ -38,7 +38,7 @@ define void @MyRayGen.resume.0() {
 ; CHECK-CPS-LABEL: define void @MyRayGen.resume.0() {
 ; CHECK-CPS-NEXT:  entryresume.0:
 ; CHECK-CPS-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @MyRayGen.resume.0)
-; CHECK-CPS-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0:%.*]] to i64
+; CHECK-CPS-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
 ; CHECK-CPS-NEXT:    call void @Use(i64 [[TMP1]])
 ; CHECK-CPS-NEXT:    ret void
 ;

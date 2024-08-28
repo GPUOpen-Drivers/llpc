@@ -44,6 +44,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/IR/Analysis.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Support/CommandLine.h"
 #include <optional>
 
 using namespace llvm;
@@ -51,12 +52,20 @@ using namespace lgc::rt;
 
 #define DEBUG_TYPE "continuations-stats-report"
 
+enum class PayloadRegisterSizeReportingMode : uint8_t { Disabled = 0, MaxOutgoing, ByJump };
+
 static cl::opt<bool> ReportContStateSizes("report-cont-state-sizes",
                                           cl::desc("Report continuation state sizes for entry functions."),
                                           cl::init(false));
 
-static cl::opt<bool> ReportPayloadRegisterSizes("report-payload-register-sizes",
-                                                cl::desc("Report payload VGPR sizes for functions."), cl::init(false));
+static cl::opt<PayloadRegisterSizeReportingMode> ReportPayloadRegisterSizes(
+    "report-payload-register-sizes", cl::init(PayloadRegisterSizeReportingMode::Disabled),
+    cl::desc("Report payload VGPR sizes for functions."),
+    cl::values(clEnumValN(PayloadRegisterSizeReportingMode::Disabled, "disabled", "Disable payload size reporting"),
+               clEnumValN(PayloadRegisterSizeReportingMode::MaxOutgoing, "max",
+                          "Report incoming and maximum outgoing payload sizes"),
+               clEnumValN(PayloadRegisterSizeReportingMode::ByJump, "byjump",
+                          "Reporting incoming register sizes and payload size for each jump")));
 
 static cl::opt<bool> ReportSystemDataSizes("report-system-data-sizes",
                                            cl::desc("Report incoming system data sizes for functions."),
@@ -92,12 +101,13 @@ ContinuationsStatsReportPassImpl::ContinuationsStatsReportPassImpl(Module &Mod) 
 }
 
 void ContinuationsStatsReportPassImpl::run() {
-  if (!ReportPayloadRegisterSizes && !ReportSystemDataSizes && !ReportContStateSizes && !ReportAllSizes)
+  if (ReportPayloadRegisterSizes == PayloadRegisterSizeReportingMode::Disabled && !ReportSystemDataSizes &&
+      !ReportContStateSizes && !ReportAllSizes)
     return;
 
   collectProcessableFunctions();
 
-  if (ReportAllSizes || ReportPayloadRegisterSizes)
+  if (ReportAllSizes || ReportPayloadRegisterSizes != PayloadRegisterSizeReportingMode::Disabled)
     reportPayloadRegisterSizes();
 
   if (ReportAllSizes || ReportSystemDataSizes)
@@ -137,7 +147,8 @@ void ContinuationsStatsReportPassImpl::collectProcessableFunctions() {
     case RayTracingShaderStage::AnyHit:
     case RayTracingShaderStage::ClosestHit:
     case RayTracingShaderStage::Miss:
-    case RayTracingShaderStage::Callable: {
+    case RayTracingShaderStage::Callable:
+    case RayTracingShaderStage::Traversal: {
       FunctionData Data;
       Data.Stage = Stage;
       Data.SystemDataTy = F.getFunctionType()->getParamType(SystemDataArgumentIndex);
@@ -165,41 +176,78 @@ void ContinuationsStatsReportPassImpl::reportContStateSizes() {
 }
 
 void ContinuationsStatsReportPassImpl::reportPayloadRegisterSizes() {
-  static const auto Visitor = llvm_dialects::VisitorBuilder<DenseMap<Function *, unsigned>>()
-                                  .addSet<lgc::ilcps::ContinueOp, lgc::ilcps::WaitContinueOp, lgc::cps::JumpOp>(
-                                      [](auto &FuncOutgoingRegCountMap, auto &CInst) {
-                                        auto RegCount = ContHelper::OutgoingRegisterCount::tryGetValue(&CInst).value();
-                                        FuncOutgoingRegCountMap[CInst.getFunction()] =
-                                            std::max(FuncOutgoingRegCountMap[CInst.getFunction()], RegCount);
-                                      })
+  using FuncJumpMapTy = DenseMap<Function *, SmallVector<std::pair<lgc::cps::JumpOp *, uint32_t>>>;
+
+  static const auto Visitor = llvm_dialects::VisitorBuilder<FuncJumpMapTy>()
+                                  .add<lgc::cps::JumpOp>([](FuncJumpMapTy &ByJumpRegisterCounts, auto &CInst) {
+                                    auto RegCount = ContHelper::OutgoingRegisterCount::tryGetValue(&CInst).value();
+                                    ByJumpRegisterCounts[CInst.getFunction()].push_back({&CInst, RegCount});
+                                  })
                                   .build();
 
-  DenseMap<Function *, unsigned> MaxOutgoingRegisterCounts;
-  Visitor.visit(MaxOutgoingRegisterCounts, Mod);
+  FuncJumpMapTy ByJumpRegisterCounts;
+  Visitor.visit(ByJumpRegisterCounts, Mod);
+
+  DenseMap<Function *, uint32_t> MaxOutgoingRegisterCounts;
+  if (ReportPayloadRegisterSizes == PayloadRegisterSizeReportingMode::MaxOutgoing) {
+    // Accumulate all outgoing payload sizes per function.
+    for (auto &[Func, Jumps] : ByJumpRegisterCounts) {
+      for (auto &[Jump, RegCount] : Jumps) {
+        MaxOutgoingRegisterCounts[Func] = std::max(MaxOutgoingRegisterCounts[Func], RegCount);
+      }
+    }
+  }
+
+  const StringRef SizeSuffix = " dwords";
+  const auto ReportIncomingPayload = [&](Function &Func, std::optional<uint32_t> OptIncomingPayloadRegisterCount,
+                                         DXILShaderKind ShaderKind, StringRef ReportSuffix, bool AppendSizeSuffix) {
+    dbgs() << ReportSuffix << " \"" << Func.getName() << "\" (" << ShaderKind << "): ";
+    if (OptIncomingPayloadRegisterCount.has_value()) {
+      dbgs() << OptIncomingPayloadRegisterCount.value();
+      if (AppendSizeSuffix)
+        dbgs() << SizeSuffix;
+    } else {
+      dbgs() << "(no incoming payload)";
+    }
+  };
 
   for (auto &[Func, FuncData] : ToProcess) {
     DXILShaderKind ShaderKind = ShaderStageHelper::rtShaderStageToDxilShaderKind(FuncData.Stage.value());
     auto OptIncomingPayloadRegisterCount = ContHelper::IncomingRegisterCount::tryGetValue(Func);
     bool HasIncomingPayload = OptIncomingPayloadRegisterCount.has_value();
-    auto It = MaxOutgoingRegisterCounts.find(Func);
-    bool HasOutgoingPayload = (It != MaxOutgoingRegisterCounts.end());
 
-    if (!HasIncomingPayload && !HasOutgoingPayload)
-      continue;
+    if (ReportPayloadRegisterSizes == PayloadRegisterSizeReportingMode::ByJump) {
+      auto It = ByJumpRegisterCounts.find(Func);
+      bool HasOutgoingPayload = (It != ByJumpRegisterCounts.end());
 
-    dbgs() << "Incoming and max outgoing payload VGPR size of \"" << Func->getName() << "\" (" << ShaderKind << "): ";
-    if (HasIncomingPayload) {
-      dbgs() << OptIncomingPayloadRegisterCount.value() * RegisterBytes;
+      if (!HasIncomingPayload && !HasOutgoingPayload)
+        continue;
+
+      ReportIncomingPayload(*Func, OptIncomingPayloadRegisterCount, ShaderKind, "Incoming payload VGPR size of", true);
+      dbgs() << "\n";
+
+      if (HasOutgoingPayload) {
+        dbgs() << "Outgoing payload VGPR size by jump:\n";
+        for (auto &[Jump, RegCount] : It->second)
+          dbgs() << *Jump << ": " << RegCount << SizeSuffix << '\n';
+      }
     } else {
-      dbgs() << "(no incoming payload)";
+      auto It = MaxOutgoingRegisterCounts.find(Func);
+      bool HasOutgoingPayload = (It != MaxOutgoingRegisterCounts.end());
+
+      if (!HasIncomingPayload && !HasOutgoingPayload)
+        continue;
+
+      ReportIncomingPayload(*Func, OptIncomingPayloadRegisterCount, ShaderKind,
+                            "Incoming and max outgoing payload VGPR size of", false);
+      dbgs() << " and ";
+      if (HasOutgoingPayload) {
+        dbgs() << It->second;
+      } else {
+        dbgs() << "(no outgoing payload)";
+      }
+      dbgs() << SizeSuffix << '\n';
     }
-    dbgs() << " and ";
-    if (HasOutgoingPayload) {
-      dbgs() << It->second * RegisterBytes;
-    } else {
-      dbgs() << "(no outgoing payload)";
-    }
-    dbgs() << " bytes\n";
   }
 }
 

@@ -82,6 +82,10 @@ LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 LLPC_MODULE_PASS("lgc-lower-desc", LowerDesc)
 
+#if LLPC_BUILD_STRIX1
+LLPC_MODULE_PASS("lgc-workaround-ds-subdword-write", WorkaroundDsSubdwordWrite)
+#endif
+
 LLPC_FUNCTION_PASS("lgc-combine-cooperative-matrix", CombineCooperativeMatrix)
 LLPC_MODULE_PASS("lgc-lower-cooperative-matrix", LowerCooperativeMatrix)
 LLPC_MODULE_PASS("lgc-lower-gpurt", LowerGpuRt)

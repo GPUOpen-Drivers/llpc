@@ -8,18 +8,22 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 declare void @await.void(%continuation.token*)
 declare i32 @_cont_GetContinuationStackAddr()
 declare %continuation.token* @async_fun()
+declare void @lgc.cps.jump(...)
+declare void @lgc.cps.complete()
 
 define <4 x i32> @simple_await(i64 %returnAddr, <4 x i32> %arg) !continuation.registercount !1 {
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
   call void @await.void(%continuation.token* %tok)
-  ret <4 x i32> %arg, !continuation.registercount !1
+  call void (...) @lgc.cps.jump(i64 %returnAddr, i32 -1, i64 poison, i64 poison, <4 x i32> %arg), !continuation.registercount !1
+  unreachable
 }
 
 define void @simple_await_entry(i64 %returnAddr, <4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !continuation.entry !0 !continuation.registercount !1 {
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
   call void @await.void(%continuation.token* %tok)
   store <4 x i32> %arg, <4 x i32> addrspace(1)* %mem
-  ret void, !continuation.registercount !1
+  call void @lgc.cps.complete(), !continuation.registercount !1
+  unreachable
 }
 
 !continuation.maxPayloadRegisterCount = !{!2}
@@ -51,7 +55,7 @@ define void @simple_await_entry(i64 %returnAddr, <4 x i32> %arg, <4 x i32> addrs
 ; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(32) [[CONT_STATE_STACK_SEGMENT]], i32 0, i32 1
 ; CLEANUP-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(32) [[RETURNADDR_RELOAD_ADDR]], align 4
 ; CLEANUP-NEXT:    call void @lgc.cps.free(i32 24)
-; CLEANUP-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR_RELOAD]], i32 poison, i64 poison, <4 x i32> [[ARG_RELOAD]]), !continuation.registercount [[META2]]
+; CLEANUP-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR_RELOAD]], i32 -1, i64 poison, i64 poison, <4 x i32> [[ARG_RELOAD]]), !continuation.registercount [[META2]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;

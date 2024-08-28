@@ -179,9 +179,12 @@ private:
 class SPIRVTypeFloat : public SPIRVType {
 public:
   static const Op OC = OpTypeFloat;
+  static const SPIRVWord FixedWC = 3;
   // Complete constructor
-  SPIRVTypeFloat(SPIRVModule *M, SPIRVId TheId, unsigned TheBitWidth)
-      : SPIRVType(M, 3, OC, TheId), BitWidth(TheBitWidth) {}
+  SPIRVTypeFloat(SPIRVModule *M, SPIRVId TheId, unsigned TheBitWidth, unsigned TheEncoding)
+      : SPIRVType(M, 3, OC, TheId), BitWidth(TheBitWidth), Encoding(TheEncoding) {
+    (void(Encoding)); // Unused
+  }
   // Incomplete constructor
   SPIRVTypeFloat() : SPIRVType(OC), BitWidth(0) {}
 
@@ -191,18 +194,20 @@ public:
     SPIRVCapVec CV;
     if (isTypeFloat(64))
       CV.push_back(CapabilityFloat64);
+
     return CV;
   }
 
 protected:
-  _SPIRV_DEF_DECODE2(Id, BitWidth)
+  _SPIRV_DCL_DECODE
   void validate() const override {
     SPIRVEntry::validate();
     assert(BitWidth >= 16 && BitWidth <= 64 && "Invalid bit width");
   }
 
 private:
-  unsigned BitWidth; // Bit width
+  unsigned BitWidth;  // Bit width
+  SPIRVWord Encoding; // FP encoding
 };
 
 class SPIRVTypePointer : public SPIRVType {

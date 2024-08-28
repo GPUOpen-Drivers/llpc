@@ -4,10 +4,12 @@ AllowShortFunctionsOnASingleLine: InlineOnly
 IncludeBlocks: Merge
 IncludeCategories:
   - Regex:           '^"lgc/'
-    Priority:        2
-  - Regex:           '^"(llvm|llvm-c|llvm-dialects|clang|clang-c)/'
     Priority:        3
-  - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
+  - Regex:           '^"(llvm|llvm-c|llvm-dialects|clang|clang-c)/'
     Priority:        4
+  - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
+    Priority:        5
+  - Regex:           '.*/'
+    Priority:        2
   - Regex:           '.*'
     Priority:        1

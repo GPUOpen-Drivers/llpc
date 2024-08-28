@@ -100,6 +100,8 @@ PreservedAnalyses LgcCpsJumpInlinerPassImpl::run() {
       ArgList.push_back(Jump->getState());
     }
 
+    ArgList.push_back(Jump->getRcr());
+
     ArgList.append(Jump->getTail().begin(), Jump->getTail().end());
 
     CrossInliner.inlineCall(Builder, JumpTargetFunc, ArgList);

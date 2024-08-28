@@ -13,6 +13,7 @@ UE = "UE"
 OpBuildNDRange = "OpBuildNDRange"
 serDataNode = "serDataNode"
 rcall = "rcall"
+Fo = "Fo"
 
 [default.extend-words]
 ba = "ba"
@@ -28,4 +29,3 @@ dne = "dne"
 offen = "offen"
 varing = "varing"
 Derivate = "Derivate"
-Fo = "Fo"

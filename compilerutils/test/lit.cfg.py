@@ -22,7 +22,7 @@ config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
 # suffixes: A list of file extensions to treat as test files. This is overridden
 # by individual lit.local.cfg files in the test subdirectories.
-config.suffixes = ['.ll']
+config.suffixes = ['.ll', '.dxil']
 
 # excludes: A list of directories to exclude from the testsuite.
 config.excludes = ['inc']

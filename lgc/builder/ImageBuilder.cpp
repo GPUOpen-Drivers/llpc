@@ -324,6 +324,155 @@ static const IntrinsicTableEntry ImageSampleIntrinsicTable[] = {
       Intrinsic::amdgcn_image_sample_o_2darray}},
     {0}};
 
+// No return image sample intrinsics.
+// Should mirror the table for normal image sample intrinsics.
+static const IntrinsicTableEntry ImageSampleNoReturnIntrinsicTable[] = {
+    {(1U << Builder::ImageAddressIdxCoordinate),
+     {
+         Intrinsic::amdgcn_image_sample_1d_nortn,
+         Intrinsic::amdgcn_image_sample_2d_nortn,
+         Intrinsic::amdgcn_image_sample_3d_nortn,
+         Intrinsic::amdgcn_image_sample_cube_nortn,
+         Intrinsic::amdgcn_image_sample_1darray_nortn,
+         Intrinsic::amdgcn_image_sample_2darray_nortn,
+     }},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLodBias),
+     {Intrinsic::amdgcn_image_sample_b_1d_nortn, Intrinsic::amdgcn_image_sample_b_2d_nortn,
+      Intrinsic::amdgcn_image_sample_b_3d_nortn, Intrinsic::amdgcn_image_sample_b_cube_nortn,
+      Intrinsic::amdgcn_image_sample_b_1darray_nortn, Intrinsic::amdgcn_image_sample_b_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLodBias) |
+         (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_b_cl_1d_nortn, Intrinsic::amdgcn_image_sample_b_cl_2d_nortn,
+      Intrinsic::amdgcn_image_sample_b_cl_3d_nortn, Intrinsic::amdgcn_image_sample_b_cl_cube_nortn,
+      Intrinsic::amdgcn_image_sample_b_cl_1darray_nortn, Intrinsic::amdgcn_image_sample_b_cl_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLodBias) |
+         (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_b_cl_o_1d_nortn, Intrinsic::amdgcn_image_sample_b_cl_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_b_cl_o_3d_nortn, Intrinsic::amdgcn_image_sample_b_cl_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_b_cl_o_1darray_nortn, Intrinsic::amdgcn_image_sample_b_cl_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLodBias) |
+         (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_b_o_1d_nortn, Intrinsic::amdgcn_image_sample_b_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_b_o_3d_nortn, Intrinsic::amdgcn_image_sample_b_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_b_o_1darray_nortn, Intrinsic::amdgcn_image_sample_b_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare),
+     {Intrinsic::amdgcn_image_sample_c_1d_nortn, Intrinsic::amdgcn_image_sample_c_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_3d_nortn, Intrinsic::amdgcn_image_sample_c_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_1darray_nortn, Intrinsic::amdgcn_image_sample_c_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxLodBias),
+     {Intrinsic::amdgcn_image_sample_c_b_1d_nortn, Intrinsic::amdgcn_image_sample_c_b_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_3d_nortn, Intrinsic::amdgcn_image_sample_c_b_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_1darray_nortn, Intrinsic::amdgcn_image_sample_c_b_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxLodBias) | (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_c_b_cl_1d_nortn, Intrinsic::amdgcn_image_sample_c_b_cl_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_cl_3d_nortn, Intrinsic::amdgcn_image_sample_c_b_cl_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_cl_1darray_nortn, Intrinsic::amdgcn_image_sample_c_b_cl_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxLodBias) | (1U << Builder::ImageAddressIdxLodClamp) |
+         (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_c_b_cl_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_b_cl_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_cl_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_b_cl_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_cl_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_b_cl_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxLodBias) | (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_c_b_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_b_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_b_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_b_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_b_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_c_cl_1d_nortn, Intrinsic::amdgcn_image_sample_c_cl_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_cl_3d_nortn, Intrinsic::amdgcn_image_sample_c_cl_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_cl_1darray_nortn, Intrinsic::amdgcn_image_sample_c_cl_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxLodClamp) | (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_c_cl_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_cl_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_cl_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_cl_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_cl_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_cl_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxDerivativeX) | (1U << Builder::ImageAddressIdxDerivativeY),
+     {Intrinsic::amdgcn_image_sample_c_d_1d_nortn, Intrinsic::amdgcn_image_sample_c_d_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_3d_nortn, Intrinsic::amdgcn_image_sample_c_d_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_1darray_nortn, Intrinsic::amdgcn_image_sample_c_d_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxDerivativeX) | (1U << Builder::ImageAddressIdxDerivativeY) |
+         (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_c_d_cl_1d_nortn, Intrinsic::amdgcn_image_sample_c_d_cl_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_cl_3d_nortn, Intrinsic::amdgcn_image_sample_c_d_cl_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_cl_1darray_nortn, Intrinsic::amdgcn_image_sample_c_d_cl_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxDerivativeX) | (1U << Builder::ImageAddressIdxDerivativeY) |
+         (1U << Builder::ImageAddressIdxLodClamp) | (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_c_d_cl_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_d_cl_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_cl_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_d_cl_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_cl_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_d_cl_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxDerivativeX) |
+         (1U << Builder::ImageAddressIdxDerivativeY) | (1U << Builder::ImageAddressIdxZCompare) |
+         (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_c_d_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_d_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_d_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_d_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_d_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLod) |
+         (1U << Builder::ImageAddressIdxZCompare),
+     {Intrinsic::amdgcn_image_sample_c_l_1d_nortn, Intrinsic::amdgcn_image_sample_c_l_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_l_3d_nortn, Intrinsic::amdgcn_image_sample_c_l_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_l_1darray_nortn, Intrinsic::amdgcn_image_sample_c_l_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxOffset) |
+         (1U << Builder::ImageAddressIdxLod) | (1U << Builder::ImageAddressIdxZCompare),
+     {Intrinsic::amdgcn_image_sample_c_l_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_l_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_l_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_l_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_l_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_l_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxOffset) |
+         (1U << Builder::ImageAddressIdxZCompare),
+     {Intrinsic::amdgcn_image_sample_c_o_1d_nortn, Intrinsic::amdgcn_image_sample_c_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_c_o_3d_nortn, Intrinsic::amdgcn_image_sample_c_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_c_o_1darray_nortn, Intrinsic::amdgcn_image_sample_c_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_cl_1d_nortn, Intrinsic::amdgcn_image_sample_cl_2d_nortn,
+      Intrinsic::amdgcn_image_sample_cl_3d_nortn, Intrinsic::amdgcn_image_sample_cl_cube_nortn,
+      Intrinsic::amdgcn_image_sample_cl_1darray_nortn, Intrinsic::amdgcn_image_sample_cl_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLodClamp) |
+         (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_cl_o_1d_nortn, Intrinsic::amdgcn_image_sample_cl_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_cl_o_3d_nortn, Intrinsic::amdgcn_image_sample_cl_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_cl_o_1darray_nortn, Intrinsic::amdgcn_image_sample_cl_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxDerivativeX) |
+         (1U << Builder::ImageAddressIdxDerivativeY),
+     {Intrinsic::amdgcn_image_sample_d_1d_nortn, Intrinsic::amdgcn_image_sample_d_2d_nortn,
+      Intrinsic::amdgcn_image_sample_d_3d_nortn, Intrinsic::amdgcn_image_sample_d_cube_nortn,
+      Intrinsic::amdgcn_image_sample_d_1darray_nortn, Intrinsic::amdgcn_image_sample_d_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxDerivativeX) |
+         (1U << Builder::ImageAddressIdxDerivativeY) | (1U << Builder::ImageAddressIdxLodClamp),
+     {Intrinsic::amdgcn_image_sample_d_cl_1d_nortn, Intrinsic::amdgcn_image_sample_d_cl_2d_nortn,
+      Intrinsic::amdgcn_image_sample_d_cl_3d_nortn, Intrinsic::amdgcn_image_sample_d_cl_cube_nortn,
+      Intrinsic::amdgcn_image_sample_d_cl_1darray_nortn, Intrinsic::amdgcn_image_sample_d_cl_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxDerivativeX) |
+         (1U << Builder::ImageAddressIdxDerivativeY) | (1U << Builder::ImageAddressIdxLodClamp) |
+         (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_d_cl_o_1d_nortn, Intrinsic::amdgcn_image_sample_d_cl_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_d_cl_o_3d_nortn, Intrinsic::amdgcn_image_sample_d_cl_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_d_cl_o_1darray_nortn, Intrinsic::amdgcn_image_sample_d_cl_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxDerivativeX) |
+         (1U << Builder::ImageAddressIdxDerivativeY) | (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_d_o_1d_nortn, Intrinsic::amdgcn_image_sample_d_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_d_o_3d_nortn, Intrinsic::amdgcn_image_sample_d_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_d_o_1darray_nortn, Intrinsic::amdgcn_image_sample_d_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLod),
+     {Intrinsic::amdgcn_image_sample_l_1d_nortn, Intrinsic::amdgcn_image_sample_l_2d_nortn,
+      Intrinsic::amdgcn_image_sample_l_3d_nortn, Intrinsic::amdgcn_image_sample_l_cube_nortn,
+      Intrinsic::amdgcn_image_sample_l_1darray_nortn, Intrinsic::amdgcn_image_sample_l_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxLod) |
+         (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_l_o_1d_nortn, Intrinsic::amdgcn_image_sample_l_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_l_o_3d_nortn, Intrinsic::amdgcn_image_sample_l_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_l_o_1darray_nortn, Intrinsic::amdgcn_image_sample_l_o_2darray_nortn}},
+    {(1U << Builder::ImageAddressIdxCoordinate) | (1U << Builder::ImageAddressIdxOffset),
+     {Intrinsic::amdgcn_image_sample_o_1d_nortn, Intrinsic::amdgcn_image_sample_o_2d_nortn,
+      Intrinsic::amdgcn_image_sample_o_3d_nortn, Intrinsic::amdgcn_image_sample_o_cube_nortn,
+      Intrinsic::amdgcn_image_sample_o_1darray_nortn, Intrinsic::amdgcn_image_sample_o_2darray_nortn}},
+    {0}};
+
 // Intrinsic ID table for struct buffer atomic
 static const Intrinsic::ID StructBufferAtomicIntrinsicTable[] = {
     Intrinsic::amdgcn_struct_buffer_atomic_swap, Intrinsic::amdgcn_struct_buffer_atomic_cmpswap,
@@ -1000,7 +1149,8 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   // Build the intrinsic arguments and overloaded types.
   SmallVector<Value *, 16> args;
   SmallVector<Type *, 4> overloadTys;
-  overloadTys.push_back(resultTy);
+  if (resultTy && !resultTy->isVoidTy())
+    overloadTys.push_back(resultTy);
 
   // Dmask.
   unsigned dmask = 15;
@@ -1089,7 +1239,9 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   args.push_back(getInt32(coherent.u32All));
 
   // Search the intrinsic ID table.
-  auto table = isSample ? &ImageSampleIntrinsicTable[0] : &ImageGather4IntrinsicTable[0];
+  auto table = isSample ? ((!resultTy || resultTy->isVoidTy()) ? &ImageSampleNoReturnIntrinsicTable[0]
+                                                               : &ImageSampleIntrinsicTable[0])
+                        : &ImageGather4IntrinsicTable[0];
   for (;; ++table) {
     assert(table->matchMask != 0 && "Image sample/gather intrinsic ID not found");
     if (table->matchMask == addressMask)

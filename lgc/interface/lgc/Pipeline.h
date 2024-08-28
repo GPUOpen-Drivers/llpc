@@ -100,6 +100,8 @@ enum class ThreadGroupSwizzleMode : unsigned {
   _4x4 = 1,    // The tile size is 4x4 in x and y dimension.
   _8x8 = 2,    // The tile size is 8x8 in x and y dimension.
   _16x16 = 3,  // The tile size is 16x16 in x and y dimension.
+  _32x32 = 4,  // The tile size is 32x32 in x and y dimension.
+  _64x64 = 5,  // The tile size is 64x64 in x and y dimension.
   Count,
 };
 
@@ -127,7 +129,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[44];
+  unsigned u32All[46];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -197,7 +199,9 @@ union Options {
     unsigned reserved22;
     bool dynamicTopology; // Whether primitive topology is dynamic.
     bool reserved23;
-    bool forceUserDataSpill; // Whether to force all user data to be spilled (Currently only for RT).
+    bool forceUserDataSpill;    // Whether to force all user data to be spilled (Currently only for RT).
+    bool enableMapClipDistMask; // For OGL only, whether to remap the clip distances.
+    unsigned clipPlaneMask;     // For OGL only, defines the bitmask for enabling/disabling clip planes.
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -653,6 +657,12 @@ struct GeometryShaderMode {
   unsigned robustGsEmits;           // robust buffer access
 };
 
+// Kind of derivativeMode:
+// None: Return 0 for derivatives calculation of compute shader
+// Linear: Calculating derivatives in linear mode(4*1)
+// Quads: Calculating derivatives in Quads mode(2*2)
+enum class DerivativeMode : unsigned { None, Linear, Quads };
+
 // Struct to pass to MeshShaderMode. The front-end should zero-initialize it with "= {}" in case
 // future changes add new fields.
 // All fields are unsigned, even those that could be bool, because the way the state is written to and read
@@ -664,6 +674,7 @@ struct MeshShaderMode {
   unsigned workgroupSizeX;          // X dimension of workgroup size. 0 is taken to be 1
   unsigned workgroupSizeY;          // Y dimension of workgroup size. 0 is taken to be 1
   unsigned workgroupSizeZ;          // Z dimension of workgroup size. 0 is taken to be 1
+  DerivativeMode derivativeMode;    // DerivativeMode for meshShader
 };
 
 // Kind of conservative depth/stencil
@@ -688,12 +699,6 @@ struct FragmentShaderMode {
   unsigned waveOpsRequireHelperLanes;
 };
 
-// Kind of derivativeMode:
-// None: Return 0 for derivatives calculation of compute shader
-// Linear: Calculating derivatives in linear mode(4*1)
-// Quads: Calculating derivatives in Quads mode(2*2)
-enum class DerivativeMode : unsigned { None, Linear, Quads };
-
 // Struct to pass to SetComputeShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // All fields are unsigned, even those that could be bool, because the way the state is written to and read
@@ -703,7 +708,7 @@ struct ComputeShaderMode {
   unsigned workgroupSizeY;             // Y dimension of workgroup size. 0 is taken to be 1
   unsigned workgroupSizeZ;             // Z dimension of workgroup size. 0 is taken to be 1
   unsigned subgroupSize;               // Override for the wave size if it is non-zero
-  DerivativeMode derivatives;          // derivativeMode for computeShader
+  DerivativeMode derivativeMode;       // derivativeMode for computeShader
   unsigned noLocalInvocationIdInCalls; // For compute with calls, assume local invocation ID is never used in callees
 };
 

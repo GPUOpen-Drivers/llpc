@@ -122,6 +122,7 @@ LowerCooperativeMatrix::TypeProperties LowerCooperativeMatrix::getTypeProperties
     props.numMatrixElements = 8;
     props.numMatrixWords = 8;
     break;
+  case CooperativeMatrixElementType::BFloat16:
   case CooperativeMatrixElementType::Float16:
   case CooperativeMatrixElementType::Float16Packed:
   case CooperativeMatrixElementType::Int16:
@@ -141,7 +142,7 @@ LowerCooperativeMatrix::TypeProperties LowerCooperativeMatrix::getTypeProperties
     assert(elemType != CooperativeMatrixElementType::Float32 && elemType != CooperativeMatrixElementType::Int32);
     props.numFlatElements = 16;
   } else if (layout == CooperativeMatrixLayout::AccumulatorMatrixLayout) {
-    if (elemType == CooperativeMatrixElementType::Float16 || elemType == CooperativeMatrixElementType::Int16) {
+    if (BuilderCommon::isTypeNCooperativeMatrix(elemType, 16)) {
       props.matrixElementStride = 2;
     }
     if (elemType == CooperativeMatrixElementType::Float16Packed) {
@@ -526,9 +527,21 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
   builder.SetInsertPoint(insertPos);
   Value *resultValue = nullptr;
   const unsigned vecSize = cast<FixedVectorType>(source->getType())->getNumElements();
-  Type *dstType = FixedVectorType::get(builder.transCooperativeMatrixElementType(dstElemType), vecSize);
 
-  if ((srcElemType == CooperativeMatrixElementType::Float16 || srcElemType == CooperativeMatrixElementType::Float32) &&
+  Type *dstType = nullptr;
+  if (dstElemType == CooperativeMatrixElementType::BFloat16)
+    dstType = FixedVectorType::get(builder.getBFloatTy(), vecSize);
+  else
+    dstType = FixedVectorType::get(builder.transCooperativeMatrixElementType(dstElemType), vecSize);
+
+  if (srcElemType == CooperativeMatrixElementType::BFloat16) {
+    assert(source->getType()->isIntOrIntVectorTy());
+    auto *bfloat16Vec = FixedVectorType::get(builder.getBFloatTy(), vecSize);
+    source = builder.CreateBitCast(source, bfloat16Vec);
+  }
+
+  if ((srcElemType == CooperativeMatrixElementType::Float16 || srcElemType == CooperativeMatrixElementType::BFloat16 ||
+       srcElemType == CooperativeMatrixElementType::Float32) &&
       (castOp == Instruction::FPToUI || castOp == Instruction::FPToSI)) {
     // FIXME: fp16's range is covered by i32. So `fptoi half` can convert
     // to i32 first following a sext/zext to target integer type.
@@ -538,8 +551,18 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
     if (builder.transCooperativeMatrixElementType(dstElemType)->getScalarSizeInBits() < 32) {
       resultValue = builder.CreateTrunc(resultValue, dstType);
     }
+  } else if (castOp == Instruction::FPTrunc && (srcElemType == CooperativeMatrixElementType::Float16 ||
+                                                srcElemType == CooperativeMatrixElementType::BFloat16)) {
+    // Float16 -> BFloat16 or BFloat16 -> Float16
+    resultValue = builder.CreateCast(Instruction::FPExt, source, FixedVectorType::get(builder.getFloatTy(), vecSize),
+                                     "Convert16tofloat32");
+    resultValue = builder.CreateFPTrunc(resultValue, dstType);
   } else {
     resultValue = builder.CreateCast(castOp, source, dstType, "castOpConvert");
+  }
+
+  if (dstElemType == CooperativeMatrixElementType::BFloat16) {
+    resultValue = builder.CreateBitCast(resultValue, FixedVectorType::get(builder.getInt16Ty(), vecSize));
   }
 
   return resultValue;
@@ -1391,38 +1414,54 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
     Value *matrixD;
     unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
 
-    if (factorElemType == CooperativeMatrixElementType::Float16 ||
-        factorElemType == CooperativeMatrixElementType::Int16) {
+    if (BuilderCommon::isTypeNCooperativeMatrix(factorElemType, 16)) {
       unsigned factorFlatElemNum = 0;
       { factorFlatElemNum = 16; }
       Type *factorType =
           FixedVectorType::get(builder.transCooperativeMatrixElementType(factorElemType), factorFlatElemNum);
       matrixA = builder.CreateBitCast(matrixA, factorType);
       matrixB = builder.CreateBitCast(matrixB, factorType);
-    } else if (factorElemType == CooperativeMatrixElementType::Int8) {
+    } else if (BuilderCommon::isTypeNCooperativeMatrix(factorElemType, 8)) {
     } else {
       llvm_unreachable("Factor element type is not supported!");
     }
 
-    if (accumElemType == CooperativeMatrixElementType::Float32 ||
-        accumElemType == CooperativeMatrixElementType::Int32) {
+    if (BuilderCommon::isTypeNCooperativeMatrix(accumElemType, 32)) {
       matrixC =
           waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector") : matrixC;
-    } else if (accumElemType == CooperativeMatrixElementType::Float16 ||
-               accumElemType == CooperativeMatrixElementType::Int16) {
+    } else if (BuilderCommon::isTypeNCooperativeMatrix(accumElemType, 16)) {
       {
         matrixC = waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector")
                                  : matrixC;
       }
       unsigned matrixLength = cast<FixedVectorType>(matrixC->getType())->getNumElements();
-      Type *accumType = FixedVectorType::get(builder.getHalfTy(), matrixLength * 2);
+
+      Type *castType = nullptr;
+      if (accumElemType == CooperativeMatrixElementType::BFloat16) {
+        // HW instructions require i16 type for bfloat16.
+        castType = builder.getInt16Ty();
+      } else
+        castType = builder.getHalfTy();
+      Type *accumType = FixedVectorType::get(castType, matrixLength * 2);
       matrixC = builder.CreateBitCast(matrixC, accumType);
     } else {
       llvm_unreachable("Accumulator element type is not supported!");
     }
 
-    if (factorElemType == CooperativeMatrixElementType::Float16 &&
-        accumElemType == CooperativeMatrixElementType::Float32) {
+    if (factorElemType == CooperativeMatrixElementType::BFloat16) {
+      Intrinsic::AMDGCNIntrinsics intrinsic = Intrinsic::amdgcn_wmma_bf16_16x16x16_bf16;
+      SmallVector<Value *, 3> args({matrixA, matrixB, matrixC});
+      if (accumElemType == CooperativeMatrixElementType::Float32)
+        intrinsic = Intrinsic::amdgcn_wmma_f32_16x16x16_bf16;
+      else {
+        assert(accumElemType == CooperativeMatrixElementType::BFloat16);
+        args.push_back(builder.getInt1(isSatOrOpsel));
+        if (muladd.getIsTied())
+          intrinsic = Intrinsic::amdgcn_wmma_bf16_16x16x16_bf16_tied;
+      }
+      matrixD = builder.CreateIntrinsic(matrixC->getType(), intrinsic, args, nullptr, instName);
+    } else if (factorElemType == CooperativeMatrixElementType::Float16 &&
+               accumElemType == CooperativeMatrixElementType::Float32) {
       matrixD = builder.CreateIntrinsic(matrixC->getType(), Intrinsic::amdgcn_wmma_f32_16x16x16_f16,
                                         {matrixA, matrixB, matrixC}, nullptr, instName);
 
@@ -1451,8 +1490,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
       llvm_unreachable("The accumulator type is not supported.");
     }
 
-    if (accumElemType == CooperativeMatrixElementType::Float16 ||
-        accumElemType == CooperativeMatrixElementType::Int16) {
+    if (BuilderCommon::isTypeNCooperativeMatrix(accumElemType, 16)) {
       unsigned coopVeclength = cast<FixedVectorType>(matrixD->getType())->getNumElements();
       Type *wordTy = builder.transCooperativeMatrixElementType(accumElemType)->isIntOrIntVectorTy()
                          ? builder.getInt32Ty()

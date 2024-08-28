@@ -82,6 +82,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitWaveScanOp)
                             .add(&LowerGpuRt::visitGetKnownSetRayFlagsOp)
                             .add(&LowerGpuRt::visitGetKnownUnsetRayFlagsOp)
+                            .add(&LowerGpuRt::visitInitStaticId)
                             .build();
 
   visitor.visit(*this, module);
@@ -543,6 +544,17 @@ void LowerGpuRt::visitGetKnownUnsetRayFlagsOp(lgc::GpurtGetKnownUnsetRayFlagsOp 
   m_builder->SetInsertPoint(&inst);
   auto flags = lgc::gpurt::getKnownUnsetRayFlags(*inst.getModule());
   inst.replaceAllUsesWith(m_builder->getInt32(flags));
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtInitStaticIdOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitInitStaticId(lgc::GpurtInitStaticIdOp &inst) {
+  inst.replaceAllUsesWith(m_builder->getInt32(
+      llvm::hash_combine(m_pipelineState->getOptions().hash, inst.getModule()->getName(), m_rayStaticId++)));
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

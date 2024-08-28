@@ -24,6 +24,7 @@
  **********************************************************************************************************************/
 
 #include "compilerutils/CompilerUtils.h"
+#include "compilerutils/DxilToLlvm.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Attributes.h"
@@ -32,6 +33,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -543,4 +545,21 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
   }
   assert(PhiElems.empty() && "All phi inputs need to be handled, otherwise we end in an inconsistent state");
 #endif
+}
+
+void CompilerUtils::RegisterPasses(llvm::PassBuilder &PB) {
+#define HANDLE_PASS(NAME, CREATE_PASS)                                                                                 \
+  if (innerPipeline.empty() && name == NAME) {                                                                         \
+    passMgr.addPass(CREATE_PASS);                                                                                      \
+    return true;                                                                                                       \
+  }
+
+  PB.registerPipelineParsingCallback(
+      [](StringRef name, ModulePassManager &passMgr, ArrayRef<PassBuilder::PipelineElement> innerPipeline) {
+        StringRef Params;
+        (void)Params;
+#define COMPILERUTILS_PASS HANDLE_PASS
+#include "PassRegistry.inc"
+        return false;
+      });
 }

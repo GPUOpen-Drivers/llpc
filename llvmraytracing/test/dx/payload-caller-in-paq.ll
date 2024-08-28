@@ -46,8 +46,8 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.start.p0(i64 16, ptr [[TMP5]]) #[[ATTR0]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store float 1.000000e+00, ptr [[TMP6]], align 8, !tbaa [[TBAA28:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP7]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], 0
@@ -58,7 +58,7 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr [[TMP10]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 -1, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [10 x i32] poison, [1 x i32] [[TMP12]]), !continuation.registercount [[META32:![0-9]+]], !continuation.wait.await [[META13]], !continuation.returnedRegistercount [[META25:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [10 x i32] poison, [1 x i32] [[TMP12]]), !continuation.registercount [[META32:![0-9]+]], !waitmask [[META33:![0-9]+]], !continuation.returnedRegistercount [[META25:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } @await(ptr [[TMP17]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } [[TMP20]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [3 x i32] [[TMP15]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
@@ -85,20 +85,21 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE:       .split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = load float, ptr [[TMP6]], align 8, !tbaa [[TBAA28]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4, !tbaa [[TBAA33:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4, !tbaa [[TBAA34:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = sitofp i32 [[TMP44]] to float
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load double, ptr [[TMP46]], align 8, !tbaa [[TBAA35:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load double, ptr [[TMP46]], align 8, !tbaa [[TBAA36:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = fptrunc double [[TMP47]] to float
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP49]], i8 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP50]], i8 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP37]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP37]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP52]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP42]], float [[TMP45]], float [[TMP48]], float 0.000000e+00, i8 15)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.end.p0(i64 16, ptr [[TMP5]]) #[[ATTR0]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret void
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @lgc.cps.complete()
+; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A", align 4
   %2 = load %dx.types.Handle, %dx.types.Handle* @"\01?gOutput@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4

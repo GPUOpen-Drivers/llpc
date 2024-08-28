@@ -68,7 +68,7 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
 
   if (!needLowerClipVertex() && !needLowerFrontColor() && !needLowerBackColor() && !needLowerFrontSecondaryColor() &&
       !needLowerBackSecondaryColor() && !needEmulateDrawPixels() && !needEmulateTwoSideLighting() &&
-      !needEmulateBitmap() && !needLowerFragColor() && !needEmulateSmoothStipple())
+      !needEmulateBitmap() && !needLowerFragColor() && !needEmulateSmoothStipple() && !needLowerAlphaTest())
     return PreservedAnalyses::all();
 
   buildPatchPositionInfo();
@@ -90,6 +90,9 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
 
   if (needLowerFragColor())
     lowerFragColor();
+
+  if (needLowerAlphaTest())
+    lowerAlphaTest();
 
   if (needEmulateDrawPixels())
     emulateDrawPixels();
@@ -119,6 +122,8 @@ bool LowerGLCompatibility::needRun() {
                                                   ->pModuleData);
     auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
     auto options = m_context->getPipelineContext()->getPipelineOptions();
+    bool enableAlphaTest =
+        (m_shaderStage == Vkgc::ShaderStageFragment && buildInfo->glState.alphaTestFunc != Vkgc::AlphaTestFunc::Always);
     result |= moduleData->usage.useClipVertex;
     result |= moduleData->usage.useFrontColor;
     result |= moduleData->usage.useBackColor;
@@ -132,6 +137,7 @@ bool LowerGLCompatibility::needRun() {
     result |= options->getGlState().enablePolygonStipple;
     result |= options->getGlState().enableLineSmooth;
     result |= options->getGlState().enablePointSmooth;
+    result |= enableAlphaTest;
   }
   return result;
 }
@@ -534,6 +540,13 @@ bool LowerGLCompatibility::needEmulateSmoothStipple() {
 bool LowerGLCompatibility::needLowerFragColor() {
   auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   return m_fragColor && (m_shaderStage == ShaderStageFragment) && (buildInfo->glState.enableColorClampFs);
+}
+
+// =====================================================================================================================
+// Check whether need do alphaTest.
+bool LowerGLCompatibility::needLowerAlphaTest() {
+  auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  return (m_shaderStage == ShaderStageFragment) && (buildInfo->glState.alphaTestFunc != Vkgc::AlphaTestFunc::Always);
 }
 
 // =====================================================================================================================
@@ -1187,6 +1200,145 @@ void LowerGLCompatibility::lowerBackSecondaryColor() {
 // Does clamp fragment color
 void LowerGLCompatibility::lowerFragColor() {
   lowerColor(m_fragColor);
+}
+
+// =====================================================================================================================
+// Does lowering operations for alpha test.
+void LowerGLCompatibility::lowerAlphaTest() {
+  GlobalVariable *outputLocationZero = nullptr;
+  auto floatTy = m_builder->getFloatTy();
+  Type *vec4Type = VectorType::get(floatTy, 4, false);
+
+  for (GlobalVariable &global : m_module->globals()) {
+    if (global.getType()->getAddressSpace() == SPIRAS_Output) {
+      ShaderInOutMetadata outputMeta = {};
+      MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
+      auto *meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+      outputMeta.U64All[0] = cast<ConstantInt>(meta->getOperand(0))->getZExtValue();
+      outputMeta.U64All[1] = cast<ConstantInt>(meta->getOperand(1))->getZExtValue();
+
+      if (outputMeta.Value == 0) {
+        outputLocationZero = &global;
+        break;
+      }
+    }
+  }
+
+  if (outputLocationZero != nullptr && outputLocationZero->getValueType()->isVectorTy()) {
+    auto type = cast<FixedVectorType>(outputLocationZero->getValueType());
+    uint32_t vectorNum = type->getNumElements();
+    if (vectorNum != 4)
+      return;
+  } else
+    return;
+
+  auto buildInfo = static_cast<const GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  auto predicate = CmpInst::Predicate::BAD_FCMP_PREDICATE;
+
+  switch (buildInfo->glState.alphaTestFunc) {
+  case Vkgc::AlphaTestFunc::Always: {
+    // always pass, do nothing
+    return;
+  }
+  case Vkgc::AlphaTestFunc::Never: {
+    predicate = CmpInst::Predicate::FCMP_FALSE;
+    break;
+  }
+  case Vkgc::AlphaTestFunc::Less: {
+    predicate = CmpInst::Predicate::FCMP_OLT;
+    break;
+  }
+  case Vkgc::AlphaTestFunc::LEqual: {
+    predicate = CmpInst::Predicate::FCMP_OLE;
+    break;
+  }
+  case Vkgc::AlphaTestFunc::Equal: {
+    predicate = CmpInst::Predicate::FCMP_OEQ;
+    break;
+  }
+  case Vkgc::AlphaTestFunc::GEqual: {
+    predicate = CmpInst::Predicate::FCMP_OGE;
+    break;
+  }
+  case Vkgc::AlphaTestFunc::Greater: {
+    predicate = CmpInst::Predicate::FCMP_OGT;
+    break;
+  }
+  case Vkgc::AlphaTestFunc::NotEqual: {
+    predicate = CmpInst::Predicate::FCMP_ONE;
+    break;
+  }
+  }
+
+  m_builder->SetInsertPoint(m_retInst);
+  auto lastBB = m_builder->GetInsertBlock();
+  lastBB->splitBasicBlock(m_retInst);
+  m_builder->SetInsertPoint(lastBB->getTerminator());
+
+  // if the alpha test is never, then discard it
+  if (predicate == llvm::CmpInst::Predicate::FCMP_FALSE) {
+    // Always discard.
+    m_builder->CreateKill();
+    return;
+  }
+
+  // get mrt0.alpha
+  Value *outputValue = m_builder->CreateLoad(vec4Type, outputLocationZero);
+  Value *outputAlpha = m_builder->CreateExtractElement(outputValue, 3);
+
+  // get alphaRef
+  auto alphaRef = new GlobalVariable(*m_module, floatTy, false, GlobalValue::ExternalLinkage, nullptr, "alphaTestRef",
+                                     nullptr, GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Uniform);
+  auto locationFound =
+      getUniformConstantEntryByLocation(m_context, m_shaderStage, Vkgc::GlCompatibilityUniformLocation::AlphaTestRef);
+  assert(locationFound != nullptr);
+  auto alphaTestBaseOffset = locationFound->offset;
+  unsigned constBufferBinding =
+      Vkgc::ConstantBuffer0Binding + static_cast<GraphicsContext *>(m_context->getPipelineContext())
+                                         ->getPipelineShaderInfo(m_shaderStage)
+                                         ->options.constantBufferBindingOffset;
+  std::vector<Metadata *> mDs;
+  auto int32Ty = Type::getInt32Ty(*m_context);
+  mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::InternalDescriptorSetId)));
+  mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, constBufferBinding)));
+  mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, alphaTestBaseOffset)));
+  mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::GlCompatibilityUniformLocation::AlphaTestRef)));
+  auto mdNode = MDNode::get(*m_context, mDs);
+  alphaRef->addMetadata(gSPIRVMD::UniformConstant, *mdNode);
+
+  Value *refValue = m_builder->CreateLoad(floatTy, alphaRef);
+
+  // br %1, label %.AlphaTestDiscard, label %.AlphaTestPass
+  //
+  // .AlphaTestDiscard:
+  // call void (...) @glc.create.kill()
+  // br label %2
+  //
+  // .AlphaTestPass:
+  // br label %2
+  //
+  // label %2:
+  // br label %3
+  //
+  // label %3:
+  // terminator
+  auto *cond = dyn_cast<Instruction>(m_builder->CreateCmp(predicate, outputAlpha, refValue));
+
+  auto *compBB = m_builder->GetInsertBlock();
+  auto *exitBB = compBB->splitBasicBlock(cond->getParent()->getTerminator());
+  auto discardBB = BasicBlock::Create(*m_context, ".AlphaTestDiscard", cond->getFunction(), exitBB);
+  auto passBB = BasicBlock::Create(*m_context, ".AlphaTestPass", cond->getFunction(), exitBB);
+
+  m_builder->SetInsertPoint(compBB);
+  compBB->getTerminator()->eraseFromParent();
+  m_builder->CreateCondBr(cond, passBB, discardBB);
+  m_builder->SetInsertPoint(discardBB);
+
+  m_builder->CreateKill();
+  m_builder->CreateBr(exitBB);
+
+  m_builder->SetInsertPoint(passBB);
+  m_builder->CreateBr(exitBB);
 }
 
 } // namespace Llpc

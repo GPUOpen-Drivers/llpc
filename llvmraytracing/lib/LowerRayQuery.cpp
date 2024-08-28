@@ -541,7 +541,14 @@ void LowerRayQuery::visitHitAccessor(GpurtFunc funcType, Value *rayQuery, bool c
 
   CrossModuleInliner inliner;
   auto call = inliner.inlineCall(*m_builder, gpurtFunc, {rayQuery, committedArg});
-  inst->replaceAllUsesWith(call.returnValue);
+  Value *retVal = call.returnValue;
+  // If the return value is a struct with a single element whose type matches the dialect op's return
+  // value, then extract the value.
+  if (auto *structTy = dyn_cast<StructType>(retVal->getType())) {
+    if (structTy->getNumElements() == 1 && structTy->getElementType(0) == inst->getType())
+      retVal = m_builder->CreateExtractValue(retVal, 0);
+  }
+  inst->replaceAllUsesWith(retVal);
   m_typeLowering->eraseInstruction(inst);
   m_funcsToLower.insert(inst->getCalledFunction());
 }

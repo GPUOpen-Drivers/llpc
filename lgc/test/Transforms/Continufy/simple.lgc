@@ -14,7 +14,8 @@ define spir_func void @raygen() !lgc.shaderstage !{i32 7} !continufy.stage !{i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = or i32 [[TMP1]], 3
 ; CHECK-NEXT:    [[TMP3:%.*]] = call [2 x i32] (...) @lgc.cps.await__a2i32(i32 [[TMP2]], i32 8, i32 poison, i32 [[X]], ptr addrspace(1) [[DST]])
 ; CHECK-NEXT:    store [2 x i32] [[TMP3]], ptr addrspace(1) [[DST]], align 4
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:    call void @lgc.cps.complete()
+; CHECK-NEXT:    unreachable
 ;
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 0)
   %fn = load ptr, ptr addrspace(4) %pushconst
@@ -60,7 +61,8 @@ define dllexport void @lgc.shader.CS.main() !lgc.shaderstage !{i32 7} {
 ; CHECK-NEXT:    call void (...) @lgc.cps.await__isVoid(i32 [[TMP1]], i32 2, i32 poison)
 ; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
-; CHECK-NEXT:    ret void
+; CHECK-NEXT:    call void @lgc.cps.complete()
+; CHECK-NEXT:    unreachable
 ;
 entry:
   %id = call i32 @lgc.shader.input.LocalInvocationId(i32 49)

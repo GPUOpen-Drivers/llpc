@@ -137,7 +137,8 @@ private:
   llvm::Instruction *makeLoop(llvm::Value *const loopStart, llvm::Value *const loopEnd, llvm::Value *const loopStride,
                               llvm::Instruction *const insertPos);
   llvm::Value *createGlobalPointerAccess(llvm::Value *const bufferDesc, llvm::Value *const offset,
-                                         llvm::Type *const type, llvm::Instruction &inst,
+                                         llvm::Value *const strideIndex, llvm::Type *const type,
+                                         llvm::Instruction &inst,
                                          const llvm::function_ref<llvm::Value *(llvm::Value *)> callback);
   llvm::Value *createCompactDesc(llvm::Value *const buffAddress, llvm::Value *const stride);
   llvm::Value *createLoadDesc(llvm::Value *buffAddress, bool forceRawView, bool isCompact);

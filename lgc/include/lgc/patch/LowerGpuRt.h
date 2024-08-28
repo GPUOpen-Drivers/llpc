@@ -61,6 +61,7 @@ class GpurtContinuationStackIsGlobalOp;
 class GpurtWaveScanOp;
 class GpurtGetKnownSetRayFlagsOp;
 class GpurtGetKnownUnsetRayFlagsOp;
+class GpurtInitStaticIdOp;
 
 class LowerGpuRt : public llvm::PassInfoMixin<LowerGpuRt> {
 public:
@@ -91,11 +92,13 @@ private:
   void visitWaveScanOp(lgc::GpurtWaveScanOp &inst);
   void visitGetKnownSetRayFlagsOp(lgc::GpurtGetKnownSetRayFlagsOp &inst);
   void visitGetKnownUnsetRayFlagsOp(lgc::GpurtGetKnownUnsetRayFlagsOp &inst);
+  void visitInitStaticId(lgc::GpurtInitStaticIdOp &inst);
   llvm::Value *m_stack = nullptr;                        // Stack array to hold stack value
   llvm::Type *m_stackTy = nullptr;                       // Stack type
   PipelineState *m_pipelineState = nullptr;              // Pipeline state
   llvm::SmallVector<llvm::Instruction *> m_callsToLower; // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;    // Functions to lower
   Builder *m_builder = nullptr;
+  unsigned m_rayStaticId = 0;
 };
 } // namespace lgc

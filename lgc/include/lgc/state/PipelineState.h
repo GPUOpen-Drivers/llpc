@@ -36,6 +36,7 @@
 #include "lgc/state/ResourceUsage.h"
 #include "lgc/state/ShaderModes.h"
 #include "lgc/state/ShaderStage.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/PassManager.h"
@@ -103,7 +104,6 @@ struct NggControl {
 // Represents transform feedback state metadata
 struct XfbStateMetadata {
   bool enableXfb;                                               // Whether transform feedback is active
-  bool enablePrimStats;                                         // Whether to count generated primitives
   std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer
   std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream
   std::array<bool, MaxGsStreams> streamActive;                  // Flag indicating which vertex stream is active
@@ -413,8 +413,7 @@ public:
   bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
 
   // Check if we need count primitives if XFB is disabled
-  // NOTE: The old interface m_xfbStateMetadata.enablePrimStats will be removed later
-  bool enablePrimStats() const { return m_options.enablePrimGeneratedQuery || m_xfbStateMetadata.enablePrimStats; }
+  bool enablePrimStats() const { return m_options.enablePrimGeneratedQuery; }
 
   // Get transform feedback strides
   const std::array<unsigned, MaxTransformFeedbackBuffers> &getXfbBufferStrides() const {
@@ -459,6 +458,7 @@ public:
 
   // Get spill_threshold for a specific shader stage
   unsigned getSpillThreshold(ShaderStageEnum shaderStage) { return m_shaderSpillThreshold[shaderStage]; }
+
   // -----------------------------------------------------------------------------------------------------------------
   // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
 

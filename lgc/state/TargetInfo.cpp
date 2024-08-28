@@ -325,6 +325,30 @@ static void setGfx1103Info(TargetInfo *targetInfo) {
 }
 #endif
 
+#if LLPC_BUILD_STRIX1
+// gfx1150
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1150Info(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
+
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+}
+
+// gfx115F
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx115FInfo(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
+
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+}
+#endif
+
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
 //
@@ -358,6 +382,10 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
     {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
 #if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
     {"gfx1103", &setGfx1103Info}, // gfx1103, phoenix1
+#endif
+#if LLPC_BUILD_STRIX1
+    {"gfx1150", &setGfx1150Info}, // gfx1150, strix
+    {"gfx115F", &setGfx115FInfo}, // gfx115F, strix A0
 #endif
   };
 

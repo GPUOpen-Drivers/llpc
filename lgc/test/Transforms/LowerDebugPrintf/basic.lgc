@@ -23,6 +23,7 @@ define spir_func void @simple() !lgc.shaderstage !0 {
 ; PALMD-NEXT:       .argument_count: 1
 ; PALMD-NEXT:       .index:
 ; PALMD-NEXT:       .string:         'Test: %u'
+; PALMD-NEXT:   .user_data_offset:  0
 ; PALMD-NEXT:   .version:        1
 
 declare void @lgc.debug.printf(...)

@@ -1,9 +1,9 @@
 ; RUN: grep -v MAX_REG_10 %s | \
-; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,continuations-lint,remove-types-metadata' -S --lint-abort-on-error | \
+; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
 ; RUN:    FileCheck -check-prefixes=COMMON,MAX30 %s
 ;
 ; RUN: grep -v MAX_REG_30 %s | \
-; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,continuations-lint,remove-types-metadata' -S --lint-abort-on-error | \
+; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
 ; RUN:    FileCheck -check-prefixes=COMMON,MAX10 %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
@@ -117,8 +117,9 @@ define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hi
   ret i1 true
 }
 
-; COMMON-DAG: define void @main(
-; COMMON-DAG: call void (...) @lgc.cps.jump(i64 2, {{.*}} %struct.DispatchSystemData %{{.*}}, [10 x i32] %{{.*}})
+; COMMON-DAG: Incoming payload VGPR size of "main" (raygeneration): 0 dwords
+; COMMON-DAG: Outgoing payload VGPR size by jump:
+; COMMON-DAG: call void (...) @lgc.cps.jump(i64 2, {{.*}} %struct.DispatchSystemData %{{.*}}: 10 dwords
 
 define void @main() {
   %params = alloca %struct.TheirParams, align 4
@@ -126,9 +127,10 @@ define void @main() {
   ret void
 }
 
-; COMMON-DAG: define void @mainTrace(
-; MAX10-DAG: call void (...) @lgc.cps.jump(i64 4, {{.*}} %struct.TraversalData %{{.*}}, [10 x i32] %{{.*}})
-; MAX30-DAG: call void (...) @lgc.cps.jump(i64 4, {{.*}} %struct.TraversalData %{{.*}}, [15 x i32] %{{.*}})
+; COMMON-DAG: Incoming payload VGPR size of "mainTrace" (raygeneration): 0 dwords
+; COMMON-DAG: Outgoing payload VGPR size by jump:
+; MAX10-DAG: call void (...) @lgc.cps.jump(i64 4, {{.*}} %struct.TraversalData %{{.*}}: 10 dwords
+; MAX30-DAG: call void (...) @lgc.cps.jump(i64 4, {{.*}} %struct.TraversalData %{{.*}}: 15 dwords
 define void @mainTrace() {
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
   %2 = load %dx.types.Handle, %dx.types.Handle* @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
@@ -141,10 +143,10 @@ define void @mainTrace() {
 }
 
 ; If we set maxPayloadRegisterCount to 10, both functions use only 10 payload registers.
-; MAX10-DAG: define void @called({{.*}}%struct.DispatchSystemData %0{{.*}}, [10 x i32] %payload)
-; MAX10-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData{{.*}}, [10 x i32] }{{.*}})
-; MAX30-DAG: define void @called({{.*}}%struct.DispatchSystemData %0{{.*}}, [26 x i32] %payload)
-; MAX30-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData{{.*}}, [27 x i32] }{{.*}})
+; MAX10-DAG: Incoming payload VGPR size of "called" (callable): 10 dwords
+; MAX10-DAG: Incoming payload VGPR size of "called.resume.0" (callable): 10 dwords
+; MAX30-DAG: Incoming payload VGPR size of "called" (callable): 26 dwords
+; MAX30-DAG: Incoming payload VGPR size of "called.resume.0" (callable): 27 dwords
 
 define void @called(%struct.MyParams* %arg) !pointeetys !39 {
   %params = alloca %struct.TheirParams2, align 4
@@ -152,12 +154,13 @@ define void @called(%struct.MyParams* %arg) !pointeetys !39 {
   ret void
 }
 
-; MAX10-DAG: define void @Intersection({{.*}}%struct.AnyHitTraversalData %0{{.*}}, [10 x i32] %payload)
-; MAX10-DAG: define dso_local void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData{{.*}}, [10 x i32] }{{.*}})
-; MAX10-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}, [10 x i32] %{{.*}})
-; MAX30-DAG: define void @Intersection({{.*}}%struct.AnyHitTraversalData %0{{.*}}, [30 x i32] %payload)
-; MAX30-DAG: define dso_local void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData{{.*}}, [30 x i32] }{{.*}})
-; MAX30-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}, [30 x i32] %{{.*}})
+; MAX10-DAG: Incoming payload VGPR size of "Intersection" (intersection): 10 dwords
+; MAX10-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 10 dwords
+; COMMON-DAG: Outgoing payload VGPR size by jump:
+; MAX10-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}: 10 dwords
+; MAX30-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 30 dwords
+; COMMON-DAG: Outgoing payload VGPR size by jump:
+; MAX30-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}: 30 dwords
 
 define void @Intersection() #3 {
   %a = alloca %struct.BuiltInTriangleIntersectionAttributes, align 4
@@ -165,32 +168,34 @@ define void @Intersection() #3 {
   ret void
 }
 
-; MAX10-DAG: define void @AnyHit({{.*}}%struct.AnyHitTraversalData %0, %struct.BuiltInTriangleIntersectionAttributes %1{{.*}}, [10 x i32] %payload)
-; MAX30-DAG: define void @AnyHit({{.*}}%struct.AnyHitTraversalData %0, %struct.BuiltInTriangleIntersectionAttributes %1{{.*}}, [15 x i32] %payload)
+; MAX10-DAG: Incoming payload VGPR size of "AnyHit" (anyhit): 10 dwords
+; MAX30-DAG: Incoming payload VGPR size of "AnyHit" (anyhit): 15 dwords
 
 define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readonly %attr) #3 !pointeetys !41 {
   ret void
 }
 
 ; With fixed hit attribute registers and without PAQs, ClosestHitOut also contains storage for hit attributes
-; MAX10-DAG: define void @ClosestHit({{.*}}%struct.SystemData %0{{.*}}, [10 x i32] %payload)
-; MAX30-DAG: define void @ClosestHit({{.*}}%struct.SystemData %0{{.*}}, [15 x i32] %payload)
+; MAX10-DAG: Incoming payload VGPR size of "ClosestHit" (closesthit): 10 dwords
+; MAX30-DAG: Incoming payload VGPR size of "ClosestHit" (closesthit): 15 dwords
 
 define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.AnyHitTraversalData* nocapture readonly %attr) #3 !pointeetys !41 {
   ret void
 }
 
-; COMMON-DAG: define void @Miss16({{.*}}%struct.SystemData %0{{.*}}, [1 x i32] %payload)
+; COMMON-DAG: Incoming payload VGPR size of "Miss16" (miss): 1 dwords
 define void @Miss16(%struct.PayloadWithI16* noalias nocapture %payload) !pointeetys !55 {
   ret void
 }
 
 declare void @_AmdEnqueueAnyHit(i64, i64, %struct._AmdSystemData, <2 x float>) #0
 
-; MAX10-DAG: define void @_cont_Traversal({{.*}}, [10 x i32] %payload)
-; MAX10-DAG: call {{.*}} @lgc.cps.jump({{.*}}, [10 x i32] %{{.*}})
-; MAX30-DAG: define void @_cont_Traversal({{.*}}, [27 x i32] %payload)
-; MAX30-DAG: call {{.*}} @lgc.cps.jump({{.*}}, [27 x i32] %{{.*}})
+; MAX10-DAG: Incoming payload VGPR size of "_cont_Traversal" (compute): 10 dwords
+; COMMON-DAG: Outgoing payload VGPR size by jump:
+; MAX10-DAG: call {{.*}} @lgc.cps.jump({{.*}}: 10 dwords
+; MAX30-DAG: Incoming payload VGPR size of "_cont_Traversal" (compute): 27 dwords
+; COMMON-DAG: Outgoing payload VGPR size by jump:
+; MAX30-DAG: call {{.*}} @lgc.cps.jump({{.*}}: 27 dwords
 
 define void @_cont_Traversal(%struct._AmdTraversalResultData* noalias nocapture sret(%struct._AmdTraversalResultData) %agg.result, %struct._AmdSystemData* noalias %data) !pointeetys !44 {
   call void @_AmdEnqueueAnyHit(i64 0, i64 poison, %struct.BuiltInTriangleIntersectionAttributes undef, <2 x float> undef)

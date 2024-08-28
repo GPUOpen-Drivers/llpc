@@ -33,7 +33,7 @@ void main() {
   data1[gl_LocalInvocationIndex].z = 0.3;
   data1[gl_LocalInvocationIndex].y = 0.2;
   data1[gl_LocalInvocationIndex].x = 0.1;
-
+  
   data2[gl_LocalInvocationIndex].z = -0.3;
   data2[gl_LocalInvocationIndex].y = -0.2;
   data2[gl_LocalInvocationIndex].x = -0.1;

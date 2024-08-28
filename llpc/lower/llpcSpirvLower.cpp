@@ -29,24 +29,24 @@
  ***********************************************************************************************************************
  */
 #include "llpcSpirvLower.h"
+#include "LowerAccessChain.h"
+#include "LowerCfgMerges.h"
+#include "LowerConstImmediateStore.h"
+#include "LowerCooperativeMatrix.h"
 #include "LowerGLCompatibility.h"
+#include "LowerGlobals.h"
+#include "LowerInstMetaRemove.h"
+#include "LowerMath.h"
+#include "LowerMemoryOp.h"
 #include "LowerPostInline.h"
+#include "LowerRayTracing.h"
+#include "LowerTerminator.h"
+#include "LowerTranslator.h"
+#include "ProcessGpuRtLibrary.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcRayTracingContext.h"
-#include "llpcSpirvLowerAccessChain.h"
-#include "llpcSpirvLowerCfgMerges.h"
-#include "llpcSpirvLowerConstImmediateStore.h"
-#include "llpcSpirvLowerCooperativeMatrix.h"
-#include "llpcSpirvLowerGlobal.h"
-#include "llpcSpirvLowerInstMetaRemove.h"
-#include "llpcSpirvLowerMath.h"
-#include "llpcSpirvLowerMemoryOp.h"
-#include "llpcSpirvLowerRayTracing.h"
-#include "llpcSpirvLowerTerminator.h"
-#include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
-#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
@@ -55,6 +55,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/ReplaceConstant.h"
 #include "llvm/IR/Verifier.h"
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
 #else
@@ -106,10 +107,10 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
   if (lowerFlag.isInternalRtShader)
-    passMgr.addPass(SpirvProcessGpuRtLibrary());
+    passMgr.addPass(ProcessGpuRtLibrary());
 
   // Lower SPIR-V CFG merges before inlining
-  passMgr.addPass(SpirvLowerCfgMerges());
+  passMgr.addPass(LowerCfgMerges());
 
   // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
   // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
@@ -117,7 +118,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   passMgr.addPass(GlobalDCEPass());
 
   // Lower SPIR-V access chain
-  passMgr.addPass(SpirvLowerAccessChain());
+  passMgr.addPass(LowerAccessChain());
 
   if (lowerFlag.isRayQuery || lowerFlag.usesAdvancedBlend)
     passMgr.addPass(LowerPostInline());
@@ -132,7 +133,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   passMgr.addPass(LowerGLCompatibility());
 
   // Lower SPIR-V global variables, inputs, and outputs
-  passMgr.addPass(SpirvLowerGlobal());
+  passMgr.addPass(LowerGlobals());
 
   // Lower SPIR-V constant immediate store.
   passMgr.addPass(SpirvLowerConstImmediateStore());
@@ -141,7 +142,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   passMgr.addPass(SpirvLowerMathConstFolding());
 
   // Lower SPIR-V memory operations
-  passMgr.addPass(SpirvLowerMemoryOp());
+  passMgr.addPass(LowerMemoryOp());
 
   // Remove redundant load/store operations and do minimal optimization
   // It is required by SpirvLowerImageOp.
@@ -215,7 +216,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 // @param [in/out] passMgr : Pass manager
 void SpirvLower::registerTranslationPasses(lgc::PassManager &passMgr) {
   passMgr.registerPass("llpc-spirv-lower-translator", SpirvLowerTranslator::name());
-  passMgr.registerPass("llpc-spirv-lower-gpurt-library", SpirvProcessGpuRtLibrary::name());
+  passMgr.registerPass("lower-gpurt-library", ProcessGpuRtLibrary::name());
 }
 
 // =====================================================================================================================

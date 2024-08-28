@@ -764,9 +764,9 @@ ShaderInputs::ShaderInputUsage *ShaderInputs::getShaderInputUsage(ShaderStageEnu
 void ShaderInputs::tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStageEnum shaderStage,
                                           Function *origFunc) {
   assert(shaderStage == ShaderStage::Compute);
-  bool useWholeWorkgroupId = false;
-  SmallVector<Instruction *> extractVec3[3];
+  std::array<unsigned, 3> compUsedCounts = {};
   SmallVector<Instruction *> workgroupIdCallInsts;
+  SmallVector<SmallVector<std::pair<Instruction *, unsigned>, 3>> extractInstsForUsers;
   unsigned kindId = static_cast<unsigned>(ShaderInput::WorkgroupId);
   ShaderInputUsage *inputUsage = getShaderInputsUsage(shaderStage)->inputs[kindId].get();
 
@@ -776,82 +776,95 @@ void ShaderInputs::tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderSt
     for (Instruction *&call : inputUsage->users) {
       if (!call)
         continue;
+      SmallVector<std::pair<Instruction *, unsigned>, 3> extractInsts;
       for (auto user : call->users()) {
         if (auto extractInst = dyn_cast<ExtractElementInst>(user)) {
           if (auto indexInst = dyn_cast<ConstantInt>(extractInst->getIndexOperand())) {
             unsigned index = indexInst->getZExtValue();
             assert(index < 3);
-            extractVec3[index].push_back(extractInst);
+            ++compUsedCounts[index];
+            extractInsts.emplace_back(extractInst, index);
             continue;
           }
         }
-        useWholeWorkgroupId = true;
-        break;
+        // Use whole workgroupId components and keep unchanged
+        return;
       }
-      if (!useWholeWorkgroupId)
-        workgroupIdCallInsts.push_back(call);
+      workgroupIdCallInsts.push_back(call);
+      extractInstsForUsers.emplace_back(extractInsts);
     }
-    if (!useWholeWorkgroupId) {
-      for (auto insts : extractVec3) {
-        if (!insts.empty())
-          ++usedCompCount;
-      }
+    for (auto num : compUsedCounts) {
+      if (num > 0)
+        ++usedCompCount;
     }
-    if (usedCompCount == 3)
-      useWholeWorkgroupId = true;
   }
-  if (useWholeWorkgroupId)
+  // Use whole workgroupId components
+  if (usedCompCount == 3)
     return;
 
-  if (extractVec3[0].empty())
+  if (compUsedCounts[0] == 0)
     origFunc->addFnAttr("amdgpu-no-workgroup-id-x");
-  if (extractVec3[1].empty())
+  if (compUsedCounts[1] == 0)
     origFunc->addFnAttr("amdgpu-no-workgroup-id-y");
-  if (extractVec3[2].empty())
+  if (compUsedCounts[2] == 0)
     origFunc->addFnAttr("amdgpu-no-workgroup-id-z");
 
   if (!inputUsage)
     return;
 
-  BuilderBase builder(pipelineState->getContext());
-  builder.SetInsertPoint(workgroupIdCallInsts.front());
-  // Clear the original default <3xi32> workgroupId
-  inputUsage->users.clear();
-  inputUsage = nullptr;
-
-  if (usedCompCount == 1) {
-    // The processing of using one component
-    auto workgroupId1 =
-        static_cast<CallInst *>(getInput(ShaderInput::WorkgroupId1, builder, *pipelineState->getLgcContext()));
-    getShaderInputUsage(shaderStage, ShaderInput::WorkgroupId1)->users.push_back(workgroupId1);
-
-    for (auto instSet : extractVec3) {
-      for (auto inst : instSet) {
-        inst->replaceAllUsesWith(workgroupId1);
-        inst->eraseFromParent();
-      }
-    }
-  } else if (usedCompCount == 2) {
-    // The processing of using two components
-    auto workgroupId2 =
-        static_cast<CallInst *>(getInput(ShaderInput::WorkgroupId2, builder, *pipelineState->getLgcContext()));
-    getShaderInputUsage(shaderStage, ShaderInput::WorkgroupId2)->users.push_back(workgroupId2);
-
-    Value *extractVec2[2] = {builder.CreateExtractElement(workgroupId2, static_cast<uint64_t>(0)),
-                             builder.CreateExtractElement(workgroupId2, 1)};
-    unsigned index = 0;
-    for (auto instSet : extractVec3) {
-      for (auto inst : instSet) {
-        inst->replaceAllUsesWith(extractVec2[index]);
-        inst->eraseFromParent();
-      }
-      if (!instSet.empty())
-        ++index;
-    }
-  } else {
-    assert(usedCompCount == 0);
+  // Create mapping of indexes to components of new input
+  std::array<int, 3> componentMap = {-1};
+  int index = 0;
+  for (unsigned i = 0; i < 3; ++i) {
+    if (compUsedCounts[i] > 0)
+      componentMap[i] = index++;
   }
 
-  for (auto call : workgroupIdCallInsts)
+  BuilderBase builder(pipelineState->getContext());
+  unsigned id = 0;
+  for (Instruction *&call : inputUsage->users) {
+    if (!call)
+      continue;
+    builder.SetInsertPoint(call);
+    if (usedCompCount == 1) {
+      // The processing of using one component
+      auto workgroupId1 =
+          static_cast<CallInst *>(getInput(ShaderInput::WorkgroupId1, builder, *pipelineState->getLgcContext()));
+      getShaderInputUsage(shaderStage, ShaderInput::WorkgroupId1)->users.push_back(workgroupId1);
+
+      for (auto [inst, index] : extractInstsForUsers[id]) {
+        assert(componentMap[index] == 0);
+        inst->replaceAllUsesWith(workgroupId1);
+        inst->dropAllReferences();
+        inst->eraseFromParent();
+      }
+    } else if (usedCompCount == 2) {
+      // The processing of using two components
+      auto workgroupId2 =
+          static_cast<CallInst *>(getInput(ShaderInput::WorkgroupId2, builder, *pipelineState->getLgcContext()));
+      getShaderInputUsage(shaderStage, ShaderInput::WorkgroupId2)->users.push_back(workgroupId2);
+
+      Value *extractVec2[2] = {builder.CreateExtractElement(workgroupId2, static_cast<uint64_t>(0)),
+                               builder.CreateExtractElement(workgroupId2, 1)};
+
+      for (auto [inst, index] : extractInstsForUsers[id]) {
+        assert(componentMap[index] >= 0);
+        inst->replaceAllUsesWith(extractVec2[componentMap[index]]);
+        inst->dropAllReferences();
+        inst->eraseFromParent();
+      }
+    } else {
+      assert(usedCompCount == 0);
+    }
+    ++id;
+  }
+
+  // Clear the original default <3xi32> workgroupId
+  inputUsage->users.clear();
+
+  for (auto call : workgroupIdCallInsts) {
+    assert(call->hasNUses(0));
+    call->dropAllReferences();
     call->eraseFromParent();
+  }
 }

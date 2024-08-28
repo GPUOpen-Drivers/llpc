@@ -246,3 +246,6 @@ GPURT_DECL bool _AmdContinuationStackIsGlobal() DUMMY_GENERIC_FUNC(0)
 // Intrinsic to get the current rtip version.
 // The version is encoded as <major><minor> in decimal digits, so 11 is rtip 1.1, 20 is rtip 2.0
 GPURT_DECL RayTracingIpLevel _AmdGetRtip() DUMMY_GENERIC_FUNC(RayTracingIpLevel::_None)
+//=====================================================================================================================
+// Intrinsic that returns whether GPURT is compiled from a LLPC-based build or not.
+GPURT_DECL bool _AmdIsLlpc() DUMMY_GENERIC_FUNC(0)

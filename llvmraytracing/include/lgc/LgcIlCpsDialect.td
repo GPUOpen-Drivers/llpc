@@ -91,21 +91,3 @@ def WaitContinueOp : LgcIlCpsOp<"waitContinue", [NoReturn]> {
       - tail, a set of arguments like the system data or hit attributes.
   }];
 }
-
-def ReturnOp : LgcIlCpsOp<"return", [NoReturn]> {
-  let arguments = (ins value:$returnAddr, varargs:$args);
-  let results = (outs);
-
-  let summary =
-    "represents the return from a shader";
-
-  let description = [{
-    Describes the return operation for a continuation shader.
-
-    In non-lgc.cps mode, this is used to jump to the incoming return address
-    for non-RGS, and optionally passing return values in the varargs list.
-
-    For RGS, this is used to terminate the shader after coroutine passes
-    by passing an undef (non-lgc.cps mode)/poison (lgc.cps mode) address.
-  }];
-}

@@ -25,6 +25,7 @@
 
 #include "compilerutils/TypeLowering.h"
 #include "compilerutils/CompilerUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 
@@ -131,17 +132,31 @@ TypeLowering::TypeLowering(LLVMContext &context) : m_builder(context) {
 Function *TypeLowering::lowerFunctionArguments(Function &fn) {
   SmallVector<Type *> newArgTys;
   SmallVector<unsigned> remappedArgs;
-  for (size_t argIdx = 0; argIdx < fn.arg_size(); ++argIdx) {
-    auto *arg = fn.getArg(argIdx);
-    auto converted = convertType(arg->getType());
+
+  // Process arguments
+  for (const auto &[index, arg] : llvm::enumerate(fn.args())) {
+    auto converted = convertType(arg.getType());
     assert(converted.size() == 1 && "Only 1:1 type remapping supported now");
-    if (converted[0] == arg->getType()) {
-      newArgTys.push_back(arg->getType());
+    if (converted[0] == arg.getType()) {
+      newArgTys.push_back(arg.getType());
     } else {
-      remappedArgs.push_back(argIdx);
+      remappedArgs.push_back(index);
       newArgTys.push_back(converted[0]);
     }
   }
+
+  // Changing return types is currently not supported.
+  // If a use case arises, we need to be a bit careful:
+  // We need to first lower function arguments (recording the argument replacement values),
+  // then process function bodies (recording replacements of SSA values),
+  // and then fixup ret statements.
+  // Because invalid IR is temporarily allowed, we should be able to mutate
+  // function types just once, also changing the return type here,
+  // and registering cleanup work to fix rets later.
+  //
+  // For now, just assert that return types don't need to change.
+  assert(convertType(fn.getReturnType()) == ArrayRef<Type *>{fn.getReturnType()} &&
+         "Return type mapping not supported.");
 
   if (remappedArgs.empty())
     return &fn;
@@ -153,12 +168,10 @@ Function *TypeLowering::lowerFunctionArguments(Function &fn) {
 
   // Setup names and replace argument uses except the remapped ones.
   // The remapped argument will be handled by later instruction visitor.
-  for (unsigned idx = 0; idx < newFn->arg_size(); idx++) {
-    Value *oldArg = fn.getArg(idx);
-    Value *newArg = newFn->getArg(idx);
-    newArg->setName(oldArg->getName());
-    if (!llvm::is_contained(remappedArgs, idx))
-      oldArg->replaceAllUsesWith(newArg);
+  for (const auto &[index, oldArg, newArg] : enumerate(fn.args(), newFn->args())) {
+    newArg.setName(oldArg.getName());
+    if (!llvm::is_contained(remappedArgs, index))
+      oldArg.replaceAllUsesWith(&newArg);
   }
   m_functionsToErase.push_back(&fn);
   return newFn;
@@ -435,6 +448,8 @@ void TypeLowering::visitAlloca(AllocaInst &alloca) {
   } else {
     alloca.setAllocatedType(StructType::get(m_builder.getContext(), types));
   }
+  const DataLayout &DL = alloca.getFunction()->getDataLayout();
+  alloca.setAlignment(DL.getPrefTypeAlign(alloca.getAllocatedType()));
 }
 
 // =====================================================================================================================

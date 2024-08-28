@@ -298,6 +298,10 @@ bool SPIRVType::isTypeCooperativeMatrixKHR() const {
   return OpCode == OpTypeCooperativeMatrixKHR;
 }
 
+void SPIRVTypeFloat::decode(std::istream &I) {
+  getDecoder(I) >> (Id) >> (BitWidth);
+}
+
 bool SPIRVType::isTypeVectorBool() const {
   return isTypeVector() && getVectorComponentType()->isTypeBool();
 }

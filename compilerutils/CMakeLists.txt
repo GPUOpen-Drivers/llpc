@@ -14,6 +14,7 @@ endfunction()
 add_llvm_library(LLVMCompilerUtils
   lib/ArgPromotion.cpp
   lib/CompilerUtils.cpp
+  lib/DxilToLlvm.cpp
   lib/TypeLowering.cpp
   lib/TypesMetadata.cpp
 
@@ -39,5 +40,6 @@ set_compiler_options(LLVMCompilerUtils)
 target_compile_features(LLVMCompilerUtils PUBLIC cxx_std_17)
 set_target_properties(LLVMCompilerUtils PROPERTIES CXX_EXTENSIONS OFF)
 
+add_subdirectory(plugin)
 add_subdirectory(tool/cross-module-inline)
 add_subdirectory(test)

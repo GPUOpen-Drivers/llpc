@@ -174,6 +174,15 @@ static bool isUtilFunction(StringRef Name) {
   return false;
 }
 
+static void handleIsLlpc(Function &Func) {
+  assert(Func.arg_empty()
+         // bool
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(1));
+
+  auto *FalseConst = ConstantInt::getFalse(Func.getContext());
+  llvm::replaceCallsToFunction(Func, *FalseConst);
+}
+
 llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
                                                           llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the dxil-cont-intrinsic-prepare pass\n");
@@ -191,8 +200,13 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
         ShouldTransform = true;
       else if (isUtilFunction(Name))
         ShouldTransform = true;
-    } else if (Name.contains("_Amd") && isUtilFunction(Name)) {
-      ShouldTransform = true;
+    } else if (Name.contains("_Amd")) {
+      if (isUtilFunction(Name)) {
+        ShouldTransform = true;
+      } else if (Name.contains("IsLlpc")) {
+        ShouldTransform = false;
+        handleIsLlpc(*F);
+      }
     }
 
     if (ShouldTransform)

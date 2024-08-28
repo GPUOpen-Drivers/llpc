@@ -644,8 +644,9 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
-  entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  // NOTE: Legacy (non-NGG) HW path for GS doesn't support wave32 mode.
+  assert(m_pipelineState->getShaderWaveSize(ShaderStage::Geometry) == 64);
+  entryPoint->addFnAttr("target-features", ",+wavefrontsize64");
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -700,10 +701,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   auto threadIdInWave =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
-
-  if (waveSize == 64) {
-    threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
-  }
+  threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   threadIdInWave->setName("threadIdInWave");
 
   auto esVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
@@ -719,8 +717,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
                                                 {mergedWaveInfo, builder.getInt32(24), builder.getInt32(4)});
   waveInSubgroup->setName("waveInSubgroup");
 
-  unsigned esGsBytesPerWave = waveSize * 4 * calcFactor.esGsRingItemSize;
-  auto esGsOffset = builder.CreateMul(waveInSubgroup, builder.getInt32(esGsBytesPerWave));
+  auto esGsOffset = builder.CreateMul(waveInSubgroup, builder.getInt32(64 * calcFactor.esGsRingItemSize));
 
   auto validEsVert = builder.CreateICmpULT(threadIdInWave, esVertCount, "validEsVert");
   builder.CreateCondBr(validEsVert, beginEsBlock, endEsBlock);

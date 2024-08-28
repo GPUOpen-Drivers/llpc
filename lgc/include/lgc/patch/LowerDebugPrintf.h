@@ -41,6 +41,7 @@
 namespace lgc {
 
 class DebugPrintfOp;
+struct ResourceNode;
 
 // =====================================================================================================================
 // Pass to lower debug.printf calls
@@ -63,6 +64,7 @@ private:
   llvm::SmallVector<llvm::Instruction *> m_toErase;
   llvm::Value *m_debugPrintfBuffer = nullptr;
   PipelineState *m_pipelineState = nullptr;
+  const ResourceNode *m_topNode = nullptr;
 };
 
 } // namespace lgc

@@ -43,8 +43,8 @@
 #include "SPIRVInternal.h"
 #include "SPIRVModule.h"
 #include "SPIRVToLLVMDbgTran.h"
-#include "compilerutils/LoweringPointerTupleMap.h"
 #include "vkgcDefs.h"
+#include "compilerutils/LoweringPointerTupleMap.h"
 #include "lgc/Builder.h"
 
 namespace llvm {
@@ -391,7 +391,6 @@ private:
   // Returns a cached type store size. If there is no entry for the given type,
   // its store size is calculated and added to the cache.
   uint64_t getTypeStoreSize(Type *const t);
-
   // If a value is mapped twice, the existing mapped value is a placeholder,
   // which must be a load instruction of a global variable whose name starts
   // with kPlaceholderPrefix.

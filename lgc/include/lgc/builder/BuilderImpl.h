@@ -786,6 +786,7 @@ private:
   llvm::Value *createThreadMask();
   llvm::Value *createThreadMaskedSelect(llvm::Value *const threadMask, uint64_t andMask, llvm::Value *const value1,
                                         llvm::Value *const value2);
+  llvm::Value *createInverseBallotSelect(uint64_t selectMask, llvm::Value *const value1, llvm::Value *const value2);
   uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
 

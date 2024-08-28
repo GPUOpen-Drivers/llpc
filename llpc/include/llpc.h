@@ -158,6 +158,7 @@ struct RayTracingPipelineBuildOut {
                                                        ///< when compiling in pure pipeline mode
   bool hasTraceRay;                                    ///< Output whether have traceray module
   bool isCps;                                          ///< Output whether is the pipeline is compiled in CPS mode
+  bool hasKernelEntry; ///< Output whether the output pipeline binaries contain kernel entry
 };
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
