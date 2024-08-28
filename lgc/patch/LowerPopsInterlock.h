@@ -44,6 +44,8 @@ public:
 
   static llvm::StringRef name() { return "Lower POPS interlock operations"; }
 
+  ~LowerPopsInterlock() { delete m_builder; }
+
 private:
   void legalizeInterlock(llvm::FunctionAnalysisManager &funcAnalysisManager);
   void collectBeginInterlock(PopsBeginInterlockOp &popsBeginInterlockOp);
