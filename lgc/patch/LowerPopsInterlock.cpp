@@ -61,17 +61,12 @@ PreservedAnalyses LowerPopsInterlock::run(Function &func, FunctionAnalysisManage
   m_pipelineState = moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*func.getParent())->getPipelineState();
   m_entryPoint = &func;
 
-  m_builder = new BuilderBase(m_pipelineState->getContext());
+  m_builder.reset(new BuilderBase(m_pipelineState->getContext()));
 
   legalizeInterlock(funcAnalysisManager);
   lowerInterlock();
 
   return m_changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
-}
-
-// =====================================================================================================================
-LowerPopsInterlock::~LowerPopsInterlock() {
-  delete m_builder;
 }
 
 // =====================================================================================================================

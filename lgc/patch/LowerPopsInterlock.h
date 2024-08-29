@@ -40,8 +40,6 @@ class PipelineState;
 
 class LowerPopsInterlock : public llvm::PassInfoMixin<LowerPopsInterlock> {
 public:
-  ~LowerPopsInterlock();
-
   llvm::PreservedAnalyses run(llvm::Function &func, llvm::FunctionAnalysisManager &funcAnalysisManager);
 
   static llvm::StringRef name() { return "Lower POPS interlock operations"; }
@@ -58,7 +56,7 @@ private:
   PipelineState *m_pipelineState = nullptr; // Pipeline state
   llvm::Function *m_entryPoint = nullptr;   // Entry-point of fragment shader
 
-  BuilderBase *m_builder = nullptr; // LLVM IR builder
+  std::unique_ptr<BuilderBase> m_builder; // LLVM IR builder
 
   // List of POPS interlock operations
   llvm::SmallVector<llvm::Instruction *, 16> m_beginInterlocks;
