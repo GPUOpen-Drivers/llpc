@@ -70,6 +70,11 @@ PreservedAnalyses LowerPopsInterlock::run(Function &func, FunctionAnalysisManage
 }
 
 // =====================================================================================================================
+LowerPopsInterlock::~LowerPopsInterlock() {
+  delete m_builder;
+}
+
+// =====================================================================================================================
 // Legalize POPS interlock operations.
 //
 // In this function, we try to collect all begin_interlock end_interlock operations and merge them to only one pair.
