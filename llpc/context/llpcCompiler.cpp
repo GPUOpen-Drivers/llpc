@@ -2459,9 +2459,10 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache miss for graphics pipeline.\n");
-    GraphicsContext graphicsContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
-    result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildUsingRelocatableElf, &candidateElf,
+    GraphicsContext *graphicsContext = new GraphicsContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
+    result = buildGraphicsPipelineInternal(graphicsContext, shaderInfo, buildUsingRelocatableElf, &candidateElf,
                                            pipelineOut->stageCacheAccesses);
+    delete graphicsContext;
 
     if (result == Result::Success) {
       elfBin.codeSize = candidateElf.size();
@@ -2588,9 +2589,10 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   ElfPackage candidateElf;
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache miss for compute pipeline.\n");
-    ComputeContext computeContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
-    result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
+    ComputeContext *computeContext = new ComputeContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
+    result = buildComputePipelineInternal(computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
+    delete computeContext;
 
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
       pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;

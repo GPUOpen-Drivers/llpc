@@ -117,7 +117,7 @@ PreservedAnalyses LowerInvariantLoads::run(Function &function, FunctionAnalysisM
 
   LLVM_DEBUG(dbgs() << (clearInvariants ? "Removing invariant load flags"
                                         : "Attempting aggressive invariant load optimization")
-                    << "\n";);
+                    << "\n");
 
   // This mirrors AMDGPUAliasAnalysis
   static const unsigned aliasMatrix[] = {

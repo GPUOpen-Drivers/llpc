@@ -151,8 +151,8 @@ Value *BuilderImpl::CreateMatrixTimesVector(Value *const matrix, Value *const ve
     else
       result = partialResult;
   }
-
-  result->setName(instName);
+  if (result)
+    result->setName(instName);
   return result;
 }
 
