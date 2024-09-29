@@ -101,7 +101,7 @@ TypedFuncTy TypedFuncTy::get(const Function *F) {
 // Construct a TypedFuncTy for the given result type and arg types.
 // This constructs the !pointeetys metadata; that can then be attached to a function
 // using writeMetadata().
-TypedFuncTy::TypedFuncTy(TypedArgTy ResultTy, ArrayRef<TypedArgTy> ArgTys) {
+TypedFuncTy::TypedFuncTy(TypedArgTy ResultTy, ArrayRef<TypedArgTy> ArgTys, bool IsVarArg) {
   SmallVector<Type *> BareArgTys;
   SmallVector<Metadata *> PointeeTys;
   unsigned SimpleFormatArgIdx = UINT_MAX;
@@ -133,7 +133,7 @@ TypedFuncTy::TypedFuncTy(TypedArgTy ResultTy, ArrayRef<TypedArgTy> ArgTys) {
       }
     }
   }
-  FuncTy = FunctionType::get(ResultTy.asType(), BareArgTys, /*isVarArg=*/false);
+  FuncTy = FunctionType::get(ResultTy.asType(), BareArgTys, IsVarArg);
   if (!PointeeTys.empty())
     Meta = MDTuple::get(FuncTy->getContext(), PointeeTys);
 }
@@ -239,6 +239,6 @@ void llvm::DXILValueTypeMetadataCallback(Value *V, unsigned TypeID, GetTypeByIDT
       else
         ArgTys.push_back(ArgTy);
     }
-    TypedFuncTy(ReturnTy, ArgTys).writeMetadata(cast<Function>(V));
+    TypedFuncTy(ReturnTy, ArgTys, FuncTy->isVarArg()).writeMetadata(cast<Function>(V));
   }
 }

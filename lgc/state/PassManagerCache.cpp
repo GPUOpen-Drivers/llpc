@@ -30,7 +30,7 @@
  */
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/LgcContext.h"
-#include "lgc/patch/PatchLlvmIrInclusion.h"
+#include "lgc/patch/IncludeLlvmIr.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438

@@ -44,8 +44,6 @@ AnalysisKey PipelineShaders::Key;
 
 // =====================================================================================================================
 PipelineShadersResult::PipelineShadersResult() {
-  for (auto &entryPoint : m_entryPoints)
-    entryPoint = nullptr;
 }
 
 // =====================================================================================================================
@@ -77,8 +75,7 @@ PipelineShadersResult PipelineShaders::run(Module &module, ModuleAnalysisManager
 //
 // @param shaderStage : Shader stage
 Function *PipelineShadersResult::getEntryPoint(ShaderStageEnum shaderStage) const {
-  assert((unsigned)shaderStage < ShaderStage::CountInternal);
-  return m_entryPoints[shaderStage];
+  return m_entryPoints.lookup(shaderStage);
 }
 
 // =====================================================================================================================

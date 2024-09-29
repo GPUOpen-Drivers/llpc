@@ -283,6 +283,26 @@ struct DxilToLlvmPassImpl {
     m_typeLower.eraseInstruction(&extractElement);
   }
 
+  void visitShuffleVector(llvm::ShuffleVectorInst &shuffleVector) {
+    Value *inputVector0 = shuffleVector.getOperand(0);
+    Value *inputVector1 = shuffleVector.getOperand(1);
+    ArrayRef<int> shuffleMask = shuffleVector.getShuffleMask();
+    Type *elementTy = cast<VectorType>(inputVector0->getType())->getElementType();
+    assert(cast<VectorType>(inputVector1->getType())->getElementType() == elementTy);
+
+    if (convertVectorElementType(elementTy) == nullptr)
+      return;
+
+    Value *convertedInputVector0 = getConvertedValue(inputVector0);
+    Value *convertedInputVector1 = getConvertedValue(inputVector1);
+
+    IRBuilder<> builder(&shuffleVector);
+    auto *replacement =
+        builder.CreateShuffleVector(convertedInputVector0, convertedInputVector1, shuffleMask, shuffleVector.getName());
+
+    m_typeLower.replaceInstruction(&shuffleVector, replacement);
+  }
+
   void visitGEP(llvm::GetElementPtrInst &gepInst) {
     Type *oldTy = gepInst.getSourceElementType();
     Type *newTy = getConvertedType(oldTy);
@@ -322,6 +342,7 @@ struct DxilToLlvmPassImpl {
                                     .nest(&TypeLowering::registerVisitors)
                                     .add(&DxilToLlvmPassImpl::visitInsertElement)
                                     .add(&DxilToLlvmPassImpl::visitExtractElement)
+                                    .add(&DxilToLlvmPassImpl::visitShuffleVector)
                                     .add(&DxilToLlvmPassImpl::visitGEP)
                                     .build();
     fixFunctionTypes();

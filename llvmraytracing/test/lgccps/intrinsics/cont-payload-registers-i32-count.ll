@@ -38,7 +38,7 @@ declare void @lgc.cps.jump(...) local_unnamed_addr
 
 !lgc.cps.module = !{}
 !continuation.maxPayloadRegisterCount = !{!11}
-!continuation.preservedPayloadRegisterCount = !{!12}
+!continuation.maxUsedPayloadRegisterCount = !{!12}
 
 !0 = !{i32 7}
 !1 = !{ { { i32 } } poison}

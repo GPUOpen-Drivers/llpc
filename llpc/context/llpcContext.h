@@ -51,7 +51,6 @@ namespace Llpc {
 class Context : public llvm::LLVMContext {
 public:
   Context(GfxIpVersion gfxIp);
-  ~Context();
 
   void reset();
 

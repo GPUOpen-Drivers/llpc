@@ -609,7 +609,7 @@ declare void @lgc.cps.jump(...) local_unnamed_addr
 declare ptr addrspace(7) @lgc.load.buffer.desc(i64 %0, i32 %1, i32 %2, i32 %3) local_unnamed_addr
 declare ptr @llvm.invariant.start.p7(i64 immarg %0, ptr addrspace(7) nocapture %1)
 
-!continuation.preservedPayloadRegisterCount = !{!7}
+!continuation.maxUsedPayloadRegisterCount = !{!7}
 !lgc.cps.module = !{}
 !lgc.rt.max.attribute.size = !{!4}
 

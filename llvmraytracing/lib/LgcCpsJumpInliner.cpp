@@ -69,16 +69,16 @@ LgcCpsJumpInlinerPassImpl::LgcCpsJumpInlinerPassImpl(Module &M, Module &GpurtLib
 
 PreservedAnalyses LgcCpsJumpInlinerPassImpl::run() {
   using JumpVecTy = SmallVector<JumpOp *>;
-  static const auto Visitor =
-      llvm_dialects::VisitorBuilder<SmallVector<JumpOp *>>()
-          .add<JumpOp>([](SmallVector<JumpOp *> &AllJumps, JumpOp &Jump) { AllJumps.push_back(&Jump); })
-          .build();
+  static const auto Visitor = llvm_dialects::VisitorBuilder<SmallVector<JumpOp *>>()
+                                  .add<JumpOp>([](JumpVecTy &AllJumps, JumpOp &Jump) { AllJumps.push_back(&Jump); })
+                                  .build();
 
   JumpVecTy AllJumps;
   // Collect lgc.cps.jump ops.
   Visitor.visit(AllJumps, *Mod);
 
   bool Changed = false;
+  DenseSet<Function *> DeadFunctions;
   // Iterate over all collected jumps and try to inline the jump target.
   for (auto *Jump : AllJumps) {
     auto *AsCROp = dyn_cast<AsContinuationReferenceOp>(Jump->getTarget());
@@ -113,11 +113,15 @@ PreservedAnalyses LgcCpsJumpInlinerPassImpl::run() {
       AsCROp->eraseFromParent();
 
     // There might still be other users left, if the function is not referenced as direct jump target.
+    // Remove function after this loop, it may contain jumps that we still want to inline.
     if (JumpTargetFunc->user_empty() && JumpTargetFunc->getLinkage() == GlobalValue::InternalLinkage)
-      JumpTargetFunc->eraseFromParent();
+      DeadFunctions.insert(JumpTargetFunc);
 
     Changed = true;
   }
+
+  for (auto *F : DeadFunctions)
+    F->eraseFromParent();
 
   return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

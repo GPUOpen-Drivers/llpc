@@ -76,21 +76,18 @@ Type *BuilderBase::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecT
 Value *BuilderImpl::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
   if (vector1->getType()->getScalarType()->isBFloatTy()) {
     assert(getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11);
-    // amdgcn_fdot2_bf16_bf16 will be used.
+    // Note: v_dot2_bf16_bf16 only respects RTE mode according to HW spec. We must check the specified rounding mode
+    //       before using it. Also, v_dot2_bf16_bf16 doesn't respect signed zeros so we must check NSZ as well.
     const auto fp16RoundMode =
         getPipelineState()->getShaderModes()->getCommonShaderMode(m_shaderStage.value()).fp16RoundMode;
     const auto vectorTy = dyn_cast<FixedVectorType>(vector1->getType());
-    if (vectorTy && (fp16RoundMode == FpRoundMode::DontCare || fp16RoundMode == FpRoundMode::Even)) {
+    if (vectorTy && (fp16RoundMode == FpRoundMode::DontCare || fp16RoundMode == FpRoundMode::Even) &&
+        getFastMathFlags().noSignedZeros()) {
       int compCount = vectorTy->getNumElements();
       Value *result = nullptr;
 
       if (compCount % 2 == 0) {
-        // If all products are of the form +x * -0.0, then the result should be -0.0. This requires a -0.0
-        // initial value.
-        //
-        // However, we prefer +0.0 as initial value when signed zeros are disabled because it can be encoded as an
-        // inline constant.
-        result = ConstantFP::get(getBFloatTy(), getFastMathFlags().noSignedZeros() ? +0.0 : -0.0);
+        result = ConstantFP::get(getBFloatTy(), 0.0);
       } else {
         // If the component count is odd, prefer feeding the last product (odd one out) as initial value.
         Value *lhs = CreateExtractElement(vector1, compCount - 1);

@@ -43,7 +43,7 @@ class LgcContext;
 // Base class for a glue shader (a fetch shader or parameter/color export shader generated during linking)
 class GlueShader {
 public:
-  virtual ~GlueShader() {}
+  virtual ~GlueShader() = default;
 
   // Create a color export shader
   static std::unique_ptr<GlueShader> createColorExportShader(PipelineState *pipelineState,

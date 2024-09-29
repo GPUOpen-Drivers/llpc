@@ -24,6 +24,8 @@
  **********************************************************************************************************************/
 
 #include "compilerutils/CompilerUtils.h"
+#include "ValueOriginTrackingTestPass.h"
+#include "ValueSpecializationTestPass.h"
 #include "compilerutils/DxilToLlvm.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/iterator_range.h"
@@ -162,17 +164,6 @@ void CompilerUtils::setIsLastUseLoad(llvm::LoadInst &Load) {
 
 namespace {
 
-// Get the name of a global that is copied to a different module for inlining.
-std::string getCrossModuleName(GlobalValue &gv) {
-  if (auto *fn = dyn_cast<Function>(&gv)) {
-    // Intrinsics should not be renamed since the IR verifier insists on a "correct" name mangling based on any
-    // overloaded types. Lgc dialects also require exact name for similar reason.
-    if (fn->isIntrinsic() || fn->getName().starts_with("lgc."))
-      return fn->getName().str();
-  }
-  return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
-}
-
 class CrossModuleValueMaterializer : public ValueMaterializer {
 public:
   CrossModuleValueMaterializer(Module *targetMod, CompilerUtils::CrossModuleInliner &inliner,
@@ -198,7 +189,7 @@ private:
     if (auto *existing = inliner->findCopiedGlobal(*gv, *targetMod))
       return existing;
 
-    auto newName = getCrossModuleName(*gv);
+    auto newName = CompilerUtils::CrossModuleInliner::getCrossModuleName(*gv);
     if (auto *callee = dyn_cast<Function>(gv)) {
       if (!callee->isDeclaration()) {
         report_fatal_error(
@@ -384,6 +375,17 @@ GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &so
   if (gv)
     assert(gv->getValueType() == sourceGv.getValueType());
   return gv;
+}
+
+// Get the name of a global that is copied to a different module for inlining.
+std::string CompilerUtils::CrossModuleInliner::getCrossModuleName(GlobalValue &gv) {
+  if (auto *fn = dyn_cast<Function>(&gv)) {
+    // Intrinsics should not be renamed since the IR verifier insists on a "correct" name mangling based on any
+    // overloaded types. Lgc dialects also require exact name for similar reason.
+    if (fn->isIntrinsic() || fn->getName().starts_with("lgc."))
+      return fn->getName().str();
+  }
+  return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
 }
 
 PointerType *llvm::getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace) {

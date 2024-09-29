@@ -49,8 +49,8 @@ class PassManager;
 // Represents the pass of LLVM patching operations, as the base class.
 class Patch {
 public:
-  Patch() : m_module(nullptr), m_context(nullptr), m_shaderStage(ShaderStage::Invalid), m_entryPoint(nullptr) {}
-  virtual ~Patch() {}
+  Patch() : m_module(nullptr), m_context(nullptr), m_entryPoint(nullptr) {}
+  virtual ~Patch() = default;
 
   static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, llvm::Timer *patchTimer,
                         llvm::Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel);
@@ -68,10 +68,10 @@ protected:
 
   void init(llvm::Module *module);
 
-  llvm::Module *m_module;        // LLVM module to be run on
-  llvm::LLVMContext *m_context;  // Associated LLVM context of the LLVM module that passes run on
-  ShaderStageEnum m_shaderStage; // Shader stage
-  llvm::Function *m_entryPoint;  // Entry-point
+  llvm::Module *m_module;                       // LLVM module to be run on
+  llvm::LLVMContext *m_context;                 // Associated LLVM context of the LLVM module that passes run on
+  std::optional<ShaderStageEnum> m_shaderStage; // Shader stage
+  llvm::Function *m_entryPoint;                 // Entry-point
 };
 
 } // namespace lgc

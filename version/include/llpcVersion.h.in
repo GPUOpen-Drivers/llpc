@@ -37,6 +37,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.4 | Add disableGlPositionOpt to PipelineShaderOptions.                                                    |
+//  |     75.3 | Add enableInitUndefZero to GraphicPipelineBuildInfo                                                   |
+//  |     75.2 | Add CompileConstInfo to PipelineShaderOptions.                                                        |
 //  |     75.1 | Add alphaFunc to GraphicPipelineBuildInfo.                                                            |
 //  |     75.0 | BuildRayTracingPipeline now will not generate kernel entry for pipeline library anymore.              |
 //  |     74.2 | Add enableMapClipDistMask to GraphicsPipelineBuildInfo.                                               |
@@ -193,7 +196,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 4
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

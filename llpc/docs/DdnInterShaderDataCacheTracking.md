@@ -22,7 +22,7 @@ Historical Background
 
 At the time of writing, LLPC already uses variant 2 described in the introduction. It does so by combining various
 pieces of information that have been saved off in a look-aside data structure (`ResourceUsage`) in the
-`PatchCheckShaderCache` pass.
+`CheckShaderCache` pass.
 
 This approach has two downsides:
 
@@ -30,7 +30,7 @@ This approach has two downsides:
      the information may otherwise be obsolete.
 
   2. Knowledge about what kind of full pipeline optimizations are applied, including some of their details, is
-     centralized in `PatchCheckShaderCache`. This limits the design's extensibility.
+     centralized in `CheckShaderCache`. This limits the design's extensibility.
 
 Implementation overview
 -----------------------
@@ -39,7 +39,7 @@ Every function in LLPC gets an attached `!llpc.hash` metadata node.
 This metadata node is initialized with the relevant input shader hash.
 Every pass that performs inter-shader transforms updates the metadata by hashing the old hash together with any data
 that is relevant from other shaders, i.e. it computes `h_new = h(h_old | inter-shader data)`.
-The metadata node is finally inspected in the `PatchCheckShaderCache` pass.
+The metadata node is finally inspected in the `CheckShaderCache` pass.
 
 Extensible specialized metadata
 -------------------------------

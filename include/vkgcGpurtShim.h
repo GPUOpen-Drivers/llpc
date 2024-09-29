@@ -38,7 +38,7 @@ namespace Vkgc {
 namespace gpurt {
 
 #ifdef HAVE_GPURT_SHIM
-void getShaderLibrarySpirv(unsigned featureFlags, const void *&code, size_t &size);
+void getShaderLibrarySpirv(Vkgc::RtIpVersion rtIpVersion, unsigned featureFlags, const void *&code, size_t &size);
 void getFuncTable(Vkgc::RtIpVersion rtIpVersion, Vkgc::GpurtFuncTable &table);
 Vkgc::RtIpVersion getRtIpVersion(Vkgc::GfxIpVersion gfxIpVersion);
 #endif

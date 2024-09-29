@@ -363,6 +363,8 @@ Type *BuilderCommon::transCooperativeMatrixElementType(CooperativeMatrixElementT
   case CooperativeMatrixElementType::Int32:
     return getInt32Ty();
   case CooperativeMatrixElementType::Int8:
+  case CooperativeMatrixElementType::Float8:
+  case CooperativeMatrixElementType::BFloat8:
     return getInt8Ty();
   default:
     llvm_unreachable("The element type is not supported.");
@@ -411,6 +413,8 @@ bool BuilderCommon::isTypeNCooperativeMatrix(CooperativeMatrixElementType elemTy
     width = 32;
     break;
   case lgc::CooperativeMatrixElementType::Int8:
+  case lgc::CooperativeMatrixElementType::Float8:
+  case lgc::CooperativeMatrixElementType::BFloat8:
     width = 8;
     break;
   default:

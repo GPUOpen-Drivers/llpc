@@ -185,7 +185,7 @@ public:
   SPIRVEntry()
       : Module(NULL), OpCode(OpNop), Id(SPIRVID_INVALID), Attrib(SPIRVEA_DEFAULT), WordCount(0), Line(nullptr) {}
 
-  virtual ~SPIRVEntry() {}
+  virtual ~SPIRVEntry() = default;
 
   bool exist(SPIRVId) const;
   template <class T> T *get(SPIRVId TheId) const { return reinterpret_cast<T *>(getEntry(TheId)); }

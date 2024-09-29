@@ -371,7 +371,7 @@ void main()
 ...
 ```
 
-After the above change, we can see the pipeline dumps for the above shader, the pass “LLPC translate SPIR-V binary to LLVM IR”  and the ISA code dump looks as following, the cases that declare bindless textures by as uniform uvec2 type can run correctly.
+After the above change, we can see the pipeline dumps for the above shader, the pass "LLPC translate SPIR-V binary to LLVM IR" and the ISA code dump looks as following, the cases that declare bindless textures by as uniform uvec2 type can run correctly.
 
 ![](./DdnBindlessTexturePipelineDumpDeclUvec2Type.PNG)
 

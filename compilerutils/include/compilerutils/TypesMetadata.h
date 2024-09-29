@@ -65,7 +65,7 @@ public:
   // Construct a TypedFuncTy for the given result type and arg types.
   // This constructs the !pointeetys metadata; that can then be attached to a function
   // using writeMetadata().
-  TypedFuncTy(TypedArgTy ResultTy, ArrayRef<TypedArgTy> ArgTys);
+  TypedFuncTy(TypedArgTy ResultTy, ArrayRef<TypedArgTy> ArgTys, bool IsVarArg = false);
 
   // Get a TypedFuncTy for the given Function, looking up the !pointeetys metadata.
   static TypedFuncTy get(const Function *F);

@@ -955,6 +955,14 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
 
+  // Merges a resource descriptor into a feedback descriptor to create a descriptor for sampler feedback instructions.
+  //
+  // @param feedbackDesc : feedback descriptor
+  // @param resourceDesc : resource descriptor
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSamplerFeedbackDesc(llvm::Value *feedbackDesc, llvm::Value *resourceDesc,
+                                         const llvm::Twine &instName = "");
+
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations
 

@@ -370,6 +370,7 @@ extern opt<bool> EnablePipelineDump;
 extern opt<std::string> PipelineDumpDir;
 extern opt<bool> EnableTimerProfile;
 extern opt<bool> BuildShaderCache;
+extern OptionCategory AmdCategory;
 
 } // namespace cl
 } // namespace llvm
@@ -412,10 +413,12 @@ CapabilityPrinter CapPrinterInstance;
 ExtensionPrinter ExtPrinterInstance;
 
 cl::opt<CapabilityPrinter, true, cl::parser<bool>> CapPrinter{"cap", cl::desc("Display the supported Capabilities."),
-                                                              cl::location(CapPrinterInstance), cl::ValueDisallowed};
+                                                              cl::location(CapPrinterInstance), cl::ValueDisallowed,
+                                                              cl::cat(cl::AmdCategory)};
 
 cl::opt<ExtensionPrinter, true, cl::parser<bool>> ExtPrinter{"ext", cl::desc("Display the supported extensions."),
-                                                             cl::location(ExtPrinterInstance), cl::ValueDisallowed};
+                                                             cl::location(ExtPrinterInstance), cl::ValueDisallowed,
+                                                             cl::cat(cl::AmdCategory)};
 } // namespace
 
 // =====================================================================================================================

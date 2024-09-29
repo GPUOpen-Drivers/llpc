@@ -59,12 +59,6 @@ MeshTaskShader::MeshTaskShader(PipelineState *pipelineState,
 }
 
 // =====================================================================================================================
-// Destructor
-MeshTaskShader::~MeshTaskShader() {
-  m_pipelineSysValues.clear();
-}
-
-// =====================================================================================================================
 // Layout mesh shader LDS if 'ldsLayout' is specified and calculate the required total LDS size (in dwords).
 //
 // @param pipelineState : Pipeline state

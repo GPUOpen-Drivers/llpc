@@ -161,31 +161,6 @@ uint64_t computePayloadSpillSize(uint64_t NumI32s, uint64_t NumReservedRegisters
 // of individual bytes at the end if NumBytes is not a multiple of 4.
 void copyBytes(IRBuilder<> &B, Value *Dst, Value *Src, uint64_t NumBytes);
 
-class DialectContextAnalysisResult {
-public:
-  DialectContextAnalysisResult() {}
-
-  bool invalidate(llvm::Module &, const llvm::PreservedAnalyses &, llvm::ModuleAnalysisManager::Invalidator &) {
-    return false;
-  }
-};
-
-/// An analysis to run with dialects, even if the running tool does not have
-/// explicit support for it. This will create a dialect context on-demand.
-class DialectContextAnalysis : public llvm::AnalysisInfoMixin<DialectContextAnalysis> {
-public:
-  using Result = DialectContextAnalysisResult;
-  DialectContextAnalysis(bool NeedDialectContext = true);
-  Result run(llvm::Module &module, llvm::ModuleAnalysisManager &);
-  static llvm::AnalysisKey Key;
-
-private:
-  std::unique_ptr<llvm_dialects::DialectContext> Context;
-  // If true, this analysis is responsible to create a dialect context.
-  // If false, a context is already created outside of the pass pipeline.
-  bool NeedDialectContext;
-};
-
 class LegacyCleanupContinuationsPass : public llvm::PassInfoMixin<LegacyCleanupContinuationsPass> {
 public:
   LegacyCleanupContinuationsPass() {}
@@ -203,37 +178,7 @@ public:
   static llvm::StringRef name() { return "continuation cleanup"; }
 
 private:
-  struct ContinuationData {
-    /// All functions belonging to this continuation, the entry function is the
-    /// first one
-    SmallVector<Function *> Functions;
-    /// Size of the continuation state in byte
-    uint32_t ContStateBytes = 0;
-    CallInst *MallocCall = nullptr;
-    MDNode *MD = nullptr;
-    SmallVector<Function *> NewFunctions;
-  };
-
-  void removeContFreeCall(Function *F, Function *ContFree);
-  Value *getContinuationFramePtr(Function *F, bool IsStart, const ContinuationData &ContinuationInfo,
-                                 SmallVector<Instruction *> *InstsToRemove = nullptr);
-  void freeCpsStack(Function *F, ContinuationData &CpsInfo);
-  void updateCpsStack(Function *F, Function *NewFunc, bool IsStart, ContinuationData &CpsInfo);
-  void analyzeContinuation(Function &F, MDNode *MD);
-  void processContinuations();
-  void handleContinue(ContinuationData &Data, Instruction *Ret);
-  void handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun);
-  void lowerIntrinsicCall(Module &Mod);
-  void lowerGetResumePoint(Module &Mod);
-
-  llvm_dialects::Builder *Builder = nullptr;
-  Function *ContMalloc = nullptr;
-  Function *ContFree = nullptr;
-  MapVector<Function *, ContinuationData> ToProcess;
-  uint32_t MaxContStateBytes;
-  llvm::Module *GpurtLibrary = nullptr;
   bool Use64BitContinuationReferences;
-  llvm::Type *ContinuationReferenceType = nullptr;
 };
 
 // Define a wrapper pass that is used for CleanupContinuationsPass creating

@@ -37,33 +37,34 @@
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/AddLoopMetadata.h"
+#include "lgc/patch/CheckShaderCache.h"
+#include "lgc/patch/CollectImageOperations.h"
 #include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/GenerateCopyShader.h"
+#include "lgc/patch/IncludeLlvmIr.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/LowerDesc.h"
 #include "lgc/patch/LowerGpuRt.h"
+#include "lgc/patch/LowerImageDerivatives.h"
+#include "lgc/patch/LowerInOut.h"
+#include "lgc/patch/LowerInvariantLoads.h"
+#include "lgc/patch/LowerMulDx9Zero.h"
 #include "lgc/patch/LowerSubgroupOps.h"
+#include "lgc/patch/MutateEntryPoint.h"
 #include "lgc/patch/PatchBufferOp.h"
-#include "lgc/patch/PatchCheckShaderCache.h"
-#include "lgc/patch/PatchCopyShader.h"
-#include "lgc/patch/PatchEntryPointMutate.h"
-#include "lgc/patch/PatchImageDerivatives.h"
-#include "lgc/patch/PatchImageOpCollect.h"
-#include "lgc/patch/PatchInOutImportExport.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
-#include "lgc/patch/PatchInvariantLoads.h"
-#include "lgc/patch/PatchLlvmIrInclusion.h"
-#include "lgc/patch/PatchLoadScalarizer.h"
-#include "lgc/patch/PatchLoopMetadata.h"
-#include "lgc/patch/PatchMulDx9Zero.h"
 #include "lgc/patch/PatchPeepholeOpt.h"
 #include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/PatchResourceCollect.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "lgc/patch/PatchWorkarounds.h"
+#include "lgc/patch/ScalarizeLoads.h"
 #include "lgc/patch/TcsPassthroughShader.h"
 #include "lgc/patch/VertexFetch.h"
+
 #if LLPC_BUILD_STRIX1
 #include "lgc/patch/WorkaroundDsSubdwordWrite.h"
 #endif
@@ -200,23 +201,23 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(PatchNullFragShader());
   passMgr.addPass(PatchResourceCollect()); // also removes inactive/unused resources
 
-  // PatchCheckShaderCache depends on PatchResourceCollect
-  passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
+  // CheckShaderCache depends on PatchResourceCollect
+  passMgr.addPass(CheckShaderCache(std::move(checkShaderCacheFunc)));
 
   // First part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchWorkarounds());
-  passMgr.addPass(PatchCopyShader());
+  passMgr.addPass(GenerateCopyShader());
   passMgr.addPass(LowerVertexFetch());
   passMgr.addPass(LowerFragColorExport());
   passMgr.addPass(LowerDebugPrintf());
   passMgr.addPass(LowerDesc());
-  passMgr.addPass(PatchEntryPointMutate());
+  passMgr.addPass(MutateEntryPoint());
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerPopsInterlock()));
   passMgr.addPass(PatchInitializeWorkgroupMemory());
   passMgr.addPass(PatchInOutImportExport());
 
   // Patch invariant load and loop metadata.
-  passMgr.addPass(createModuleToFunctionPassAdaptor(PatchInvariantLoads()));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(LowerInvariantLoads()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
 
 #if LLPC_BUILD_STRIX1
@@ -276,7 +277,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
 
-  passMgr.addPass(PatchImageDerivatives());
+  passMgr.addPass(LowerImageDerivatives());
 
   // Set up target features in shader entry-points.
   // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
@@ -486,7 +487,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
 void Patch::init(Module *module) {
   m_module = module;
   m_context = &m_module->getContext();
-  m_shaderStage = ShaderStage::Invalid;
+  m_shaderStage = std::nullopt;
   m_entryPoint = nullptr;
 }
 

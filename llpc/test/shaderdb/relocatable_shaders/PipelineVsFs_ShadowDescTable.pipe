@@ -26,7 +26,7 @@ entryPoint = main
 [FsGlsl]
 #version 450 core
 
-layout(set = 0, binding = 0) uniform sampler2DMS samp;
+layout(set = 0, binding = 2) uniform sampler2DMS samp;
 layout(location = 0) in vec2 inUV;
 layout(location = 0) out vec4 oColor;
 
@@ -62,7 +62,7 @@ userDataNode[0].next[1].type = DescriptorFmask
 userDataNode[0].next[1].offsetInDwords = 12
 userDataNode[0].next[1].sizeInDwords = 8
 userDataNode[0].next[1].set = 0
-userDataNode[0].next[1].binding = 0
+userDataNode[0].next[1].binding = 2
 userDataNode[1].type = IndirectUserDataVaPtr
 userDataNode[1].offsetInDwords = 12
 userDataNode[1].sizeInDwords = 1

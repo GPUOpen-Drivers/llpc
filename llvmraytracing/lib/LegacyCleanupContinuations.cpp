@@ -41,6 +41,7 @@
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Instructions.h"
@@ -88,6 +89,7 @@ private:
   void handleFunctionEntry(ContinuationData &Data, Function *F, bool IsEntry);
   void handleContinue(ContinuationData &Data, Instruction *Ret);
   void handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun);
+  bool lowerCompleteOp(Module &M);
 
   Module &M;
   LLVMContext &Context;
@@ -295,6 +297,26 @@ Value *getContFrame(CallInst *MallocCall, Function *F, bool IsStart, SmallVector
   return ContFrame;
 }
 
+bool LegacyCleanupContinuationsPassImpl::lowerCompleteOp(Module &M) {
+  struct VisitState {
+    llvm_dialects::Builder &Builder;
+    bool completeLowered;
+  };
+
+  bool completeLowered = false;
+  VisitState State = {B, completeLowered};
+  static auto Visitor = llvm_dialects::VisitorBuilder<VisitState>()
+                            .add<lgc::cps::CompleteOp>([](VisitState &State, auto &complete) {
+                              State.Builder.SetInsertPoint(&complete);
+                              llvm::terminateShader(State.Builder, &complete);
+                              State.completeLowered = true;
+                            })
+                            .build();
+
+  Visitor.visit(State, M);
+  return State.completeLowered;
+}
+
 void LegacyCleanupContinuationsPassImpl::processContinuation(Function *StartFunc, ContinuationData &FuncData) {
   auto *Void = Type::getVoidTy(Context);
   LLVM_DEBUG(dbgs() << "Processing function: " << StartFunc->getName() << "\n");
@@ -471,8 +493,6 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(Function *StartFunc
           uint32_t NeededStackSize = FuncData.getContStateStackBytes();
           if (NeededStackSize > 0)
             B.create<lgc::cps::FreeOp>(B.getInt32(NeededStackSize));
-
-          llvm::terminateShader(B, PrevInst);
         } else {
           LLVM_DEBUG(PrevInst->dump());
           llvm_unreachable("Unexpected instruction!");
@@ -669,6 +689,8 @@ PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
 
     fixupDxilMetadata(M);
   }
+
+  Changed |= lowerCompleteOp(M);
 
   return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

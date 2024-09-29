@@ -1,4 +1,4 @@
-/*
+﻿/*
  ***********************************************************************************************************************
  *
  *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
@@ -442,14 +442,7 @@ Value *BuilderImpl::createSubgroupShuffle(Value *const value, Value *const index
     return result;
   }
 
-  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
-                        ArrayRef<Value *> passthroughArgs) -> Value * {
-    Value *const readlane =
-        builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
-    return createWaterfallLoop(cast<Instruction>(readlane), 1);
-  };
-
-  return CreateMapToSimpleType(mapFunc, value, index);
+  return createShuffleLoop(value, index, shaderStage);
 }
 
 // =====================================================================================================================
@@ -1419,6 +1412,26 @@ Value *BuilderImpl::createInverseBallotSelect(uint64_t selectMask, Value *const 
 }
 
 // =====================================================================================================================
+// Do group ballot with all active threads participated, turning a boolean value (in a VGPR) into a subgroup-wide
+// shared SGPR.
+//
+// @param value : The value to contribute to the SGPR, must be an boolean type.
+Value *BuilderImpl::createGroupBallotAllActive(Value *const value) {
+  // Check the type is definitely an boolean.
+  assert(value->getType()->isIntegerTy(1));
+
+  Value *result = value;
+  unsigned waveSize = getShaderWaveSize();
+  result = CreateIntrinsic(getIntNTy(waveSize), Intrinsic::amdgcn_ballot, result);
+
+  // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
+  if (waveSize <= 32)
+    result = CreateZExt(result, getInt64Ty());
+
+  return result;
+}
+
+// =====================================================================================================================
 // Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
 //
 // @param value : The value to contribute to the SGPR, must be an boolean type.
@@ -1435,15 +1448,7 @@ Value *BuilderImpl::createGroupBallot(Value *const value, ShaderStageEnum shader
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateAnd(isLive, result);
   }
-
-  unsigned waveSize = getShaderWaveSize();
-  result = CreateIntrinsic(getIntNTy(waveSize), Intrinsic::amdgcn_ballot, result);
-
-  // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
-  if (waveSize <= 32)
-    result = CreateZExt(result, getInt64Ty());
-
-  return result;
+  return createGroupBallotAllActive(result);
 }
 
 // =====================================================================================================================
@@ -1452,6 +1457,87 @@ Value *BuilderImpl::createGroupBallot(Value *const value, ShaderStageEnum shader
 // @param value : The value to contribute to the SGPR, must be an boolean type.
 Value *BuilderImpl::createGroupBallot(Value *const value) {
   return createGroupBallot(value, m_shaderStage.value());
+}
+
+// =====================================================================================================================
+// Create a traditional loop for subgroup shuffle.
+//
+// This is done in three steps:
+// 1. Collect the active lane mask for loop condition.
+//
+// 2. Check whether the shuffle index of each lane is equal to the shuffle index of first lane. If so, update the value
+//    of the current lane.
+//
+// 3. Update the first lane by update work list.
+//
+// Pseudo code:
+// result = poison
+// workList = ballot(true)
+// do {
+//     firstLaneIdx = find_first_set(workList)
+//     currentSrcLaneIdx = readlane(srcLaneIdx, firstLaneIdx)
+//     notCurrentLane = srcLaneIdx != currentSrcLaneIdx
+//     CreateMapToSimpleType
+//       value = readlane(srcData, currentSrcLaneIdx)
+//       result = notCurrentLane ? result : value
+//     workList &= ballot(notCurrentLane)
+// }
+// while (workList != 0)
+//
+// @param value : The value to shuffle.
+// @param index : The index to shuffle from.
+// @param instName : Name to give instruction(s)
+llvm::Value *BuilderImpl::createShuffleLoop(llvm::Value *const value, llvm::Value *const index,
+                                            ShaderStageEnum shaderStage, const llvm::Twine &instName) {
+  assert(value != nullptr && index != nullptr);
+  // Return readlane directly, if the index is a constant value.
+  if (isa<Constant>(index))
+    return CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readlane, {value, index});
+
+  // Creat workList out of loop
+  // By implementation, the Insert point has been set to the callInst when call processCall
+  auto *loopPoint = &*(GetInsertPoint());
+  auto *originalBlock = loopPoint->getParent();
+
+  // We are forcing all active threads participate the shuffle because CreateSubgroupClusteredMultiExclusive()
+  // depends on this to be correct.
+  // TODO: Refine the code or algorithm so that createShuffleLoop is no longer affected by external code
+  // implementations.
+  auto *workList = createGroupBallotAllActive(getTrue());
+
+  // Init loop block.
+  auto *loop = originalBlock->splitBasicBlock(loopPoint, ".shuffleLoop");
+  auto *loopNext = loop->splitBasicBlock(loop->getFirstInsertionPt());
+  SetInsertPoint(loop->getFirstInsertionPt());
+
+  Type *waveSize = workList->getType();
+  auto *resultPhi = CreatePHI(value->getType(), 2);
+  auto *workListPhi = CreatePHI(workList->getType(), 2);
+  resultPhi->addIncoming(PoisonValue::get(value->getType()), originalBlock);
+  workListPhi->addIncoming(workList, originalBlock);
+  auto *firstLaneIndex =
+      CreateZExtOrTrunc(CreateIntrinsic(Intrinsic::cttz, waveSize, {workListPhi, getTrue()}), getInt32Ty());
+  // In each loop iteration, the lanes with the same shuffle source index are being processed together. So,
+  // the iteration count will be equal to the count of unique values of the shuffle index.
+  Value *const currentSrcLaneIndex =
+      CreateIntrinsic(index->getType(), Intrinsic::amdgcn_readlane, {index, firstLaneIndex});
+  auto *notCurrentLane = CreateICmpNE(index, currentSrcLaneIndex);
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    Value *const index = passthroughArgs[0];
+    Value *const result = mappedArgs[0];
+    Value *const srcDate = mappedArgs[1];
+    Value *const value = builder.CreateIntrinsic(srcDate->getType(), Intrinsic::amdgcn_readlane, {srcDate, index});
+    return builder.CreateSelect(passthroughArgs[1], result, value);
+  };
+  auto result = CreateMapToSimpleType(mapFunc, {resultPhi, value}, {currentSrcLaneIndex, notCurrentLane});
+  auto newWorkList = CreateAnd(createGroupBallotAllActive(notCurrentLane), workListPhi);
+  resultPhi->addIncoming(result, loop);
+  workListPhi->addIncoming(newWorkList, loop);
+  auto *cond = CreateICmpEQ(newWorkList, ConstantInt::get(waveSize, 0));
+  CreateCondBr(cond, loopNext, loop);
+  loop->back().eraseFromParent();
+  SetInsertPoint(loopPoint);
+  return result;
 }
 
 // =====================================================================================================================

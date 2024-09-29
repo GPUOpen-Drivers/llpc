@@ -49,7 +49,7 @@ struct ColorExportInfo;
 // relocs.
 class ElfLinker {
 public:
-  virtual ~ElfLinker() {}
+  virtual ~ElfLinker() = default;
 
   // Add another input ELF to the link, in addition to the ones that were added when the ElfLinker was constructed.
   virtual void addInputElf(llvm::MemoryBufferRef inputElf) = 0;

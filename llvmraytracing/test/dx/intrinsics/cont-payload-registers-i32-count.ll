@@ -48,7 +48,7 @@ entry:
 
 !dx.entryPoints = !{!0, !3}
 !continuation.maxPayloadRegisterCount = !{!7}
-!continuation.preservedPayloadRegisterCount = !{!8}
+!continuation.maxUsedPayloadRegisterCount = !{!8}
 
 !0 = !{null, !"", null, !1, !6}
 !1 = !{!2, null, null, null}

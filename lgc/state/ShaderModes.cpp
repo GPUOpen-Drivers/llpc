@@ -51,7 +51,7 @@ static const char ComputeShaderModeMetadataName[] = "llpc.compute.mode";
 // =====================================================================================================================
 // Clear shader modes
 void ShaderModes::clear() {
-  memset(m_commonShaderModes, 0, sizeof(m_commonShaderModes));
+  m_commonShaderModes.clear();
 }
 
 // =====================================================================================================================
@@ -82,14 +82,16 @@ CommonShaderMode ShaderModes::getCommonShaderMode(Module &module, ShaderStageEnu
 //
 // @param stage : Shader stage
 const CommonShaderMode &ShaderModes::getCommonShaderMode(ShaderStageEnum stage) const {
-  return ArrayRef<CommonShaderMode>(m_commonShaderModes)[stage];
+  auto mode = m_commonShaderModes.find(stage);
+  assert(mode != m_commonShaderModes.end());
+  return mode->second;
 }
 
 // =====================================================================================================================
 // Check if any shader stage has useSubgroupSize set
 bool ShaderModes::getAnyUseSubgroupSize() const {
   for (const auto &commonShaderMode : m_commonShaderModes) {
-    if (commonShaderMode.useSubgroupSize)
+    if (commonShaderMode.second.useSubgroupSize)
       return true;
   }
   return false;
@@ -222,8 +224,8 @@ void ShaderModes::setSubgroupSizeUsage(Module &module, ShaderStageEnum stage, bo
 // @param module : LLVM module
 void ShaderModes::readModesFromPipeline(Module *module) {
   // First the common state.
-  for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
-    m_commonShaderModes[stage] = getCommonShaderMode(*module, ShaderStageEnum(stage));
+  for (auto stage : ShaderStagesNative)
+    m_commonShaderModes[stage] = getCommonShaderMode(*module, stage);
 
   // Then the specific shader modes except tessellation.
   PipelineState::readNamedMetadataArrayOfInt32(module, GeometryShaderModeMetadataName, m_geometryShaderMode);

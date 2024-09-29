@@ -4902,6 +4902,8 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
 
   Type *const ptrType = transType(spvVar->getType());
   unsigned addrSpace = ptrType->getPointerAddressSpace();
+  auto llpcContext = static_cast<Llpc::Context *>(m_context);
+  auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
 
   Type *const varType = transType(spvVarType, 0, true, layout);
 
@@ -4927,9 +4929,12 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
       }
     }
     if (!isBuiltIn) {
-      // Initializize user-defined output variable to zero
+      // Initialize user-defined output variable to zero
       initializer = Constant::getNullValue(varType);
     }
+  } else if (buildInfo->enableInitUndefZero && (storageClass == SPIRVStorageClassKind::StorageClassPrivate ||
+                                                storageClass == SPIRVStorageClassKind::StorageClassFunction)) {
+    initializer = Constant::getNullValue(varType);
   }
 
   bool readOnly = false;
@@ -5262,15 +5267,15 @@ lgc::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(SPIRVType *const e
 
 lgc::CooperativeMatrixLayout SPIRVToLLVM::getLayout(lgc::CooperativeMatrixElementType elemType) {
   const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
-  if (elemType == lgc::CooperativeMatrixElementType::Int32 || elemType == lgc::CooperativeMatrixElementType::Float32) {
+
+  if (BuilderCommon::isTypeNCooperativeMatrix(elemType, 32)) {
     if (gfxIp.major == 11)
       return lgc::CooperativeMatrixLayout::AccumulatorMatrixLayout;
     return lgc::CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout;
   }
-  if (elemType == lgc::CooperativeMatrixElementType::Int16 || elemType == lgc::CooperativeMatrixElementType::Int8 ||
-      elemType == lgc::CooperativeMatrixElementType::Float16) {
+  if (BuilderCommon::isTypeNCooperativeMatrix(elemType, 16) || BuilderCommon::isTypeNCooperativeMatrix(elemType, 8))
     return lgc::CooperativeMatrixLayout::FactorMatrixLayout;
-  }
+
   llvm_unreachable("The element type is not supported!");
   return lgc::CooperativeMatrixLayout::InvalidLayout;
 }
@@ -5292,7 +5297,7 @@ lgc::CooperativeMatrixLayout SPIRVToLLVM::getCooperativeMatrixKHRLayout(Cooperat
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAccumulatorKHR) {
     if (gfxIp.major == 11)
       return lgc::CooperativeMatrixLayout::AccumulatorMatrixLayout;
-    if (elemType == lgc::CooperativeMatrixElementType::Float32 || elemType == lgc::CooperativeMatrixElementType::Int32)
+    if (BuilderCommon::isTypeNCooperativeMatrix(elemType, 32))
       return lgc::CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout;
     if (elemType == lgc::CooperativeMatrixElementType::Int16 || elemType == lgc::CooperativeMatrixElementType::Float16)
       return lgc::CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout;
@@ -5526,9 +5531,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
   bool isSignedB = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixBSigned());
   bool isSat = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixSatAccumulation());
 
-  Value *coopMatrixD = getBuilder()->create<CooperativeMatrixMulAddOp>(coopMatrixC->getType(), coopMatrixA, coopMatrixB,
-                                                                       coopMatrixC, isSignedA, isSignedB, isSat, 0,
-                                                                       elemBasicTypeC, elemBasicTypeA, "mulAdd");
+  // Current SPIRV does not supported fp8 or bf8 yet, so the types of A and B use the same value.
+  Value *coopMatrixD = getBuilder()->create<CooperativeMatrixMulAddOp>(
+      coopMatrixC->getType(), coopMatrixA, coopMatrixB, coopMatrixC, isSignedA, isSignedB, isSat, 0, elemBasicTypeA,
+      elemBasicTypeA, elemBasicTypeC, "mulAdd");
   return coopMatrixD;
 }
 

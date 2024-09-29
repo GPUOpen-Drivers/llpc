@@ -79,7 +79,7 @@ PreservedAnalyses PatchInitializeWorkgroupMemory::run(Module &module, ModuleAnal
 
   Patch::init(&module);
   m_shaderStage = ShaderStage::Compute;
-  m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStageEnum>(m_shaderStage));
+  m_entryPoint = pipelineShaders.getEntryPoint(m_shaderStage.value());
   BuilderBase builder(*m_context);
   builder.SetInsertPointPastAllocas(m_entryPoint);
 
@@ -133,7 +133,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
   builder.SetInsertPoint(originBlock->getTerminator());
   // Get thread info
   auto &shaderMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
-  const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
+  const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage.value())->entryArgIdxs;
   Value *localInvocationId = getFunctionArgument(m_entryPoint, entryArgIdxs.cs.localInvocationId);
   const unsigned actualNumThreads = shaderMode.workgroupSizeX * shaderMode.workgroupSizeY * shaderMode.workgroupSizeZ;
 

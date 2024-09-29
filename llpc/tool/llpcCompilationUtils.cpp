@@ -58,12 +58,12 @@
 #endif
 
 #include "llpcCompilationUtils.h"
+#include "LoweringUtil.h"
 #include "llpcAutoLayout.h"
 #include "llpcDebug.h"
 #include "llpcError.h"
 #include "llpcInputUtils.h"
 #include "llpcShaderModuleHelper.h"
-#include "llpcSpirvLowerUtil.h"
 #include "llpcThreading.h"
 #include "llpcUtil.h"
 #ifndef LLPC_DISABLE_SPVGEN
@@ -404,9 +404,8 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     for (auto &libFileName : pipelineState->graphicsLibFileName) {
       if (!libFileName.empty()) {
         LLPC_OUTS(libFileName + "\n");
-        auto inputSpecOrErr = parseInputFileSpec(libFileName);
-        assert(!inputSpecOrErr.takeError());
-        compileInfo.inputSpecs.push_back(std::move(*inputSpecOrErr));
+        InputSpec inputSpec = cantFail(parseInputFileSpec(libFileName));
+        compileInfo.inputSpecs.push_back(std::move(inputSpec));
       }
     }
     return Error::success();

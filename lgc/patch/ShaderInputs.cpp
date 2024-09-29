@@ -308,7 +308,7 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
 }
 
 // =====================================================================================================================
-// Gather usage of shader inputs from before PatchEntryPointMutate
+// Gather usage of shader inputs from before MutateEntryPoint
 //
 // @param module : IR module
 void ShaderInputs::gatherUsage(Module &module) {
@@ -397,7 +397,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
 
       // The new ShaderInputs scheme means that InOutBuilder or PatchResourceCollect no longer needs to set
       // the builtInUsage field for an input that is generated using ShaderInputs::getInput() and/or
-      // ShaderInputs::getSpecialUserData() (before PatchEntryPointMutate), and we can remove that
+      // ShaderInputs::getSpecialUserData() (before MutateEntryPoint), and we can remove that
       // builtInUsage field.
       //
       // However, in some cases, the builtInUsage field is used in NggPrimShader and/or Gfx*ConfigBuilder
@@ -735,7 +735,6 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
 //
 // @param stage : Shader stage
 ShaderInputs::ShaderInputsUsage *ShaderInputs::getShaderInputsUsage(ShaderStageEnum stage) {
-  m_shaderInputsUsage.resize(std::max(m_shaderInputsUsage.size(), static_cast<size_t>(stage) + 1));
   return &m_shaderInputsUsage[stage];
 }
 

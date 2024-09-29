@@ -55,9 +55,6 @@ namespace SPIRV {
 SPIRVModule::SPIRVModule() : AutoAddCapability(true), ValidateCapability(false) {
 }
 
-SPIRVModule::~SPIRVModule() {
-}
-
 class SPIRVModuleImpl : public SPIRVModule {
 public:
   SPIRVModuleImpl()

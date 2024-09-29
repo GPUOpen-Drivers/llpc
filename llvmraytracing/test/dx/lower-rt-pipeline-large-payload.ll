@@ -193,7 +193,7 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP9]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [10 x i32] poison, [1 x i32] [[TMP10]]), !continuation.registercount [[META17]], !waitmask [[META20:![0-9]+]], !continuation.returnedRegistercount [[META17]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [1 x i32] } @await(ptr [[TMP19]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [1 x i32] } @await.2(ptr [[TMP19]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [1 x i32] } [[TMP25]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP13]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SMALLPAYLOAD]] poison, ptr [[P1]], align 4
@@ -204,7 +204,7 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP11]], ptr [[TMP7]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT10:%.*]]
-; LOWERRAYTRACINGPIPELINE:       .split12:
+; LOWERRAYTRACINGPIPELINE:       .split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP16]], align 4
@@ -249,7 +249,7 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP26]], ptr [[TMP16]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT9:%.*]]
-; LOWERRAYTRACINGPIPELINE:       .split11:
+; LOWERRAYTRACINGPIPELINE:       .split.split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[T3]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I5:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP53]], align 4
@@ -281,7 +281,7 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP52]], ptr addrspace(32) [[TMP50]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP62:%.*]] = load [2 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP63:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I10]], [10 x i32] poison, [2 x i32] [[TMP62]]), !continuation.registercount [[META13]], !waitmask [[META20]], !continuation.returnedRegistercount [[META13]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } @await.2(ptr [[TMP63]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } @await(ptr [[TMP63]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP65:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [27 x i32], [2 x i32] } [[TMP64]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [2 x i32] [[TMP65]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_LARGEPAYLOAD]] poison, ptr [[P3]], align 4
@@ -310,7 +310,7 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP75]], ptr [[TMP53]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
-; LOWERRAYTRACINGPIPELINE:       .split:
+; LOWERRAYTRACINGPIPELINE:       .split.split.split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = getelementptr inbounds [[STRUCT_SMALLPAYLOAD]], ptr [[TMP2]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP84:%.*]] = load i32, ptr [[TMP70]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP84]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4

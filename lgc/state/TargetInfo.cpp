@@ -35,9 +35,37 @@
 using namespace lgc;
 using namespace llvm;
 
+namespace llvm {
+namespace cl {
+// Define a category for Helper options.
+OptionCategory AmdCategory{"Helper Options"};
+} // namespace cl
+} // namespace llvm
+
 // -native-wave-size: an option to override hardware native wave size, it will allow compiler to choose
 // final wave size base on it. Used in pre-silicon verification.
 static cl::opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardware native wave size"), cl::init(0));
+
+namespace {
+
+class TargetInfoPrinter {
+public:
+  void print();
+
+  void operator=(bool value) {
+    if (!value)
+      return;
+    print();
+    exit(0);
+  }
+};
+
+TargetInfoPrinter TargetInfoPrinterInstance;
+
+cl::opt<TargetInfoPrinter, true, cl::parser<bool>> TargetPrinter{
+    "targetInfo", cl::desc("Display the supported device infos."), cl::location(TargetInfoPrinterInstance),
+    cl::cat(cl::AmdCategory)};
+} // namespace
 
 // =====================================================================================================================
 // Functions to set up TargetInfo for the various targets
@@ -349,46 +377,49 @@ static void setGfx115FInfo(TargetInfo *targetInfo) {
 }
 #endif
 
+// Represents device infos.
+struct GpuNameStringMap {
+  const char *gpuName;
+  const char *deviceName;
+  void (*setTargetInfoFunc)(TargetInfo *targetInfo);
+};
+
+// The supported device list
+static const GpuNameStringMap GpuNameMap[] = {
+    {"gfx1010", "Navi10", &setGfx1010Info}, // gfx1010
+#if LLPC_BUILD_NAVI12
+    {"gfx1011", "Navi12", &setGfx1011Info}, // gfx1011
+#endif
+    {"gfx1012", "Navi14", &setGfx1012Info}, // gfx1012
+    {"gfx1030", "Navi21", &setGfx1030Info}, // gfx1030
+    {"gfx1031", "Navi22", &setGfx1031Info}, // gfx1031
+    {"gfx1032", "Navi23", &setGfx1032Info}, // gfx1032
+    {"gfx1034", "Navi24", &setGfx1034Info}, // gfx1034
+#if LLPC_BUILD_REMBRANDT
+    {"gfx1035", "Rembrandt", &setGfx1035Info}, // gfx1035
+#endif
+#if LLPC_BUILD_RAPHAEL || LLPC_BUILD_MENDOCINO
+    {"gfx1036", "Raphael", &setGfx1036Info}, // gfx1036
+#endif
+    {"gfx1100", "Navi31", &setGfx1100Info}, // gfx1100
+#if LLPC_BUILD_NAVI32
+    {"gfx1101", "Navi32", &setGfx1101Info}, // gfx1101
+#endif
+    {"gfx1102", "Navi33", &setGfx1102Info}, // gfx1102
+#if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
+    {"gfx1103", "Phoenix1", &setGfx1103Info}, // gfx1103
+#endif
+#if LLPC_BUILD_STRIX1
+    {"gfx1150", "Strix1", &setGfx1150Info},    // gfx1150
+    {"gfx115F", "Strix1 A0", &setGfx115FInfo}, // gfx115F
+#endif
+};
+
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
 //
 // @param gpuName : LLVM GPU name, e.g. "gfx900"
 bool TargetInfo::setTargetInfo(StringRef gpuName) {
-  struct GpuNameStringMap {
-    const char *gpuName;
-    void (*setTargetInfoFunc)(TargetInfo *targetInfo);
-  };
-
-  static const GpuNameStringMap GpuNameMap[] = {
-    {"gfx1010", &setGfx1010Info}, // gfx1010
-#if LLPC_BUILD_NAVI12
-    {"gfx1011", &setGfx1011Info}, // gfx1011, navi12
-#endif
-    {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
-    {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
-    {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
-    {"gfx1032", &setGfx1032Info}, // gfx1032, navi23
-    {"gfx1034", &setGfx1034Info}, // gfx1034, navi24
-#if LLPC_BUILD_REMBRANDT
-    {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
-#endif
-#if LLPC_BUILD_RAPHAEL || LLPC_BUILD_MENDOCINO
-    {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
-#endif
-    {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
-#if LLPC_BUILD_NAVI32
-    {"gfx1101", &setGfx1101Info}, // gfx1101, navi32
-#endif
-    {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
-#if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
-    {"gfx1103", &setGfx1103Info}, // gfx1103, phoenix1
-#endif
-#if LLPC_BUILD_STRIX1
-    {"gfx1150", &setGfx1150Info}, // gfx1150, strix
-    {"gfx115F", &setGfx115FInfo}, // gfx115F, strix A0
-#endif
-  };
-
   void (*setTargetInfoFunc)(TargetInfo * targetInfo) = nullptr;
   for (const GpuNameStringMap &mapEntry : ArrayRef<GpuNameStringMap>(GpuNameMap)) {
     if (gpuName == mapEntry.gpuName) {
@@ -412,4 +443,14 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
   (*setTargetInfoFunc)(this);
 
   return true;
+}
+
+// =====================================================================================================================
+// Print the target infos
+void TargetInfoPrinter::print() {
+  unsigned count = sizeof(GpuNameMap) / sizeof(GpuNameMap[0]);
+  for (unsigned i = 0; i < count; ++i) {
+    // Remove substring "gfx"
+    outs() << StringRef(GpuNameMap[i].gpuName).drop_front(3) << "  " << GpuNameMap[i].deviceName << '\n';
+  }
 }

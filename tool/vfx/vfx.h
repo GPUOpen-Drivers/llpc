@@ -156,9 +156,6 @@ public:
   // Constructor, initializes our VfxFloat32 with another VfxFloat32
   Float32(const Float32 &other) : m_bits(other.m_bits) {}
 
-  // Destructor
-  ~Float32() {}
-
   // Gets the numeric value
   float GetValue() const { return *reinterpret_cast<const float *>(&m_bits.u32All); }
 

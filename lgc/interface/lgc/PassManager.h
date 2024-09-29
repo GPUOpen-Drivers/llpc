@@ -48,7 +48,7 @@ class LgcContext;
 class LegacyPassManager : public llvm::legacy::PassManager {
 public:
   static LegacyPassManager *Create();
-  virtual ~LegacyPassManager() {}
+  virtual ~LegacyPassManager() = default;
   virtual void stop() = 0;
   virtual void setPassIndex(unsigned *passIndex) = 0;
 };

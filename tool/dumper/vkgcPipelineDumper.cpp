@@ -712,6 +712,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.forwardPropagateNoContract = " << shaderInfo->options.forwardPropagateNoContract << "\n";
   dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
   dumpFile << "options.imageSampleDrefReturnsRgba = " << shaderInfo->options.imageSampleDrefReturnsRgba << "\n";
+  dumpFile << "options.disableGlPositionOpt = " << shaderInfo->options.disableGlPositionOpt << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -960,6 +961,30 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << glStatePrefix << "enableLineSmooth = " << options->getGlState().enableLineSmooth << "\n";
   dumpFile << glStatePrefix << "emulateWideLineStipple = " << options->getGlState().emulateWideLineStipple << "\n";
   dumpFile << glStatePrefix << "enablePointSmooth = " << options->getGlState().enablePointSmooth << "\n";
+
+  // Output compile time constant info
+  if (options->compileConstInfo) {
+    auto compileConstInfo = options->compileConstInfo;
+    dumpFile << "options.compileTimeConstants.numCompileTimeConstants = " << compileConstInfo->numCompileTimeConstants
+             << "\n";
+    for (unsigned i = 0; i < compileConstInfo->numCompileTimeConstants; ++i) {
+      dumpFile << "options.compileTimeConstants.constItem[" << i
+               << "].offset = " << compileConstInfo->pCompileTimeConstants[i].offset << "\n";
+      dumpFile << "options.compileTimeConstants.constItem[" << i
+               << "].set = " << compileConstInfo->pCompileTimeConstants[i].set << "\n";
+      dumpFile << "options.compileTimeConstants.constItem[" << i
+               << "].binding = " << compileConstInfo->pCompileTimeConstants[i].binding << "\n";
+      dumpFile << "options.compileTimeConstants.constItem[" << i
+               << "].validBytes = " << compileConstInfo->pCompileTimeConstants[i].validBytes << "\n";
+      dumpFile << "options.compileTimeConstants.constItem[" << i << "].values = ";
+      for (unsigned j = 0; j < compileConstInfo->pCompileTimeConstants[i].validBytes; ++j) {
+        dumpFile << compileConstInfo->pCompileTimeConstants[i].values.u32[j] << "";
+        if (j < compileConstInfo->pCompileTimeConstants[i].validBytes - 1)
+          dumpFile << ", ";
+      }
+      dumpFile << "\n";
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -1060,6 +1085,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableColorClampFs = " << pipelineInfo->glState.enableColorClampFs << "\n";
   dumpFile << "enableFlatShade = " << pipelineInfo->glState.enableFlatShade << "\n";
   dumpFile << "alphaTestFunc = " << pipelineInfo->glState.alphaTestFunc << "\n";
+  dumpFile << "enableInitialUndefVar = " << pipelineInfo->enableInitUndefZero << "\n";
 
   dumpFile << "originUpperLeft = " << pipelineInfo->getGlState().originUpperLeft << "\n";
   if (pipelineInfo->clientMetadataSize > 0) {
@@ -1551,6 +1577,8 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->unlinked);
   hasher.Update(pipeline->enableEarlyCompile);
   hasher.Update(pipeline->dynamicTopology);
+  hasher.Update(pipeline->enableInitUndefZero);
+
   if (unlinkedShaderType == UnlinkedStageFragment && isCacheHash)
     hasher.Update(pipeline->enableColorExportShader);
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, unlinkedShaderType);
@@ -2003,6 +2031,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.backwardPropagateNoContract);
       hasher->Update(options.forwardPropagateNoContract);
       hasher->Update(options.imageSampleDrefReturnsRgba);
+      hasher->Update(options.disableGlPositionOpt);
     }
   }
 }

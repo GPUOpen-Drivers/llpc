@@ -126,9 +126,6 @@ public:
   // Constructor given PipelineState and ELFs to link
   ElfLinkerImpl(lgc::PipelineState *pipelineState, llvm::ArrayRef<llvm::MemoryBufferRef> elfs);
 
-  // Destructor
-  ~ElfLinkerImpl() override final;
-
   // -----------------------------------------------------------------------------------------------------------------
   // Implementations of ElfLinker methods exposed to the front-end
 

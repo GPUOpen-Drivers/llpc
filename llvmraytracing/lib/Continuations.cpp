@@ -832,6 +832,12 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *
     }
   }
 
+  // Tolerate Replacement returning a single-element struct containing a value of the right type.
+  if (!Call->getType()->isVoidTy() && Call->getType() != Replacement->getType()) {
+    assert(cast<StructType>(Replacement->getType())->getNumElements() == 1);
+    Replacement = B.CreateExtractValue(Replacement, 0);
+  }
+
   LLVM_DEBUG(dbgs() << "Replacing " << *Call << " by " << *NewCall << "\n");
   if (!Call->getType()->isVoidTy())
     Call->replaceAllUsesWith(Replacement);

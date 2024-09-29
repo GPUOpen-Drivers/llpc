@@ -107,12 +107,12 @@ public:
   void readModesFromPipeline(llvm::Module *module);
 
 private:
-  CommonShaderMode m_commonShaderModes[ShaderStage::Compute + 1] = {}; // Per-shader FP modes
-  TessellationMode m_tessellationMode = {};                            // Tessellation mode
-  GeometryShaderMode m_geometryShaderMode = {};                        // Geometry shader mode
-  MeshShaderMode m_meshShaderMode = {};                                // Mesh shader mode
-  FragmentShaderMode m_fragmentShaderMode = {};                        // Fragment shader mode
-  ComputeShaderMode m_computeShaderMode = {};                          // Compute shader mode (workgroup size)
+  ShaderStageMap<CommonShaderMode> m_commonShaderModes; // Per-shader FP mode
+  TessellationMode m_tessellationMode = {};             // Tessellation mode
+  GeometryShaderMode m_geometryShaderMode = {};         // Geometry shader mode
+  MeshShaderMode m_meshShaderMode = {};                 // Mesh shader mode
+  FragmentShaderMode m_fragmentShaderMode = {};         // Fragment shader mode
+  ComputeShaderMode m_computeShaderMode = {};           // Compute shader mode (workgroup size)
 };
 
 } // namespace lgc

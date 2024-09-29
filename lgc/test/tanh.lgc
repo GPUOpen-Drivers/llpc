@@ -33,22 +33,12 @@ define float @sample(float %x) !lgc.shaderstage !1 {
   ret float %y
 }
 
-; Function Attrs: nounwind willreturn memory(read)
-declare !lgc.create.opcode !2 i32 @lgc.create.read.builtin.input.i32(...) #0
-
-; Function Attrs: nounwind willreturn memory(none)
-declare ptr addrspace(7) @lgc.load.buffer.desc(i64, i32, i32, i32) #1
-
 ; Function Attrs: nounwind memory(none)
-declare !lgc.create.opcode !3 float @lgc.create.tanh.f32(...) #2
+declare float @lgc.create.tanh.f32(...) #2
 
-attributes #0 = { nounwind willreturn memory(read) }
-attributes #1 = { nounwind willreturn memory(none) }
-attributes #2 = { nounwind memory(none) }
+attributes #0 = { nounwind memory(none) }
 
 !llpc.compute.mode = !{!0}
 
 !0 = !{i32 8, i32 8, i32 1}
 !1 = !{i32 7}
-!2 = !{i32 77}
-!3 = !{i32 17}

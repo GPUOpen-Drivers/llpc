@@ -34,6 +34,8 @@
 #include "LowerCfgMerges.h"
 #include "LowerRayTracing.h"
 #include "LowerTranslator.h"
+#include "Lowering.h"
+#include "LoweringUtil.h"
 #include "PrepareContinuations.h"
 #include "SPIRVEntry.h"
 #include "SPIRVFunction.h"
@@ -49,8 +51,6 @@
 #include "llpcGraphicsContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcShaderModuleHelper.h"
-#include "llpcSpirvLower.h"
-#include "llpcSpirvLowerUtil.h"
 #include "llpcThreading.h"
 #include "llpcTimerProfiler.h"
 #include "llpcUtil.h"
@@ -78,6 +78,7 @@
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Support/ErrorHandling.h"
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
 #else
@@ -1855,7 +1856,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
       // SPIR-V translation, then dump the result.
-      lowerPassMgr->addPass(SpirvLowerTranslator(entryStage, shaderInfoEntry));
+      lowerPassMgr->addPass(LowerTranslator(entryStage, shaderInfoEntry));
       if (EnableOuts()) {
         lowerPassMgr->addPass(
             PrintModulePass(outs(), "\n"
@@ -2019,7 +2020,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
 // =====================================================================================================================
 // Check shader cache for graphics pipeline, returning mask of which shader stages we want to keep in this compile.
-// This is called from the PatchCheckShaderCache pass (via a lambda in BuildPipelineInternal), to remove
+// This is called from the CheckShaderCache pass (via a lambda in BuildPipelineInternal), to remove
 // shader stages that we don't want because there was a shader cache hit.
 //
 // @param module : Module
@@ -2846,13 +2847,15 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     assert(success);
     (void(success)); // unused
 
-    auto maxUsedPayloadRegisterCount = ContHelper::tryGetMaxUsedPayloadRegisterCount(*module).value_or(0);
+    auto moduleStateOrErr = llvmraytracing::PipelineState::fromModuleMetadata(*module);
+    if (auto err = moduleStateOrErr.takeError()) {
+      return errorToResult(std::move(err));
+    }
     {
       // Library summary in rtContext could be shared between threads, need to ensure it is only modified by one thread
       // at a time.
       std::lock_guard<sys::Mutex> lock(getHelperThreadMutex());
-      rtContext->getRayTracingLibrarySummary().maxUsedPayloadRegisterCount =
-          std::max(rtContext->getRayTracingLibrarySummary().maxUsedPayloadRegisterCount, maxUsedPayloadRegisterCount);
+      rtContext->getRayTracingLibrarySummary().llvmRaytracingState.merge(*moduleStateOrErr);
     }
   }
 
@@ -3107,7 +3110,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     SpirvLower::registerTranslationPasses(*lowerPassMgr);
 
     // SPIR-V translation, then dump the result.
-    lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
+    lowerPassMgr->addPass(LowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
     lowerPassMgr->addPass(LowerCfgMerges());
     lowerPassMgr->addPass(AlwaysInlinerPass());
 
@@ -3312,8 +3315,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // Build traversal at last after we gather all needed information.
   if (traversalModule) {
     if (isContinuationsMode)
-      ContHelper::setPreservedPayloadRegisterCount(*traversalModule,
-                                                   rtContext.getRayTracingLibrarySummary().maxUsedPayloadRegisterCount);
+      rtContext.getRayTracingLibrarySummary().llvmRaytracingState.exportModuleMetadata(*traversalModule);
 
     auto rayFlagsKnownBits = rtContext.getRayFlagsKnownBits();
     lgc::gpurt::setKnownSetRayFlags(*traversalModule, rayFlagsKnownBits.One.getZExtValue());

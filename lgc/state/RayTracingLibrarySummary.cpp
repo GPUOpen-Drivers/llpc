@@ -38,7 +38,7 @@ using namespace lgc;
 namespace {
 namespace RtLibSummary {
 
-constexpr unsigned MajorVersion = 1;
+constexpr unsigned MajorVersion = 2;
 
 static constexpr char Version[] = "version";
 static constexpr char UsesTraceRay[] = "uses_trace_ray";
@@ -46,9 +46,9 @@ static constexpr char KnownSetRayFlags[] = "ray_flags_known_set";
 static constexpr char KnownUnsetRayFlags[] = "ray_flags_known_unset";
 static constexpr char MaxRayPayloadSize[] = "max_ray_payload_size";
 static constexpr char MaxHitAttributeSize[] = "max_hit_attribute_size";
-static constexpr char MaxUsedPayloadRegisterCount[] = "max_used_payload_register_count";
 static constexpr char HasKernelEntry[] = "has_kernel_entry";
 static constexpr char HasTraceRayModule[] = "has_trace_ray_module";
+static constexpr char LlvmRaytracingState[] = "llvm_raytracing_state";
 
 } // namespace RtLibSummary
 } // anonymous namespace
@@ -81,9 +81,12 @@ Expected<RayTracingLibrarySummary> RayTracingLibrarySummary::decodeMsgpack(Strin
   getUInt(root[RtLibSummary::KnownUnsetRayFlags], rls.knownUnsetRayFlags);
   getUInt(root[RtLibSummary::MaxRayPayloadSize], rls.maxRayPayloadSize);
   getUInt(root[RtLibSummary::MaxHitAttributeSize], rls.maxHitAttributeSize);
-  getUInt(root[RtLibSummary::MaxUsedPayloadRegisterCount], rls.maxUsedPayloadRegisterCount);
   getBool(root[RtLibSummary::HasKernelEntry], rls.hasKernelEntry);
   getBool(root[RtLibSummary::HasTraceRayModule], rls.hasTraceRayModule);
+  auto errorOrState = llvmraytracing::PipelineState::decodeMsgpack(root[RtLibSummary::LlvmRaytracingState]);
+  if (auto error = errorOrState.takeError())
+    return error;
+  rls.llvmRaytracingState = *errorOrState;
 
   return rls;
 }
@@ -100,9 +103,9 @@ std::string RayTracingLibrarySummary::encodeMsgpack() const {
   root[RtLibSummary::KnownUnsetRayFlags] = knownUnsetRayFlags;
   root[RtLibSummary::MaxRayPayloadSize] = maxRayPayloadSize;
   root[RtLibSummary::MaxHitAttributeSize] = maxHitAttributeSize;
-  root[RtLibSummary::MaxUsedPayloadRegisterCount] = maxUsedPayloadRegisterCount;
   root[RtLibSummary::HasKernelEntry] = hasKernelEntry;
   root[RtLibSummary::HasTraceRayModule] = hasTraceRayModule;
+  llvmRaytracingState.encodeMsgpack(root[RtLibSummary::LlvmRaytracingState]);
 
   std::string out;
   doc.writeToBlob(out);
@@ -117,9 +120,9 @@ void RayTracingLibrarySummary::merge(const RayTracingLibrarySummary &other) {
   }
   maxRayPayloadSize = std::max(maxRayPayloadSize, other.maxRayPayloadSize);
   maxHitAttributeSize = std::max(maxHitAttributeSize, other.maxHitAttributeSize);
-  maxUsedPayloadRegisterCount = std::max(maxUsedPayloadRegisterCount, other.maxUsedPayloadRegisterCount);
 
   // TODO: Inherit kernel entry and trace ray module if possible and avoid recompile?
   hasKernelEntry = false;
   hasTraceRayModule = false;
+  llvmRaytracingState.merge(other.llvmRaytracingState);
 }

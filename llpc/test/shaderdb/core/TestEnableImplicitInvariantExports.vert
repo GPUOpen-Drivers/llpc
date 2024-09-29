@@ -22,8 +22,8 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=WITHOUT_IIE %s
 ; WITHOUT_IIE-LABEL: {{^// LLPC}} pipeline before-patching results
 ; WITHOUT_IIE: %[[val:.*]] = extractvalue [4 x <4 x float>] %{{.*}}, 3
-; WITHOUT_IIE: %[[mul:.*]] = fmul <4 x float> %[[val]], %{{.*}}
-; WITHOUT_IIE: %[[arg:.*]] = fadd <4 x float> %{{.*}}, %[[mul]]
+; WITHOUT_IIE: %[[mul:.*]] = fmul nnan nsz <4 x float> %[[val]], %{{.*}}
+; WITHOUT_IIE: %[[arg:.*]] = fadd nnan nsz <4 x float> %{{.*}}, %[[mul]]
 ; WITHOUT_IIE-NEXT: call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> %[[arg]])
 ; WITHOUT_IIE: AMDLLPC SUCCESS
 */

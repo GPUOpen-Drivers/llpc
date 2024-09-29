@@ -26,7 +26,7 @@ define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) !pointeet
 ; Need _cont_ReportHit to get system data type
 declare  !pointeetys !22 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData)
+declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData)
 
 declare !pointeetys !15 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*)
 
@@ -38,7 +38,7 @@ define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwin
 
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) !pointeetys !18 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -102,7 +102,7 @@ attributes #0 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP3]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call ptr inttoptr (i64 2 to ptr)([[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], [20 x i32] poison, [1 x i32] [[TMP4]]), !continuation.registercount [[META14:![0-9]+]], !continuation.returnedRegistercount [[META14]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call ptr inttoptr (i64 2 to ptr)(i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], [19 x i32] poison, [1 x i32] [[TMP4]]), !continuation.registercount [[META14:![0-9]+]], !continuation.returnedRegistercount [[META14]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } @await(ptr [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP9]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP10]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
@@ -136,7 +136,7 @@ attributes #0 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP3]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa19i32a1i32s(i32 2, i32 4, i32 5, [20 x i32] poison, [1 x i32] [[TMP4]]), !continuation.returnedRegistercount [[META14]], !continuation.registercount [[META14]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa19i32a1i32s(i32 2, i32 4, i32 5, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], [19 x i32] poison, [1 x i32] [[TMP4]]), !continuation.returnedRegistercount [[META14]], !continuation.registercount [[META14]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [19 x i32], [1 x i32] } [[TMP5]], 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [1 x i32] [[TMP6]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_THEIRPARAMS]] poison, ptr [[PARAMS]], align 4
@@ -168,7 +168,7 @@ attributes #0 = { nounwind }
 ; POSTPROCESS-CPS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 undef, 0
 ; POSTPROCESS-CPS-NEXT:    [[TMP4:%.*]] = call i64 @continuation.getAddrAndMD(ptr @main.resume.0)
 ; POSTPROCESS-CPS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-CPS-NEXT:    call void (...) @lgc.ilcps.continue(i64 2, i32 [[TMP3]], i64 [[TMP4]], i32 5, [20 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT]])
+; POSTPROCESS-CPS-NEXT:    call void (...) @lgc.ilcps.continue(i64 2, i32 [[TMP3]], i64 [[TMP4]], i32 5, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], [19 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT]])
 ; POSTPROCESS-CPS-NEXT:    unreachable
 ;
 ;

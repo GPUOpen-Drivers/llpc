@@ -228,13 +228,17 @@ public:
 
   uint32_t getMaxPayloadRegisterCount() const { return MaxPayloadRegisterCount; }
 
-  std::optional<uint32_t> tryGetPreservedPayloadRegisterCount() const { return PreservedPayloadRegisterCount; }
-
   void updateMaxUsedPayloadRegisterCount(uint32_t Count) {
     MaxUsedPayloadRegisterCount = std::max(Count, MaxUsedPayloadRegisterCount);
   }
 
   uint32_t getMaxUsedPayloadRegisterCount() const { return MaxUsedPayloadRegisterCount; }
+
+  // Returns whether a value for maxUsedPayloadRegisterCount was set in the input module.
+  // If that is the case, for driver functions we rely on it.
+  // This mechanism ensures we don't rely on it in case the value was only initialized
+  // during processing of the current module.
+  bool maxUsedPayloadRegisterCountWasSet() const { return MaxUsedPayloadRegisterCountWasSet; }
 
   uint32_t getMaxHitAttributeByteCount() const { return MaxHitAttributeByteCount; }
 
@@ -250,12 +254,13 @@ private:
   /// [In]: Maximum allowed number of registers to be used for the payload.
   ///       It is guaranteed that all modules in a pipeline share this value.
   uint32_t MaxPayloadRegisterCount = 0;
-  /// [In]: If known, the number of payload registers that need to be preserved
-  ///       by functions that don't know the payload type, e.g. Traversal.
-  std::optional<uint32_t> PreservedPayloadRegisterCount = {};
-  /// [Out]: The maximum number of payload registers written or read by any
-  ///        shader in the module. This excludes intersection shaders, which
-  ///        just pass through an existing payload.
+  /// [In/Out]: The maximum number of payload registers written or read by any
+  ///           shader in the pipeline observed so far.
+  ///           This excludes intersection shaders, which just pass through an existing payload.
+  ///           If set on an incoming module, we can rely on it being an upper bound
+  ///           for driver functions, because driver functions are compiled last and not
+  ///           reused for child pipelines.
+  ///           We can't rely on it when compiling app shaders (e.g. intersection).
   uint32_t MaxUsedPayloadRegisterCount = 0;
   /// [In]: The maximum size of hit attribute stored on the module as metadata.
   uint32_t MaxHitAttributeByteCount = 0;
@@ -265,6 +270,8 @@ private:
 
   /// If the module has lgc.cps.module metadata attached.
   bool IsInLgcCpsMode = false;
+
+  bool MaxUsedPayloadRegisterCountWasSet = false;
 };
 
 class LowerRaytracingPipelinePassImpl final {
@@ -611,14 +618,9 @@ ModuleMetadataState::ModuleMetadataState(Module &Module) : Mod{Module} {
   auto RegisterCountFromMD = ContHelper::MaxPayloadRegisterCount::tryGetValue(&Module);
   MaxPayloadRegisterCount = RegisterCountFromMD.value_or(DefaultPayloadRegisterCount);
 
-  // Check that if there is a required minimum number of payload registers,
-  // it is compatible
-  PreservedPayloadRegisterCount = ContHelper::PreservedPayloadRegisterCount::tryGetValue(&Module);
-  assert(PreservedPayloadRegisterCount.value_or(MaxPayloadRegisterCount) <= MaxPayloadRegisterCount);
-
-  MaxUsedPayloadRegisterCount = ContHelper::MaxUsedPayloadRegisterCount::tryGetValue(&Module).value_or(0);
-  if (PreservedPayloadRegisterCount.has_value())
-    MaxUsedPayloadRegisterCount = std::max(MaxUsedPayloadRegisterCount, PreservedPayloadRegisterCount.value());
+  auto OptMaxUsedPayloadRegisterCount = ContHelper::MaxUsedPayloadRegisterCount::tryGetValue(&Module);
+  MaxUsedPayloadRegisterCount = OptMaxUsedPayloadRegisterCount.value_or(0);
+  MaxUsedPayloadRegisterCountWasSet = OptMaxUsedPayloadRegisterCount.has_value();
 
   // Use max hit attribute size from metadata, or use globally max allowed
   // value for the max if metadata is not set
@@ -961,6 +963,7 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(ContinuationCallTy
       RetAddr = PoisonValue::get(Builder.getInt64Ty());
     } else {
       RetAddr = Call->getArgOperand(RetAddrArgIndex);
+      assert(RetAddr->getType()->isIntegerTy(32) || RetAddr->getType()->isIntegerTy(64));
       ++RetAddrArgIndex;
     }
 
@@ -1430,9 +1433,9 @@ void LowerRaytracingPipelinePassImpl::setGpurtEntryRegisterCountMetadata() {
   // Even if PreservedPayloadRegisterCount is set, there may be
   // additional shaders in the current module whose usage is recorded
   // in MaxUsedPayloadRegisterCount, to take the max with it.
-  uint32_t MaxRegisterCount =
-      std::max(MetadataState.tryGetPreservedPayloadRegisterCount().value_or(MetadataState.getMaxPayloadRegisterCount()),
-               MetadataState.getMaxUsedPayloadRegisterCount());
+  uint32_t MaxRegisterCount = MetadataState.maxUsedPayloadRegisterCountWasSet()
+                                  ? MetadataState.getMaxUsedPayloadRegisterCount()
+                                  : MetadataState.getMaxPayloadRegisterCount();
 
   struct VisitorState {
     ModuleMetadataState &Metadata;
@@ -1759,10 +1762,9 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
     AllArgTypes.push_back(SystemDataTy);
     NewRetTy = SystemDataTy;
 
-    // We should have set up preserved register count for Traversal, if not,
-    // fall back to max count.
-    Data.NumPassedThroughPayloadDwords =
-        MetadataState.tryGetPreservedPayloadRegisterCount().value_or(MetadataState.getMaxPayloadRegisterCount());
+    Data.NumPassedThroughPayloadDwords = MetadataState.maxUsedPayloadRegisterCountWasSet()
+                                             ? MetadataState.getMaxUsedPayloadRegisterCount()
+                                             : MetadataState.getMaxPayloadRegisterCount();
     break;
   }
   default:
@@ -2385,7 +2387,6 @@ PreservedAnalyses LowerRaytracingPipelinePassImpl::run() {
 
   static const auto Visitor =
       llvm_dialects::VisitorBuilder<VisitorState>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByInstruction)
           .addSet<TraceRayOp, CallCallableShaderOp, ReportHitOp, ShaderIndexOp, ShaderRecordBufferOp, JumpOp>(
               [](VisitorState &State, Instruction &Op) {
                 auto *CInst = cast<CallInst>(&Op);

@@ -49,7 +49,7 @@ public:
   RayTracingContext(GfxIpVersion gfxIp, const RayTracingPipelineBuildInfo *pipelineInfo,
                     const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
-  virtual ~RayTracingContext() {}
+  virtual ~RayTracingContext() = default;
 
   virtual PipelineType getPipelineType() const override { return PipelineType::RayTracing; }
 

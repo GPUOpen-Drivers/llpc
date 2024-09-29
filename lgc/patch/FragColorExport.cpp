@@ -756,26 +756,6 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
 }
 
 // =====================================================================================================================
-// Generates a dummy export instruction.  Returns last export instruction that was generated.
-//
-// @param builder : The builder object that will be used to create new instructions.
-CallInst *FragColorExport::addDummyExport(BuilderBase &builder) {
-  auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
-  auto poison = PoisonValue::get(builder.getFloatTy());
-  Value *args[] = {
-      builder.getInt32(EXP_TARGET_MRT_0), // tgt
-      builder.getInt32(0x1),              // en
-      zero,                               // src0
-      poison,                             // src1
-      poison,                             // src2
-      poison,                             // src3
-      builder.getFalse(),                 // done
-      builder.getTrue()                   // vm
-  };
-  return builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
-}
-
-// =====================================================================================================================
 // Sets the done flag on the given export instruction.
 //
 // @param [in/out] exportInst : The export instruction to be updated.
@@ -1061,9 +1041,35 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
       }
     }
     if (!lastExport && dummyExport) {
-      lastExport = FragColorExport::addDummyExport(builder);
+      // NOTE: We maybe should not set SPI_SHADER_COL_FORMAT to 0 because of observe corruptions in some games.
+      // For performance, we must set the CB_SHADER_MASK to non-zero for RB+ optimization. In this case, PAL re-sets
+      // SPI_SHADER_COL_FORMAT to 32R, maybe causing a mismatch with CB_SHADER_MASK, there seems to be no impact on
+      // performance.
+      // For correctness, we should enable all channels enabled via the export format and write 0.
+      auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
+      auto zeros = ConstantVector::get({zero, zero, zero, zero});
+      const auto expFmt = key.dummyExpFmt == EXP_FORMAT_ZERO ? EXP_FORMAT_32_R : key.dummyExpFmt;
+      lastExport = handleColorExportInstructions(zeros, 0, builder, expFmt, false, false);
       palMetadata->setPsDummyExport();
-      finalExportFormats.push_back(EXP_FORMAT_32_R);
+      finalExportFormats.push_back(expFmt);
+      switch (expFmt) {
+      case EXP_FORMAT_32_R: {
+        cbShaderMask = 0x1U;
+        break;
+      }
+      case EXP_FORMAT_32_GR: {
+        cbShaderMask = 0x3U;
+        break;
+      }
+      case EXP_FORMAT_32_AR: {
+        cbShaderMask = 0x9U;
+        break;
+      }
+      default: {
+        cbShaderMask = 0xFU;
+        break;
+      }
+      }
     }
     if (lastExport)
       FragColorExport::setDoneFlag(lastExport, builder);
@@ -1154,6 +1160,8 @@ FragColorExport::Key FragColorExport::computeKey(ArrayRef<ColorExportInfo> infos
   key.enableFragColor = pipelineState->getOptions().enableFragColor;
   key.colorExportState = pipelineState->getColorExportState();
   key.waveSize = pipelineState->getShaderWaveSize(ShaderStage::Fragment);
+  key.dummyExpFmt = static_cast<ExportFormat>(
+      pipelineState->computeExportFormat(Type::getFloatTy(pipelineState->getContext()), 0, false));
 
   if (!infos.empty() && infos[0].hwColorTarget == MaxColorTargets) {
     infos = infos.drop_front(1);

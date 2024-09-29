@@ -83,6 +83,7 @@ enum SectionType : unsigned {
 // Enumerates VFX member type.
 enum MemberType : unsigned {
   MemberTypeInt,                          // VFX member type: 32 bit integer
+  MemberTypeUint,                         // VFX member type: 32 bit unsigned integer
   MemberTypeFloat,                        // VFX member type: 32 bit float
   MemberTypeFloat16,                      // VFX member type: 16 bit float
   MemberTypeDouble,                       // VFX member type: 64 bit double
@@ -116,6 +117,8 @@ enum MemberType : unsigned {
   MemberTypeSpecEntryItem,                // VFX member type: SectionSpecEntryItem
   MemberTypeResourceMappingNode,          // VFX member type: SectionResourceMappingNode
   MemberTypeSpecInfo,                     // VFX member type: SectionSpecInfo
+  MemberTypeCompileConstItem,             // VFX member type: SectionCompileConstItem
+  MemberTypeCompileConstInfo,             // VFX member type: SectionCompileConstInfo
   MemberTypeDescriptorRangeValue,         // VFX member type: SectionDescriptorRangeValueItem
   MemberTypePipelineOption,               // VFX member type: SectionPipelineOption
   MemberTypeShaderOption,                 // VFX member type: SectionShaderOption
@@ -356,7 +359,7 @@ struct StrToMemberAddrArrayRef {
 class Section {
 public:
   Section(StrToMemberAddrArrayRef addrTable, SectionType type, const char *sectionName);
-  virtual ~Section() {}
+  virtual ~Section() = default;
 
   static SectionType getSectionType(const char *sectionName);
   static void initSectionInfo();
@@ -874,6 +877,83 @@ private:
   std::vector<VkVertexInputBindingDivisorDescriptionEXT> m_vkDivisors; // Vulkan vertex input divisor
   VkPipelineVertexInputDivisorStateCreateInfoEXT m_vkDivisorState;     // Vulkan vertex input divisor state
   std::vector<uint8_t> m_vbAddressLowBits;                             // Lowest two bits of vertex inputs offsets.
+};
+
+// =====================================================================================================================
+// Represents the sub section compile time constant map entry
+class SectionCompileConstItem : public Section {
+public:
+  typedef Vkgc::CompileTimeConst SubState;
+
+  SectionCompileConstItem() : Section(getAddrTable(), SectionTypeUnset, "constItem") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  void getSubState(SubState &state) {
+    state = m_state;
+    state.values.u32[0] = m_values.iVec4[0];
+    state.values.u32[1] = m_values.iVec4[1];
+    state.values.u32[2] = m_values.iVec4[2];
+    state.values.u32[3] = m_values.iVec4[3];
+  };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionCompileConstItem, offset, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionCompileConstItem, set, MemberTypeUint, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionCompileConstItem, binding, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionCompileConstItem, validBytes, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionCompileConstItem, m_values, MemberTypeIVec4, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+  IUFValue m_values = {};
+};
+
+// =====================================================================================================================
+// Represents the sub section compile time constant info
+class SectionCompileConstInfo : public Section {
+public:
+  typedef Vkgc::CompileConstInfo SubState;
+
+  SectionCompileConstInfo() : Section(getAddrTable(), SectionTypeUnset, "compileTimeConstants") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  void getSubState(SubState &state) {
+    memset(&state, 0, sizeof(SubState));
+    if (m_constItem.size()) {
+      m_state.numCompileTimeConstants = static_cast<unsigned>(m_constItem.size());
+      m_compileConsts.resize(m_state.numCompileTimeConstants);
+      for (unsigned i = 0; i < m_compileConsts.size(); ++i)
+        m_constItem[i].getSubState(m_compileConsts[i]);
+      m_state.pCompileTimeConstants = &m_compileConsts[0];
+      state = m_state;
+    } else
+      memset(&m_state, 0, sizeof(SubState));
+  }
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionCompileConstInfo, numCompileTimeConstants, MemberTypeInt, false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionCompileConstInfo, m_constItem, MemberTypeCompileConstItem, true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  std::vector<SectionCompileConstItem> m_constItem;
+  std::vector<Vkgc::CompileTimeConst> m_compileConsts;
+  SubState m_state;
 };
 
 // =====================================================================================================================

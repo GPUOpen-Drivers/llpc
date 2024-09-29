@@ -684,9 +684,16 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_1En] = enablePrimStats || streamXfbBuffers[1] > 0;
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_2En] = enablePrimStats || streamXfbBuffers[2] > 0;
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = enablePrimStats || streamXfbBuffers[3] > 0;
-  if (shaderStage == ShaderStage::CopyShader)
-    vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] =
-        m_pipelineState->getRasterizerState().rasterStream;
+  if (shaderStage == ShaderStage::CopyShader) {
+    unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+    if (m_pipelineState->getRasterizerState().rasterStream == InvalidValue) {
+      // NOTE: According to HW register spec, rasterization stream has 3 bits, the lower 2 bits are programmed to stream
+      // ID (0~3). If rasterization is not enabled for any stream, set the highest 1 bit to 1.
+      static const unsigned NoRasterStream = 0x4;
+      rasterStream = NoRasterStream;
+    }
+    vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] = rasterStream;
+  }
 
   // Set some field of SPI_SHADER_PGM_RSRC2_VS
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsStreamoutEn] = enableXfb;

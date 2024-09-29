@@ -53,24 +53,24 @@ static const char *const GpurtFuncNames[] = {
     "_RayQuery_CommitNonOpaqueTriangleHit",
     "_RayQuery_CommitProceduralPrimitiveHit",
     "_RayQuery_EndInterleavedProceed",
-    "FetchTrianglePositionFromRayQuery",
+    "_RayQuery_FetchTrianglePosition",
     "_RayQuery_GeometryIndex",
     "_RayQuery_GetObjId",
     "_RayQuery_InstanceContributionToHitGroupIndex",
     "_RayQuery_InstanceID",
     "_RayQuery_InstanceIndex",
     "_RayQuery_IntersectionType",
-    "LongRayQueryProceedAMD",
+    "_RayQuery_LongProceedAMD",
     "_RayQuery_ObjectRayDirection",
     "_RayQuery_ObjectRayOrigin",
     "_RayQuery_ObjectToWorld4x3",
     "_RayQuery_PrimitiveIndex",
     "_RayQuery_RayFlags",
-    "RayQueryProceed",
+    "_RayQuery_Proceed",
     "_RayQuery_RayT",
     "_RayQuery_RayTMin",
     "_RayQuery_SetObjId",
-    "TraceRayInline",
+    "_RayQuery_TraceRayInline",
     "_RayQuery_TriangleBarycentrics",
     "_RayQuery_TriangleFrontFace",
     "_RayQuery_WorldRayDirection",
@@ -605,6 +605,17 @@ void LowerRayQuery::visitLdsStackInitOp(GpurtLdsStackInitOp &inst) {
 }
 
 // =====================================================================================================================
+// Visits "lgc.gpurt.get.ray.static.id" instructions
+//
+// @param inst : The instruction
+void LowerRayQuery::visitGetRayStaticIdOp(GpurtGetRayStaticIdOp &inst) {
+  auto hashcode = hash_combine(m_traceRayId++, inst.getFunction()->getName());
+  inst.replaceAllUsesWith(m_builder->getInt32(hashcode));
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
 // Executes this LowerRayquery pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -622,7 +633,6 @@ PreservedAnalyses LowerRayQuery::run(Module &module, ModuleAnalysisManager &anal
 
   static auto findRayqueryDialect =
       llvm_dialects::VisitorBuilder<FuncSet>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
           .add<rtq::InitializeOp>([](FuncSet &funcSet, auto &inst) { funcSet.insert(inst.getFunction()); })
           .build();
   findRayqueryDialect.visit(rayQueryFuncs, module);
@@ -679,21 +689,29 @@ PreservedAnalyses LowerRayQuery::run(Module &module, ModuleAnalysisManager &anal
 
   payload.typeLower.finishPhis();
   payload.typeLower.finishCleanup();
-
   static auto postVisit = llvm_dialects::VisitorBuilder<LowerRayQuery>()
-                              .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                               .add(&LowerRayQuery::visitGetStaticFlagsOp)
                               .add(&LowerRayQuery::visitStackReadOp)
                               .add(&LowerRayQuery::visitStackWriteOp)
                               .add(&LowerRayQuery::visitLdsStackInitOp)
+                              .add(&LowerRayQuery::visitGetRayStaticIdOp)
                               .build();
   postVisit.visit(*this, module);
 
   m_typeLowering = nullptr;
+
+  for (Instruction *call : m_callsToLower) {
+    call->dropAllReferences();
+    call->eraseFromParent();
+  }
+  m_callsToLower.clear();
+
   for (Function *func : m_funcsToLower) {
     func->dropAllReferences();
     func->eraseFromParent();
   }
+  m_funcsToLower.clear();
+
   return PreservedAnalyses::none();
 }
 

@@ -145,12 +145,12 @@ enum class ShaderInput : unsigned {
 // =====================================================================================================================
 // Class for handling shader inputs (other than user data)
 //
-// From BuilderImpl up to just before PatchEntryPointMutate, static methods in this class can be used to
+// From BuilderImpl up to just before MutateEntryPoint, static methods in this class can be used to
 // generate code to access shader inputs. That generates an lgc.shader.input.* call for each access.
 //
-// The PatchEntryPointMutate pass creates a ShaderInputs object, and uses a method on it to gather already-
+// The MutateEntryPoint pass creates a ShaderInputs object, and uses a method on it to gather already-
 // generated uses of shader inputs, and another method to create arguments for the shader function based
-// on that, and on usage that will happen after PatchEntryPointMutate.
+// on that, and on usage that will happen after MutateEntryPoint.
 //
 // The resulting shader function has input arguments that represent a kind of idealized GFX8 shader,
 // before GFX9+ shader merging and/or GFX10+ NGG primitive shader formation.
@@ -173,7 +173,7 @@ public:
   static const char *getInputName(ShaderInput inputKind);
 
   // -------------------------------------------------------------------------------------------------------------------
-  // Static methods called before PatchEntryPointMutate
+  // Static methods called before MutateEntryPoint
 
   // Get a special user data value by inserting a call to lgc.special.user.data
   static llvm::CallInst *getSpecialUserData(UserDataMapping kind, BuilderBase &builder);
@@ -191,9 +191,9 @@ public:
   static llvm::Value *getInput(ShaderInput kind, BuilderBase &builder, const LgcContext &lgcContext);
 
   // -------------------------------------------------------------------------------------------------------------------
-  // Object methods called during PatchEntryPointMutate
+  // Object methods called during MutateEntryPoint
 
-  // Gather usage of shader inputs from before PatchEntryPointMutate
+  // Gather usage of shader inputs from before MutateEntryPoint
   void gatherUsage(llvm::Module &module);
 
   // Fix up uses of shader inputs to use entry args directly
@@ -230,7 +230,7 @@ private:
   // amdgpu-no-workgroup-id-*
   void tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStageEnum shaderStage, llvm::Function *origFunc);
 
-  llvm::SmallVector<ShaderInputsUsage, ShaderStage::CountInternal> m_shaderInputsUsage;
+  ShaderStageMap<ShaderInputsUsage> m_shaderInputsUsage;
 };
 
 } // namespace lgc

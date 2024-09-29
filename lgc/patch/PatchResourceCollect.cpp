@@ -41,6 +41,7 @@
 #include "lgc/util/BuilderBase.h"
 #include "lgc/util/Debug.h"
 #include "llvm-dialects/Dialect/Visitor.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -94,8 +95,7 @@ PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManage
   m_tcsInputHasDynamicIndexing = false;
 
   bool needPack = false;
-  for (int shaderStage = 0; shaderStage < ShaderStage::GfxCount; ++shaderStage) {
-    ShaderStageEnum stage = static_cast<ShaderStageEnum>(shaderStage);
+  for (auto stage : ShaderStagesGraphics) {
     if (pipelineState->hasShaderStage(stage) &&
         (pipelineState->canPackInput(stage) || pipelineState->canPackOutput(stage))) {
       needPack = true;
@@ -109,9 +109,9 @@ PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManage
   }
 
   // Process each shader stage, in reverse order. We process FS even if it does not exist (part-pipeline compile).
-  for (int shaderStage = ShaderStage::CountInternal - 1; shaderStage >= 0; --shaderStage) {
-    m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStageEnum>(shaderStage));
-    m_shaderStage = static_cast<ShaderStageEnum>(shaderStage);
+  for (auto shaderStage : llvm::reverse(ShaderStagesNativeCopy)) {
+    m_entryPoint = pipelineShaders.getEntryPoint(shaderStage);
+    m_shaderStage = shaderStage;
     if (m_entryPoint)
       processShader();
     else if (m_shaderStage == ShaderStage::Fragment)
@@ -538,7 +538,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     // NOTE: Make gsVsVertexItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
     unsigned gsVsVertexItemTotalSize = 0;
     for (int i = 0; i < MaxGsStreams; ++i) {
-      gsVsVertexItemSize[i] = (4 * gsResUsage->inOutUsage.gs.outLocCount[i]) | 1;
+      gsVsVertexItemSize[i] = 4 * gsResUsage->inOutUsage.gs.outLocCount[i];
+      if (gsVsVertexItemSize[i] != 0)
+        gsVsVertexItemSize[i] |= 1; // If vertex item size is 0, this stream is inactive without any export.
       gsVsVertexItemTotalSize += gsVsVertexItemSize[i];
     }
 
@@ -630,6 +632,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // If GS is not present, instance count must be 1
       assert(gsInstanceCount == 1);
     }
+
+    // The minimum number of esVertsPerSubgroup must be at least the number of vertices per primitive.
+    esVertsPerSubgroup = std::max(inVertsPerPrim, esVertsPerSubgroup);
 
     // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
     // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -952,61 +957,125 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   }
 
   LLPC_OUTS("===============================================================================\n");
-  LLPC_OUTS("// LLPC geometry calculation factor results\n\n");
-  LLPC_OUTS("ES vertices per subgroup: " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
-  LLPC_OUTS("GS primitives per subgroup: " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
-  LLPC_OUTS("\n");
-  LLPC_OUTS("ES-GS LDS size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
-  LLPC_OUTS("On-chip GS LDS size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
-  LLPC_OUTS("\n");
-  LLPC_OUTS("ES-GS ring item size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << "\n");
-  LLPC_OUTS("GS-VS ring item size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << "\n");
+  LLPC_OUTS("// LLPC HW GS configurations\n\n");
+  LLPC_OUTS("HW GS = ");
+  if (meshPipeline) {
+    LLPC_OUTS("Mesh shader\n");
+  } else if (m_pipelineState->getNggControl()->enableNgg) {
+    LLPC_OUTS((hasGs ? "NGG GS" : "NGG") << "\n");
+  } else {
+    LLPC_OUTS("Legacy GS (" << (gsOnChip ? "Onchip" : "Offchip") << ")\n");
+  }
   LLPC_OUTS("\n");
 
+  LLPC_OUTS("EsVerts = " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << " verts/subgroup\n");
+  LLPC_OUTS("GsPrims = " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << " prims/subgroup\n");
+  LLPC_OUTS("\n");
+
+  LLPC_OUTS("EsGsLdsSize = " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << " dwords\n");
+  LLPC_OUTS("GsOnchipLdsSize = " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << " dwords\n");
+  if (gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize > 0) {
+    LLPC_OUTS("RayQueryLdsStack = " << gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize << " dwords (Start = "
+                                    << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << ")\n");
+  }
+  LLPC_OUTS("\n");
+
+  LLPC_OUTS("EsGsRingItemSize = " << gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << " dwords\n");
+  LLPC_OUTS("GsVsRingItemSize = " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << " dwords\n");
+  LLPC_OUTS("GsVsVertexItemSizes = [");
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    LLPC_OUTS(gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i]);
+    LLPC_OUTS((i == MaxGsStreams - 1 ? "" : ", "));
+  }
+  LLPC_OUTS("] dwords\n");
+  LLPC_OUTS("\n");
+
+  if (meshPipeline || m_pipelineState->getNggControl()->enableNgg) {
+    LLPC_OUTS("PrimAmpFactor = " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
+    LLPC_OUTS("EnableMaxVertOut = " << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false")
+                                    << "\n");
+    LLPC_OUTS("\n");
+  }
+
   if (hasGs) {
-    LLPC_OUTS("GS stream item sizes (in dwords):\n");
+    LLPC_OUTS("InputPrimitive = ");
+    switch (geometryMode.inputPrimitive) {
+    case InputPrimitives::Points:
+      LLPC_OUTS("Points\n");
+      break;
+    case InputPrimitives::Lines:
+      LLPC_OUTS("Lines\n");
+      break;
+    case InputPrimitives::LinesAdjacency:
+      LLPC_OUTS("LinesAdjacency\n");
+      break;
+    case InputPrimitives::Triangles:
+      LLPC_OUTS("Triangles\n");
+      break;
+    case InputPrimitives::TrianglesAdjacency:
+      LLPC_OUTS("TrianglesAdjacency\n");
+      break;
+    case InputPrimitives::Patch:
+      LLPC_OUTS("Patch (ControlPoints = " << geometryMode.controlPoints << ")\n");
+      break;
+    default:
+      break;
+    }
+    LLPC_OUTS("OutputPrimitive = ");
+    switch (geometryMode.outputPrimitive) {
+    case OutputPrimitives::Points:
+      LLPC_OUTS("Points\n");
+      break;
+    case OutputPrimitives::LineStrip:
+      LLPC_OUTS("LineStrip\n");
+      break;
+    case OutputPrimitives::TriangleStrip:
+      LLPC_OUTS("TriangleStrip\n");
+      break;
+    default:
+      break;
+    }
+    LLPC_OUTS("Invocations = " << geometryMode.invocations << "\n");
+    LLPC_OUTS("MaxOutputVertices = " << geometryMode.outputVertices << "\n");
+    LLPC_OUTS("RobustGsEmits = " << (geometryMode.robustGsEmits ? "true" : "false") << "\n");
+    LLPC_OUTS("\n");
+
+    const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+    LLPC_OUTS("RasterStream = ");
+    if (rasterStream != InvalidValue)
+      LLPC_OUTS("Stream[" << rasterStream << "]\n");
+    else
+      LLPC_OUTS("NoRasterization\n");
+
+    const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       unsigned streamItemSize =
           gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] * geometryMode.outputVertices;
-      LLPC_OUTS("    stream[" << i << "] = " << streamItemSize);
-
+      LLPC_OUTS("Stream[" << i << "] = " << streamItemSize << " dwords");
+      if (streamItemSize == 0)
+        LLPC_OUTS(" (Inactive)");
+      LLPC_OUTS("  =>  ");
       if (m_pipelineState->enableXfb()) {
-        const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
-        LLPC_OUTS(", XFB buffers = { ");
         if (streamXfbBuffers[i] != 0) {
+          LLPC_OUTS("XfbBuffer[");
+          bool printFirstXfbBuffer = true;
           for (unsigned j = 0; j < MaxTransformFeedbackBuffers; ++j) {
-            if ((streamXfbBuffers[i] & (1 << j)) != 0)
-              LLPC_OUTS(j << " ");
+            if ((streamXfbBuffers[i] & (1 << j)) != 0) {
+              LLPC_OUTS((printFirstXfbBuffer ? "" : ", ") << j << "");
+              printFirstXfbBuffer = false;
+            }
           }
+          LLPC_OUTS("]");
+        } else {
+          LLPC_OUTS("NoXfb");
         }
-        LLPC_OUTS("}");
+      } else {
+        LLPC_OUTS("NoXfb");
       }
-
       LLPC_OUTS("\n");
     }
     LLPC_OUTS("\n");
   }
-
-  if (gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize > 0) {
-    LLPC_OUTS("Ray query LDS stack size (in dwords): "
-              << gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize
-              << " (start = " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << ")\n\n");
-  }
-
-  if (meshPipeline) {
-    LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
-    LLPC_OUTS("\n");
-    LLPC_OUTS("GS is on-chip (Mesh)\n");
-  } else if (m_pipelineState->getNggControl()->enableNgg) {
-    LLPC_OUTS("GS primitive amplifier: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
-    LLPC_OUTS("GS enable max output vertices: "
-              << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false") << "\n");
-    LLPC_OUTS("\n");
-    LLPC_OUTS("GS is on-chip (NGG)\n");
-  } else {
-    LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
-  }
-  LLPC_OUTS("\n");
 
   return gsOnChip;
 }
@@ -1014,7 +1083,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 // =====================================================================================================================
 // Process a single shader.
 void PatchResourceCollect::processShader() {
-  m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+  m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value());
 
   // Invoke handling of "call" instruction
   visit(m_entryPoint);
@@ -1081,7 +1150,7 @@ void PatchResourceCollect::processMissingFs() {
   assert(m_shaderStage == ShaderStage::Fragment);
   if (!m_processMissingFs)
     return;
-  m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+  m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value());
 
   FsInputMappings fsInputMappings = {};
   m_pipelineState->getPalMetadata()->retrieveFragmentInputInfo(fsInputMappings);
@@ -1226,7 +1295,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       // Collect transform feedback export calls, used in SW-emulated stream-out. For GS, the collecting will
       // be done when we generate copy shader since GS is primitive-based.
       if (m_shaderStage != ShaderStage::Geometry) {
-        auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+        auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
         // A transform feedback export call is expected to be <4 x dword> at most
         inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
       }
@@ -1506,11 +1575,11 @@ void PatchResourceCollect::matchGenericInOut() {
   assert(m_pipelineState->isGraphics());
 
   // Do input matching and location remapping
-  bool packInput = m_pipelineState->canPackInput(m_shaderStage);
+  bool packInput = m_pipelineState->canPackInput(m_shaderStage.value());
   if (m_shaderStage == ShaderStage::TessControl && m_tcsInputHasDynamicIndexing) {
     packInput = false;
     // Disable to pack VS-TCS
-    m_pipelineState->setPackInput(m_shaderStage, false);
+    m_pipelineState->setPackInput(m_shaderStage.value(), false);
     m_pipelineState->setPackOutput(ShaderStage::Vertex, false);
   }
   if (packInput)
@@ -1519,7 +1588,7 @@ void PatchResourceCollect::matchGenericInOut() {
     updateInputLocInfoMapWithUnpack();
 
   // Do output matching and location remapping
-  bool packOutput = m_pipelineState->canPackOutput(m_shaderStage);
+  bool packOutput = m_pipelineState->canPackOutput(m_shaderStage.value());
   if (m_shaderStage == ShaderStage::Vertex && m_tcsInputHasDynamicIndexing)
     assert(!packOutput);
   if (packOutput) {
@@ -1535,8 +1604,9 @@ void PatchResourceCollect::matchGenericInOut() {
 
   // Update location count of input/output
   LLPC_OUTS("===============================================================================\n");
-  LLPC_OUTS("// LLPC location input/output mapping results (" << getShaderStageAbbreviation(m_shaderStage) << ")\n\n");
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  LLPC_OUTS("// LLPC location input/output mapping results (" << getShaderStageAbbreviation(m_shaderStage.value())
+                                                              << ")\n\n");
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &inLocInfoMap = inOutUsage.inputLocInfoMap;
   auto &outLocInfoMap = inOutUsage.outputLocInfoMap;
   auto &perPatchInLocMap = inOutUsage.perPatchInputLocMap;
@@ -1553,8 +1623,8 @@ void PatchResourceCollect::matchGenericInOut() {
       const unsigned newComp = locInfoPair.second.getComponent();
       assert(newLoc != InvalidValue);
       inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, newLoc + 1);
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  [location, component] = [" << origLoc
-                    << ", " << origComp << "]  =>  Mapped = [" << newLoc << ", " << newComp << "]\n");
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Input:  [location, component] = ["
+                    << origLoc << ", " << origComp << "]  =>  Mapped = [" << newLoc << ", " << newComp << "]\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1576,13 +1646,13 @@ void PatchResourceCollect::matchGenericInOut() {
                                     inOutUsage.gs.outLocCount[2] + inOutUsage.gs.outLocCount[3];
 
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, assignedLocCount);
-        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: stream = " << streamId << ", "
+        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output: stream = " << streamId << ", "
                       << " [location, component] = [" << origLoc << ", " << origComp << "]  =>  Mapped = [" << newLoc
                       << ", " << newComp << "]\n");
       } else {
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, newLoc + 1);
-        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: [location, component] = [" << origLoc
-                      << ", " << origComp << "]  =>  Mapped = [" << newLoc << ", " << newComp << "]\n");
+        LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output: [location, component] = ["
+                      << origLoc << ", " << origComp << "]  =>  Mapped = [" << newLoc << ", " << newComp << "]\n");
       }
     }
     LLPC_OUTS("\n");
@@ -1593,8 +1663,8 @@ void PatchResourceCollect::matchGenericInOut() {
     for (auto locMap : perPatchInLocMap) {
       assert(m_shaderStage == ShaderStage::TessEval && locMap.second != InvalidValue);
       inOutUsage.perPatchInputMapLocCount = std::max(inOutUsage.perPatchInputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  location = " << locMap.first
-                    << "  =>  Mapped = " << locMap.second << "\n");
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Input (per-patch):  location = "
+                    << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1604,8 +1674,8 @@ void PatchResourceCollect::matchGenericInOut() {
     for (auto locMap : perPatchOutLocMap) {
       assert(m_shaderStage == ShaderStage::TessControl && locMap.second != InvalidValue);
       inOutUsage.perPatchOutputMapLocCount = std::max(inOutUsage.perPatchOutputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): location = " << locMap.first
-                    << "  =>  Mapped = " << locMap.second << "\n");
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output (per-patch): location = "
+                    << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
   }
@@ -1615,7 +1685,7 @@ void PatchResourceCollect::matchGenericInOut() {
     for (auto locMap : perPrimitiveInLocMap) {
       assert(m_shaderStage == ShaderStage::Fragment && locMap.second != InvalidValue);
       inOutUsage.perPrimitiveInputMapLocCount = std::max(inOutUsage.perPrimitiveInputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-primitive):  location = "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Input (per-primitive):  location = "
                     << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
@@ -1626,31 +1696,31 @@ void PatchResourceCollect::matchGenericInOut() {
     for (auto locMap : perPrimitiveOutLocMap) {
       assert(m_shaderStage == ShaderStage::Mesh && locMap.second != InvalidValue);
       inOutUsage.perPrimitiveOutputMapLocCount = std::max(inOutUsage.perPrimitiveOutputMapLocCount, locMap.second + 1);
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-primitive): location = "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output (per-primitive): location = "
                     << locMap.first << "  =>  Mapped = " << locMap.second << "\n");
     }
     LLPC_OUTS("\n");
   }
 
   LLPC_OUTS("// LLPC location count results (after input/output matching) \n\n");
-  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  locations = " << inOutUsage.inputMapLocCount
-                << "\n");
-  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: locations = " << inOutUsage.outputMapLocCount
-                << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
+                << ") Input:  locations = " << inOutUsage.inputMapLocCount << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
+                << ") Output: locations = " << inOutUsage.outputMapLocCount << "\n");
   if (m_shaderStage == ShaderStage::TessEval) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Input (per-patch):  locations = " << inOutUsage.perPatchInputMapLocCount << "\n");
   }
   if (m_shaderStage == ShaderStage::TessControl) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Output (per-patch): locations = " << inOutUsage.perPatchOutputMapLocCount << "\n");
   }
   if (m_shaderStage == ShaderStage::Fragment) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Input (per-primitive):  locations = " << inOutUsage.perPrimitiveInputMapLocCount << "\n");
   }
   if (m_shaderStage == ShaderStage::Mesh) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Output (per-primitive): locations = " << inOutUsage.perPrimitiveOutputMapLocCount << "\n");
   }
   LLPC_OUTS("\n");
@@ -1663,12 +1733,12 @@ void PatchResourceCollect::matchGenericInOut() {
 void PatchResourceCollect::mapBuiltInToGenericInOut() {
   assert(m_pipelineState->isGraphics());
 
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value());
 
   auto &builtInUsage = resUsage->builtInUsage;
   auto &inOutUsage = resUsage->inOutUsage;
 
-  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
   auto nextResUsage = nextStage ? m_pipelineState->getShaderResourceUsage(nextStage.value()) : nullptr;
 
   assert(inOutUsage.builtInInputLocMap.empty()); // Should be empty
@@ -2060,7 +2130,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       // NOTE: If gl_in[].gl_ClipDistance is used, we have to check the usage of gl_out[].gl_ClipDistance in
       // tessellation control shader. The clip distance is the maximum of the two. We do this to avoid
       // incorrectness of location assignment during builtin-to-generic mapping.
-      const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
+      const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage.value());
       if (prevStage == ShaderStage::TessControl) {
         const auto &prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage.value())->builtInUsage.tcs;
         clipDistanceCount = std::max(clipDistanceCount, prevBuiltInUsage.clipDistance);
@@ -2074,7 +2144,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     if (builtInUsage.tes.cullDistanceIn > 0) {
       unsigned cullDistanceCount = builtInUsage.tes.cullDistanceIn;
 
-      const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
+      const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage.value());
       if (prevStage == ShaderStage::TessControl) {
         const auto &prevBuiltInUsage = m_pipelineState->getShaderResourceUsage(prevStage.value())->builtInUsage.tcs;
         cullDistanceCount = std::max(cullDistanceCount, prevBuiltInUsage.clipDistance);
@@ -2411,7 +2481,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         std::max(inOutUsage.perPrimitiveOutputMapLocCount, availPerPrimitiveOutMapLoc);
   } else if (m_shaderStage == ShaderStage::Fragment) {
     // FS
-    const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
+    const auto prevStage = m_pipelineState->getPrevShaderStage(m_shaderStage.value());
     unsigned availInMapLoc = inOutUsage.inputMapLocCount;
     unsigned availPerPrimitiveInMapLoc = inOutUsage.perPrimitiveInputMapLocCount;
 
@@ -2467,11 +2537,12 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 
   // Do builtin-to-generic mapping
   LLPC_OUTS("===============================================================================\n");
-  LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << getShaderStageAbbreviation(m_shaderStage) << ")\n\n");
+  LLPC_OUTS("// LLPC builtin-to-generic mapping results (" << getShaderStageAbbreviation(m_shaderStage.value())
+                                                           << ")\n\n");
   for (const auto &builtInMap : inOutUsage.builtInInputLocMap) {
     const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
     const unsigned loc = builtInMap.second;
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  builtin = "
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Input:  builtin = "
                   << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
   }
   if (!inOutUsage.builtInInputLocMap.empty())
@@ -2482,11 +2553,11 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     const unsigned loc = builtInMap.second;
 
     if (m_shaderStage == ShaderStage::Geometry) {
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                     << ") Output: stream = " << m_pipelineState->getRasterizerState().rasterStream << " , "
                     << "builtin = " << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     } else {
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: builtin = "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output: builtin = "
                     << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     }
   }
@@ -2496,7 +2567,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   for (const auto &builtInMap : inOutUsage.perPatchBuiltInInputLocMap) {
     const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
     const unsigned loc = builtInMap.second;
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-patch):  builtin = "
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Input (per-patch):  builtin = "
                   << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
   }
   if (!inOutUsage.perPatchBuiltInInputLocMap.empty())
@@ -2505,7 +2576,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   for (const auto &builtInMap : inOutUsage.perPatchBuiltInOutputLocMap) {
     const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
     const unsigned loc = builtInMap.second;
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-patch): builtin = "
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output (per-patch): builtin = "
                   << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
   }
   if (!inOutUsage.perPatchBuiltInOutputLocMap.empty())
@@ -2514,7 +2585,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   for (const auto &builtInMap : inOutUsage.perPrimitiveBuiltInInputLocMap) {
     const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
     const unsigned loc = builtInMap.second;
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input (per-primitive):  builtin = "
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Input (per-primitive):  builtin = "
                   << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
   }
   if (!inOutUsage.perPrimitiveBuiltInInputLocMap.empty())
@@ -2523,31 +2594,31 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
   for (const auto &builtInMap : inOutUsage.perPrimitiveBuiltInOutputLocMap) {
     const BuiltInKind builtInId = static_cast<BuiltInKind>(builtInMap.first);
     const unsigned loc = builtInMap.second;
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output (per-primitive): builtin = "
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value()) << ") Output (per-primitive): builtin = "
                   << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
   }
   if (!inOutUsage.perPrimitiveBuiltInOutputLocMap.empty())
     LLPC_OUTS("\n");
 
   LLPC_OUTS("// LLPC location count results (after builtin-to-generic mapping)\n\n");
-  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Input:  locations = " << inOutUsage.inputMapLocCount
-                << "\n");
-  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: locations = " << inOutUsage.outputMapLocCount
-                << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
+                << ") Input:  locations = " << inOutUsage.inputMapLocCount << "\n");
+  LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
+                << ") Output: locations = " << inOutUsage.outputMapLocCount << "\n");
   if (m_shaderStage == ShaderStage::TessEval) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Input (per-patch):  locations = " << inOutUsage.perPatchInputMapLocCount << "\n");
   }
   if (m_shaderStage == ShaderStage::TessControl) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Output (per-patch): locations = " << inOutUsage.perPatchOutputMapLocCount << "\n");
   }
   if (m_shaderStage == ShaderStage::Fragment) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Input (per-primitive):  locations = " << inOutUsage.perPrimitiveInputMapLocCount << "\n");
   }
   if (m_shaderStage == ShaderStage::Mesh) {
-    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+    LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage.value())
                   << ") Output (per-primitive): locations = " << inOutUsage.perPrimitiveOutputMapLocCount << "\n");
   }
   LLPC_OUTS("\n");
@@ -2578,7 +2649,7 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 // =====================================================================================================================
 // Update the inputLocInfoutputoMap, perPatchInputLocMap and perPrimitiveInputLocMap
 void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
   // Remove unused locationInfo
   bool eraseUnusedLocInfo = !m_pipelineState->isUnlinked(); // Should be whole pipeline compilation
@@ -2656,7 +2727,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
   // corresponding input location in the next stage. For example, if TCS output has dynamic location indexing from
   // [0,2], we need add the corresponding location info to TES input map. Otherwise, it will cause mismatch when the
   // dynamic indexing is in a loop and TES only uses location 1.
-  auto preStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
+  auto preStage = m_pipelineState->getPrevShaderStage(m_shaderStage.value());
   if (preStage == ShaderStage::TessControl || preStage == ShaderStage::Mesh) {
     if (!inputLocInfoMap.empty()) {
       auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(preStage.value())->inOutUsage.outputLocInfoMap;
@@ -2734,8 +2805,8 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
 // =====================================================================================================================
 // Clear unused output from outputLocInfoMap, perPatchOutputLocMap, and perPrimitiveOutputLocMap
 void PatchResourceCollect::clearUnusedOutput() {
-  auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   if (nextStage) {
     // Collect the locations of TCS's imported outputs
@@ -2878,8 +2949,8 @@ void PatchResourceCollect::clearUnusedOutput() {
 void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
   clearUnusedOutput();
 
-  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
 
   //
   // Update per-vertex output location info
@@ -3133,7 +3204,7 @@ bool PatchResourceCollect::canChangeOutputLocationsForGs() {
 // =====================================================================================================================
 // Update inputLocInfoMap based on {TCS, GS, FS} input import calls
 void PatchResourceCollect::updateInputLocInfoMapWithPack() {
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
   inputLocInfoMap.clear();
 
@@ -3153,7 +3224,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
   bool isFsAndHasGs = (isFs && (m_pipelineState->hasShaderStage(ShaderStage::Geometry) || partPipelineHasGs));
   bool requireDword = isTcs || isGs || isFsAndHasGs;
   // Create locationMap
-  m_locationInfoMapManager->createMap(m_inputCalls, m_shaderStage, requireDword);
+  m_locationInfoMapManager->createMap(m_inputCalls, m_shaderStage.value(), requireDword);
 
   // Fill inputLocInfoMap of {TCS, GS, FS} for the packable calls
   unsigned newLocIdx = 0;
@@ -3176,112 +3247,128 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
 // =====================================================================================================================
 // Update outputLocInfoMap based on inputLocInfoMap of next stage or GS output export calls for copy shader
 void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
-  outputLocInfoMap.clear();
+  outputLocInfoMap.clear(); // Clear it, will reconstruct
 
   if (m_outputCalls.empty())
     return;
 
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
-         m_shaderStage == ShaderStage::Geometry);
-  auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+         m_shaderStage == ShaderStage::Geometry); // Possible stages
+  auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
   auto &nextStageInputLocInfoMap =
       m_pipelineState->getShaderResourceUsage(nextStage.value())->inOutUsage.inputLocInfoMap;
 
   // Remove unused outputs and update the output map
   if (m_shaderStage != m_pipelineState->getLastVertexProcessingStage()) {
-    // For VS-{TCS, GS}, the dead output has no matching input of the next stage
+    // Not last vertex processing stage, collect dead outputs that have no matching inputs of the next stage.
+
+    // Collect dead output calls.
     for (auto call : m_outputCalls) {
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
       origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-      if (nextStageInputLocInfoMap.find(origLocInfo) == nextStageInputLocInfoMap.end())
+      if (nextStageInputLocInfoMap.count(origLocInfo) == 0)
         m_deadCalls.push_back(call);
     }
-    // The output map should be equal to the input map of the next stage
+
+    // Use the input map of the next stage to update the output map of current stage.
     outputLocInfoMap = nextStageInputLocInfoMap;
   } else {
-    // For {VS, TES, GS}-FS, the dead output is neither a XFB output or a corresponding FS' input.
+    // Last vertex processing stage, collect dead outputs that are not XFB output or have no matching FS inputs.
     assert(nextStage == ShaderStage::Fragment);
 
-    // Collect XFB locations
-    auto &xfbOutLocInfoMap = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.locInfoXfbOutInfoMap;
-    std::set<unsigned> xfbOutputLocs[MaxGsStreams];
-    for (const auto &locInfoPair : xfbOutLocInfoMap) {
-      const auto &locInfo = locInfoPair.first;
-      xfbOutputLocs[locInfo.getStreamId()].insert(locInfo.getLocation());
+    const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+
+    // Collect XFB output location pair <location, component>.
+    SmallSet<std::pair<unsigned, unsigned>, MaxInOutLocCount> xfbOutputLocPairs[MaxGsStreams];
+    auto &xfbOutInfoMap =
+        m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage.locInfoXfbOutInfoMap;
+    for (const auto &xfbOutLocInfo : xfbOutInfoMap) {
+      const auto &locInfo = xfbOutLocInfo.first;
+      if (locInfo.isBuiltIn())
+        continue; // Skip built-in outputs
+      xfbOutputLocPairs[locInfo.getStreamId()].insert(std::make_pair(locInfo.getLocation(), locInfo.getComponent()));
     }
 
-    // Store the output calls that have no corresponding input in FS
+    // Collect the output calls that have no corresponding FS inputs.
     std::vector<CallInst *> noMappedCalls;
     for (auto call : m_outputCalls) {
-      // NOTE: Don't set stream ID to the original output location info for GS. This is because the corresponding input
-      // location info of FS doesn't have stream ID. This will cause in-out mismatch.
-      InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-      origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
+      const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
+      const unsigned component = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+      const unsigned streamId =
+          m_shaderStage == ShaderStage::Geometry ? cast<ConstantInt>(call->getOperand(2))->getZExtValue() : 0;
 
-      const unsigned origLocation = origLocInfo.getLocation();
-      const bool hasNoMappedInput = (nextStageInputLocInfoMap.find(origLocInfo) == nextStageInputLocInfoMap.end());
-      if (hasNoMappedInput) {
-        const unsigned streamId =
-            m_shaderStage == ShaderStage::Geometry ? cast<ConstantInt>(call->getOperand(2))->getZExtValue() : 0;
+      bool noMappedInput = true;
+      if (streamId == rasterStream) {
+        // Skip checking FS inputs if this output doesn't belong to rasterization stream.
+        InOutLocationInfo origLocInfo;
+        origLocInfo.setLocation(location);
+        origLocInfo.setComponent(component);
+        // NOTE: Don't set stream ID to the original output location info for GS. This is because the corresponding
+        // input location info of FS doesn't have stream ID. This will cause in-out mismatch.
+        noMappedInput = nextStageInputLocInfoMap.count(origLocInfo) == 0;
+      }
 
-        if (xfbOutputLocs[streamId].count(origLocation) == 0)
+      if (noMappedInput) {
+        if (xfbOutputLocPairs[streamId].count(std::make_pair(location, component)) == 0)
           m_deadCalls.push_back(call);
         else
           noMappedCalls.push_back(call);
       }
     }
-    // The output map of current stage contains at most two parts: the first part is consistent with FS input map and
-    // the second part is built from the no mapped calls.
-    std::vector<InOutLocationInfo> outLocInfos;
+
+    // The output map of current stage consists of two parts: the first part is consistent with FS input map and
+    // the second part is from the no mapped calls.
+    std::vector<InOutLocationInfo> noMappedOutputLocInfos;
     for (auto call : noMappedCalls) {
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
       origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
       if (m_shaderStage == ShaderStage::Geometry)
         origLocInfo.setStreamId(cast<ConstantInt>(call->getOperand(2))->getZExtValue());
-      outLocInfos.push_back(origLocInfo);
+      noMappedOutputLocInfos.push_back(origLocInfo);
     }
-    m_locationInfoMapManager->createMap(outLocInfos, m_shaderStage);
-    const auto &calcOutLocInfoMap = m_locationInfoMapManager->getMap();
+    m_locationInfoMapManager->createMap(noMappedOutputLocInfos, m_shaderStage.value());
+    const auto &noMappedOutputLocInfoMap = m_locationInfoMapManager->getMap();
 
+    // Reconstruct the first part of output map by using FS input map.
     if (m_shaderStage == ShaderStage::Geometry) {
-      // NOTE: The output location info from next shader stage (FS) doesn't contain raster stream ID. We have to
-      // reconstruct it.
-      const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
-      for (auto &entry : nextStageInputLocInfoMap) {
-        InOutLocationInfo origLocInfo(entry.first);
-        origLocInfo.setStreamId(rasterStream);
-        InOutLocationInfo newLocInfo(entry.second);
-        newLocInfo.setStreamId(rasterStream);
-        outputLocInfoMap.insert({origLocInfo, newLocInfo});
+      if (rasterStream != InvalidValue) {
+        // NOTE: The output location info from FS doesn't contain rasterization stream ID. We have to reconstruct it.
+        for (auto &locInfo : nextStageInputLocInfoMap) {
+          InOutLocationInfo origLocInfo(locInfo.first);
+          origLocInfo.setStreamId(rasterStream);
+          InOutLocationInfo newLocInfo(locInfo.second);
+          newLocInfo.setStreamId(rasterStream);
+          outputLocInfoMap.insert({origLocInfo, newLocInfo});
+        }
       }
     } else {
       outputLocInfoMap = nextStageInputLocInfoMap;
     }
 
-    unsigned newLocMax = 0;
-    for (const auto &entry : outputLocInfoMap)
-      newLocMax = std::max(newLocMax, entry.second.getLocation() + 1);
-    // Update output map
-    for (const auto &entry : calcOutLocInfoMap) {
-      InOutLocationInfo origLocInfo;
-      origLocInfo.setStreamId(entry.first.getStreamId());
-      origLocInfo.setLocation(entry.first.getLocation());
-      origLocInfo.setComponent(entry.first.getComponent());
-      InOutLocationInfo newLocInfo(entry.second);
-      newLocInfo.setLocation(newLocInfo.getLocation() + newLocMax);
+    // Reconstruct the second part of output map by visiting each call of XFB output.
+    unsigned maxMappedLoc[MaxGsStreams] = {};
+    for (const auto &locInfo : outputLocInfoMap) {
+      maxMappedLoc[locInfo.first.getStreamId()] =
+          std::max(maxMappedLoc[locInfo.first.getStreamId()], locInfo.second.getLocation() + 1);
+    }
+
+    // Update output map for those XFB outputs.
+    for (const auto &locInfo : noMappedOutputLocInfoMap) {
+      InOutLocationInfo origLocInfo(locInfo.first);
+      InOutLocationInfo newLocInfo(locInfo.second);
+      newLocInfo.setLocation(newLocInfo.getLocation() + maxMappedLoc[locInfo.first.getStreamId()]);
       outputLocInfoMap.insert({origLocInfo, newLocInfo});
     }
 
-    // update output count per stream for GS
+    // Update output count per stream for GS
     if (m_shaderStage == ShaderStage::Geometry) {
-      for (auto &locInfoPair : outputLocInfoMap) {
-        auto &outLocCount = inOutUsage.gs.outLocCount[locInfoPair.first.getStreamId()];
-        outLocCount = std::max(outLocCount, locInfoPair.second.getLocation() + 1);
+      for (auto &locInfo : outputLocInfoMap) {
+        auto &outLocCount = inOutUsage.gs.outLocCount[locInfo.first.getStreamId()];
+        outLocCount = std::max(outLocCount, locInfo.second.getLocation() + 1);
       }
     }
   }
@@ -3292,7 +3379,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
 void PatchResourceCollect::reassembleOutputExportCalls() {
   if (m_outputCalls.empty())
     return;
-  assert(m_pipelineState->canPackOutput(m_shaderStage));
+  assert(m_pipelineState->canPackOutput(m_shaderStage.value()));
 
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(m_outputCalls.back());
@@ -3317,7 +3404,7 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
   };
 
   // Collect ElementsInfo in each packed location
-  auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.outputLocInfoMap;
+  auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage.outputLocInfoMap;
   std::vector<ElementsInfo> elementsInfoArray(outputLocInfoMap.size());
 
   for (auto call : m_outputCalls) {
@@ -3746,7 +3833,7 @@ void PatchResourceCollect::clearUndefinedOutput() {
 
     for (auto call : candidateCalls) {
       // For unlinked case, we should keep the location info map unchanged.
-      if (m_pipelineState->getNextShaderStage(m_shaderStage)) {
+      if (m_pipelineState->getNextShaderStage(m_shaderStage.value())) {
         // Remove the output location info if it exists
         unsigned index = m_shaderStage == ShaderStage::Mesh ? 2 : 1;
         unsigned component = cast<ConstantInt>(call->getArgOperand(index))->getZExtValue();

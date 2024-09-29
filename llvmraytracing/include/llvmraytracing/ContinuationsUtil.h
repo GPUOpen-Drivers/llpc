@@ -125,6 +125,31 @@ struct ContSetting {
   uint64_t Value;
 };
 
+class DialectContextAnalysisResult {
+public:
+  DialectContextAnalysisResult() {}
+
+  bool invalidate(llvm::Module &, const llvm::PreservedAnalyses &, llvm::ModuleAnalysisManager::Invalidator &) {
+    return false;
+  }
+};
+
+/// An analysis to run with dialects, even if the running tool does not have
+/// explicit support for it. This will create a dialect context on-demand.
+class DialectContextAnalysis : public llvm::AnalysisInfoMixin<DialectContextAnalysis> {
+public:
+  using Result = DialectContextAnalysisResult;
+  DialectContextAnalysis(bool NeedDialectContext = true);
+  Result run(llvm::Module &Module, llvm::ModuleAnalysisManager &);
+  static llvm::AnalysisKey Key;
+
+private:
+  std::unique_ptr<llvm_dialects::DialectContext> Context;
+  // If true, this analysis is responsible to create a dialect context.
+  // If false, a context is already created outside of the pass pipeline.
+  bool NeedDialectContext;
+};
+
 // Helper class to access data specific to continuation passes, e.g.
 // metadata or globals.
 class ContHelper {
@@ -162,32 +187,17 @@ private:
   // for PAQed fields, and all other data required in a particular stage (e.g.
   // hit attributes).
   //
-  // [in] PreservedPayloadRegisterCount:
-  // The required number of preserved payload registers for functions that
-  // are not aware of payload types (e.g. Intersection or Traversal), if known.
-  // This gives an upper bound on the number of payload registers used by other
-  // functions together with functions in the current module.
-  // Setting this value can be used to reduce the number of preserved registers
-  // for such functions to prevent having to preserve the maximum possible
-  // amount of payload registers. This is used when compiling a specialized
-  // Traversal function for a pipeline after all shaders in the pipeline have
-  // been processed.
-  // For intersection, it is not used, because early-compiled intersection
-  // shaders can be used in pipelines with large payload types unknown when
-  // compiling the intersection shader.
-  static constexpr const char *MDPreservedPayloadRegisterCountName = "continuation.preservedPayloadRegisterCount";
   // [in] MaxPayloadRegisterCount
   // The maximum allowed number of payload registers to be used for payload and
   // other inter-stage date (e.g. attributes). If state does not fit into this
   // limit, we spill to the continuation stack.
   static constexpr const char *MDMaxPayloadRegisterCountName = "continuation.maxPayloadRegisterCount";
-  // [out] MaxUsedPayloadRegisterCount
+  // [in/out] MaxUsedPayloadRegisterCount
   // The maximum number of payload registers written or read by any
-  // shader in the module. This excludes intersection shaders, which
+  // shader in the pipeline. This excludes intersection shaders, which
   // just pass through an existing payload.
-  // This can be used to populate PreservedPayloadRegisterCount when compiling
-  // the driver module in case all modules of the pipeline are known and
-  // have already been processed.
+  // If this is set on a driver module, we rely on it being an upper bound on the
+  // number of payload registers that need to be preserved.
   static constexpr const char *MDMaxUsedPayloadRegisterCountName = "continuation.maxUsedPayloadRegisterCount";
   // The address space used to store the continuations stack.
   // The possible values for this metadata are the values of ContStackAddrspace.
@@ -348,18 +358,17 @@ public:
   static std::optional<uint32_t> tryGet##NAME(const Module &M) { return NAME::tryGetValue(&M); }                       \
   static void set##NAME(Module &M, uint32_t Value) { NAME::setValue(&M, Value); }
 
-  MODULE_METADATA_HELPER(PreservedPayloadRegisterCount, MDPreservedPayloadRegisterCountName)
+  static std::optional<uint32_t> tryGetPreservedPayloadRegisterCount(const Module &M) {
+    return tryGetMaxUsedPayloadRegisterCount(M);
+  }
+  static void setPreservedPayloadRegisterCount(Module &M, uint32_t Value) { setMaxUsedPayloadRegisterCount(M, Value); }
+
   MODULE_METADATA_HELPER(MaxUsedPayloadRegisterCount, MDMaxUsedPayloadRegisterCountName)
   MODULE_METADATA_HELPER(MaxPayloadRegisterCount, MDMaxPayloadRegisterCountName)
   MODULE_METADATA_HELPER(Rtip, MDRtipName)
   MODULE_METADATA_HELPER(Flags, MDFlagsName)
 
 #undef MODULE_METADATA_HELPER
-
-  // Old alias until clients are migrated to setPreservedPayloadRegisterCount:
-  static void setMinPayloadRegisterCount(Module &M, uint32_t PreservedPayloadRegisterCount) {
-    PreservedPayloadRegisterCount::setValue(&M, PreservedPayloadRegisterCount);
-  }
 
   // If there is module-level metadata specifying the stack addrspace,
   // return that value. Otherwise, return std::nullopt.

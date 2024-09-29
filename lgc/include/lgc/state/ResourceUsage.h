@@ -639,7 +639,7 @@ struct InterfaceData {
     };
 
     bool initialized; // Whether entryArgIdxs has been initialized
-                      //   by PatchEntryPointMutate
+                      //   by MutateEntryPoint
   } entryArgIdxs = {};
 
   InterfaceData();

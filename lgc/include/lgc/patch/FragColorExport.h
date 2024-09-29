@@ -66,6 +66,7 @@ public:
     unsigned expFmt[MaxColorTargets];           // Export format used for "export" instruction.
     unsigned waveSize;                          // The wave size for fragment.
     bool enableFragColor;                       // Whether to broadcast frag color. Only for OGLP
+    ExportFormat dummyExpFmt;                   // Export format used for dummy "export" instruction.
   };
 
   FragColorExport(LgcContext *context);
@@ -74,7 +75,6 @@ public:
                                   bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
                                   llvm::Value *dynamicIsDualSource, const Key &key);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
-  static llvm::CallInst *addDummyExport(BuilderBase &builder);
   static llvm::Function *generateNullFragmentShader(llvm::Module &module, PipelineState *pipelineState,
                                                     llvm::StringRef entryPointName);
   static llvm::Function *generateNullFragmentEntryPoint(llvm::Module &module, PipelineState *pipelineState,

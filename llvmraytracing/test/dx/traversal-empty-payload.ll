@@ -10,7 +10,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 %struct.SystemData = type { %struct.DispatchSystemData, float }
 %struct.DispatchSystemData = type { i32 }
 
-!continuation.preservedPayloadRegisterCount = !{!8} ; EMPTY_PAYLOAD
+!continuation.maxUsedPayloadRegisterCount = !{!8} ; EMPTY_PAYLOAD
 
 declare !pointeetys !4 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 

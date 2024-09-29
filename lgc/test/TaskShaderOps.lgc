@@ -16,7 +16,7 @@
 ; CHECK-NEXT: [[dimX:%[0-9]*]] = extractelement <3 x i32> %meshTaskDispatchDims, i64 0
 ; CHECK-NEXT: [[tempResult2:%[0-9]*]] = mul i32 [[tempResult1]], [[dimX]]
 ; CHECK-NEXT: [[flattenId:%[0-9]*]] = add i32 [[tempResult2]], [[groupIdX]]
-; CHECK-NEXT: [[entryIndex:%[0-9]*]] = add i32 [[flattenId]], %meshTaskRingIndex
+; CHECK-NEXT: [[entryIndex:%[0-9]*]] = add i32 {{(%meshTaskRingIndex, )?}}[[flattenId]]{{(, %meshTaskRingIndex)?}}{{$}}
 ; CHECK: [[drawDataRingDescPtr:%[0-9]*]] = getelementptr {{i8|<4 x i32>}}, ptr addrspace(4) %{{[0-9]*}}, i64 {{224|14}}
 ; CHECK-NEXT: [[drawDataRingDesc:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[drawDataRingDescPtr]], align 16
 ; CHECK: [[payloadRingDescPtr:%[0-9]*]] = getelementptr {{i8|<4 x i32>}}, ptr addrspace(4) %{{[0-9]*}}, i64 {{208|13}}

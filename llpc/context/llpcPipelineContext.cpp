@@ -145,10 +145,6 @@ PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHa
 }
 
 // =====================================================================================================================
-PipelineContext::~PipelineContext() {
-}
-
-// =====================================================================================================================
 // Gets the hash code of input shader with specified shader stage.
 //
 // @param stage : Shader stage
@@ -202,7 +198,7 @@ void PipelineContext::setRayTracingState(const Vkgc::RtState &rtState, const Vkg
     m_rtState.rtIpVersion = Vkgc::gpurt::getRtIpVersion(m_gfxIp);
 
   if (m_rtState.rtIpVersion.major != 0 && !m_rtState.gpurtOverride) {
-    gpurt::getShaderLibrarySpirv(m_rtState.gpurtFeatureFlags, m_rtState.gpurtShaderLibrary.pCode,
+    gpurt::getShaderLibrarySpirv(m_rtState.rtIpVersion, m_rtState.gpurtFeatureFlags, m_rtState.gpurtShaderLibrary.pCode,
                                  m_rtState.gpurtShaderLibrary.codeSize);
     gpurt::getFuncTable(m_rtState.rtIpVersion, m_rtState.gpurtFuncTable);
   }
@@ -401,7 +397,7 @@ void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappi
   dst.sizeInDwords = src.sizeInDwords;
   dst.offsetInDwords = src.offsetInDwords;
   dst.abstractType = ResourceNodeType::Unknown;
-  dst.visibility = visibility;
+  dst.visibility = ShaderStageMask::fromRaw(visibility);
 
   switch (src.type) {
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
