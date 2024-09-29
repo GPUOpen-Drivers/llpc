@@ -2,9 +2,11 @@
 // instruction combine removing subtraction for gl_Position computation.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc --gfxip=10.3.0 -v %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc --gfxip=10.3.0 -v %s | FileCheck -check-prefixes=SHADERTEST,OPT %s
+; RUN: amdllpc --gfxip=10.3.0 --disable-gl-position-opt=1 -v %s | FileCheck -check-prefixes=SHADERTEST,NOOPT %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: fsub float 1.000000e+00, %__llpc_input_proxy_in_Pos.0.vec.extract
+; OPT: fsub nnan nsz float 1.000000e+00, %__llpc_input_proxy_in_Pos.0.vec.extract
+; NOOPT: fsub float 1.000000e+00, %__llpc_input_proxy_in_Pos.0.vec.extract
 ; SHADERTEST-LABEL: _amdgpu_vs_main:
 ; SHADERTEST: v_sub_f32_e32 v{{[0-9]+}}, 1.0, v{{[0-9]+}}
 ; END_SHADERTEST
@@ -51,5 +53,5 @@ binding[0].stride = 2
 binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
 attribute[0].location = 0
 attribute[0].binding = 0
-attribute[0].format = VK_FORMAT_R8G8_SNORM
+attribute[0].format = VK_FORMAT_R8G8B8A8_SNORM
 attribute[0].offset = 0

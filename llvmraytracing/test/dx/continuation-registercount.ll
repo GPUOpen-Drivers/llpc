@@ -39,10 +39,10 @@ declare i32 @_cont_GetContinuationStackAddr() #0
 declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData) #0
 
 ; Function Attrs: alwaysinline
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #0
+declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, i64, %struct.AnyHitTraversalData) #0
 
 ; Function Attrs: nounwind memory(read)
 declare !pointeetys !24 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #1
@@ -102,7 +102,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 ; Function Attrs: alwaysinline
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !pointeetys !37 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -111,7 +111,7 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !poi
 ; Function Attrs: alwaysinline
 define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind) #0 !pointeetys !38 {
   %trav_data = load %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, align 4
-  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
+  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, i64 poison, %struct.AnyHitTraversalData %trav_data)
   store %struct.AnyHitTraversalData %newdata, %struct.AnyHitTraversalData* %data, align 4
   call void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData* %data)
   ret i1 true
@@ -155,12 +155,16 @@ define void @called(%struct.MyParams* %arg) !pointeetys !39 {
 }
 
 ; MAX10-DAG: Incoming payload VGPR size of "Intersection" (intersection): 10 dwords
-; MAX10-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 10 dwords
+; MAX30-DAG: Incoming payload VGPR size of "Intersection" (intersection): 30 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
-; MAX10-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}: 10 dwords
+; MAX10-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}}: 10 dwords
+; MAX30-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}}: 30 dwords
+
+; MAX10-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 10 dwords
 ; MAX30-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 30 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
-; MAX30-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}: 30 dwords
+; MAX10-DAG: call void (...) @lgc.cps.jump(i64 %returnAddr.reload{{.*}}: 10 dwords
+; MAX30-DAG: call void (...) @lgc.cps.jump(i64 %returnAddr.reload{{.*}}: 30 dwords
 
 define void @Intersection() #3 {
   %a = alloca %struct.BuiltInTriangleIntersectionAttributes, align 4
@@ -231,8 +235,8 @@ attributes #3 = { nounwind }
 !dx.entryPoints = !{!3, !6, !13, !15, !17, !19, !21, !57}
 !continuation.maxPayloadRegisterCount = !{!23} ; 10; only for MAX_REG_10
 !continuation.maxPayloadRegisterCount = !{!53} ; 30; only for MAX_REG_30
-!continuation.preservedPayloadRegisterCount = !{!23} ; 10; only for MAX_REG_10
-!continuation.preservedPayloadRegisterCount = !{!54} ; 27; only for MAX_REG_30
+!continuation.maxUsedPayloadRegisterCount = !{!23} ; 10; only for MAX_REG_10
+!continuation.maxUsedPayloadRegisterCount = !{!54} ; 27; only for MAX_REG_30
 !lgc.rt.max.attribute.size = !{!60}
 
 !0 = !{!"clang version 3.7.0 (tags/RELEASE_370/final)"}

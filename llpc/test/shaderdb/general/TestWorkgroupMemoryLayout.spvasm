@@ -4,7 +4,6 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[LDS0:[^ ]*]] = addrspace(3) global <{ [8 x i32] }> poison, align 4
 ; SHADERTEST: @[[LDS1:[^ ]*]] = addrspace(3) global <{ [4 x i32] }> poison, align 4
@@ -14,9 +13,9 @@
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}([4 x i32], ptr addrspace(3) @[[LDS1]], i32 0, i32 2), align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}([4 x i32], ptr addrspace(3) @[[LDS1]], i32 0, i32 3), align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1), align 4
-; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1, i32 1), align 4
-; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1, i32 2), align 4
-; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1, i32 3), align 4
+; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1), i32 0, i32 1), align 4
+; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1), i32 0, i32 2), align 4
+; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [16 x i8], [4 x i32] }>, ptr addrspace(3) @[[LDS2]], i32 0, i32 1), i32 0, i32 3), align 4
 ; SHADERTEST: load i32, ptr addrspace(3) @[[LDS0]], align 4
 ; SHADERTEST: load i32, ptr addrspace(3) getelementptr {{.*}}([8 x i32], ptr addrspace(3) @[[LDS0]], i32 0, i32 1), align 4
 ; SHADERTEST: load i32, ptr addrspace(3) getelementptr {{.*}}([8 x i32], ptr addrspace(3) @[[LDS0]], i32 0, i32 2), align 4

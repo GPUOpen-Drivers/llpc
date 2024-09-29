@@ -88,7 +88,7 @@ public:
 
   static SPIRVModule *createSPIRVModule();
   SPIRVModule();
-  virtual ~SPIRVModule();
+  virtual ~SPIRVModule() = default;
 
   // Object query functions
   virtual bool exist(SPIRVId) const = 0;

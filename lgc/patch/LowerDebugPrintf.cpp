@@ -75,8 +75,10 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
     return PreservedAnalyses::all();
 
   const ResourceNode *node = nullptr;
-  std::tie(m_topNode, node) = pipelineState->findResourceNode(ResourceNodeType::DescriptorBuffer,
-                                                              InternalDescriptorSetId, PrintfBufferBindingId);
+  // LLpc node type is DescriptorBuffer
+  // So use ResourceNodeType::Unknown to match different node type.
+  std::tie(m_topNode, node) =
+      pipelineState->findResourceNode(ResourceNodeType::Unknown, InternalDescriptorSetId, PrintfBufferBindingId);
 
   static const auto lowerDebugfPrintOpVisitor = llvm_dialects::VisitorBuilder<LowerDebugPrintf>()
                                                     .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)

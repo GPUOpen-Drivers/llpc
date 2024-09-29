@@ -416,6 +416,8 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
     CASE_SUBSECTION(MemberTypeGlState, SectionGlState)
 #endif
+    CASE_SUBSECTION(MemberTypeCompileConstItem, SectionCompileConstItem)
+    CASE_SUBSECTION(MemberTypeCompileConstInfo, SectionCompileConstInfo)
   default:
     result = Document::getPtrOfSubSection(section, lineNum, memberName, memberType, isWriteAccess, arrayIndex, ptrOut,
                                           errorMsg);

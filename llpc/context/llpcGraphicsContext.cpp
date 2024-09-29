@@ -89,10 +89,6 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
 }
 
 // =====================================================================================================================
-GraphicsContext::~GraphicsContext() {
-}
-
-// =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage

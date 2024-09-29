@@ -17,6 +17,10 @@ add_llvm_library(LLVMCompilerUtils
   lib/DxilToLlvm.cpp
   lib/TypeLowering.cpp
   lib/TypesMetadata.cpp
+  lib/ValueOriginTracking.cpp
+  lib/ValueOriginTrackingTestPass.cpp
+  lib/ValueSpecialization.cpp
+  lib/ValueSpecializationTestPass.cpp
 
   DEPENDS
   intrinsics_gen

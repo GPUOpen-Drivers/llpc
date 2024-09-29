@@ -73,11 +73,6 @@ ElfLinkerImpl::ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBuffer
 }
 
 // =====================================================================================================================
-// Destructor
-ElfLinkerImpl::~ElfLinkerImpl() {
-}
-
-// =====================================================================================================================
 // Add another input ELF to the link.
 void ElfLinkerImpl::addInputElf(MemoryBufferRef inputElf, bool addAtStart) {
   assert(!m_doneInputs && "Cannot use ElfLinker::addInputElf after other ElfLinker calls");

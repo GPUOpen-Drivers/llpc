@@ -650,7 +650,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
 
     // Rectangle image uses the same Intrinsic ID with 2D image.
     Intrinsic::ID intrinsicId = (dim == DimRect) ? table[Dim2D] : table[dim];
-    imageInst = CreateIntrinsic(intrinsicId, {intrinsicDataTy, coords[0]->getType()}, args, nullptr, instName);
+    imageInst = CreateIntrinsic(intrinsicDataTy, intrinsicId, args, nullptr, instName);
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
     imageDescArgIndex = args.size();
@@ -867,7 +867,7 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
 
     // Rectangle image uses the same Intrinsic ID with 2D image.
     Intrinsic::ID intrinsicId = (dim == DimRect) ? table[Dim2D] : table[dim];
-    imageStore = CreateIntrinsic(intrinsicId, {texelTy, coords[0]->getType()}, args, nullptr, instName);
+    imageStore = CreateIntrinsic(getVoidTy(), intrinsicId, args, nullptr, instName);
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
     // First widen texel to vec4 if necessary.
@@ -1148,9 +1148,6 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
 
   // Build the intrinsic arguments and overloaded types.
   SmallVector<Value *, 16> args;
-  SmallVector<Type *, 4> overloadTys;
-  if (resultTy && !resultTy->isVoidTy())
-    overloadTys.push_back(resultTy);
 
   // Dmask.
   unsigned dmask = 15;
@@ -1185,10 +1182,8 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   }
 
   // Bias: float
-  if (Value *biasVal = address[ImageAddressIdxLodBias]) {
+  if (Value *biasVal = address[ImageAddressIdxLodBias])
     args.push_back(biasVal);
-    overloadTys.push_back(biasVal->getType());
-  }
 
   // ZCompare (dref)
   if (Value *zCompareVal = address[ImageAddressIdxZCompare]) {
@@ -1198,14 +1193,10 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   }
 
   // Grad (explicit derivatives)
-  if (!derivatives.empty()) {
-    args.insert(args.end(), derivatives.begin(), derivatives.end());
-    overloadTys.push_back(derivatives[0]->getType());
-  }
+  args.insert(args.end(), derivatives.begin(), derivatives.end());
 
   // Coordinate
   args.insert(args.end(), coords.begin(), coords.end());
-  overloadTys.push_back(coords[0]->getType());
 
   // LodClamp
   if (Value *lodClampVal = address[ImageAddressIdxLodClamp])
@@ -1252,7 +1243,7 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   Intrinsic::ID intrinsicId = (dim == DimRect) ? table->ids[Dim2D] : table->ids[dim];
 
   // Create the intrinsic.
-  Instruction *imageOp = CreateIntrinsic(intrinsicId, overloadTys, args, nullptr, instName);
+  Instruction *imageOp = CreateIntrinsic(resultTy, intrinsicId, args, nullptr, instName);
 
   // Add a waterfall loop if needed.
   SmallVector<unsigned, 2> nonUniformArgIndexes;
@@ -1368,8 +1359,12 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
     // Rectangle image uses the same Intrinsic ID with 2D image.
     Intrinsic::ID intrinsicId =
         (dim == DimRect) ? ImageAtomicIntrinsicTable[atomicOp][Dim2D] : ImageAtomicIntrinsicTable[atomicOp][dim];
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION >= 511095
+    atomicInst = CreateIntrinsic(inputValue->getType(), intrinsicId, args, nullptr, instName);
+#else
     atomicInst = CreateIntrinsic(intrinsicId, {inputValue->getType(), coord->getType()->getScalarType()}, args, nullptr,
                                  instName);
+#endif
   } else {
     // Texel buffer descriptor. Use the buffer atomic instruction.
     args.push_back(inputValue);
@@ -1660,8 +1655,8 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
   args.push_back(getInt32(0));    // tfe/lwe
   args.push_back(getInt32(0));    // glc/slc
 
-  Instruction *result = CreateIntrinsic(ImageGetLodIntrinsicTable[dim],
-                                        {FixedVectorType::get(getFloatTy(), 2), getFloatTy()}, args, nullptr, instName);
+  Instruction *result =
+      CreateIntrinsic(FixedVectorType::get(getFloatTy(), 2), ImageGetLodIntrinsicTable[dim], args, nullptr, instName);
 
   SmallVector<unsigned, 2> nonUniformArgIndexes;
   if (imageDesc->getType()->isVectorTy()) {
@@ -2183,4 +2178,25 @@ Value *BuilderImpl::transformSamplerDesc(Value *samplerDesc) {
   Value *desc = CreateAlignedLoad(descType, samplerDesc, Align(4));
   cast<Instruction>(desc)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));
   return desc;
+}
+
+// =====================================================================================================================
+// Merges a resource descriptor into a feedback descriptor to create a descriptor for sampler feedback instructions.
+//
+// @param feedbackDesc : feedback descriptor
+// @param resourceDesc : resource descriptor
+// @param instName : Name to give instruction(s)
+// @returns Descriptor for use with sampler feedback image sample calls
+Value *BuilderImpl::CreateSamplerFeedbackDesc(Value *feedbackDesc, Value *resourceDesc, const Twine &instName) {
+  GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+  SqImgRsrcRegHandler feedbackRsrc(this, feedbackDesc, &gfxIp);
+  SqImgRsrcRegHandler resourceRsrc(this, feedbackDesc, &gfxIp);
+
+  feedbackRsrc.setReg(SqRsrcRegs::BaseLevel, resourceRsrc.getReg(SqRsrcRegs::BaseLevel));
+  feedbackRsrc.setReg(SqRsrcRegs::LastLevel, resourceRsrc.getReg(SqRsrcRegs::LastLevel));
+  feedbackRsrc.setReg(SqRsrcRegs::Depth, resourceRsrc.getReg(SqRsrcRegs::Depth));
+  feedbackRsrc.setReg(SqRsrcRegs::BaseArray, resourceRsrc.getReg(SqRsrcRegs::BaseArray));
+  feedbackRsrc.setReg(SqRsrcRegs::MinLod, resourceRsrc.getReg(SqRsrcRegs::MinLod));
+
+  return feedbackRsrc.getRegister();
 }

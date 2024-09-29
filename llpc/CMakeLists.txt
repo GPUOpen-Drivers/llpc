@@ -186,7 +186,7 @@ target_include_directories(llpcinternal
         include
         ../include
         context
-        lower
+        lowering
         translator/include
         translator/lib/SPIRV
         translator/lib/SPIRV/libSPIRV
@@ -214,28 +214,29 @@ if(ICD_BUILD_LLPC)
         context/llpcRayTracingContext.cpp
     )
 
-# llpc/lower
+# llpc/lowering
     target_sources(llpcinternal PRIVATE
-        lower/llpcSpirvLower.cpp
-        lower/LowerAccessChain.cpp
-        lower/LowerCfgMerges.cpp
-        lower/LowerConstImmediateStore.cpp
-        lower/LowerGlobals.cpp
-        lower/LowerInstMetaRemove.cpp
-        lower/LowerMath.cpp
-        lower/LowerMemoryOp.cpp
-        lower/LowerPostInline.cpp
-        lower/LowerRayTracing.cpp
-        lower/LowerTerminator.cpp
-        lower/LowerTranslator.cpp
-        lower/llpcSpirvLowerUtil.cpp
-        lower/ProcessGpuRtLibrary.cpp
-        lower/LowerInternalLibraryIntrinsic.cpp
-        lower/LowerGLCompatibility.cpp
-        lower/LowerCooperativeMatrix.cpp
-        lower/PrepareContinuations.cpp
-        lower/LowerAdvancedBlend.cpp
-        lower/ProcessGfxRuntimeLibrary.cpp
+        lowering/Lowering.cpp
+        lowering/LowerAccessChain.cpp
+        lowering/LowerCfgMerges.cpp
+        lowering/LowerConstImmediateStore.cpp
+        lowering/LowerGlobals.cpp
+        lowering/LowerInstMetaRemove.cpp
+        lowering/LowerMath.cpp
+        lowering/LowerMemoryOp.cpp
+        lowering/LowerPostInline.cpp
+        lowering/LowerRayTracing.cpp
+        lowering/LowerTerminator.cpp
+        lowering/LowerTranslator.cpp
+        lowering/LoweringUtil.cpp
+        lowering/ProcessGpuRtLibrary.cpp
+        lowering/LowerInternalLibraryIntrinsic.cpp
+        lowering/LowerGlCompatibility.cpp
+        lowering/ScalarReplacementOfBuiltins.cpp
+        lowering/LowerCooperativeMatrix.cpp
+        lowering/PrepareContinuations.cpp
+        lowering/LowerAdvancedBlend.cpp
+        lowering/ProcessGfxRuntimeLibrary.cpp
     )
 
 # llpc/translator
@@ -385,7 +386,7 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${PROJECT_SOURCE_DIR}/../util
     ${PROJECT_SOURCE_DIR}/context
     ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/lower
+    ${PROJECT_SOURCE_DIR}/lowering
     ${PROJECT_SOURCE_DIR}/tool
     ${PROJECT_SOURCE_DIR}/translator/include
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV

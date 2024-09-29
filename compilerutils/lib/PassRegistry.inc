@@ -38,6 +38,8 @@
 #endif
 
 COMPILERUTILS_MODULE_PASS("dxil-to-llvm", DxilToLlvmPass())
+COMPILERUTILS_MODULE_PASS("value-origin-tracking-test", ValueOriginTrackingTestPass())
+COMPILERUTILS_MODULE_PASS("value-specialization-test", ValueSpecializationTestPass())
 
 #undef COMPILERUTILS_PASS
 #undef COMPILERUTILS_MODULE_PASS

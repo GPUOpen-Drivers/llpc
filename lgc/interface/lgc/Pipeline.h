@@ -335,7 +335,7 @@ struct ResourceNode {
 
   ResourceNodeType concreteType; // Underlying actual type of this node
   ResourceNodeType abstractType; // Node type for resource node matching
-  unsigned visibility;           // Visibility bitmap: bit N set means entry is visible to ShaderStageEnum(N); value 0
+  ShaderStageMask visibility;    // Visibility bitmap: entry is visible to the shader stages in the mask; empty mask
                                  //  means visible to all shader stages
   unsigned sizeInDwords;         // Size in dwords
   unsigned offsetInDwords;       // Offset in dwords
@@ -741,7 +741,7 @@ class Pipeline {
 public:
   Pipeline(LgcContext *builderContext) : m_builderContext(builderContext) {}
 
-  virtual ~Pipeline() {}
+  virtual ~Pipeline() = default;
 
   // Get LgcContext
   LgcContext *getLgcContext() const { return m_builderContext; }

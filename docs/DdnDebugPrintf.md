@@ -206,7 +206,7 @@ Example:
 
 #### lgc::LowerDebugPrintf
 
-The module pass `LowerDebugPrintf` runs just before `PatchEntryPointMutate`.
+The module pass `LowerDebugPrintf` runs just before `MutateEntryPoint`.
 It collects all calls to `@lgc.debug.printf` in the entire module and:
 
 * Collects the format strings and adds the `amdpal.format_strings` entry to the

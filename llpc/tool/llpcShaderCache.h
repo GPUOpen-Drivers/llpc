@@ -173,7 +173,7 @@ protected:
   IShaderCache() {}
 
   /// @internal Destructor. Prevent use of delete operator on this interface.
-  virtual ~IShaderCache() {}
+  virtual ~IShaderCache() = default;
 };
 #endif
 

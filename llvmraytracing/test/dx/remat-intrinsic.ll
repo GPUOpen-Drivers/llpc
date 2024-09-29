@@ -23,7 +23,7 @@ declare i32 @_cont_GetContinuationStackAddr()
 
 declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData)
 
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData)
+declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData)
 
 declare !pointeetys !14 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*)
 
@@ -39,7 +39,7 @@ define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) !pointeet
 
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) !pointeetys !20 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -93,6 +93,7 @@ attributes #1 = { nounwind }
 !dx.shaderModel = !{!2}
 !dx.entryPoints = !{!3, !6}
 !continuation.maxPayloadRegisterCount = !{!13}
+!lgc.rt.max.attribute.size = !{!26}
 
 !0 = !{!"clang version 3.7.0 (tags/RELEASE_370/final)"}
 !1 = !{i32 1, i32 6}
@@ -120,13 +121,14 @@ attributes #1 = { nounwind }
 !23 = !{%struct.MyParams poison}
 !24 = !{i32 0, %struct.TraversalData poison}
 !25 = !{%struct.TraversalData poison}
+!26 = !{i32 8}
 ; POSTPROCESS-LABEL: define i32 @_cont_GetLocalRootIndex(
 ; POSTPROCESS-SAME: ptr [[DATA:%.*]]) #[[ATTR1:[0-9]+]] {
 ; POSTPROCESS-NEXT:    ret i32 5
 ;
 ;
 ; POSTPROCESS-LABEL: define void @called(
-; POSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !continuation [[META16:![0-9]+]] !lgc.rt.shaderstage [[META17:![0-9]+]] !continuation.stacksize [[META18:![0-9]+]] {
+; POSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [2 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !continuation [[META17:![0-9]+]] !lgc.rt.shaderstage [[META18:![0-9]+]] !continuation.stacksize [[META14:![0-9]+]] {
 ; POSTPROCESS-NEXT:  AllocaSpillBB:
 ; POSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; POSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
@@ -151,23 +153,23 @@ attributes #1 = { nounwind }
 ; POSTPROCESS-NEXT:    [[DOTFCA_0_INSERT4:%.*]] = insertvalue [1 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
 ; POSTPROCESS-NEXT:    [[TMP8:%.*]] = call i64 @continuation.getAddrAndMD(ptr @called.resume.0)
 ; POSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 2, i32 [[TMP7]], i64 [[TMP8]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], [9 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT4]])
+; POSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 2, i32 [[TMP7]], i64 [[TMP8]], i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]], [2 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT4]])
 ; POSTPROCESS-NEXT:    unreachable
 ;
 ;
 ; POSTPROCESS-LABEL: define dso_local void @called.resume.0(
-; POSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[TMP0:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [8 x i32], [1 x i32] } [[TMP1:%.*]]) !continuation [[META16]] !lgc.rt.shaderstage [[META17]] {
+; POSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[TMP0:%.*]], { [[STRUCT_DISPATCHSYSTEMDATA:%.*]], [2 x i32], [1 x i32] } [[TMP1:%.*]]) !continuation [[META17]] !lgc.rt.shaderstage [[META18]] {
 ; POSTPROCESS-NEXT:  entryresume.0:
 ; POSTPROCESS-NEXT:    [[TMP16:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; POSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    [[TMP3:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [1 x i32] } [[TMP1]], 0
+; POSTPROCESS-NEXT:    [[TMP3:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [2 x i32], [1 x i32] } [[TMP1]], 0
 ; POSTPROCESS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], ptr [[TMP16]], align 4
 ; POSTPROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr [[CSP]], align 4
 ; POSTPROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP13]], -8
-; POSTPROCESS-NEXT:    [[TMP4:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [1 x i32] } [[TMP1]], 2
+; POSTPROCESS-NEXT:    [[TMP4:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [2 x i32], [1 x i32] } [[TMP1]], 2
 ; POSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[TMP4]], 0
-; POSTPROCESS-NEXT:    [[TMP15:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [1 x i32] } [[TMP1]], 0
+; POSTPROCESS-NEXT:    [[TMP15:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [2 x i32], [1 x i32] } [[TMP1]], 0
 ; POSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT3:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP15]], 0
 ; POSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
 ; POSTPROCESS-NEXT:    [[TMP5:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
@@ -200,6 +202,6 @@ attributes #1 = { nounwind }
 ; POSTPROCESS-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], -8
 ; POSTPROCESS-NEXT:    store i32 [[TMP11]], ptr [[CSP]], align 4
 ; POSTPROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CSP]], align 4
-; POSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP12]], i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]], [8 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT1]])
+; POSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP12]], i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]], [2 x i32] poison, [1 x i32] [[DOTFCA_0_INSERT1]])
 ; POSTPROCESS-NEXT:    unreachable
 ;

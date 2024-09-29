@@ -119,7 +119,7 @@ enum class PipelineType {
 class PipelineContext {
 public:
   PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
-  virtual ~PipelineContext();
+  virtual ~PipelineContext() = default;
 
   // Returns the pipeline type
   virtual PipelineType getPipelineType() const = 0;

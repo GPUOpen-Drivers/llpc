@@ -257,6 +257,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, constantBufferBindingOffset, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, imageSampleDrefReturnsRgba, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableGlPositionOpt, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -481,6 +482,9 @@ public:
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
     m_glState.getSubState(m_state.glState);
 #endif
+    m_state.compileConstInfo = new Vkgc::CompileConstInfo();
+    m_compileTimeConstants.getSubState(*m_state.compileConstInfo);
+    state.compileConstInfo = m_state.compileConstInfo;
     state = m_state;
   };
   SubState &getSubStateRef() { return m_state; };
@@ -537,6 +541,7 @@ private:
 #endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_compileTimeConstants, MemberTypeCompileConstInfo, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -544,6 +549,7 @@ private:
 
   SubState m_state;
   SectionExtendedRobustness m_extendedRobustness;
+  SectionCompileConstInfo m_compileTimeConstants; // Compile time constant info
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73
   SectionGlState m_glState;
 #endif
@@ -956,6 +962,7 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, useSoftwareVertexBufferDescriptors, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableInitUndefZero, MemberTypeBool, false);
 
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_clientMetadata, MemberTypeU8Array, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_uniformConstantMaps, MemberTypeUniformConstantMap,

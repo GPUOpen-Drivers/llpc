@@ -118,7 +118,7 @@ bool CooperativeMatrixCombiner::run() {
                                       [](auto &self, auto &op) { self.m_ops.push_back(&op); })
                                   .add<CooperativeMatrixMulAddOp>([](auto &self, auto &op) {
 #if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
-                                    auto accumElemType = op.getAccuElemType();
+                                    auto accumElemType = op.getMatrixCElemType();
                                     bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
                                     if ((self.m_gfxIpVersion.major == 11) && isPackable) {
                                       self.m_muladds[op.getParent()].push_back(&op);

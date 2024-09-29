@@ -408,6 +408,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateLoadPushConstantsPtr();
   }
 
+  case BuilderOpcode::SamplerFeedbackDesc: {
+    return m_builder->CreateSamplerFeedbackDesc(args[0], args[1]);
+  }
+
   // Replayer implementations of ImageBuilder methods
   case BuilderOpcode::ImageLoad: {
     unsigned dim = cast<ConstantInt>(args[0])->getZExtValue();

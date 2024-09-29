@@ -37,12 +37,6 @@
 
 using namespace Vkgc;
 
-void gpurt::getShaderLibrarySpirv(unsigned featureFlags, const void *&code, size_t &size) {
-  auto libCode = GpuRt::GetShaderLibraryCode(featureFlags);
-  code = libCode.pSpvCode;
-  size = libCode.spvSize;
-}
-
 RtIpVersion gpurt::getRtIpVersion(GfxIpVersion gfxIpVersion) {
   if (gfxIpVersion.major >= 11)
     return {2, 0};
@@ -69,6 +63,16 @@ static Pal::RayTracingIpLevel getRtIpLevel(RtIpVersion rtIpVersion) {
   }
 
   abort();
+}
+
+void gpurt::getShaderLibrarySpirv(RtIpVersion rtIpVersion, unsigned featureFlags, const void *&code, size_t &size) {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 48
+  auto libCode = GpuRt::GetShaderLibraryCode(featureFlags);
+#else
+  auto libCode = GpuRt::GetShaderLibraryCode(getRtIpLevel(rtIpVersion), featureFlags);
+#endif
+  code = libCode.pSpvCode;
+  size = libCode.spvSize;
 }
 
 static void unmangleDxilName(char *dst, const char *src) {

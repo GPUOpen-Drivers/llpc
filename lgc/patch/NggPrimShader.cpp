@@ -246,9 +246,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // ES-GS ring
     if (ldsLayout) {
-      // NOTE: We round ES-GS LDS size to 4-dword alignment. This is for later LDS read/write operations of mutilple
-      // dwords (such as DS128).
-      ldsRegionSize = alignTo(calcFactor.esGsLdsSize, 4U);
+      ldsRegionSize = calcFactor.esGsLdsSize;
 
       printLdsRegionInfo("ES-GS Ring", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::EsGsRing] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -7049,7 +7047,6 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
       }
 
       Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
-      Value *dwordsPerPrim[MaxTransformFeedbackBuffers] = {};
 
       // Calculate numPrimsToWrite
       for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
@@ -7090,20 +7087,14 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
         dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
                                                     {dwordsRemaining, m_builder.getInt32(0)});
         // numPrimsToWrite = min(dwordsRemaining / dwordsPerPrim, numPrimsToWrite)
-        dwordsPerPrim[i] =
+        Value *dwordsPerPrim =
             m_builder.CreateMul(m_verticesPerPrimitive, m_builder.getInt32(xfbStrides[i] / sizeof(unsigned)));
-        Value *primsCanWrite = m_builder.CreateUDiv(dwordsRemaining, dwordsPerPrim[i]);
+        Value *primsCanWrite = m_builder.CreateUDiv(dwordsRemaining, dwordsPerPrim);
         numPrimsToWrite[xfbBufferToStream[i]] =
             m_builder.CreateIntrinsic(Intrinsic::umin, numPrimsToWrite[xfbBufferToStream[i]]->getType(),
                                       {numPrimsToWrite[xfbBufferToStream[i]], primsCanWrite});
-      }
 
-      // Increment dwordsWritten
-      for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-        if (!bufferActive[i])
-          continue;
-
-        Value *dwordsToWrite = m_builder.CreateMul(numPrimsToWrite[xfbBufferToStream[i]], dwordsPerPrim[i]);
+        Value *dwordsToWrite = m_builder.CreateMul(numPrimsToWrite[xfbBufferToStream[i]], dwordsPerPrim);
 
         if (i == lastActiveBuffer) {
           // ds_ordered_count, wave done

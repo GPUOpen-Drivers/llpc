@@ -235,6 +235,9 @@ enum class ResourceLayoutScheme : unsigned {
   Compact = 0, ///< Compact scheme make full use of all the user data registers.
   Indirect     ///< Fixed layout, push constant will be the sub node of DescriptorTableVaPtr
 };
+
+template <typename T>
+using ShaderStageMap = llvm::SmallDenseMap<ShaderStageEnum, T, llvm::NextPowerOf2(ShaderStages.size())>;
 } // namespace lgc
 
 namespace llvm {

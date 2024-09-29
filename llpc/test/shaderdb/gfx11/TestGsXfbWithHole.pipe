@@ -2,7 +2,7 @@
 ; qualifier. In a location, only part of its components are exported to XFB buffer and they are not
 ; consecutive.
 
-; RUN: amdllpc -gfxip=11 -stop-after=lgc-patch-copy-shader -v %s | FileCheck -check-prefix=CHECK %s
+; RUN: amdllpc -gfxip=11 -stop-after=lgc-generate-copy-shader -v %s | FileCheck -check-prefix=CHECK %s
 
 ; CHECK-LABEL: @lgc.shader.COPY.main(
 ; CHECK: [[TMP1:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 0, i32 0)

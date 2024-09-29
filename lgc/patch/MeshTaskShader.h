@@ -86,7 +86,6 @@ struct MeshOutputsLayout {
 class MeshTaskShader {
 public:
   MeshTaskShader(PipelineState *pipelineState, PatchPreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers);
-  ~MeshTaskShader();
 
   static unsigned layoutMeshShaderLds(PipelineState *pipelineState, llvm::Function *entryPoint,
                                       MeshLdsLayout *ldsLayout = nullptr, MeshOutputsLayout *outputsLayout = nullptr);

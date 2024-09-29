@@ -118,6 +118,8 @@ public:
   // target module.
   llvm::GlobalValue *findCopiedGlobal(llvm::GlobalValue &sourceGv, llvm::Module &targetModule);
 
+  static std::string getCrossModuleName(llvm::GlobalValue &gv);
+
 private:
   // Checks that we haven't processed a different target module earlier.
   void checkTargetModule(llvm::Module &targetModule) {

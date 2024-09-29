@@ -40,7 +40,7 @@ class ComputeContext : public PipelineContext {
 public:
   ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo, MetroHash::Hash *pipelineHash,
                  MetroHash::Hash *cacheHash);
-  virtual ~ComputeContext() {}
+  virtual ~ComputeContext() = default;
 
   virtual PipelineType getPipelineType() const override { return PipelineType::Compute; }
 

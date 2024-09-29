@@ -254,6 +254,7 @@ public:
   // Accessors for shader stage mask
   ShaderStageMask getShaderStageMask();
   bool getPreRasterHasGs() const { return m_preRasterHasGs; }
+
   bool hasShaderStage(ShaderStageEnum stage) { return getShaderStageMask().contains(stage); }
   bool isGraphics();
   bool isComputeLibrary() const { return m_computeLibrary; }
@@ -274,7 +275,7 @@ public:
   llvm::ArrayRef<ResourceNode> getUserDataNodes() const { return m_userDataNodes; }
 
   // Find the push constant resource node
-  const ResourceNode *findPushConstantResourceNode(std::optional<ShaderStageEnum> shaderStage = std::nullopt) const;
+  const ResourceNode *findPushConstantResourceNode(std::optional<ShaderStageEnum> shaderStage) const;
 
   // Find the resource node for the given set,binding
   std::pair<const ResourceNode *, const ResourceNode *>
@@ -282,7 +283,8 @@ public:
                    std::optional<ShaderStageEnum> shaderStage = std::nullopt) const;
 
   // Find the single root resource node of the given type
-  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStageEnum shaderStage) const;
+  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType,
+                                                 std::optional<ShaderStageEnum> shaderStage) const;
 
   // Accessors for vertex input descriptions.
   llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }
@@ -302,7 +304,6 @@ public:
 
   // Set GS on-chip mode
   void setGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
-
   // Checks whether GS on-chip mode is enabled
   // NOTE: on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
   // ring is on-chip.
@@ -449,7 +450,12 @@ public:
   }
 
   // Get user data for a specific shader stage
-  llvm::ArrayRef<unsigned> getUserDataMap(ShaderStageEnum shaderStage) const { return m_userDataMaps[shaderStage]; }
+  llvm::ArrayRef<unsigned> getUserDataMap(ShaderStageEnum shaderStage) const {
+    auto it = m_userDataMaps.find(shaderStage);
+    if (it != m_userDataMaps.end())
+      return it->second;
+    return {};
+  }
 
   // Set spill_threshold for a specific shader stage
   void setSpillThreshold(ShaderStageEnum shaderStage, unsigned spillThreshold) {
@@ -583,7 +589,7 @@ private:
   llvm::ArrayRef<llvm::MDString *> getResourceTypeNames();
   llvm::MDString *getResourceTypeName(ResourceNodeType type);
   ResourceNodeType getResourceTypeFromName(llvm::MDString *typeName);
-  bool matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, uint64_t descSet, unsigned binding) const;
+  bool matchResourceNode(const ResourceNode &node, uint64_t descSet, unsigned binding) const;
 
   // Device index handling
   void recordDeviceIndex(llvm::Module *module);
@@ -613,7 +619,7 @@ private:
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   std::string m_client;                                 // Client name for PAL metadata
   Options m_options = {};                               // Per-pipeline options
-  std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
+  ShaderStageMap<ShaderOptions> m_shaderOptions;        // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data
   llvm::ArrayRef<ResourceNode> m_userDataNodes;         // Top-level user data node table
   // Cached MDString for each resource node type
@@ -621,27 +627,27 @@ private:
   // Allocated buffers for immutable sampler data
   llvm::SmallVector<std::unique_ptr<uint32_t[]>, 4> m_immutableValueAllocs;
 
-  bool m_gsOnChip = false;                                                       // Whether to use GS on-chip mode
-  bool m_meshRowExport = false;                                                  // Enable mesh shader row export or not
-  NggControl m_nggControl = {};                                                  // NGG control settings
-  ShaderModes m_shaderModes;                                                     // Shader modes for this pipeline
-  unsigned m_deviceIndex = 0;                                                    // Device index
-  std::vector<VertexInputDescription> m_vertexInputDescriptions;                 // Vertex input descriptions
-  llvm::SmallVector<ColorExportFormat, 8> m_colorExportFormats;                  // Color export formats
-  ColorExportState m_colorExportState = {};                                      // Color export state
-  InputAssemblyState m_inputAssemblyState = {};                                  // Input-assembly state
-  RasterizerState m_rasterizerState = {};                                        // Rasterizer state
-  DepthStencilState m_depthStencilState = {};                                    // Depth/stencil state
-  std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStage::Compute + 1] = {}; // Per-shader ResourceUsage
-  std::unique_ptr<InterfaceData> m_interfaceData[ShaderStage::Compute + 1] = {}; // Per-shader InterfaceData
-  PalMetadata *m_palMetadata = nullptr;                                          // PAL metadata object
-  unsigned m_waveSize[ShaderStage::CountInternal] = {};                          // Per-shader wave size
-  unsigned m_subgroupSize[ShaderStage::CountInternal] = {};                      // Per-shader subgroup size
-  bool m_inputPackState[ShaderStage::GfxCount] = {};  // The input packable state per shader stage
-  bool m_outputPackState[ShaderStage::GfxCount] = {}; // The output packable state per shader stage
-  XfbStateMetadata m_xfbStateMetadata = {};           // Transform feedback state metadata
-  llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStage::CountInternal]; // The user data per-shader
-  unsigned m_shaderSpillThreshold[ShaderStage::CountInternal] = {};           // The spillThreshold per-shader
+  bool m_gsOnChip = false;                                          // Whether to use GS on-chip mode
+  bool m_meshRowExport = false;                                     // Enable mesh shader row export or not
+  NggControl m_nggControl = {};                                     // NGG control settings
+  ShaderModes m_shaderModes;                                        // Shader modes for this pipeline
+  unsigned m_deviceIndex = 0;                                       // Device index
+  std::vector<VertexInputDescription> m_vertexInputDescriptions;    // Vertex input descriptions
+  llvm::SmallVector<ColorExportFormat, 8> m_colorExportFormats;     // Color export formats
+  ColorExportState m_colorExportState = {};                         // Color export state
+  InputAssemblyState m_inputAssemblyState = {};                     // Input-assembly state
+  RasterizerState m_rasterizerState = {};                           // Rasterizer state
+  DepthStencilState m_depthStencilState = {};                       // Depth/stencil state
+  ShaderStageMap<std::unique_ptr<ResourceUsage>> m_resourceUsage;   // Per-shader ResourceUsage
+  ShaderStageMap<std::unique_ptr<InterfaceData>> m_interfaceData;   // Per-shader InterfaceData
+  PalMetadata *m_palMetadata = nullptr;                             // PAL metadata object
+  ShaderStageMap<unsigned> m_waveSize;                              // Per-shader wave size
+  ShaderStageMap<unsigned> m_subgroupSize;                          // Per-shader subgroup size
+  ShaderStageMap<bool> m_inputPackState;                            // The input packable state per shader stage
+  ShaderStageMap<bool> m_outputPackState;                           // The output packable state per shader stage
+  XfbStateMetadata m_xfbStateMetadata = {};                         // Transform feedback state metadata
+  ShaderStageMap<llvm::SmallVector<unsigned, 32>> m_userDataMaps;   // The user data per-shader
+  unsigned m_shaderSpillThreshold[ShaderStage::CountInternal] = {}; // The spillThreshold per-shader
 
   struct {
     float inner[2]; // default tessellation inner level

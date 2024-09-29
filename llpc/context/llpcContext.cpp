@@ -34,13 +34,13 @@
 #include "LowerCfgMerges.h"
 #include "LowerGlobals.h"
 #include "LowerTranslator.h"
+#include "Lowering.h"
 #include "ProcessGfxRuntimeLibrary.h"
 #include "ProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
-#include "llpcSpirvLower.h"
 #include "llpcTimerProfiler.h"
 #include "vkgcMetroHash.h"
 #include "gfxruntime/GfxRuntimeLibrary.h"
@@ -101,10 +101,6 @@ Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
 }
 
 // =====================================================================================================================
-Context::~Context() {
-}
-
-// =====================================================================================================================
 void Context::reset() {
   m_pipelineContext = nullptr;
   delete m_builder;
@@ -127,7 +123,6 @@ LgcContext *Context::getLgcContext() {
     lgc::GpurtContext::get(*this).theModule = nullptr;
     lgc::GpurtContext::get(*this).ownedTheModule.reset();
     lgc::GfxRuntimeContext::get(*this).theModule.reset();
-
     // Pass the state of LLPC_OUTS on to LGC.
     LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
   }
@@ -273,7 +268,7 @@ void Context::ensureGpurtLibrary() {
 
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
-  lowerPassMgr->addPass(SpirvLowerTranslator(ShaderStageCompute, &shaderInfo, "_gpurtvar_"));
+  lowerPassMgr->addPass(LowerTranslator(ShaderStageCompute, &shaderInfo, "_gpurtvar_"));
   if (EnableOuts()) {
     lowerPassMgr->addPass(
         PrintModulePass(outs(), "\n"
@@ -335,7 +330,7 @@ void Context::ensureGfxRuntimeLibrary() {
 
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
-  lowerPassMgr->addPass(SpirvLowerTranslator(ShaderStageCompute, &shaderInfo));
+  lowerPassMgr->addPass(LowerTranslator(ShaderStageCompute, &shaderInfo));
   if (EnableOuts()) {
     lowerPassMgr->addPass(
         PrintModulePass(outs(), "\n"

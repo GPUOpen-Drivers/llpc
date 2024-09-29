@@ -42,7 +42,7 @@ class GraphicsContext : public PipelineContext {
 public:
   GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo, MetroHash::Hash *pipelineHash,
                   MetroHash::Hash *cacheHash);
-  virtual ~GraphicsContext();
+  virtual ~GraphicsContext() = default;
 
   virtual PipelineType getPipelineType() const override { return PipelineType::Graphics; }
 

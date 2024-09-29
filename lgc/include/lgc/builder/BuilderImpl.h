@@ -312,6 +312,10 @@ public:
   // Build buffer compact descriptor
   llvm::Value *buildBufferCompactDesc(llvm::Value *desc, unsigned stride);
 
+  // Build image sampler feedback descriptor
+  llvm::Value *CreateSamplerFeedbackDesc(llvm::Value *feedbackDesc, llvm::Value *resourceDesc,
+                                         const llvm::Twine &instName = "");
+
 private:
   // Get a struct containing the pointer and byte stride for a descriptor
   llvm::Value *getDescPtrAndStride(ResourceNodeType resType, uint64_t descSet, unsigned binding,
@@ -791,10 +795,14 @@ private:
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
 
   llvm::Value *createGroupBallot(llvm::Value *const value);
+  // Create a traditional loop for subgroup shuffle.
+  llvm::Value *createShuffleLoop(llvm::Value *const value, llvm::Value *const index, ShaderStageEnum shaderStage,
+                                 const llvm::Twine &instName = "");
 
 protected:
   // The subgroup operation with explicit shader stage as parameter.
   llvm::Value *createFindMsb(llvm::Value *const mask);
+  llvm::Value *createGroupBallotAllActive(llvm::Value *const value);
   llvm::Value *createGroupBallot(llvm::Value *const value, ShaderStageEnum shaderStage);
   llvm::Value *createSubgroupBroadcastFirst(llvm::Value *const value, ShaderStageEnum shaderStage,
                                             const llvm::Twine &instName);

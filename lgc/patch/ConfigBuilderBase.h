@@ -60,7 +60,6 @@ struct PalMetadataNoteEntry {
 class ConfigBuilderBase {
 public:
   ConfigBuilderBase(llvm::Module *module, PipelineState *pipelineState);
-  ~ConfigBuilderBase();
 
   void writePalMetadata();
   llvm::msgpack::MapDocNode &getGraphicsRegNode() { return m_graphicsRegistersNode; }
@@ -130,7 +129,7 @@ private:
 
   llvm::msgpack::Document *m_document;      // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
-  llvm::DenseMap<ShaderStageEnum, llvm::msgpack::MapDocNode> m_apiShaderNodes;
+  ShaderStageMap<llvm::msgpack::MapDocNode> m_apiShaderNodes;
   // MsgPack map node for each API shader's node in
   //  ".shaders"
   llvm::msgpack::MapDocNode m_hwShaderNodes[unsigned(Util::Abi::HardwareStage::Count)];

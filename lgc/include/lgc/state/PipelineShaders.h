@@ -46,7 +46,7 @@ public:
   std::optional<ShaderStageEnum> getShaderStage(const llvm::Function *func) const;
 
 private:
-  llvm::Function *m_entryPoints[ShaderStage::CountInternal];         // The entry-point for each shader stage.
+  ShaderStageMap<llvm::Function *> m_entryPoints;                    // The entry-point for each shader stage.
   std::map<const llvm::Function *, ShaderStageEnum> m_entryPointMap; // Map from shader entry-point to shader stage.
 };
 

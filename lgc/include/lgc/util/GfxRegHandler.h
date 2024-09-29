@@ -61,7 +61,7 @@ struct BitsState {
 // =====================================================================================================================
 // Helper class for handling graphics registers.
 // Note: 1) Don't use GfxRegHandler directly, please implement your own register helper class, such as
-// SqImgSampRegHelper
+// SqImgSampRegHandler
 //       2) The ID (enum) used in this class is determined by BitsInfo
 //       3) The count of BisState used in this class is determined by BitsInfo
 // e.g.
@@ -154,6 +154,9 @@ enum class SqRsrcRegs {
   WidthLo,
   WidthHi,
   ArrayPitch,
+  MinLod,
+  MinLodLo,
+  MinLodHi,
 
   Count,
 };

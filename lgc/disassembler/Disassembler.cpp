@@ -257,7 +257,9 @@ void ObjDisassembler::run() {
   std::unique_ptr<MCRegisterInfo> regInfo(m_target->createMCRegInfo(m_tripleName));
   if (!regInfo)
     report_fatal_error(m_data.getBufferIdentifier() + ": No register info for target");
-  std::unique_ptr<MCAsmInfo> asmInfo(m_target->createMCAsmInfo(*regInfo, m_tripleName, MCTargetOptions()));
+  MCTargetOptions targetOptions{};
+  targetOptions.AsmVerbose = true;
+  std::unique_ptr<MCAsmInfo> asmInfo(m_target->createMCAsmInfo(*regInfo, m_tripleName, targetOptions));
   if (!asmInfo)
     report_fatal_error(m_data.getBufferIdentifier() + ": No assembly info for target");
   m_subtargetInfo.reset(m_target->createMCSubtargetInfo(m_tripleName, *mcpu, features.getString()));
@@ -267,7 +269,7 @@ void ObjDisassembler::run() {
   if (!instrInfo)
     report_fatal_error(m_data.getBufferIdentifier() + ": No instruction info for target");
 
-  MCContext context(triple, asmInfo.get(), regInfo.get(), m_subtargetInfo.get());
+  MCContext context(triple, asmInfo.get(), regInfo.get(), m_subtargetInfo.get(), nullptr, &targetOptions);
   std::unique_ptr<MCObjectFileInfo> objFileInfo(m_target->createMCObjectFileInfo(context, /*PIC=*/false));
   if (!objFileInfo)
     report_fatal_error("No MC object file info");
@@ -282,9 +284,12 @@ void ObjDisassembler::run() {
     report_fatal_error(m_data.getBufferIdentifier() + ": No instruction printer for target");
 
   auto fostream = std::make_unique<formatted_raw_ostream>(m_ostream);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 505779
   m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), true, false, m_instPrinter, nullptr,
                                                nullptr, false));
-
+#else
+  m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), m_instPrinter, nullptr, nullptr));
+#endif
   // Process each section.
   for (ELFSectionRef sectionRef : m_objFile->sections())
     processSection(sectionRef);

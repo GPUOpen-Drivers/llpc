@@ -889,8 +889,8 @@ def CooperativeMatrixTimesScalarOp : LgcOp<"cooperative.matrix.times.scalar", [C
 
 def CooperativeMatrixMulAddOp : LgcOp<"cooperative.matrix.muladd", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix_a, value:$matrix_b, value:$matrix_c, AttrI1:$is_signed_a, AttrI1:$is_signed_b,
-                   AttrI1:$is_sat_or_opsel, AttrI1:$is_tied, CooperativeMatrixElementType:$accu_elem_type,
-                   CooperativeMatrixElementType:$factor_elem_type);
+                   AttrI1:$is_sat_or_opsel, AttrI1:$is_tied, CooperativeMatrixElementType:$matrix_a_elem_type,
+                   CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -913,8 +913,9 @@ def CooperativeMatrixMulAddOp : LgcOp<"cooperative.matrix.muladd", [Convergent, 
     'is_tied' is the flag of the output matrix has to be the same
     as the input accumulator (i.e., D has to be C)
 
-    'accu_elem_type' is the component type of the accumulator matrix.
-    'factor_elem_type' is the component type of the factor matrix.
+    '$matrix_a_elem_type' is the component type of the matrix A
+    '$matrix_b_elem_type' is the component type of the matrix B
+    '$matrix_c_elem_type' is the component type of the matrix C
   }];
 }
 

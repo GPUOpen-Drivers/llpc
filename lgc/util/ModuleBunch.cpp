@@ -77,8 +77,12 @@ bool ModuleBunch::isNormalized() const {
 /// to Module::print for each module.
 void ModuleBunch::print(raw_ostream &OS, AssemblyAnnotationWriter *AAW, bool ShouldPreserveUseListOrder,
                         bool IsForDebug) const {
-  for (const Module &M : *this)
-    M.print(OS, AAW, ShouldPreserveUseListOrder, IsForDebug);
+  for (const std::unique_ptr<Module> &M : Modules) {
+    if (!M)
+      OS << "<EMPTY SLOT IN MODULEBUNCH>\n";
+    else
+      M->print(OS, AAW, ShouldPreserveUseListOrder, IsForDebug);
+  }
 }
 
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)

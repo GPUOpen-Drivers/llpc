@@ -66,13 +66,14 @@ class GpurtInitStaticIdOp;
 class LowerGpuRt : public llvm::PassInfoMixin<LowerGpuRt> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  void updateWorkgroupSize(llvm::Function *func);
 
 private:
   typedef void (LowerGpuRt::*LibraryFuncPtr)(llvm::Function *, unsigned);
   const static unsigned MaxLdsStackEntries = 16;
-  uint32_t getWorkgroupSize() const;
+  unsigned getWorkgroupSize(llvm::Function *func) const;
   llvm::Value *getThreadIdInGroup() const;
-  void createGlobalStack(llvm::Module &module);
+  void createLdsStack(llvm::Module &module);
   void createRayStaticIdValue();
   void visitGetStackSize(lgc::GpurtGetStackSizeOp &inst);
   void visitGetStackBase(lgc::GpurtGetStackBaseOp &inst);
@@ -100,5 +101,6 @@ private:
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;    // Functions to lower
   Builder *m_builder = nullptr;
   unsigned m_rayStaticId = 0;
+  unsigned m_workGroupSize = 0;
 };
 } // namespace lgc

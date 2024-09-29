@@ -775,11 +775,14 @@ void BufferOpLowering::visitStridedBufferAddrAndStrideToPtr(StridedBufferAddrAnd
 // @param loadDescToPtr : The instruction
 void BufferOpLowering::visitBufferLoadDescToPtr(BufferLoadDescToPtrOp &loadDescToPtr) {
   m_builder.SetInsertPoint(&loadDescToPtr);
-  Value *descriptor =
-      createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(), loadDescToPtr.getIsCompact());
-
-  if (loadDescToPtr.getIsCompact())
-    descriptor = createCompactDesc(descriptor, nullptr);
+  bool needLoadDesc = true;
+  Value *descriptor = loadDescToPtr.getDescPtr();
+  if (needLoadDesc) {
+    descriptor =
+        createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(), loadDescToPtr.getIsCompact());
+    if (loadDescToPtr.getIsCompact())
+      descriptor = createCompactDesc(descriptor, nullptr);
+  }
 
   m_typeLowering.replaceInstruction(&loadDescToPtr, {descriptor, ConstantPointerNull::get(m_offsetType)});
 
@@ -804,11 +807,15 @@ void BufferOpLowering::visitBufferLoadDescToPtr(BufferLoadDescToPtrOp &loadDescT
 // @param loadDescToPtr : The instruction
 void BufferOpLowering::visitStridedBufferLoadDescToPtr(StridedBufferLoadDescToPtrOp &loadDescToPtr) {
   m_builder.SetInsertPoint(&loadDescToPtr);
-  Value *descriptor =
-      createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(), loadDescToPtr.getIsCompact());
+  bool needLoadDesc = true;
+  Value *descriptor = loadDescToPtr.getDescPtr();
+  if (needLoadDesc) {
+    descriptor =
+        createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(), loadDescToPtr.getIsCompact());
 
-  if (loadDescToPtr.getIsCompact())
-    descriptor = createCompactDesc(descriptor, loadDescToPtr.getStride());
+    if (loadDescToPtr.getIsCompact())
+      descriptor = createCompactDesc(descriptor, loadDescToPtr.getStride());
+  }
 
   m_typeLowering.replaceInstruction(&loadDescToPtr,
                                     {descriptor, ConstantPointerNull::get(m_offsetType), m_builder.getInt32(0)});
@@ -1486,6 +1493,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
 
   auto pointerValues = m_typeLowering.getValue(pointerOperand);
   Value *const bufferDesc = pointerValues[0];
+  const bool isIndexedDesc = isa<PointerType>(bufferDesc->getType());
 
   const DataLayout &dataLayout = m_builder.GetInsertBlock()->getModule()->getDataLayout();
 
@@ -1502,9 +1510,10 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
   const bool isDlc = isGlc; // For buffer load on GFX10+, we set DLC = GLC
 
   Value *const baseIndex = m_builder.CreatePtrToInt(pointerValues[1], m_builder.getInt32Ty());
+  const bool isDivergentDesc = getDescriptorInfo(bufferDesc).divergent.value();
 
-  // If our buffer descriptor is divergent, need to handle that differently.
-  if (getDescriptorInfo(bufferDesc).divergent.value()) {
+  if (!isIndexedDesc && isDivergentDesc) {
+    // If our buffer descriptor is divergent, need to handle that differently in non resource indexing mode.
     auto createLoadStoreFunc = [&](Value *pointer) {
       Value *result = nullptr;
       if (isLoad) {
@@ -1588,6 +1597,14 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     }
   }
 
+  auto getBufferDesc = [&]() -> Value * {
+    if (isIndexedDesc) {
+      auto address = m_builder.CreatePtrToInt(bufferDesc, m_builder.getInt64Ty());
+      return m_builder.CreateTrunc(address, m_builder.getInt32Ty());
+    }
+    return bufferDesc;
+  };
+
   // The index in storeValue which we use next
   unsigned storeIndex = 0;
 
@@ -1635,49 +1652,51 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     }
 
     if (isLoad) {
+      bool accessSizeAllowed = true;
       if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
         // TODO For stores?
         coherent.bits.dlc = isDlc;
+        accessSizeAllowed = accessSize >= 4;
       }
-      if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
-        Value *indexValue = pointerValues[2];
-        CallInst *call = nullptr;
-        // Especially when the index is a constant, and the stride is known at compile-time,
-        // we should create s_buffer_load instructions with constant offsets: index * stride + offset
-        if ((isInvariant && accessSize >= 4) && isa<ConstantInt>(indexValue)) {
-          Value *desc1 = m_builder.CreateExtractElement(bufferDesc, 1);
+
+      Value *indexValue = pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER
+                              ? pointerValues[2]
+                              : nullptr;
+      if (isInvariant && !isDivergentDesc && accessSizeAllowed) {
+        // create s.buffer.load
+        Value *desc = bufferDesc;
+        if (isIndexedDesc)
+          desc = m_builder.CreateLoad(FixedVectorType::get(m_builder.getInt32Ty(), 4), bufferDesc);
+        if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
+          // Especially when the index is a constant, and the stride is known at compile-time,
+          // we should create s_buffer_load instructions with constant offsets: index * stride + offset
+          assert(isa<ConstantInt>(indexValue));
+          Value *desc1 = m_builder.CreateExtractElement(desc, 1);
           // stride is 61:48 bits in descriptor, which will always be constantInt when create BufferDesc
           Value *stride =
               m_builder.CreateAnd(m_builder.CreateLShr(desc1, m_builder.getInt32(16)), m_builder.getInt32(0x3fff));
           Value *indexOffsetVal = m_builder.CreateMul(indexValue, stride);
           offsetVal = m_builder.CreateAdd(offsetVal, indexOffsetVal);
-          call = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
-                                           {bufferDesc, offsetVal, m_builder.getInt32(coherent.u32All)});
-        } else {
-          call = m_builder.CreateIntrinsic(
-              Intrinsic::amdgcn_struct_buffer_load, intAccessType,
-              {bufferDesc, indexValue, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
         }
-        copyMetadata(call, &inst);
-        if (isInvariant)
-          call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
-        part = call;
-      } else if (isInvariant && accessSize >= 4) {
+
         CallInst *call = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
-                                                   {bufferDesc, offsetVal, m_builder.getInt32(coherent.u32All)});
+                                                   {desc, offsetVal, m_builder.getInt32(coherent.u32All)});
         call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
+        copyMetadata(call, &inst);
         part = call;
       } else {
-        unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
-#if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
-#warning[!amd-gfx] Atomic load loses memory semantics
-#else
-        if (ordering != AtomicOrdering::NotAtomic)
-          intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
-#endif
-        part = m_builder.CreateIntrinsic(
-            intrinsicID, intAccessType,
-            {bufferDesc, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+        if (indexValue) {
+          part = m_builder.CreateIntrinsic(
+              Intrinsic::amdgcn_struct_buffer_load, intAccessType,
+              {getBufferDesc(), indexValue, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+        } else {
+          unsigned intrinsicID = Intrinsic::amdgcn_raw_buffer_load;
+          if (ordering != AtomicOrdering::NotAtomic)
+            intrinsicID = Intrinsic::amdgcn_raw_atomic_buffer_load;
+          part = m_builder.CreateIntrinsic(
+              intrinsicID, intAccessType,
+              {getBufferDesc(), offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+        }
       }
     } else {
       // Store
@@ -1692,12 +1711,12 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       copyMetadata(part, &inst);
       if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
         part = m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, intAccessType,
-                                         {part, bufferDesc, pointerValues[2], offsetVal, m_builder.getInt32(0),
+                                         {part, getBufferDesc(), pointerValues[2], offsetVal, m_builder.getInt32(0),
                                           m_builder.getInt32(coherent.u32All)});
       } else {
         part = m_builder.CreateIntrinsic(
             Intrinsic::amdgcn_raw_buffer_store, intAccessType,
-            {part, bufferDesc, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+            {part, getBufferDesc(), offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
       }
     }
 

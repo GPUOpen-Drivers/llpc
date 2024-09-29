@@ -76,10 +76,6 @@ ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineStat
 }
 
 // =====================================================================================================================
-ConfigBuilderBase::~ConfigBuilderBase() {
-}
-
-// =====================================================================================================================
 /// Adds the .shaders.$(apiStage).hardware_mapping node to the PAL metadata.
 /// Also add .shader_subtype if it is a compute shader.
 ///

@@ -35,6 +35,7 @@ add_llvm_library(LLVMRaytracing
   lib/LowerRayQuery.cpp
   lib/LowerRaytracingPipeline.cpp
   lib/PassRegistry.inc
+  lib/PipelineState.cpp
   lib/PayloadAccessQualifiers.cpp
   lib/RemoveTypesMetadata.cpp
 
@@ -43,6 +44,7 @@ add_llvm_library(LLVMRaytracing
 
   LINK_COMPONENTS
   Analysis
+  BinaryFormat
   Core
   Coroutines
   IPO
@@ -106,9 +108,4 @@ if(LLVMRAYTRACING_BUILD_TESTS)
   # Temporary aliases -- to be removed when Vulkan CI and DXCP have been updated.
   add_custom_target(check-continuations DEPENDS check-llvmraytracing)
   add_custom_target(check-continuations-units DEPENDS check-llvmraytracing-units)
-endif()
-
-# Temporary alias -- to be removed when Vulkan CI and DXCP have been updated.
-if (LLPC_RAYTRACING_ADD_TRANSITION_TARGETS)
-  add_library(LLVMContinuations ALIAS LLVMRaytracing)
 endif()

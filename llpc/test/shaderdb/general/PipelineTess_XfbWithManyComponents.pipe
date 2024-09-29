@@ -5,8 +5,8 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v -gfxip=11 %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: LLPC geometry calculation factor results
-; SHADERTEST: ES-GS ring item size (in dwords): 129
+; SHADERTEST-LABEL: LLPC HW GS configurations
+; SHADERTEST: EsGsRingItemSize = 129 dwords
 
 ; SHADERTEST-LABEL: .fetchXfbOutput
 ; Write v4[31] = 4.0 -> LDS

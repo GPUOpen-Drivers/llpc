@@ -37,6 +37,7 @@
  */
 #pragma once
 
+#include "llvmraytracing/PipelineState.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
@@ -59,10 +60,6 @@ struct RayTracingLibrarySummary {
   // attributes (no AHS/IS/CHS).
   unsigned maxHitAttributeSize = 0;
 
-  // The maximum occurring number of payload registers in the pipeline, which will be taken into account for Traversal
-  // module so that it sees the correct maximum payload size of a pipeline.
-  unsigned maxUsedPayloadRegisterCount = 0;
-
   // Whether a kernel entry function was built for this library.
   bool hasKernelEntry = false;
 
@@ -75,6 +72,9 @@ struct RayTracingLibrarySummary {
   // may no longer be suitable for the larger library or pipeline (e.g. due to incompatibilities in statically known ray
   // flags).
   bool hasTraceRayModule = false;
+
+  // Opaque state owned by the llvmraytracing middle-end.
+  llvmraytracing::PipelineState llvmRaytracingState;
 
   static llvm::Expected<RayTracingLibrarySummary> decodeMsgpack(llvm::StringRef data);
   std::string encodeMsgpack() const;

@@ -435,6 +435,27 @@ enum class ResourceLayoutScheme : unsigned {
                ///  3. descriptor set index for each set
 };
 
+/// Specifies compile-time values for a single slot in a constant buffer.
+struct CompileTimeConst {
+  uint32_t offset;     ///< Which constant buffer slot (i.e., vec4) contains these values.
+  uint32_t set;        ///< Uniform set.
+  uint32_t binding;    ///< Uniform binding.
+  uint32_t validBytes; ///< Mask of which bytes in the values array are valid (are provided by the caller). This
+                       ///< is not a mask but the actual valid bytes count from first bit of 'values' as LLPC
+                       ///< could provide enough type info..
+  union {
+    uint32_t u32[4]; ///< The compile-time values as an array of 32-bit values (x, y, z, w).
+    uint16_t u16[8]; ///< The compile-time values as an array of 16-bit values.
+    uint8_t u8[16];  ///< The compile-time values as an array of 8-bit values.
+  } values;          ///< The compile-time values for this slot.
+};
+
+/// Represents info of compile-time constants within a shader of a specified stage.
+struct CompileConstInfo {
+  unsigned numCompileTimeConstants;        ///< Number of compile time constants.
+  CompileTimeConst *pCompileTimeConstants; ///< Actual compile time constants data, for uniform value replacement.
+};
+
 /// Represents per pipeline options.
 struct PipelineOptions {
   bool includeDisassembly;         ///< If set, the disassembly for all compiled shaders will be included in
@@ -515,6 +536,7 @@ struct PipelineOptions {
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
   bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
   bool reserved21;
+  CompileConstInfo *compileConstInfo; ///< Compile time constant data.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -903,6 +925,9 @@ struct PipelineShaderOptions {
 
   /// Let dmask bits be fully enabled when call 'image.sample.c', for depth compare mode swizzling workaround.
   bool imageSampleDrefReturnsRgba;
+
+  /// Application workaround: disable all fast math flags on gl_Position.
+  bool disableGlPositionOpt;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1315,6 +1340,7 @@ struct GraphicsPipelineBuildInfo {
   NggState nggState;                       ///< NGG state used for tuning and debugging
   PipelineOptions options;                 ///< Per pipeline tuning/debugging options
   bool unlinked;                           ///< True to build an "unlinked" half-pipeline ELF
+  bool enableInitUndefZero;                ///< True to initialize undefined variable
   bool dynamicVertexStride;                ///< Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader;              ///< Use uber fetch shader
   bool enableColorExportShader;            ///< Explicitly build color export shader, UnlinkedStageFragment elf will

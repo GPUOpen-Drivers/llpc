@@ -10,7 +10,7 @@ define <8 x float> @insert_transpose(<8 x float> %x) {
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[V_LOOP:%.*]] = phi <8 x float> [ [[X]], [[ENTRY:%.*]] ], [ [[MULADD:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[F:%.*]] = call <8 x float> @getmat1()
-; CHECK-NEXT:    [[MULADD]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[F]], <8 x float> [[F]], <8 x float> [[V_LOOP]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+; CHECK-NEXT:    [[MULADD]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[F]], <8 x float> [[F]], <8 x float> [[V_LOOP]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
 ; CHECK-NEXT:    [[CC:%.*]] = call i1 @getcc()
 ; CHECK-NEXT:    br i1 [[CC]], label [[LOOP]], label [[END]]
 ; CHECK:       end:
@@ -28,7 +28,7 @@ loop:
 
   %f = call <8 x float> @getmat1()
   %pre.t = call <8 x float> (...) @lgc.cooperative.matrix.transpose__v8f32(<8 x float> %v.loop, i32 1, i32 0)
-  %muladd = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %f, <8 x float> %f, <8 x float> %pre.t, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+  %muladd = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %f, <8 x float> %f, <8 x float> %pre.t, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
   %v.next = call <8 x float> (...) @lgc.cooperative.matrix.transpose__v8f32(<8 x float> %muladd, i32 1, i32 0)
 
   %cc = call i1 @getcc()
@@ -43,12 +43,12 @@ define <8 x float> @reuse_transpose(<8 x float> %x) {
 ; CHECK-LABEL: define <8 x float> @reuse_transpose
 ; CHECK-SAME: (<8 x float> [[X:%.*]]) {
 ; CHECK-NEXT:    [[T1:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.transpose__v8f32(<8 x float> [[X]], i32 1, i32 0)
-; CHECK-NEXT:    [[R:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[T1]], <8 x float> [[X]], <8 x float> zeroinitializer, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+; CHECK-NEXT:    [[R:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[T1]], <8 x float> [[X]], <8 x float> zeroinitializer, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
 ; CHECK-NEXT:    ret <8 x float> [[R]]
 ;
   %t1 = call <8 x float> (...) @lgc.cooperative.matrix.transpose__v8f32(<8 x float> %x, i32 1, i32 0)
   %t2 = call <8 x float> (...) @lgc.cooperative.matrix.transpose__v8f32(<8 x float> %t1, i32 1, i32 0)
-  %r = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %t1, <8 x float> %t2, <8 x float> zeroinitializer, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+  %r = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %t1, <8 x float> %t2, <8 x float> zeroinitializer, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
   ret <8 x float> %r
 }
 
@@ -63,7 +63,7 @@ define <8 x float> @insert_convert(ptr %ptr) {
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[V_LOOP:%.*]] = phi <8 x float> [ [[LOAD]], [[ENTRY:%.*]] ], [ [[MULADD:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[F:%.*]] = call <8 x float> @getmat1()
-; CHECK-NEXT:    [[MULADD]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[F]], <8 x float> [[F]], <8 x float> [[V_LOOP]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+; CHECK-NEXT:    [[MULADD]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[F]], <8 x float> [[F]], <8 x float> [[V_LOOP]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
 ; CHECK-NEXT:    [[CC:%.*]] = call i1 @getcc()
 ; CHECK-NEXT:    br i1 [[CC]], label [[LOOP]], label [[END]]
 ; CHECK:       end:
@@ -81,7 +81,7 @@ loop:
 
   %f = call <8 x float> @getmat1()
   %pre = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %v.loop, i32 1, i32 1, i32 0, i32 1)
-  %muladd = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %f, <8 x float> %f, <8 x float> %pre, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+  %muladd = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %f, <8 x float> %f, <8 x float> %pre, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
   %v.next = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %muladd, i32 1, i32 1, i32 1, i32 0)
 
   %cc = call i1 @getcc()
@@ -96,12 +96,12 @@ define <8 x float> @reuse_convert(<8 x float> %x) {
 ; CHECK-LABEL: define <8 x float> @reuse_convert
 ; CHECK-SAME: (<8 x float> [[X:%.*]]) {
 ; CHECK-NEXT:    [[CVT1:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> [[X]], i32 1, i32 1, i32 0, i32 1)
-; CHECK-NEXT:    [[R:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[X]], <8 x float> [[X]], <8 x float> [[CVT1]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+; CHECK-NEXT:    [[R:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[X]], <8 x float> [[X]], <8 x float> [[CVT1]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
 ; CHECK-NEXT:    ret <8 x float> [[R]]
 ;
   %cvt1 = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %x, i32 1, i32 1, i32 0, i32 1)
   %cvt2 = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %cvt1, i32 1, i32 1, i32 1, i32 0)
-  %r = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %cvt2, <8 x float> %cvt2, <8 x float> %cvt1, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+  %r = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %cvt2, <8 x float> %cvt2, <8 x float> %cvt1, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
   ret <8 x float> %r
 }
 
@@ -193,7 +193,7 @@ define void @convert_to_acc_inner_chain(ptr %ptr) {
 ; CHECK:       loop:
 ; CHECK-NEXT:    [[V_LOOP:%.*]] = phi <8 x float> [ [[LOAD]], [[ENTRY:%.*]] ], [ [[SCALAR:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[F:%.*]] = call <8 x float> @getmat1()
-; CHECK-NEXT:    [[MULADD:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[F]], <8 x float> [[F]], <8 x float> [[V_LOOP]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+; CHECK-NEXT:    [[MULADD:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> [[F]], <8 x float> [[F]], <8 x float> [[V_LOOP]], i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
 ; CHECK-NEXT:    [[BINOP:%.*]] = call <8 x float> (...) @lgc.cooperative.matrix.binop__v8f32(i32 1, <8 x float> [[MULADD]], <8 x float> [[MULADD]], i32 1, i32 1)
 ; CHECK-NEXT:    [[SCALAR]] = call <8 x float> (...) @lgc.cooperative.matrix.times.scalar__v8f32(<8 x float> [[BINOP]], half 0xH310F, i32 1, i32 1)
 ; CHECK-NEXT:    [[CC:%.*]] = call i1 @getcc()
@@ -214,7 +214,7 @@ loop:
 
   %f = call <8 x float> @getmat1()
   %pre = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %v.loop, i32 1, i32 1, i32 0, i32 1)
-  %muladd = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %f, <8 x float> %f, <8 x float> %pre, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1)
+  %muladd = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f32(<8 x float> %f, <8 x float> %f, <8 x float> %pre, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 1)
   %binop = call <8 x float> (...) @lgc.cooperative.matrix.binop__v8f32(i32 1, <8 x float> %muladd, <8 x float> %muladd, i32 1, i32 1)
   %scalar = call <8 x float> (...) @lgc.cooperative.matrix.times.scalar__v8f32(<8 x float> %binop, half 0xH310F, i32 1, i32 1)
   %v.next = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %scalar, i32 1, i32 1, i32 1, i32 0)

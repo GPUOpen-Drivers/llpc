@@ -589,9 +589,7 @@ ShaderStageMask PipelineState::getShaderStageMask() {
 // =====================================================================================================================
 // Check whether the pipeline is a graphics pipeline
 bool PipelineState::isGraphics() {
-  return getShaderStageMask().contains_any({ShaderStage::Task, ShaderStage::Vertex, ShaderStage::TessControl,
-                                            ShaderStage::TessEval, ShaderStage::Geometry, ShaderStage::Mesh,
-                                            ShaderStage::Fragment});
+  return getShaderStageMask().contains_any(ShaderStagesGraphics);
 }
 
 // =====================================================================================================================
@@ -600,8 +598,6 @@ bool PipelineState::isGraphics() {
 // @param stage : Shader stage
 // @param options : Shader options
 void PipelineState::setShaderOptions(ShaderStageEnum stage, const ShaderOptions &options) {
-  if (m_shaderOptions.size() <= stage)
-    m_shaderOptions.resize(stage + 1);
   m_shaderOptions[stage] = options;
 }
 
@@ -610,8 +606,6 @@ void PipelineState::setShaderOptions(ShaderStageEnum stage, const ShaderOptions 
 //
 // @param stage : Shader stage
 const ShaderOptions &PipelineState::getShaderOptions(ShaderStageEnum stage) {
-  if (m_shaderOptions.size() <= stage)
-    m_shaderOptions.resize(stage + 1);
   return m_shaderOptions[stage];
 }
 
@@ -632,9 +626,12 @@ void PipelineState::recordOptions(Module *module) {
   if (unsigned preRasterHasGs = unsigned(m_preRasterHasGs))
     setNamedMetadataToArrayOfInt32(module, preRasterHasGs, PreRasterHasGsMetadataName);
   setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
-  for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage) {
-    std::string metadataName =
-        (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage))).str();
+  // Iterate stages in deterministic order
+  for (auto stage : ShaderStagesNative) {
+    if (!m_shaderOptions.contains(stage))
+      continue;
+
+    std::string metadataName = (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(stage)).str();
     setNamedMetadataToArrayOfInt32(module, m_shaderOptions[stage], metadataName);
   }
 }
@@ -664,13 +661,12 @@ void PipelineState::readOptions(Module *module) {
   m_preRasterHasGs = preRasterHasGsAsInt;
 
   readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
-  for (unsigned stage = 0; stage != ShaderStage::Compute + 1; ++stage) {
+  for (auto stage : ShaderStagesNative) {
     std::string metadataName =
         (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage))).str();
     auto namedMetaNode = module->getNamedMetadata(metadataName);
     if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
       continue;
-    m_shaderOptions.resize(stage + 1);
     readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), m_shaderOptions[stage]);
   }
 }
@@ -769,7 +765,7 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     // Operand 1: matchType
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.abstractType))));
     // Operand 2: visibility
-    operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.visibility)));
+    operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.visibility.toRaw())));
     // Operand 3: offsetInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.offsetInDwords)));
     // Operand 4: sizeInDwords
@@ -840,7 +836,8 @@ void PipelineState::readUserDataNodes(Module *module) {
     nextNode->abstractType =
         static_cast<ResourceNodeType>(mdconst::extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
     // Operand 2: visibility
-    nextNode->visibility = mdconst::extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    nextNode->visibility =
+        ShaderStageMask::fromRaw(mdconst::extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue());
     // Operand 3: offsetInDwords
     nextNode->offsetInDwords = mdconst::extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
     // Operand 4: sizeInDwords
@@ -900,18 +897,22 @@ void PipelineState::readUserDataNodes(Module *module) {
 //
 // @param stage : Shader stage to check against nodes' visibility field, or ShaderStage::Invalid for any
 const ResourceNode *PipelineState::findPushConstantResourceNode(std::optional<ShaderStageEnum> stage) const {
-  unsigned visibilityMask = UINT_MAX;
-  if (stage)
-    visibilityMask = 1 << std::min(unsigned(stage.value()), unsigned(ShaderStage::Compute));
+  ShaderStageMask visibilityMask(ShaderStages);
+  if (stage) {
+    ShaderStageEnum maskStage = stage.value();
+    if (!ShaderStageMask(ShaderStagesNative).contains(maskStage))
+      maskStage = ShaderStage::Compute;
+    visibilityMask = ShaderStageMask(maskStage);
+  }
 
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+    if (!node.visibility.empty() && (node.visibility & visibilityMask).empty())
       continue;
     if (node.concreteType == ResourceNodeType::PushConst)
       return &node;
     if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       if (!node.innerTable.empty() && node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
-        if (node.innerTable[0].visibility != 0 && (node.innerTable[0].visibility & visibilityMask) == 0)
+        if (!node.innerTable[0].visibility.empty() && (node.innerTable[0].visibility & visibilityMask).empty())
           continue;
         assert(ResourceLayoutScheme::Indirect == m_options.resourceLayoutScheme);
         return &node;
@@ -919,50 +920,6 @@ const ResourceNode *PipelineState::findPushConstantResourceNode(std::optional<Sh
     }
   }
   return nullptr;
-}
-
-// =====================================================================================================================
-// Returns true when type nodeType is compatible with candidateType.
-// A node type is compatible with a candidate type iff (nodeType) <= (candidateType) in the ResourceNodeType lattice:
-//
-// DescriptorBufferCompact
-//        +                                               DescriptorCombinedTexture
-//        |         DescriptorConstBufferCompact                     +
-//        |             +                                            |
-//        |             |    InlineBuffer                            |
-//        |             |      +                 +-------------------+--------------------+
-//        |             |      |                 |                   |                    |
-//        v             v      v                 v                   v                    v
-// DescriptorBuffer  DescriptorConstBuffer  DescriptorResource  DescriptorTexelBuffer  DescriptorSampler
-//          +            +                       +                   +                    +
-//          |            |                       |                   |                    |
-//          v            v                       |                   |                    |
-//       DescriptorAnyBuffer                     v                   |                    |
-//                +-------------------------> Unknown <--------------+--------------------+
-//
-// @param nodeType : Resource node type
-// @param candidateType : Resource node candidate type
-static bool isNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType candidateType) {
-  if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType ||
-      candidateType == ResourceNodeType::DescriptorMutable)
-    return true;
-
-  if ((nodeType == ResourceNodeType::DescriptorConstBuffer || nodeType == DescriptorAnyBuffer) &&
-      (candidateType == ResourceNodeType::DescriptorConstBufferCompact ||
-       candidateType == ResourceNodeType::DescriptorConstBuffer || candidateType == ResourceNodeType::InlineBuffer))
-    return true;
-
-  if ((nodeType == ResourceNodeType::DescriptorBuffer || nodeType == DescriptorAnyBuffer) &&
-      (candidateType == ResourceNodeType::DescriptorBufferCompact ||
-       candidateType == ResourceNodeType::DescriptorBuffer))
-    return true;
-
-  if ((nodeType == ResourceNodeType::DescriptorResource || nodeType == ResourceNodeType::DescriptorTexelBuffer ||
-       nodeType == ResourceNodeType::DescriptorSampler) &&
-      candidateType == ResourceNodeType::DescriptorCombinedTexture)
-    return true;
-
-  return false;
 }
 
 // =====================================================================================================================
@@ -998,12 +955,10 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 // sizeInDwords/stride.
 //
 // @param node : Node to try and match
-// @param nodeType : Resource node type being searched for
 // @param descSet : Descriptor set being searched for
 // @param binding : Descriptor binding being searched for
-bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, uint64_t descSet,
-                                      unsigned binding) const {
-  if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.abstractType))
+bool PipelineState::matchResourceNode(const ResourceNode &node, uint64_t descSet, unsigned binding) const {
+  if (node.set != descSet)
     return false;
   if (node.binding == binding)
     return true;
@@ -1032,14 +987,18 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 std::pair<const ResourceNode *, const ResourceNode *>
 PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding,
                                 std::optional<ShaderStageEnum> stage) const {
-  unsigned visibilityMask = UINT_MAX;
-  if (stage)
-    visibilityMask = 1 << std::min(unsigned(stage.value()), unsigned(ShaderStage::Compute));
+  ShaderStageMask visibilityMask(ShaderStages);
+  if (stage) {
+    ShaderStageEnum maskStage = stage.value();
+    if (!ShaderStageMask(ShaderStagesNative).contains(maskStage))
+      maskStage = ShaderStage::Compute;
+    visibilityMask = ShaderStageMask(maskStage);
+  }
 
   for (const ResourceNode &node : getUserDataNodes()) {
     if (!nodeTypeHasBinding(node.concreteType))
       continue;
-    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+    if (!node.visibility.empty() && (node.visibility & visibilityMask).empty())
       continue;
 
     if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
@@ -1053,12 +1012,12 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, uns
 
       // Check inner nodes.
       for (const ResourceNode &innerNode : node.innerTable) {
-        if (innerNode.visibility != 0 && (innerNode.visibility & visibilityMask) == 0)
+        if (!innerNode.visibility.empty() && (innerNode.visibility & visibilityMask).empty())
           continue;
-        if (matchResourceNode(innerNode, nodeType, descSet, binding))
+        if (matchResourceNode(innerNode, descSet, binding))
           return {&node, &innerNode};
       }
-    } else if (matchResourceNode(node, nodeType, descSet, binding))
+    } else if (matchResourceNode(node, descSet, binding))
       return {&node, &node};
   }
 
@@ -1081,13 +1040,18 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, uns
 //
 // @param nodeType : Type of the resource mapping node
 // @param stage : Shader stage to check against nodes' visibility field, or ShaderStage::Invalid for any
-const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStageEnum stage) const {
-  unsigned visibilityMask = UINT_MAX;
-  if (stage != ShaderStage::Invalid)
-    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStage::Compute));
+const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType,
+                                                              std::optional<ShaderStageEnum> stage) const {
+  ShaderStageMask visibilityMask(ShaderStages);
+  if (stage) {
+    ShaderStageEnum maskStage = stage.value();
+    if (!ShaderStageMask(ShaderStagesNative).contains(maskStage))
+      maskStage = ShaderStage::Compute;
+    visibilityMask = ShaderStageMask(maskStage);
+  }
 
   for (const ResourceNode &node : getUserDataNodes()) {
-    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+    if (!node.visibility.empty() && (node.visibility & visibilityMask).empty())
       continue;
     if (node.concreteType == nodeType)
       return &node;
@@ -1356,7 +1320,7 @@ unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
     stage = ShaderStage::Geometry;
   }
 
-  assert(stage <= ShaderStage::Compute);
+  assert(ShaderStageMask(ShaderStagesNative).contains(stage));
   if (!m_waveSize[stage])
     setShaderDefaultWaveSize(stage);
 
@@ -1655,10 +1619,9 @@ bool PipelineState::getShaderWgpMode(ShaderStageEnum stage) const {
     stage = ShaderStage::Geometry;
   }
 
-  assert(stage <= ShaderStage::Compute);
-  assert(stage < m_shaderOptions.size());
+  assert(ShaderStageMask(ShaderStagesNative).contains(stage));
 
-  return m_shaderOptions[stage].wgpMode;
+  return m_shaderOptions.lookup(stage).wgpMode;
 }
 
 // =====================================================================================================================
@@ -1704,7 +1667,7 @@ bool PipelineState::enableSwXfb() {
   lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
 
   if (!lastVertexStage) {
-    assert(isUnlinked()); // Unlinked fragment shader or part-pipeline
+    assert(!isWholePipeline()); // Unlinked fragment shader or part-pipeline
     return false;
   }
 
@@ -1735,7 +1698,7 @@ ResourceUsage *PipelineState::getShaderResourceUsage(ShaderStageEnum shaderStage
   if (shaderStage == ShaderStage::CopyShader)
     shaderStage = ShaderStage::Geometry;
 
-  auto &resUsage = MutableArrayRef<std::unique_ptr<ResourceUsage>>(m_resourceUsage)[shaderStage];
+  auto &resUsage = m_resourceUsage[shaderStage];
   if (!resUsage) {
     resUsage = std::make_unique<ResourceUsage>(shaderStage);
   }
@@ -1750,7 +1713,7 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStageEnum shaderStage
   if (shaderStage == ShaderStage::CopyShader)
     shaderStage = ShaderStage::Geometry;
 
-  auto &intfData = MutableArrayRef<std::unique_ptr<InterfaceData>>(m_interfaceData)[shaderStage];
+  auto &intfData = m_interfaceData[shaderStage];
   if (!intfData) {
     intfData = std::make_unique<InterfaceData>();
   }

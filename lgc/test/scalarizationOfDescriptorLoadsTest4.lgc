@@ -12,23 +12,31 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spi
 ; CHECK-LABEL: define dllexport spir_func void @lgc.shader.VS.main(
 ; CHECK-SAME: ) local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel [[META14:![0-9]+]] !lgc.shaderstage [[META15:![0-9]+]] {
 ; CHECK-NEXT:  .entry:
+; CHECK-NEXT:    [[TMP19:%.*]] = call i64 @llvm.amdgcn.s.getpc()
+; CHECK-NEXT:    [[TMP20:%.*]] = bitcast i64 [[TMP19]] to <2 x i32>
 ; CHECK-NEXT:    [[TMP0:%.*]] = call i32 @lgc.input.import.generic__i32(i1 false, i32 0, i32 0, i32 0, i32 poison)
-; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[TMP0]], poison
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @lgc.load.user.data__i32(i32 0)
+; CHECK-NEXT:    [[TMP4:%.*]] = insertelement <2 x i32> [[TMP20]], i32 [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP21:%.*]] = bitcast <2 x i32> [[TMP4]] to i64
+; CHECK-NEXT:    [[TMP23:%.*]] = inttoptr i64 [[TMP21]] to ptr addrspace(4)
+; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP23]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP23]], i32 -1) ]
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP23]], i32 0
+; CHECK-NEXT:    [[TMP1:%.*]] = mul i32 [[TMP0]], 16
 ; CHECK-NEXT:    [[TMP2:%.*]] = sext i32 [[TMP1]] to i64
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(4) poison, i64 [[TMP2]]
-; CHECK-NEXT:    [[TMP4:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP3]], align 16, !invariant.load [[META16:![0-9]+]]
-; CHECK-NEXT:    [[TMP5:%.*]] = mul i32 [[TMP0]], poison
+; CHECK-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i64 [[TMP2]]
+; CHECK-NEXT:    [[TMP25:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP24]], align 16, !invariant.load [[META16:![0-9]+]]
+; CHECK-NEXT:    [[TMP5:%.*]] = mul i32 [[TMP0]], 16
 ; CHECK-NEXT:    [[TMP6:%.*]] = sext i32 [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(4) poison, i64 [[TMP6]]
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i64 [[TMP6]]
 ; CHECK-NEXT:    [[TMP8:%.*]] = call ptr addrspace(4) @foo1(i32 [[TMP0]])
-; CHECK-NEXT:    [[TMP19:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP7]], align 4, !invariant.load [[META16]]
+; CHECK-NEXT:    [[TMP26:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP14]], align 4, !invariant.load [[META16]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP8]], align 4, !invariant.load [[META16]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP5]])
 ; CHECK-NEXT:    [[TMP11:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.v4i32(i32 [[TMP10]], <4 x i32> [[TMP9]])
 ; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP11]], i32 [[TMP5]])
 ; CHECK-NEXT:    [[TMP13:%.*]] = sext i32 [[TMP12]] to i64
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(4) poison, i64 [[TMP13]]
-; CHECK-NEXT:    [[TMP15:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP14]], align 4, !invariant.load [[META16]]
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i64 [[TMP13]]
+; CHECK-NEXT:    [[TMP15:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP22]], align 4, !invariant.load [[META16]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP11]], <4 x i32> [[TMP9]])
 ; CHECK-NEXT:    [[TMP17:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP15]], <4 x i32> [[TMP16]], i1 false, i32 0, i32 0)
 ; CHECK-NEXT:    [[TMP18:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP11]], <4 x float> [[TMP17]])

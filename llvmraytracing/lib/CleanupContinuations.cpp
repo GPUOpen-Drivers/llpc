@@ -75,6 +75,52 @@ using namespace lgc;
 
 #define DEBUG_TYPE "cleanup-continuations"
 
+namespace {
+
+class CleanupContinuationsPassImpl {
+public:
+  CleanupContinuationsPassImpl(llvm::Module &M, llvm::ModuleAnalysisManager &AM,
+                               bool Use64BitContinuationReferences = false);
+
+  PreservedAnalyses run();
+
+private:
+  struct ContinuationData {
+    /// All functions belonging to this continuation, the entry function is the
+    /// first one
+    SmallVector<Function *> Functions;
+    /// Size of the continuation state in byte
+    uint32_t ContStateBytes = 0;
+    CallInst *MallocCall = nullptr;
+    MDNode *MD = nullptr;
+    SmallVector<Function *> NewFunctions;
+  };
+
+  void removeContFreeCall(Function *F, Function *ContFree);
+  Value *getContinuationFramePtr(Function *F, bool IsStart, const ContinuationData &ContinuationInfo,
+                                 SmallVector<Instruction *> *InstsToRemove = nullptr);
+  void freeCpsStack(Function *F, ContinuationData &CpsInfo);
+  void updateCpsStack(Function *F, Function *NewFunc, bool IsStart, ContinuationData &CpsInfo);
+  void analyzeContinuation(Function &F, MDNode *MD);
+  void processContinuations();
+  void handleContinue(ContinuationData &Data, Instruction *Ret);
+  void handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun);
+  void lowerIntrinsicCall(Module &Mod);
+  void lowerGetResumePoint(Module &Mod);
+  bool lowerCompleteOp(Module &Mod);
+
+  llvm::Module &Mod;
+  llvm::ModuleAnalysisManager &AnalysisManager;
+  llvm_dialects::Builder *Builder = nullptr;
+  Function *ContMalloc = nullptr;
+  Function *ContFree = nullptr;
+  MapVector<Function *, ContinuationData> ToProcess;
+  uint32_t MaxContStateBytes;
+  llvm::Module *GpurtLibrary = nullptr;
+  bool Use64BitContinuationReferences;
+  llvm::Type *ContinuationReferenceType = nullptr;
+};
+
 /// Find the original call that created the continuation token and the matching
 /// resume function for a return value.
 ///
@@ -139,7 +185,7 @@ findTokenOrigin(BasicBlock *BB, Value *V, SmallVectorImpl<Instruction *> &ToRemo
   return Result;
 }
 
-void CleanupContinuationsPass::analyzeContinuation(Function &F, MDNode *MD) {
+void CleanupContinuationsPassImpl::analyzeContinuation(Function &F, MDNode *MD) {
   // Only analyze main continuation
   auto *MDTup = cast<MDTuple>(MD);
   auto *EntryF = mdconst::extract<Function>(MDTup->getOperand(0));
@@ -173,7 +219,8 @@ void CleanupContinuationsPass::analyzeContinuation(Function &F, MDNode *MD) {
     MaxContStateBytes = Data.ContStateBytes;
 }
 
-void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc, bool IsStart, ContinuationData &CpsInfo) {
+void CleanupContinuationsPassImpl::updateCpsStack(Function *F, Function *NewFunc, bool IsStart,
+                                                  ContinuationData &CpsInfo) {
 
   Builder->SetInsertPoint(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
   Value *CpsStack = nullptr;
@@ -247,9 +294,9 @@ static void buildCpsArgInfos(Function *F, bool IsStart, SmallVector<Type *> &All
 
 /// Find the continuation state pointer, either returned by the malloc or
 /// given as an argument
-Value *CleanupContinuationsPass::getContinuationFramePtr(Function *F, bool IsStart,
-                                                         const ContinuationData &ContinuationInfo,
-                                                         SmallVector<Instruction *> *InstsToRemove) {
+Value *CleanupContinuationsPassImpl::getContinuationFramePtr(Function *F, bool IsStart,
+                                                             const ContinuationData &ContinuationInfo,
+                                                             SmallVector<Instruction *> *InstsToRemove) {
   if (!ContinuationInfo.MallocCall)
     return IsStart ? F->getArg(F->arg_size() - 1) : F->getArg(0);
 
@@ -267,7 +314,7 @@ Value *CleanupContinuationsPass::getContinuationFramePtr(Function *F, bool IsSta
 
 /// Remove call to continuation.free() in F, ContFree is the pointer to
 /// declaration of continuation.free().
-void CleanupContinuationsPass::removeContFreeCall(Function *F, Function *ContFree) {
+void CleanupContinuationsPassImpl::removeContFreeCall(Function *F, Function *ContFree) {
   for (auto *User : make_early_inc_range(ContFree->users())) {
     if (auto *Call = dyn_cast<CallInst>(User)) {
       if (Call->getFunction() == F) {
@@ -279,7 +326,7 @@ void CleanupContinuationsPass::removeContFreeCall(Function *F, Function *ContFre
 }
 
 /// Insert cps.free() before the original function exits and lgc.cps.complete calls.
-void CleanupContinuationsPass::freeCpsStack(Function *F, ContinuationData &CpsInfo) {
+void CleanupContinuationsPassImpl::freeCpsStack(Function *F, ContinuationData &CpsInfo) {
   struct VisitState {
     ContinuationData &CpsInfo;
     llvm_dialects::Builder *Builder;
@@ -288,7 +335,6 @@ void CleanupContinuationsPass::freeCpsStack(Function *F, ContinuationData &CpsIn
   VisitState State = {CpsInfo, Builder, F};
   static const auto Visitor =
       llvm_dialects::VisitorBuilder<VisitState>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
           .addSet<cps::JumpOp, cps::CompleteOp>([](auto &State, auto &Instruction) {
             if (Instruction.getFunction() == State.F && State.CpsInfo.ContStateBytes) {
               State.Builder->SetInsertPoint(&Instruction);
@@ -299,7 +345,31 @@ void CleanupContinuationsPass::freeCpsStack(Function *F, ContinuationData &CpsIn
   Visitor.visit(State, *F);
 }
 
-void CleanupContinuationsPass::processContinuations() {
+/// Handle lgc.cps.complete calls.
+bool CleanupContinuationsPassImpl::lowerCompleteOp(Module &Mod) {
+  struct VisitState {
+    llvm_dialects::Builder *Builder;
+    bool completeLowered;
+  };
+
+  bool completeLowered = false;
+  VisitState State = {Builder, completeLowered};
+  static auto Visitor = llvm_dialects::VisitorBuilder<VisitState>()
+                            .add<cps::CompleteOp>([](VisitState &State, auto &complete) {
+                              State.Builder->SetInsertPoint(&complete);
+                              State.Builder->CreateRetVoid();
+                              BasicBlock *block = complete.getParent();
+                              block->getTerminator()->eraseFromParent();
+                              complete.eraseFromParent();
+                              State.completeLowered = true;
+                            })
+                            .build();
+
+  Visitor.visit(State, Mod);
+  return State.completeLowered;
+}
+
+void CleanupContinuationsPassImpl::processContinuations() {
   // Summarize of what to do here:
   // 1. Continuation Stack
   //    a.) cps.alloc() in start, and cps.peek() cps.free() in resume.
@@ -362,17 +432,6 @@ void CleanupContinuationsPass::processContinuations() {
         auto *I = BB.getTerminator();
         if (isa<ReturnInst>(I)) {
           handleContinue(FuncData.second, I);
-        } else if (I->getOpcode() == Instruction::Unreachable) {
-          // We should only have 'lgc.cps.complete' or 'lgc.cps.jump' calls before unreachable.
-          auto *Call = cast<CallInst>(--I->getIterator());
-          if (isa<cps::CompleteOp>(Call)) {
-            Builder->SetInsertPoint(Call);
-            Builder->CreateRetVoid();
-            Call->eraseFromParent();
-            I->eraseFromParent();
-          } else {
-            assert(isa<cps::JumpOp>(Call));
-          }
         }
       }
 
@@ -413,7 +472,7 @@ void CleanupContinuationsPass::processContinuations() {
 ///                                 i32 %cr2, ...)
 ///
 /// Also handles cases where the token and resume function are behind a phi.
-void CleanupContinuationsPass::handleContinue(ContinuationData &Data, Instruction *Ret) {
+void CleanupContinuationsPassImpl::handleContinue(ContinuationData &Data, Instruction *Ret) {
   // Find the function call that generates the token
   LLVM_DEBUG(dbgs() << "Converting ret to continue: " << *Ret << "\nArgument: " << *Ret->getOperand(0) << "\n");
   auto *BB = Ret->getParent();
@@ -438,7 +497,7 @@ void CleanupContinuationsPass::handleContinue(ContinuationData &Data, Instructio
   }
 }
 
-void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun) {
+void CleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun) {
   Builder->SetInsertPoint(Call);
 
   SmallVector<Value *> TailArgs;
@@ -478,7 +537,7 @@ void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data, Call
 }
 
 /// Lower lgc.rt calls inside cps functions.
-void CleanupContinuationsPass::lowerIntrinsicCall(Module &Mod) {
+void CleanupContinuationsPassImpl::lowerIntrinsicCall(Module &Mod) {
   DenseMap<Function *, SmallVector<CallInst *>> CpsIntrinsicCalls;
 
   // We only care about lgc.rt here.
@@ -520,7 +579,7 @@ void CleanupContinuationsPass::lowerIntrinsicCall(Module &Mod) {
   }
 }
 
-void CleanupContinuationsPass::lowerGetResumePoint(Module &Mod) {
+void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
   for (auto &F : make_early_inc_range(Mod)) {
     auto FuncName = F.getName();
     if (!FuncName.starts_with("_AmdGetResumePointAddr"))
@@ -544,7 +603,12 @@ void CleanupContinuationsPass::lowerGetResumePoint(Module &Mod) {
   }
 }
 
-llvm::PreservedAnalyses CleanupContinuationsPass::run(llvm::Module &Mod, llvm::ModuleAnalysisManager &AnalysisManager) {
+CleanupContinuationsPassImpl::CleanupContinuationsPassImpl(llvm::Module &M, llvm::ModuleAnalysisManager &AM,
+                                                           bool Use64BitContinuationReferences)
+    : Mod(M), AnalysisManager(AM), Use64BitContinuationReferences{Use64BitContinuationReferences} {
+}
+
+llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
   LLVM_DEBUG(dbgs() << "Run the lgc-cleanup-continuations pass\n");
   AnalysisManager.getResult<DialectContextAnalysis>(Mod);
   auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod).getManager();
@@ -614,13 +678,26 @@ llvm::PreservedAnalyses CleanupContinuationsPass::run(llvm::Module &Mod, llvm::M
     }
   }
 
+  bool Changed = false;
   if (!ToProcess.empty()) {
     processContinuations();
     // Lower lgc.rt intrinsics
     lowerIntrinsicCall(Mod);
 
     lowerGetResumePoint(Mod);
-    return PreservedAnalyses::none();
+    Changed = true;
   }
-  return PreservedAnalyses::all();
+
+  Changed |= lowerCompleteOp(Mod);
+
+  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+}
+
+} // namespace
+
+llvm::PreservedAnalyses CleanupContinuationsPass::run(llvm::Module &Mod, llvm::ModuleAnalysisManager &AnalysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the cleanup-continuations pass\n");
+  AnalysisManager.getResult<DialectContextAnalysis>(Mod);
+  CleanupContinuationsPassImpl Impl(Mod, AnalysisManager, Use64BitContinuationReferences);
+  return Impl.run();
 }

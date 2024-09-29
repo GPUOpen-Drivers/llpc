@@ -46,6 +46,7 @@ class GpurtGetStaticFlagsOp;
 class GpurtStackReadOp;
 class GpurtStackWriteOp;
 class GpurtLdsStackInitOp;
+class GpurtGetRayStaticIdOp;
 
 namespace rtq {
 class InitializeOp;
@@ -151,6 +152,7 @@ private:
   void visitStackReadOp(lgc::GpurtStackReadOp &inst);
   void visitStackWriteOp(lgc::GpurtStackWriteOp &inst);
   void visitLdsStackInitOp(lgc::GpurtLdsStackInitOp &inst);
+  void visitGetRayStaticIdOp(lgc::GpurtGetRayStaticIdOp &inst);
 
   void visitHitAccessor(GpurtFunc instType, llvm::Value *rayQuery, bool committed, llvm::CallBase *inst);
   void visitAccessor(GpurtFunc instType, llvm::Value *rayQuery, llvm::CallBase *inst);
@@ -164,10 +166,12 @@ private:
   llvm::Module *m_gpurtModule = nullptr;
   llvm::Function **m_gpurtFuncs = nullptr;
   llvm::SmallVector<llvm::Value *> m_rtqAlloc;
+  llvm::SmallVector<llvm::Instruction *> m_callsToLower;
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;
   llvm_dialects::Builder *m_builder = nullptr;
   CompilerUtils::TypeLowering *m_typeLowering = nullptr;
   llvm::Type *m_rtqType = nullptr;
+  unsigned m_traceRayId = 0;
 };
 
 } // namespace rt

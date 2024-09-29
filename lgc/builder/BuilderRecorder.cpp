@@ -178,6 +178,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "get.desc.ptr";
   case BuilderOpcode::LoadPushConstantsPtr:
     return "load.push.constants.ptr";
+  case BuilderOpcode::SamplerFeedbackDesc:
+    return "sampler.feedback.desc";
   case BuilderOpcode::ReadGenericInput:
     return "read.generic.input";
   case BuilderOpcode::ReadPerVertexInput:
@@ -1082,6 +1084,16 @@ Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateLoadPushConstantsPtr(const Twine &instName) {
   return record(BuilderOpcode::LoadPushConstantsPtr, getPtrTy(ADDR_SPACE_CONST), {}, instName);
+}
+
+// =====================================================================================================================
+// Merges a resource descriptor into a feedback descriptor to create a descriptor for sampler feedback instructions.
+//
+// @param feedbackDesc : feedback descriptor
+// @param resourceDesc : resource descriptor
+Value *Builder::CreateSamplerFeedbackDesc(Value *feedbackDesc, Value *resourceDesc, const Twine &instName) {
+  return record(BuilderOpcode::SamplerFeedbackDesc, getDescTy(ResourceNodeType::DescriptorResource),
+                {feedbackDesc, resourceDesc}, instName);
 }
 
 // =====================================================================================================================
@@ -2043,6 +2055,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::SubgroupBallotFindLsb:
     case BuilderOpcode::SubgroupBallotFindMsb:
     case BuilderOpcode::SubgroupBallotInclusiveBitCount:
+    case BuilderOpcode::SamplerFeedbackDesc:
       // Functions that don't access memory.
       func->setDoesNotAccessMemory();
       break;

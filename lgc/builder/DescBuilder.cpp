@@ -254,7 +254,7 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
     // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
     StringRef startGlobalName = lgcName::ImmutableSamplerGlobal;
     std::string globalName =
-        (startGlobalName + Twine(node->set) + "_" + Twine(node->binding) + "_" + Twine(node->visibility)).str();
+        (startGlobalName + Twine(node->set) + "_" + Twine(node->binding) + "_" + Twine(node->visibility.toRaw())).str();
     Module *module = GetInsertPoint()->getModule();
     descPtr = module->getGlobalVariable(globalName, /*AllowInternal=*/true);
     if (!descPtr) {

@@ -109,6 +109,7 @@ enum BuilderOpcode : unsigned {
   GetDescStride,
   GetDescPtr,
   LoadPushConstantsPtr,
+  SamplerFeedbackDesc,
 
   // Image
   ImageLoad,

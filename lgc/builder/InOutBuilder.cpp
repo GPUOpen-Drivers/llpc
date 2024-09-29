@@ -2033,33 +2033,35 @@ void BuilderImpl::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize
   }
 
   case ShaderStage::Geometry: {
-    switch (builtIn) {
-    case BuiltInPointSize:
-      usage.gs.pointSize = true;
-      break;
-    case BuiltInPosition:
-      usage.gs.position = true;
-      break;
-    case BuiltInClipDistance:
-      usage.gs.clipDistance = std::max(usage.gs.clipDistance, arraySize);
-      break;
-    case BuiltInCullDistance:
-      usage.gs.cullDistance = std::max(usage.gs.cullDistance, arraySize);
-      break;
-    case BuiltInPrimitiveId:
-      usage.gs.primitiveId = true;
-      break;
-    case BuiltInViewportIndex:
-      usage.gs.viewportIndex = true;
-      break;
-    case BuiltInLayer:
-      usage.gs.layer = true;
-      break;
-    case BuiltInPrimitiveShadingRate:
-      usage.gs.primitiveShadingRate = true;
-      break;
-    default:
-      break;
+    if (streamId == m_pipelineState->getRasterizerState().rasterStream) {
+      switch (builtIn) {
+      case BuiltInPointSize:
+        usage.gs.pointSize = true;
+        break;
+      case BuiltInPosition:
+        usage.gs.position = true;
+        break;
+      case BuiltInClipDistance:
+        usage.gs.clipDistance = std::max(usage.gs.clipDistance, arraySize);
+        break;
+      case BuiltInCullDistance:
+        usage.gs.cullDistance = std::max(usage.gs.cullDistance, arraySize);
+        break;
+      case BuiltInPrimitiveId:
+        usage.gs.primitiveId = true;
+        break;
+      case BuiltInViewportIndex:
+        usage.gs.viewportIndex = true;
+        break;
+      case BuiltInLayer:
+        usage.gs.layer = true;
+        break;
+      case BuiltInPrimitiveShadingRate:
+        usage.gs.primitiveShadingRate = true;
+        break;
+      default:
+        break;
+      }
     }
     break;
   }

@@ -59,8 +59,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
 
   Builder builderImpl(pipelineState->getContext());
   m_builder = &builderImpl;
-
-  createGlobalStack(module);
+  createLdsStack(module);
 
   static auto visitor = llvm_dialects::VisitorBuilder<LowerGpuRt>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -104,20 +103,25 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
 
 // =====================================================================================================================
 // Get pipeline workgroup size for stack size calculation
-unsigned LowerGpuRt::getWorkgroupSize() const {
+// @param [in] Function : The function to retrieve shader information
+unsigned LowerGpuRt::getWorkgroupSize(Function *func) const {
   unsigned workgroupSize = 0;
-  if (m_pipelineState->isGraphics()) {
-    // Force 64 for graphics stages
-    workgroupSize = 64;
-  } else {
+  auto stage = getShaderStage(func);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(stage.value());
+  if (stage == ShaderStage::Mesh) {
+    auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+    workgroupSize = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
+  } else if (stage == ShaderStage::Task || stage == ShaderStage::Compute) {
     ComputeShaderMode mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
     workgroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
+  } else {
+    assert(m_pipelineState->isGraphics());
+    workgroupSize = 64;
   }
   assert(workgroupSize != 0);
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-    // Round up to multiple of 32, as the ds_bvh_stack swizzle as 32 threads
-    workgroupSize = alignTo(workgroupSize, 32);
-  }
+
+  workgroupSize = alignTo(workgroupSize, waveSize);
+
   return workgroupSize;
 }
 
@@ -136,33 +140,47 @@ Value *LowerGpuRt::getThreadIdInGroup() const {
 }
 
 // =====================================================================================================================
-// Create global variable for the stack
+// Update the workgroup size from different functions
+// @param func : Function to get WorkgroupSize from
+void LowerGpuRt::updateWorkgroupSize(Function *func) {
+  unsigned funcWorkSize = getWorkgroupSize(func);
+  m_workGroupSize = m_workGroupSize > funcWorkSize ? m_workGroupSize : funcWorkSize;
+}
+
+// =====================================================================================================================
+// Create global variable for the lds stack
 // @param [in/out] module : LLVM module to be run on
-void LowerGpuRt::createGlobalStack(Module &module) {
+void LowerGpuRt::createLdsStack(Module &module) {
   struct Payload {
-    bool needGlobalStack;
+    bool needLdsStack;
     bool needExtraStack;
+    LowerGpuRt *lowerRt;
   };
-  Payload payload = {false, false};
+  Payload payload = {false, false, this};
+  m_workGroupSize = 0;
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add<GpurtStackWriteOp>([](auto &payload, auto &op) {
-                              payload.needGlobalStack = true;
+                              payload.needLdsStack = true;
                               payload.needExtraStack |= op.getUseExtraStack();
+                              payload.lowerRt->updateWorkgroupSize(op.getFunction());
                             })
                             .add<GpurtStackReadOp>([](auto &payload, auto &op) {
-                              payload.needGlobalStack = true;
+                              payload.needLdsStack = true;
                               payload.needExtraStack |= op.getUseExtraStack();
+                              payload.lowerRt->updateWorkgroupSize(op.getFunction());
                             })
                             .add<GpurtLdsStackInitOp>([](auto &payload, auto &op) {
-                              payload.needGlobalStack = true;
+                              payload.needLdsStack = true;
                               payload.needExtraStack |= op.getUseExtraStack();
+                              payload.lowerRt->updateWorkgroupSize(op.getFunction());
                             })
                             .build();
   visitor.visit(payload, module);
 
-  if (payload.needGlobalStack) {
-    auto ldsStackSize = getWorkgroupSize() * MaxLdsStackEntries;
+  if (payload.needLdsStack) {
+    assert(m_workGroupSize > 0);
+    auto ldsStackSize = m_workGroupSize * MaxLdsStackEntries;
     // Double LDS size when any operations requires to perform on extra stack.
     if (payload.needExtraStack)
       ldsStackSize = ldsStackSize << 1;
@@ -183,7 +201,7 @@ void LowerGpuRt::createGlobalStack(Module &module) {
 void LowerGpuRt::visitGetStackSize(GpurtGetStackSizeOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *size = nullptr;
-  size = m_builder->getInt32(MaxLdsStackEntries * getWorkgroupSize());
+  size = m_builder->getInt32(MaxLdsStackEntries * m_workGroupSize);
   inst.replaceAllUsesWith(size);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
@@ -207,7 +225,7 @@ void LowerGpuRt::visitGetStackBase(GpurtGetStackBaseOp &inst) {
 // @param inst : The dialect instruction to process
 void LowerGpuRt::visitGetStackStride(GpurtGetStackStrideOp &inst) {
   m_builder->SetInsertPoint(&inst);
-  Value *stride = m_builder->getInt32(getWorkgroupSize());
+  Value *stride = m_builder->getInt32(m_workGroupSize);
   inst.replaceAllUsesWith(stride);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
@@ -222,7 +240,7 @@ void LowerGpuRt::visitStackRead(GpurtStackReadOp &inst) {
   Value *stackIndex = inst.getIndex();
   Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
   if (inst.getUseExtraStack()) {
-    auto ldsStackSize = m_builder->getInt32(getWorkgroupSize() * MaxLdsStackEntries);
+    auto ldsStackSize = m_builder->getInt32(m_workGroupSize * MaxLdsStackEntries);
     stackIndex = m_builder->CreateAdd(stackIndex, ldsStackSize);
   }
 
@@ -244,7 +262,7 @@ void LowerGpuRt::visitStackWrite(GpurtStackWriteOp &inst) {
   Value *stackData = inst.getValue();
   Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
   if (inst.getUseExtraStack()) {
-    auto ldsStackSize = m_builder->getInt32(getWorkgroupSize() * MaxLdsStackEntries);
+    auto ldsStackSize = m_builder->getInt32(m_workGroupSize * MaxLdsStackEntries);
     stackIndex = m_builder->CreateAdd(stackIndex, ldsStackSize);
   }
 
@@ -266,7 +284,7 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
 
   // From Navi3x on, Hardware has decided that the stacks are only swizzled across every 32 threads,
   // with stacks for every set of 32 threads stored after all the stack data for the previous 32 threads.
-  if (getWorkgroupSize() > 32) {
+  if (m_workGroupSize > 32) {
     // localThreadId = (LinearLocalThreadID%32)
     // localGroupId = (LinearLocalThreadID/32)
     // stackSize = STACK_SIZE * 32 = m_stackEntries * 32
@@ -281,7 +299,7 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
   }
 
   if (inst.getUseExtraStack()) {
-    auto ldsStackSize = m_builder->getInt32(getWorkgroupSize() * MaxLdsStackEntries);
+    auto ldsStackSize = m_builder->getInt32(m_workGroupSize * MaxLdsStackEntries);
     stackBasePerThread = m_builder->CreateAdd(stackBasePerThread, ldsStackSize);
   }
 

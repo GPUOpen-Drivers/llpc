@@ -31,7 +31,7 @@ declare !pointeetys !33 i1 @_cont_ReportHit(%struct.TraversalData* %data, float 
 declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData) #0
 
 ; Function Attrs: alwaysinline
 declare !pointeetys !17 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
@@ -61,7 +61,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 ; Function Attrs: alwaysinline
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !pointeetys !23 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -147,6 +147,7 @@ attributes #3 = { nounwind memory(read) }
 !dx.valver = !{!1}
 !dx.shaderModel = !{!2}
 !dx.entryPoints = !{!3, !6, !13, !15}
+!lgc.rt.max.attribute.size = !{!34}
 
 !0 = !{!"clang version 3.7.0 (tags/RELEASE_370/final)"}
 !1 = !{i32 1, i32 6}
@@ -182,3 +183,4 @@ attributes #3 = { nounwind memory(read) }
 !31 = !{i32 0, %struct.TheirParams2 poison}
 !32 = !{i32 0, %struct.TraversalData poison}
 !33 = !{%struct.TraversalData poison}
+!34 = !{i32 8}

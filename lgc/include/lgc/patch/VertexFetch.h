@@ -43,7 +43,7 @@ class InputImportGenericOp;
 // Public interface to vertex fetch manager.
 class VertexFetch {
 public:
-  virtual ~VertexFetch() {}
+  virtual ~VertexFetch() = default;
 
   // Create a VertexFetch
   static VertexFetch *create(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors,

@@ -149,16 +149,16 @@ target_sources(LLVMlgc PRIVATE
     patch/NggPrimShader.cpp
     patch/Patch.cpp
     patch/PatchBufferOp.cpp
-    patch/PatchCheckShaderCache.cpp
-    patch/PatchCopyShader.cpp
-    patch/PatchEntryPointMutate.cpp
-    patch/PatchImageDerivatives.cpp
-    patch/PatchInOutImportExport.cpp
-    patch/PatchInvariantLoads.cpp
-    patch/PatchLlvmIrInclusion.cpp
-    patch/PatchLoadScalarizer.cpp
-    patch/PatchMulDx9Zero.cpp
-    patch/PatchLoopMetadata.cpp
+    patch/CheckShaderCache.cpp
+    patch/GenerateCopyShader.cpp
+    patch/MutateEntryPoint.cpp
+    patch/LowerImageDerivatives.cpp
+    patch/LowerInOut.cpp
+    patch/LowerInvariantLoads.cpp
+    patch/IncludeLlvmIr.cpp
+    patch/ScalarizeLoads.cpp
+    patch/LowerMulDx9Zero.cpp
+    patch/AddLoopMetadata.cpp
     patch/PatchNullFragShader.cpp
     patch/PatchPeepholeOpt.cpp
     patch/PatchPreparePipelineAbi.cpp
@@ -172,7 +172,7 @@ target_sources(LLVMlgc PRIVATE
     patch/ShaderMerger.cpp
     patch/SystemValues.cpp
     patch/VertexFetch.cpp
-    patch/PatchImageOpCollect.cpp
+    patch/CollectImageOperations.cpp
     patch/RegisterMetadataBuilder.cpp
 #if VKI_BUILD_STRIX1
     patch/WorkaroundDsSubdwordWrite.cpp

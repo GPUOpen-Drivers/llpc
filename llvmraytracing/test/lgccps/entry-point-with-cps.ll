@@ -8,6 +8,11 @@
 
 declare void @lgc.cps.complete()
 
+define void @_cont_KernelEntry() #0 !lgc.rt.shaderstage !{i32 7} {
+  call void @lgc.cps.complete()
+  unreachable
+}
+
 define spir_func void @raygen({} %state, i32 %rcr) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 0} {
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 0)
   %fn = load ptr, ptr addrspace(4) %pushconst
@@ -67,6 +72,9 @@ declare void @lgc.cps.await__isVoid(...)
 declare i32 @lgc.cps.await__i32(...)
 declare [2 x i32] @lgc.cps.await__a2i32(...)
 declare void @lgc.cps.jump(...)
+; CHECK-LABEL: define void @_cont_KernelEntry(
+; CHECK-NEXT:    ret void
+
 ; CHECK-LABEL: define spir_func void @raygen(
 ; CHECK-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]]) !lgc.shaderstage [[META0:![0-9]+]] !lgc.cps [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] {
 ; CHECK-NEXT:  AllocaSpillBB:

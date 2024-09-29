@@ -181,6 +181,9 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
     {5, 0, 4},   // ArrayPitch
+    {1, 8, 12},  // MinLod
+    {},          // MinLodLo
+    {},          // MinLodHi
 };
 
 // =====================================================================================================================
@@ -204,6 +207,9 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
     {5, 0, 4},   // ArrayPitch
+    {},          // MinLod
+    {5, 27, 5},  // MinLodLo
+    {6, 0, 7},   // MinLodHi
 };
 
 // =====================================================================================================================
@@ -247,6 +253,17 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
   case SqRsrcRegs::BaseArray:
   case SqRsrcRegs::ArrayPitch:
     return getRegCommon(static_cast<unsigned>(regId));
+  case SqRsrcRegs::MinLod:
+    switch (m_gfxIpVersion->major) {
+    case 10:
+      return getRegCommon(static_cast<unsigned>(regId));
+    case 11:
+      return getRegCombine(static_cast<unsigned>(SqRsrcRegs::MinLodLo), static_cast<unsigned>(SqRsrcRegs::MinLodHi));
+    default:
+      llvm_unreachable("GFX IP is not supported!");
+      break;
+    }
+    break;
   case SqRsrcRegs::Depth:
   case SqRsrcRegs::Height:
   case SqRsrcRegs::Pitch:
@@ -281,10 +298,26 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
   case SqRsrcRegs::DstSelXYZW:
   case SqRsrcRegs::SwizzleMode:
   case SqRsrcRegs::Type:
-  case SqRsrcRegs::Depth:
   case SqRsrcRegs::BcSwizzle:
+  case SqRsrcRegs::BaseLevel:
+  case SqRsrcRegs::LastLevel:
+  case SqRsrcRegs::BaseArray:
     setRegCommon(static_cast<unsigned>(regId), regValue);
     break;
+  case SqRsrcRegs::MinLod:
+    switch (m_gfxIpVersion->major) {
+    case 10:
+      setRegCommon(static_cast<unsigned>(regId), regValue);
+      break;
+    case 11:
+      setRegCombine(static_cast<unsigned>(SqRsrcRegs::MinLodLo), static_cast<unsigned>(SqRsrcRegs::MinLodHi), regValue);
+      break;
+    default:
+      llvm_unreachable("GFX IP is not supported!");
+      break;
+    }
+    break;
+  case SqRsrcRegs::Depth:
   case SqRsrcRegs::Height:
   case SqRsrcRegs::Pitch:
     setRegCommon(static_cast<unsigned>(regId), m_builder->CreateSub(regValue, m_one));

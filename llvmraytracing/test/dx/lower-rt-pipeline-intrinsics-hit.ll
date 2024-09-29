@@ -28,7 +28,7 @@ declare !pointeetys !27 void @_cont_SetTriangleHitAttributes(%struct.SystemData*
 
 declare %struct.DispatchSystemData @_cont_Traversal(%struct.TraversalData) #0
 
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #0
+declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, i64, %struct.AnyHitTraversalData) #0
 
 declare !pointeetys !28 %struct.HitData @_cont_GetCommittedState(%struct.SystemData*) #0
 
@@ -79,7 +79,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 
 define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind) #0 !pointeetys !36 {
   %trav_data = load %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, align 4
-  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
+  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, i64 poison, %struct.AnyHitTraversalData %trav_data)
   store %struct.AnyHitTraversalData %newdata, %struct.AnyHitTraversalData* %data, align 4
   ret i1 true
 }
@@ -181,7 +181,7 @@ declare !pointeetys !46 [4 x <3 x float>] @_cont_WorldToObject4x3(%struct.Dispat
 ; Function Attrs: nounwind
 define void @RayGen() #3 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @RayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META18:![0-9]+]] !continuation [[META29:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META18]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META18:![0-9]+]] !continuation [[META30:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META18]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
@@ -190,7 +190,7 @@ define void @RayGen() #3 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @RayGen(
-; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META18:![0-9]+]] !continuation [[META28:![0-9]+]] !continuation.entry [[META13:![0-9]+]] {
+; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META18:![0-9]+]] !continuation [[META29:![0-9]+]] !continuation.entry [[META13:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -206,7 +206,7 @@ define void @RayGen() #3 {
 ; Function Attrs: nounwind
 define void @Intersection() #3 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.AnyHitTraversalData @Intersection(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META30:![0-9]+]] !continuation [[META31:![0-9]+]] !continuation.registercount [[META25:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [2 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META31:![0-9]+]] !continuation [[META32:![0-9]+]] !continuation.registercount [[META26:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
@@ -234,11 +234,11 @@ define void @Intersection() #3 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP11]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call ptr inttoptr (i64 3 to ptr)([[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I]], float 4.000000e+00, i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP12]], [19 x i32] poison, [30 x i32] [[TMP13]]), !continuation.registercount [[META25]], !continuation.returnedRegistercount [[META25]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = call { [[STRUCT_ANYHITTRAVERSALDATA]], [8 x i32], [30 x i32] } @await(ptr [[TMP20]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = extractvalue { [[STRUCT_ANYHITTRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP22]], 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call ptr inttoptr (i64 3 to ptr)(i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP12]], {} poison, [30 x i32] [[TMP13]]), !continuation.registercount [[META26]], !continuation.returnedRegistercount [[META26]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = call { [[STRUCT_ANYHITTRAVERSALDATA]], [2 x i32], [30 x i32] } @await(ptr [[TMP20]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = extractvalue { [[STRUCT_ANYHITTRAVERSALDATA]], [2 x i32], [30 x i32] } [[TMP22]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [30 x i32] [[TMP23]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = extractvalue { [[STRUCT_ANYHITTRAVERSALDATA]], [8 x i32], [30 x i32] } [[TMP22]], 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = extractvalue { [[STRUCT_ANYHITTRAVERSALDATA]], [2 x i32], [30 x i32] } [[TMP22]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP14]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ISEND_I:%.*]] = call i1 @opaqueIsEnd()
@@ -246,16 +246,16 @@ define void @Intersection() #3 {
 ; LOWERRAYTRACINGPIPELINE:       19:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP17]], [8 x i32] poison, [30 x i32] [[TMP21]]), !continuation.registercount [[META25]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP17]], [2 x i32] poison, [30 x i32] [[TMP21]]), !continuation.registercount [[META26]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE:       22:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP19]], [8 x i32] poison, [30 x i32] [[TMP24]]), !continuation.registercount [[META25]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP19]], [2 x i32] poison, [30 x i32] [[TMP24]]), !continuation.registercount [[META26]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @Intersection(
-; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META29:![0-9]+]] !continuation [[META30:![0-9]+]] !continuation.stacksize [[META31:![0-9]+]] {
+; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [2 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META30:![0-9]+]] !continuation [[META31:![0-9]+]] !continuation.stacksize [[META25:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
@@ -366,7 +366,7 @@ define void @Intersection() #3 {
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_29_INSERT96:%.*]] = insertvalue [30 x i32] [[DOTFCA_28_INSERT93]], i32 [[PAYLOAD_FCA_29_EXTRACT]], 29
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = call i64 @continuation.getAddrAndMD(ptr @Intersection.resume.0)
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 3, i32 [[TMP11]], i64 [[TMP12]], [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I_FCA_1_1_INSERT]], float 4.000000e+00, i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]], [19 x i32] poison, [30 x i32] [[DOTFCA_29_INSERT96]])
+; DXILCONTPOSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 3, i32 [[TMP11]], i64 [[TMP12]], i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I_FCA_1_1_INSERT]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]], {} poison, [30 x i32] [[DOTFCA_29_INSERT96]])
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)
@@ -381,39 +381,38 @@ define void @Intersection() #3 {
 ; Function Attrs: nounwind
 define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readonly %attr) #3 !pointeetys !47 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.AnyHitTraversalData @AnyHit(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META32:![0-9]+]] !continuation [[META33:![0-9]+]] !continuation.registercount [[META26:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]], {} [[PADDING:%.*]], [4 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META33:![0-9]+]] !continuation [[META34:![0-9]+]] !continuation.registercount [[META27:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = alloca [4 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ORIGHITATTRS:%.*]] = alloca [8 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRSALLOCA:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [10 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [4 x i32] [[PAYLOAD]], ptr [[TMP15]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP15]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP11]], ptr [[TMP10]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP15]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP25]], ptr [[TMP12]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP12]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[TMP15]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP21]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP17]], ptr [[TMP14]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[TMP12]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i32 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP15]], i32 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP22]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP20]], ptr [[TMP16]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds i32, ptr [[TMP15]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = load i32, ptr [[TMP26]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP29]], ptr [[TMP25]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](ptr [[TMP18]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP7]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 0, i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP7]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP28]], ptr [[ORIGHITATTRS]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i32 1
@@ -450,22 +449,22 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] [[TMP55]], ptr [[TMP8]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = load i32, ptr [[TMP39]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP42]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP60:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = getelementptr inbounds i32, ptr [[TMP39]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP59:%.*]] = load i32, ptr [[TMP41]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP59]], ptr [[TMP60]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP62:%.*]] = getelementptr inbounds i32, ptr [[TMP60]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP63:%.*]] = getelementptr inbounds i32, ptr [[TMP41]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = load i32, ptr [[TMP63]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = load i32, ptr [[TMP39]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP41]], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP62:%.*]] = getelementptr inbounds i32, ptr [[TMP15]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP59:%.*]] = getelementptr inbounds i32, ptr [[TMP39]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = load i32, ptr [[TMP59]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP61]], ptr [[TMP62]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr [[TMP60]], i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = getelementptr inbounds i32, ptr [[TMP41]], i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = load i32, ptr [[TMP67]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP66:%.*]] = getelementptr inbounds i32, ptr [[TMP15]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP60:%.*]] = getelementptr inbounds i32, ptr [[TMP39]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP64:%.*]] = load i32, ptr [[TMP60]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP64]], ptr [[TMP66]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP65:%.*]] = load i32, ptr [[HITATTRSALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP65]], ptr [[TMP6]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP63:%.*]] = getelementptr inbounds i32, ptr [[TMP15]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP65:%.*]] = getelementptr inbounds i32, ptr [[TMP39]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP67:%.*]] = load i32, ptr [[TMP65]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP67]], ptr [[TMP63]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP69:%.*]] = load i32, ptr [[HITATTRSALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP69]], ptr [[TMP6]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP70:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP71:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP68:%.*]] = load i32, ptr [[TMP70]], align 4
@@ -474,27 +473,21 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP57:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP57]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP56]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP58:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP73:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP58]], [8 x i32] poison, [10 x i32] [[TMP73]]), !continuation.registercount [[META26]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP72:%.*]] = load [4 x i32], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP58]], [2 x i32] poison, [4 x i32] [[TMP72]]), !continuation.registercount [[META27]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @AnyHit(
-; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]], [6 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META32:![0-9]+]] !continuation [[META33:![0-9]+]] {
+; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]], {} [[PADDING:%.*]], [4 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META32:![0-9]+]] !continuation [[META33:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_1_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_2_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 2
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_3_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 3
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_4_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 4
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_5_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 5
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_6_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 6
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_7_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 7
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_8_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 8
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_9_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 9
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_7_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_2_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 2
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_3_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 0, 0, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x i32> [[DOTFCA_0_0_0_0_EXTRACT]], ptr [[DOTFCA_0_0_0_0_GEP]], align 4
@@ -625,18 +618,12 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_GEP21:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_LOAD:%.*]] = load i32, ptr [[DOTFCA_1_1_GEP21]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_0_INSERT]], i32 [[DOTFCA_1_1_LOAD]], 1, 1
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [10 x i32] poison, i32 [[TMP23]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_2_INSERT]], i32 [[PAYLOAD_FCA_3_EXTRACT]], 3
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_4_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_3_INSERT]], i32 [[PAYLOAD_FCA_4_EXTRACT]], 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_5_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_4_INSERT]], i32 [[PAYLOAD_FCA_5_EXTRACT]], 5
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_6_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_5_INSERT]], i32 [[PAYLOAD_FCA_6_EXTRACT]], 6
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_7_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_6_INSERT]], i32 [[TMP24]], 7
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_8_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_7_INSERT]], i32 [[DOTFCA_2_EXTRACT]], 8
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_9_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_8_INSERT]], i32 [[DOTFCA_3_EXTRACT]], 9
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [4 x i32] poison, i32 [[TMP23]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_0_INSERT]], i32 [[TMP24]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_1_INSERT]], i32 [[DOTFCA_2_EXTRACT]], 2
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_2_INSERT]], i32 [[DOTFCA_3_EXTRACT]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR]], i32 [[TMP30]], i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]], [8 x i32] poison, [10 x i32] [[DOTFCA_9_INSERT]])
+; DXILCONTPOSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR]], i32 [[TMP30]], i64 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]], [2 x i32] poison, [4 x i32] [[DOTFCA_3_INSERT]])
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)
@@ -654,33 +641,33 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; Function Attrs: nounwind
 define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readonly %attr) #3 !pointeetys !47 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @ClosestHit(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META34:![0-9]+]] !continuation [[META35:![0-9]+]] !continuation.registercount [[META26]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [13 x i32] [[PADDING:%.*]], [4 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META35:![0-9]+]] !continuation [[META36:![0-9]+]] !continuation.registercount [[META27]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = alloca [4 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRS:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [10 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [4 x i32] [[PAYLOAD]], ptr [[TMP13]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP13]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP9]], ptr [[TMP8]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP13]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP17]], ptr [[TMP10]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP18]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP15]], ptr [[TMP12]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i32 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP19]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP22]], ptr [[TMP14]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP17]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr [[TMP25]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @[[_CONT_GETTRIANGLEHITATTRIBUTES]](ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP16]], ptr [[TMP5]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP5]], align 4
@@ -705,43 +692,37 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I1:%.*]] = load i32, ptr [[RESPTR_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = load i32, ptr [[TMP31]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP35]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], i32 7
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = getelementptr inbounds i32, ptr [[TMP31]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = load i32, ptr [[TMP33]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP36]], ptr [[TMP34]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = getelementptr inbounds i32, ptr [[TMP34]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i32, ptr [[TMP33]], i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = load i32, ptr [[TMP38]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr [[TMP31]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[TMP13]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = getelementptr inbounds i32, ptr [[TMP31]], i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = load i32, ptr [[TMP35]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP43]], ptr [[TMP37]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[TMP34]], i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr [[TMP33]], i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP49]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = getelementptr inbounds i32, ptr [[TMP31]], i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP38]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP47]], ptr [[TMP48]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr [[TMP13]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr [[TMP31]], i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = load i32, ptr [[TMP50]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP53]], ptr [[TMP49]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP51]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP52]], [20 x i32] poison, [10 x i32] [[TMP45]]), !continuation.registercount [[META26]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = load [4 x i32], ptr [[TMP13]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP52]], [14 x i32] poison, [4 x i32] [[TMP45]]), !continuation.registercount [[META27]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @ClosestHit(
-; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [19 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META34:![0-9]+]] !continuation [[META35:![0-9]+]] {
+; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [13 x i32] [[PADDING:%.*]], [4 x i32] [[PAYLOAD:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META34:![0-9]+]] !continuation [[META35:![0-9]+]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_1_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_2_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 2
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_3_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 3
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_4_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 4
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_5_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 5
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_6_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 6
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_7_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 7
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_8_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 8
-; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_9_EXTRACT:%.*]] = extractvalue [10 x i32] [[PAYLOAD]], 9
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_1_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_2_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 2
+; DXILCONTPOSTPROCESS-NEXT:    [[PAYLOAD_FCA_3_EXTRACT:%.*]] = extractvalue [4 x i32] [[PAYLOAD]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x i32> [[DOTFCA_0_0_EXTRACT]], ptr [[DOTFCA_0_0_GEP]], align 4
@@ -780,18 +761,12 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP14]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_LOAD:%.*]] = load <3 x i32>, ptr [[DOTFCA_0_GEP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_LOAD]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT1:%.*]] = insertvalue [10 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_0_INSERT1]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_2_INSERT]], i32 [[PAYLOAD_FCA_3_EXTRACT]], 3
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_4_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_3_INSERT]], i32 [[PAYLOAD_FCA_4_EXTRACT]], 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_5_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_4_INSERT]], i32 [[PAYLOAD_FCA_5_EXTRACT]], 5
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_6_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_5_INSERT]], i32 [[PAYLOAD_FCA_6_EXTRACT]], 6
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_7_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_6_INSERT]], i32 [[PAYLOAD_FCA_7_EXTRACT]], 7
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_8_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_7_INSERT]], i32 [[PAYLOAD_FCA_8_EXTRACT]], 8
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_9_INSERT:%.*]] = insertvalue [10 x i32] [[DOTFCA_8_INSERT]], i32 [[PAYLOAD_FCA_9_EXTRACT]], 9
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT1:%.*]] = insertvalue [4 x i32] poison, i32 [[PAYLOAD_FCA_0_EXTRACT]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_0_INSERT1]], i32 [[PAYLOAD_FCA_1_EXTRACT]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_1_INSERT]], i32 [[PAYLOAD_FCA_2_EXTRACT]], 2
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_INSERT:%.*]] = insertvalue [4 x i32] [[DOTFCA_2_INSERT]], i32 [[PAYLOAD_FCA_3_EXTRACT]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR]], i32 [[TMP19]], i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]], [20 x i32] poison, [10 x i32] [[DOTFCA_9_INSERT]])
+; DXILCONTPOSTPROCESS-NEXT:    call void (...) @lgc.ilcps.continue(i64 [[RETURNADDR]], i32 [[TMP19]], i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]], [14 x i32] poison, [4 x i32] [[DOTFCA_3_INSERT]])
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)
@@ -862,6 +837,7 @@ attributes #4 = { nounwind }
 !dx.resources = !{!3}
 !dx.typeAnnotations = !{!10}
 !dx.entryPoints = !{!14, !16, !19, !21, !23}
+!lgc.rt.max.attribute.size = !{!51}
 
 !0 = !{!"clang version 3.7.0 (tags/RELEASE_370/final)"}
 !1 = !{i32 1, i32 6}
@@ -914,3 +890,4 @@ attributes #4 = { nounwind }
 !48 = !{i32 0, %struct.RayPayload poison}
 !49 = !{i32 0, %struct.BuiltInTriangleIntersectionAttributes poison}
 !50 = !{%struct.BuiltInTriangleIntersectionAttributes poison}
+!51 = !{i32 8}
