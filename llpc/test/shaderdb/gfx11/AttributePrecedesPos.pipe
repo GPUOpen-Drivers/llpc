@@ -2,12 +2,12 @@
 
 ; RUN: amdllpc %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: @_amdgpu_gs_main(
-; SHADERTEST: call void @llvm.amdgcn.struct.buffer.store.v4f32(<4 x float> %{{.*}}, <4 x i32> %{{.*}}, i32 %{{.*}}, i32 0, i32 %{{.*}}, i32 3)
+; SHADERTEST: call void @llvm.amdgcn.struct.buffer.store.v4f32(<4 x float> %{{.*}}, <4 x i32> %{{.*}}, i32 %{{.*}}, i32 0, i32 %{{.*}}, i32 1)
 ; SHADERTEST: fence syncscope("agent") release
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 12, i32 15, float %{{.*}}, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 false, i1 false)
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 13, i32 1, float 1.000000e+00, float poison, float poison, float poison, i1 true, i1 false)
 ; SHADERTEST-LABEL: _amdgpu_gs_main:
-; SHADERTEST: buffer_store_b128 {{v[[0-9]*:[0-9]*]}}, {{v[0-9]*}}, {{s[[0-9]*:[0-9]*]}}, {{s[0-9]*}} idxen glc slc
+; SHADERTEST: buffer_store_b128 {{v[[0-9]*:[0-9]*]}}, {{v[0-9]*}}, {{s[[0-9]*:[0-9]*]}}, {{s[0-9]*}} idxen glc
 ; SHADERTEST: s_waitcnt_vscnt null, 0x0
 ; SHADERTEST: exp pos0 {{v[0-9]*}}, {{v[0-9]*}}, {{v[0-9]*}}, {{v[0-9]*}}
 ; SHADERTEST: exp pos1 {{v[0-9]*}}, off, off, off done

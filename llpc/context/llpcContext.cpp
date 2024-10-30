@@ -40,7 +40,9 @@
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
+#include "llpcDialect.h"
 #include "llpcPipelineContext.h"
+#include "llpcRayTracingContext.h"
 #include "llpcTimerProfiler.h"
 #include "vkgcMetroHash.h"
 #include "gfxruntime/GfxRuntimeLibrary.h"
@@ -95,7 +97,7 @@ namespace Llpc {
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
   m_dialectContext =
       llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcRtqDialect, LgcCpsDialect,
-                                          LgcIlCpsDialect, continuations::ContinuationsDialect>(*this);
+                                          LgcIlCpsDialect, LlpcDialect, continuations::ContinuationsDialect>(*this);
 
   reset();
 }
@@ -222,25 +224,55 @@ void Context::setModuleTargetMachine(Module *module) {
 }
 
 // =====================================================================================================================
-// Ensure that a compatible GPURT library module is attached to this context via GpurtContext.
-void Context::ensureGpurtLibrary() {
+// Compute the GPURT key for the current pipeline context.
+GpurtKey Context::buildGpurtKey() {
   // Check whether we already have a GPURT library module that can be used
   const Vkgc::RtState *rtState = getPipelineContext()->getRayTracingState();
-  auto &gpurtContext = lgc::GpurtContext::get(*this);
   GpurtKey key = {};
+  key.rtipVersion = rtState->rtIpVersion;
   key.gpurtFeatureFlags = rtState->gpurtFeatureFlags; // gpurtFeatureFlags affect which GPURT library we're using
-  key.hwIntersectRay = rtState->bvhResDesc.dataSizeInDwords > 0;
+  key.bvhResDesc.resize(rtState->bvhResDesc.dataSizeInDwords);
+  std::copy(rtState->bvhResDesc.descriptorData,
+            rtState->bvhResDesc.descriptorData + rtState->bvhResDesc.dataSizeInDwords, key.bvhResDesc.begin());
 
-  if (gpurtContext.ownedTheModule && key != m_currentGpurtKey) {
-    gpurtContext.theModule = nullptr;
-    gpurtContext.ownedTheModule.reset();
+  if (getPipelineType() == PipelineType::RayTracing) {
+    auto &rtContext = *static_cast<RayTracingContext *>(getPipelineContext());
+    const auto &rtPipelineBuildInfo = *rtContext.getRayTracingPipelineBuildInfo();
+    key.rtPipeline.valid = true;
+    key.rtPipeline.cpsFlags = rtPipelineBuildInfo.cpsFlags;
+    key.rtPipeline.options.resize(rtPipelineBuildInfo.gpurtOptionCount);
+    std::copy(rtPipelineBuildInfo.pGpurtOptions,
+              rtPipelineBuildInfo.pGpurtOptions + rtPipelineBuildInfo.gpurtOptionCount, key.rtPipeline.options.begin());
+
+    // Use a stable sort so that if an option is supplied multiple times, the last occurrence is guaranteed to win.
+    llvm::stable_sort(key.rtPipeline.options, [](const Vkgc::GpurtOption &lhs, const Vkgc::GpurtOption &rhs) {
+      return lhs.nameHash < rhs.nameHash;
+    });
   }
 
-  if (gpurtContext.theModule)
-    return;
+  return key;
+}
 
-  // Create the GPURT library module
-  m_currentGpurtKey = key;
+// =====================================================================================================================
+// Ensure that a compatible GPURT library module is attached to this context via GpurtContext.
+void Context::ensureGpurtLibrary() {
+  const Vkgc::RtState *rtState = getPipelineContext()->getRayTracingState();
+  auto &gpurtContext = lgc::GpurtContext::get(*this);
+
+  {
+    GpurtKey key = buildGpurtKey();
+
+    if (gpurtContext.ownedTheModule && !m_currentGpurtKey.refines(key)) {
+      gpurtContext.theModule = nullptr;
+      gpurtContext.ownedTheModule.reset();
+    }
+
+    if (gpurtContext.theModule)
+      return;
+
+    // Create the GPURT library module
+    m_currentGpurtKey = std::move(key);
+  }
 
   ShaderModuleData moduleData = {};
   moduleData.binCode = rtState->gpurtShaderLibrary;
@@ -257,7 +289,8 @@ void Context::ensureGpurtLibrary() {
   shaderInfo.pModuleData = &moduleData;
 
   // Disable fast math contract on OpDot when there is no hardware intersectRay
-  shaderInfo.options.noContractOpDot = !key.hwIntersectRay;
+  bool hwIntersectRay = !m_currentGpurtKey.bvhResDesc.empty();
+  shaderInfo.options.noContractOpDot = !hwIntersectRay;
 
   auto gpurt = std::make_unique<Module>("_cs_", *this);
   setModuleTargetMachine(gpurt.get());
@@ -277,7 +310,7 @@ void Context::ensureGpurtLibrary() {
   }
 
   lowerPassMgr->addPass(LowerCfgMerges());
-  lowerPassMgr->addPass(ProcessGpuRtLibrary());
+  lowerPassMgr->addPass(ProcessGpuRtLibrary(m_currentGpurtKey));
   lowerPassMgr->addPass(AlwaysInlinerPass());
   lowerPassMgr->addPass(LowerAccessChain());
   lowerPassMgr->addPass(LowerGlobals());

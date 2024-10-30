@@ -15,10 +15,11 @@ declare void @lgc.cps.jump(...)
 ; REPORT-CONT-SIZES: Continuation state size of "RayGen" (raygeneration): 108 bytes
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "RayGen" (raygeneration): 7 and 6 dwords
 define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
-  %csp = alloca i32, align 4
+  %ptr = alloca i32, align 4
   %cspInit = call i32 @continuation.initialContinuationStackPtr()
-  store i32 %cspInit, i32* %csp
-  call void (...) @lgc.cps.jump(i64 2, i32 poison, {} poison, i64 poison), !continuation.registercount !6
+  store i32 %cspInit, i32* %ptr
+  %csp = load i32, ptr %ptr, align 4
+  call void (...) @lgc.cps.jump(i64 2, i32 poison, {} poison, i32 %csp, i64 poison), !continuation.registercount !6
   ret void
 }
 
@@ -32,7 +33,7 @@ define void @RayGen.resume.0(i64 %0, { %struct.DispatchSystemData } %1) !continu
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "CHS" (closesthit): 8 and 9 dwords
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "CHS" (closesthit) is "struct.CHSSystemData", size: 400 bytes
 define void @CHS(i64 %returnAddr, %struct.CHSSystemData %0) !continuation !14 !continuation.registercount !8 !lgc.rt.shaderstage !13 {
-  call void ( ...) @lgc.cps.jump(i64 2, i32 poison, {} poison, i64 poison), !continuation.registercount !9
+  call void ( ...) @lgc.cps.jump(i64 2, i32 poison, {} poison, i32 poison, i64 poison), !continuation.registercount !9
   ret void
 }
 

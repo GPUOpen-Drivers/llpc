@@ -111,7 +111,7 @@ int main(int argc, char **argv) {
       if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
         if (CInst->isCallee(&Use)) {
           // Change call target to other module
-          Use = targetF;
+          CInst->setCalledFunction(targetF);
 
           inliner.inlineCall(*CInst);
         }

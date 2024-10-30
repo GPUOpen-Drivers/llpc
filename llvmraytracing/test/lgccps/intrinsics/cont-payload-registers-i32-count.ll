@@ -7,6 +7,7 @@
 ; Need _cont_ReportHit to get system data type
 declare !pointeetys !6 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
+declare !pointeetys !10 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 declare i64 @_AmdGetCurrentFuncAddr()
@@ -24,13 +25,13 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-NEXT:    store { { i32 } } [[SYSTEM_DATA]], ptr addrspace(5) [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 11, ptr @debug_global, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load [11 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 -1, {} poison, i32 poison, i32 5, [42 x i32] poison, [11 x i32] [[TMP0]]), !continuation.registercount [[META1:![0-9]+]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 -1, {} poison, i32 poison, i32 poison, i32 5, [42 x i32] poison, [11 x i32] [[TMP0]]), !continuation.registercount [[META1:![0-9]+]]
 ; CHECK-NEXT:    unreachable
 ;
 .entry:
   %val = call i32 @_AmdContPayloadRegistersI32Count()
   store i32 %val, i32* @debug_global, align 4
-  call void (...) @lgc.cps.jump(i32 4, i32 -1, {} poison, i32 poison, i32 5)
+  call void (...) @lgc.cps.jump(i32 4, i32 -1, {} poison, i32 poison, i32 poison, i32 5)
   unreachable
 }
 

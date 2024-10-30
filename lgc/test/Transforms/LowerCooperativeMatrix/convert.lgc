@@ -9,9 +9,9 @@ define <8 x float> @convert_f16_to_accumulator(<8 x float> %fact) {
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[TMP3]], 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast <8 x float> [[FACT:%.*]] to <8 x i32>
 ; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[TMP4]], <8 x i32> zeroinitializer, <8 x i32> <i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16>
-; CHECK-NEXT:    [[RESHAPE16BIT:%.*]] = lshr <8 x i32> [[TMP5]], [[TMP6]]
-; CHECK-NEXT:    [[RESHAPE16BIT1:%.*]] = bitcast <8 x i32> [[RESHAPE16BIT]] to <8 x float>
-; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <8 x float> [[RESHAPE16BIT1]], <8 x float> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+; CHECK-NEXT:    [[ACCUM1:%.*]] = lshr <8 x i32> [[TMP5]], [[TMP6]]
+; CHECK-NEXT:    [[ACCUM2:%.*]] = bitcast <8 x i32> [[ACCUM1]] to <8 x float>
+; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <8 x float> [[ACCUM2]], <8 x float> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
 ; CHECK-NEXT:    ret <8 x float> [[TMP7]]
 ;
   %accum = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 0, <8 x float> %fact, i32 1, i32 1, i32 0, i32 1)
@@ -28,28 +28,28 @@ define <8 x float> @convert_f16_to_factor(<8 x float> %accum) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = shufflevector <8 x i32> [[TMP2]], <8 x i32> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
 ; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <8 x i32> [[TMP6]], i64 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <8 x i32> [[TMP6]], i64 0
-; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP7]], i32 [[TMP8]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP7]], i32 [[TMP8]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <8 x i32> [[TMP6]], i64 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <8 x i32> [[TMP6]], i64 1
-; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP10]], i32 [[TMP11]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP10]], i32 [[TMP11]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <8 x i32> [[TMP6]], i64 2
 ; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <8 x i32> [[TMP6]], i64 2
-; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP13]], i32 [[TMP14]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP15:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP13]], i32 [[TMP14]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <8 x i32> [[TMP6]], i64 3
 ; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <8 x i32> [[TMP6]], i64 3
-; CHECK-NEXT:    [[TMP18:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP16]], i32 [[TMP17]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP18:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP16]], i32 [[TMP17]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <8 x i32> [[TMP6]], i64 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <8 x i32> [[TMP6]], i64 4
-; CHECK-NEXT:    [[TMP21:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP19]], i32 [[TMP20]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP21:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP19]], i32 [[TMP20]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <8 x i32> [[TMP6]], i64 5
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <8 x i32> [[TMP6]], i64 5
-; CHECK-NEXT:    [[TMP24:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP22]], i32 [[TMP23]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP24:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP22]], i32 [[TMP23]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <8 x i32> [[TMP6]], i64 6
 ; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <8 x i32> [[TMP6]], i64 6
-; CHECK-NEXT:    [[TMP27:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP25]], i32 [[TMP26]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP27:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP25]], i32 [[TMP26]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <8 x i32> [[TMP6]], i64 7
 ; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <8 x i32> [[TMP6]], i64 7
-; CHECK-NEXT:    [[TMP30:%.*]] = call i32 @llvm.amdgcn.permlanex16{{(.i32)?}}(i32 [[TMP28]], i32 [[TMP29]], i32 1985229328, i32 -19088744, i1 false, i1 false)
+; CHECK-NEXT:    [[TMP30:%.*]] = call i32 @llvm.amdgcn.permlanex16.i32(i32 [[TMP28]], i32 [[TMP29]], i32 1985229328, i32 -19088744, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <8 x i32> poison, i32 [[TMP9]], i64 0
 ; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <8 x i32> [[TMP31]], i32 [[TMP12]], i64 1
 ; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <8 x i32> [[TMP32]], i32 [[TMP15]], i64 2
@@ -86,6 +86,193 @@ define <8 x i32> @convert_f16_to_bf16(<8 x float> %acc) {
   ret <8 x i32> %fConvert
 }
 
+define <8 x float> @convert_u4_to_f16(<2 x i32> %load) {
+; CHECK-LABEL: @convert_u4_to_f16(
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast <2 x i32> [[LOAD:%.*]] to <8 x i8>
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <8 x i8> [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i8 [[TMP3]], 15
+; CHECK-NEXT:    [[TMP5:%.*]] = lshr i8 [[TMP3]], 4
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <8 x i8> [[TMP2]], i64 1
+; CHECK-NEXT:    [[TMP7:%.*]] = and i8 [[TMP6]], 15
+; CHECK-NEXT:    [[TMP8:%.*]] = lshr i8 [[TMP6]], 4
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <8 x i8> [[TMP2]], i64 2
+; CHECK-NEXT:    [[TMP10:%.*]] = and i8 [[TMP9]], 15
+; CHECK-NEXT:    [[TMP11:%.*]] = lshr i8 [[TMP9]], 4
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <8 x i8> [[TMP2]], i64 3
+; CHECK-NEXT:    [[TMP13:%.*]] = and i8 [[TMP12]], 15
+; CHECK-NEXT:    [[TMP14:%.*]] = lshr i8 [[TMP12]], 4
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <8 x i8> [[TMP2]], i64 4
+; CHECK-NEXT:    [[TMP16:%.*]] = and i8 [[TMP15]], 15
+; CHECK-NEXT:    [[TMP17:%.*]] = lshr i8 [[TMP15]], 4
+; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <8 x i8> [[TMP2]], i64 5
+; CHECK-NEXT:    [[TMP19:%.*]] = and i8 [[TMP18]], 15
+; CHECK-NEXT:    [[TMP20:%.*]] = lshr i8 [[TMP18]], 4
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <8 x i8> [[TMP2]], i64 6
+; CHECK-NEXT:    [[TMP22:%.*]] = and i8 [[TMP21]], 15
+; CHECK-NEXT:    [[TMP23:%.*]] = lshr i8 [[TMP21]], 4
+; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <8 x i8> [[TMP2]], i64 7
+; CHECK-NEXT:    [[TMP25:%.*]] = and i8 [[TMP24]], 15
+; CHECK-NEXT:    [[TMP26:%.*]] = lshr i8 [[TMP24]], 4
+; CHECK-NEXT:    [[TMP27:%.*]] = uitofp i8 [[TMP4]] to half
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x half> poison, half [[TMP27]], i64 0
+; CHECK-NEXT:    [[TMP29:%.*]] = uitofp i8 [[TMP5]] to half
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x half> [[TMP28]], half [[TMP29]], i64 1
+; CHECK-NEXT:    [[TMP31:%.*]] = uitofp i8 [[TMP7]] to half
+; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x half> [[TMP30]], half [[TMP31]], i64 2
+; CHECK-NEXT:    [[TMP33:%.*]] = uitofp i8 [[TMP8]] to half
+; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <16 x half> [[TMP32]], half [[TMP33]], i64 3
+; CHECK-NEXT:    [[TMP35:%.*]] = uitofp i8 [[TMP10]] to half
+; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <16 x half> [[TMP34]], half [[TMP35]], i64 4
+; CHECK-NEXT:    [[TMP37:%.*]] = uitofp i8 [[TMP11]] to half
+; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <16 x half> [[TMP36]], half [[TMP37]], i64 5
+; CHECK-NEXT:    [[TMP39:%.*]] = uitofp i8 [[TMP13]] to half
+; CHECK-NEXT:    [[TMP40:%.*]] = insertelement <16 x half> [[TMP38]], half [[TMP39]], i64 6
+; CHECK-NEXT:    [[TMP41:%.*]] = uitofp i8 [[TMP14]] to half
+; CHECK-NEXT:    [[TMP42:%.*]] = insertelement <16 x half> [[TMP40]], half [[TMP41]], i64 7
+; CHECK-NEXT:    [[TMP43:%.*]] = uitofp i8 [[TMP16]] to half
+; CHECK-NEXT:    [[TMP44:%.*]] = insertelement <16 x half> [[TMP42]], half [[TMP43]], i64 8
+; CHECK-NEXT:    [[TMP45:%.*]] = uitofp i8 [[TMP17]] to half
+; CHECK-NEXT:    [[TMP46:%.*]] = insertelement <16 x half> [[TMP44]], half [[TMP45]], i64 9
+; CHECK-NEXT:    [[TMP47:%.*]] = uitofp i8 [[TMP19]] to half
+; CHECK-NEXT:    [[TMP48:%.*]] = insertelement <16 x half> [[TMP46]], half [[TMP47]], i64 10
+; CHECK-NEXT:    [[TMP49:%.*]] = uitofp i8 [[TMP20]] to half
+; CHECK-NEXT:    [[TMP50:%.*]] = insertelement <16 x half> [[TMP48]], half [[TMP49]], i64 11
+; CHECK-NEXT:    [[TMP51:%.*]] = uitofp i8 [[TMP22]] to half
+; CHECK-NEXT:    [[TMP52:%.*]] = insertelement <16 x half> [[TMP50]], half [[TMP51]], i64 12
+; CHECK-NEXT:    [[TMP53:%.*]] = uitofp i8 [[TMP23]] to half
+; CHECK-NEXT:    [[TMP54:%.*]] = insertelement <16 x half> [[TMP52]], half [[TMP53]], i64 13
+; CHECK-NEXT:    [[TMP55:%.*]] = uitofp i8 [[TMP25]] to half
+; CHECK-NEXT:    [[TMP56:%.*]] = insertelement <16 x half> [[TMP54]], half [[TMP55]], i64 14
+; CHECK-NEXT:    [[TMP57:%.*]] = uitofp i8 [[TMP26]] to half
+; CHECK-NEXT:    [[TMP58:%.*]] = insertelement <16 x half> [[TMP56]], half [[TMP57]], i64 15
+; CHECK-NEXT:    [[TMP59:%.*]] = bitcast <16 x half> [[TMP58]] to <8 x float>
+; CHECK-NEXT:    ret <8 x float> [[TMP59]]
+;
+  %convert = call <8 x float> (...) @lgc.cooperative.matrix.convert__v8f32(i32 43, <2 x i32> %load, i32 10, i32 1, i32 0, i32 0)
+  ret <8 x float> %convert
+}
+
+define <2 x i32> @convert_u8_to_u4(<4 x i32> %load) {
+; CHECK-LABEL: @convert_u8_to_u4(
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast <4 x i32> [[LOAD:%.*]] to <16 x i8>
+; CHECK-NEXT:    [[TMP3:%.*]] = extractelement <16 x i8> [[TMP2]], i64 0
+; CHECK-NEXT:    [[TMP4:%.*]] = and i8 [[TMP3]], 15
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <16 x i8> [[TMP2]], i64 1
+; CHECK-NEXT:    [[TMP6:%.*]] = shl i8 [[TMP5]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <16 x i8> [[TMP2]], i64 2
+; CHECK-NEXT:    [[TMP8:%.*]] = and i8 [[TMP7]], 15
+; CHECK-NEXT:    [[TMP9:%.*]] = extractelement <16 x i8> [[TMP2]], i64 3
+; CHECK-NEXT:    [[TMP10:%.*]] = shl i8 [[TMP9]], 4
+; CHECK-NEXT:    [[TMP11:%.*]] = extractelement <16 x i8> [[TMP2]], i64 4
+; CHECK-NEXT:    [[TMP12:%.*]] = and i8 [[TMP11]], 15
+; CHECK-NEXT:    [[TMP13:%.*]] = extractelement <16 x i8> [[TMP2]], i64 5
+; CHECK-NEXT:    [[TMP14:%.*]] = shl i8 [[TMP13]], 4
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <16 x i8> [[TMP2]], i64 6
+; CHECK-NEXT:    [[TMP16:%.*]] = and i8 [[TMP15]], 15
+; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <16 x i8> [[TMP2]], i64 7
+; CHECK-NEXT:    [[TMP18:%.*]] = shl i8 [[TMP17]], 4
+; CHECK-NEXT:    [[TMP19:%.*]] = extractelement <16 x i8> [[TMP2]], i64 8
+; CHECK-NEXT:    [[TMP20:%.*]] = and i8 [[TMP19]], 15
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <16 x i8> [[TMP2]], i64 9
+; CHECK-NEXT:    [[TMP22:%.*]] = shl i8 [[TMP21]], 4
+; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <16 x i8> [[TMP2]], i64 10
+; CHECK-NEXT:    [[TMP24:%.*]] = and i8 [[TMP23]], 15
+; CHECK-NEXT:    [[TMP25:%.*]] = extractelement <16 x i8> [[TMP2]], i64 11
+; CHECK-NEXT:    [[TMP26:%.*]] = shl i8 [[TMP25]], 4
+; CHECK-NEXT:    [[TMP27:%.*]] = extractelement <16 x i8> [[TMP2]], i64 12
+; CHECK-NEXT:    [[TMP28:%.*]] = and i8 [[TMP27]], 15
+; CHECK-NEXT:    [[TMP29:%.*]] = extractelement <16 x i8> [[TMP2]], i64 13
+; CHECK-NEXT:    [[TMP30:%.*]] = shl i8 [[TMP29]], 4
+; CHECK-NEXT:    [[TMP31:%.*]] = extractelement <16 x i8> [[TMP2]], i64 14
+; CHECK-NEXT:    [[TMP32:%.*]] = and i8 [[TMP31]], 15
+; CHECK-NEXT:    [[TMP33:%.*]] = extractelement <16 x i8> [[TMP2]], i64 15
+; CHECK-NEXT:    [[TMP34:%.*]] = shl i8 [[TMP33]], 4
+; CHECK-NEXT:    [[TMP35:%.*]] = or i8 [[TMP4]], [[TMP6]]
+; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <8 x i8> poison, i8 [[TMP35]], i64 0
+; CHECK-NEXT:    [[TMP37:%.*]] = or i8 [[TMP8]], [[TMP10]]
+; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <8 x i8> [[TMP36]], i8 [[TMP37]], i64 1
+; CHECK-NEXT:    [[TMP39:%.*]] = or i8 [[TMP12]], [[TMP14]]
+; CHECK-NEXT:    [[TMP40:%.*]] = insertelement <8 x i8> [[TMP38]], i8 [[TMP39]], i64 2
+; CHECK-NEXT:    [[TMP41:%.*]] = or i8 [[TMP16]], [[TMP18]]
+; CHECK-NEXT:    [[TMP42:%.*]] = insertelement <8 x i8> [[TMP40]], i8 [[TMP41]], i64 3
+; CHECK-NEXT:    [[TMP43:%.*]] = or i8 [[TMP20]], [[TMP22]]
+; CHECK-NEXT:    [[TMP44:%.*]] = insertelement <8 x i8> [[TMP42]], i8 [[TMP43]], i64 4
+; CHECK-NEXT:    [[TMP45:%.*]] = or i8 [[TMP24]], [[TMP26]]
+; CHECK-NEXT:    [[TMP46:%.*]] = insertelement <8 x i8> [[TMP44]], i8 [[TMP45]], i64 5
+; CHECK-NEXT:    [[TMP47:%.*]] = or i8 [[TMP28]], [[TMP30]]
+; CHECK-NEXT:    [[TMP48:%.*]] = insertelement <8 x i8> [[TMP46]], i8 [[TMP47]], i64 6
+; CHECK-NEXT:    [[TMP49:%.*]] = or i8 [[TMP32]], [[TMP34]]
+; CHECK-NEXT:    [[TMP50:%.*]] = insertelement <8 x i8> [[TMP48]], i8 [[TMP49]], i64 7
+; CHECK-NEXT:    [[TMP51:%.*]] = bitcast <8 x i8> [[TMP50]] to <2 x i32>
+; CHECK-NEXT:    ret <2 x i32> [[TMP51]]
+;
+  %u4Convert = call <2 x i32> (...) @lgc.cooperative.matrix.convert__v2i32(i32 38, <4 x i32> %load, i32 3, i32 10, i32 0, i32 0)
+  ret <2 x i32> %u4Convert
+}
+
+define <2 x i32> @convert_fp16_to_i4(<8 x i32> %load) {
+; CHECK-LABEL: @convert_fp16_to_i4(
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast <8 x i32> [[LOAD:%.*]] to <16 x half>
+; CHECK-NEXT:    [[CONVERTINTOINT32:%.*]] = fptosi <16 x half> [[TMP2]] to <16 x i32>
+; CHECK-NEXT:    [[TMP3:%.*]] = trunc <16 x i32> [[CONVERTINTOINT32]] to <16 x i8>
+; CHECK-NEXT:    [[TMP4:%.*]] = extractelement <16 x i8> [[TMP3]], i64 0
+; CHECK-NEXT:    [[TMP5:%.*]] = and i8 [[TMP4]], 15
+; CHECK-NEXT:    [[TMP6:%.*]] = extractelement <16 x i8> [[TMP3]], i64 1
+; CHECK-NEXT:    [[TMP7:%.*]] = shl i8 [[TMP6]], 4
+; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <16 x i8> [[TMP3]], i64 2
+; CHECK-NEXT:    [[TMP9:%.*]] = and i8 [[TMP8]], 15
+; CHECK-NEXT:    [[TMP10:%.*]] = extractelement <16 x i8> [[TMP3]], i64 3
+; CHECK-NEXT:    [[TMP11:%.*]] = shl i8 [[TMP10]], 4
+; CHECK-NEXT:    [[TMP12:%.*]] = extractelement <16 x i8> [[TMP3]], i64 4
+; CHECK-NEXT:    [[TMP13:%.*]] = and i8 [[TMP12]], 15
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <16 x i8> [[TMP3]], i64 5
+; CHECK-NEXT:    [[TMP15:%.*]] = shl i8 [[TMP14]], 4
+; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <16 x i8> [[TMP3]], i64 6
+; CHECK-NEXT:    [[TMP17:%.*]] = and i8 [[TMP16]], 15
+; CHECK-NEXT:    [[TMP18:%.*]] = extractelement <16 x i8> [[TMP3]], i64 7
+; CHECK-NEXT:    [[TMP19:%.*]] = shl i8 [[TMP18]], 4
+; CHECK-NEXT:    [[TMP20:%.*]] = extractelement <16 x i8> [[TMP3]], i64 8
+; CHECK-NEXT:    [[TMP21:%.*]] = and i8 [[TMP20]], 15
+; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <16 x i8> [[TMP3]], i64 9
+; CHECK-NEXT:    [[TMP23:%.*]] = shl i8 [[TMP22]], 4
+; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <16 x i8> [[TMP3]], i64 10
+; CHECK-NEXT:    [[TMP25:%.*]] = and i8 [[TMP24]], 15
+; CHECK-NEXT:    [[TMP26:%.*]] = extractelement <16 x i8> [[TMP3]], i64 11
+; CHECK-NEXT:    [[TMP27:%.*]] = shl i8 [[TMP26]], 4
+; CHECK-NEXT:    [[TMP28:%.*]] = extractelement <16 x i8> [[TMP3]], i64 12
+; CHECK-NEXT:    [[TMP29:%.*]] = and i8 [[TMP28]], 15
+; CHECK-NEXT:    [[TMP30:%.*]] = extractelement <16 x i8> [[TMP3]], i64 13
+; CHECK-NEXT:    [[TMP31:%.*]] = shl i8 [[TMP30]], 4
+; CHECK-NEXT:    [[TMP32:%.*]] = extractelement <16 x i8> [[TMP3]], i64 14
+; CHECK-NEXT:    [[TMP33:%.*]] = and i8 [[TMP32]], 15
+; CHECK-NEXT:    [[TMP34:%.*]] = extractelement <16 x i8> [[TMP3]], i64 15
+; CHECK-NEXT:    [[TMP35:%.*]] = shl i8 [[TMP34]], 4
+; CHECK-NEXT:    [[TMP36:%.*]] = or i8 [[TMP5]], [[TMP7]]
+; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <8 x i8> poison, i8 [[TMP36]], i64 0
+; CHECK-NEXT:    [[TMP38:%.*]] = or i8 [[TMP9]], [[TMP11]]
+; CHECK-NEXT:    [[TMP39:%.*]] = insertelement <8 x i8> [[TMP37]], i8 [[TMP38]], i64 1
+; CHECK-NEXT:    [[TMP40:%.*]] = or i8 [[TMP13]], [[TMP15]]
+; CHECK-NEXT:    [[TMP41:%.*]] = insertelement <8 x i8> [[TMP39]], i8 [[TMP40]], i64 2
+; CHECK-NEXT:    [[TMP42:%.*]] = or i8 [[TMP17]], [[TMP19]]
+; CHECK-NEXT:    [[TMP43:%.*]] = insertelement <8 x i8> [[TMP41]], i8 [[TMP42]], i64 3
+; CHECK-NEXT:    [[TMP44:%.*]] = or i8 [[TMP21]], [[TMP23]]
+; CHECK-NEXT:    [[TMP45:%.*]] = insertelement <8 x i8> [[TMP43]], i8 [[TMP44]], i64 4
+; CHECK-NEXT:    [[TMP46:%.*]] = or i8 [[TMP25]], [[TMP27]]
+; CHECK-NEXT:    [[TMP47:%.*]] = insertelement <8 x i8> [[TMP45]], i8 [[TMP46]], i64 5
+; CHECK-NEXT:    [[TMP48:%.*]] = or i8 [[TMP29]], [[TMP31]]
+; CHECK-NEXT:    [[TMP49:%.*]] = insertelement <8 x i8> [[TMP47]], i8 [[TMP48]], i64 6
+; CHECK-NEXT:    [[TMP50:%.*]] = or i8 [[TMP33]], [[TMP35]]
+; CHECK-NEXT:    [[TMP51:%.*]] = insertelement <8 x i8> [[TMP49]], i8 [[TMP50]], i64 7
+; CHECK-NEXT:    [[TMP52:%.*]] = bitcast <8 x i8> [[TMP51]] to <2 x i32>
+; CHECK-NEXT:    ret <2 x i32> [[TMP52]]
+;
+  %u4Convert = call <2 x i32> (...) @lgc.cooperative.matrix.convert__v2i32(i32 42, <8 x i32> %load, i32 1, i32 10, i32 0, i32 0)
+  ret <2 x i32> %u4Convert
+}
+
 declare i1 @getcc()
 declare <8 x float> @process1(<8 x float>)
 
@@ -93,4 +280,6 @@ declare <8 x float> @lgc.cooperative.matrix.load__v8f32(...)
 declare <8 x float> @lgc.cooperative.matrix.transpose__v8f32(...)
 declare <8 x float> @lgc.cooperative.matrix.convert__v8f32(...)
 declare <8 x i32> @lgc.cooperative.matrix.convert__v8i32(...)
+declare <8 x float> @lgc.cooperative.matrix.convert_v8i32(...)
+declare <2 x i32> @lgc.cooperative.matrix.convert__v2i32(...)
 declare void @lgc.cooperative.matrix.store(...)

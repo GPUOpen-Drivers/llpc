@@ -96,63 +96,83 @@ llvm::PreservedAnalyses ValueSpecializationTestPass::run(llvm::Module &Module,
   if (!SpecializeFunc)
     return PreservedAnalyses::all();
 
+  // First collect all specialization requests grouped by BB (because we re-use the specializer per BB),
+  // then remove all specialization intrinsic calls, then do the actual specialization.
+  struct BBInfo {
+    SmallVector<ValueSpecializationInfo> SpecializationRequests;
+  };
+  SmallVector<BBInfo> SpecializationRequestsByBB;
+
   SmallVector<CallInst *> ToBeDeleted;
+
   for (auto &F : Module) {
     for (auto &BB : F) {
-      // Use one specialize per BB, and re-use insertion points.
-      ValueSpecializer VS(Module);
-
+      SpecializationRequestsByBB.push_back({});
       for (auto &Inst : BB) {
         auto *CI = dyn_cast<CallInst>(&Inst);
         if (!CI || CI->getCalledOperand() != SpecializeFunc) {
           continue;
         }
         ToBeDeleted.push_back(CI);
-
-        ValueSpecializationInfo VSI = parseSpecializeCall(*CI);
-        bool ReplaceUses = true;
-        bool PreserveInsertionPoint = true;
-        const auto [Replacement, NumReplacedDwords] =
-            VS.replaceDwords(VSI.Val, VSI.DwordInfos, ReplaceUses, PreserveInsertionPoint);
-
-        if (!(VSI.Flags & TestFlags::AllowFailure) && NumReplacedDwords != VSI.NumToBeReplacedDwords)
-          report_fatal_error("Less than expected replacements");
-        if (NumReplacedDwords != 0 && Replacement == nullptr)
-          report_fatal_error("Missing replacement result");
-
-        if (Replacement && !(VSI.Flags & TestFlags::SkipValueTrackingCheck)) {
-          // Run value tracking analysis on the replacement result, and check that it matches the requested replacements
-          ValueOriginTracker VOT{Module.getDataLayout(), 4, 256};
-          const ValueTracking::ValueInfo VI = VOT.getValueInfo(Replacement);
-          if (VI.Slices.size() != VSI.DwordInfos.size())
-            report_fatal_error("Size mismatch");
-          for (unsigned DwordIdx = 0; DwordIdx < VI.Slices.size(); ++DwordIdx) {
-            const ValueTracking::SliceInfo &SI = VI.Slices[DwordIdx];
-            const ValueSpecializer::DwordSpecializationInfo &DSI = VSI.DwordInfos[DwordIdx];
-            if (DSI.Kind == ValueSpecializer::SpecializationKind::Constant) {
-              if (SI.Status != ValueTracking::SliceStatus::Constant || SI.ConstantValue != DSI.ConstantValue)
-                report_fatal_error("Failed constant specialization");
-            }
-            if (DSI.Kind == ValueSpecializer::SpecializationKind::FrozenPoison) {
-              if (SI.Status != ValueTracking::SliceStatus::UndefOrPoison)
-                report_fatal_error("Failed frozen poison specialization");
-            }
-          }
-        }
-
-        dbgs() << "[VS]: Replaced " << NumReplacedDwords << " dwords in ";
-        VSI.Val->printAsOperand(dbgs());
-        if (Replacement) {
-          dbgs() << ", replaced by ";
-          Replacement->printAsOperand(dbgs());
-        }
-        dbgs() << "\n";
+        SpecializationRequestsByBB.back().SpecializationRequests.push_back(parseSpecializeCall(*CI));
       }
     }
   }
 
   for (auto *CI : ToBeDeleted)
     CI->eraseFromParent();
+
+  for (const auto &BBInfo : SpecializationRequestsByBB) {
+    // Use one specializer per BB, and re-use insertion points.
+    ValueSpecializer VS(Module);
+
+    for (const auto &VSI : BBInfo.SpecializationRequests) {
+      bool ReplaceUses = true;
+      bool PreserveInsertionPoint = true;
+      const auto [Replacement, NumReplacedDwords] =
+          VS.replaceDwords(VSI.Val, VSI.DwordInfos, ReplaceUses, PreserveInsertionPoint);
+
+      if (!(VSI.Flags & TestFlags::AllowFailure) && NumReplacedDwords != VSI.NumToBeReplacedDwords)
+        report_fatal_error("Less than expected replacements");
+      if (NumReplacedDwords != 0 && Replacement == nullptr)
+        report_fatal_error("Missing replacement result");
+
+      if (Replacement && !(VSI.Flags & TestFlags::SkipValueTrackingCheck)) {
+        // Run value tracking analysis on the replacement result, and check that it matches the requested replacements
+        // Use Forward freeze handling mode. This is the most relaxed one and helps avoiding mismatches
+        // caused by conservative analysis of freeze.
+        ValueOriginTracker::Options Opts{};
+        Opts.FreezeMode = ValueOriginTracker::Options::FreezeHandlingMode::Forward;
+        Opts.MaxBytesPerValue = 256;
+        Opts.BytesPerSlice = 4;
+        ValueOriginTracker VOT{Module.getDataLayout(), Opts};
+        const ValueTracking::ValueInfo VI = VOT.getValueInfo(Replacement);
+        if (VI.Slices.size() != VSI.DwordInfos.size())
+          report_fatal_error("Size mismatch");
+        for (unsigned DwordIdx = 0; DwordIdx < VI.Slices.size(); ++DwordIdx) {
+          const ValueTracking::SliceInfo &SI = VI.Slices[DwordIdx];
+          const ValueSpecializer::DwordSpecializationInfo &DSI = VSI.DwordInfos[DwordIdx];
+          if (DSI.Kind == ValueSpecializer::SpecializationKind::Constant) {
+            if (SI.Status != ValueTracking::SliceStatus::Constant || SI.ConstantValue != DSI.ConstantValue)
+              report_fatal_error("Failed constant specialization");
+          }
+          if (DSI.Kind == ValueSpecializer::SpecializationKind::FrozenPoison) {
+            if (SI.Status != ValueTracking::SliceStatus::UndefOrPoison) {
+              report_fatal_error("Failed frozen poison specialization");
+            }
+          }
+        }
+      }
+
+      dbgs() << "[VS]: Replaced " << NumReplacedDwords << " dwords in ";
+      VSI.Val->printAsOperand(dbgs());
+      if (Replacement) {
+        dbgs() << ", replaced by ";
+        Replacement->printAsOperand(dbgs());
+      }
+      dbgs() << "\n";
+    }
+  }
 
   return PreservedAnalyses::none();
 }

@@ -98,7 +98,9 @@ using Vkgc::StaticDescriptorValue;
 using Vkgc::WaveBreakSize;
 
 static const unsigned MaxViewports = 16;
+
 static const char VkIcdName[] = "amdvlk";
+static const char VkCompilerName[] = "amdllpc";
 
 /// Represents per shader module options.
 struct ShaderModuleOptions {

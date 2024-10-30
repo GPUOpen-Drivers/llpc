@@ -24,7 +24,6 @@ add_llvm_library(LLVMRaytracing
   lib/DXILSupport.cpp
   lib/GpurtContext.cpp
   lib/GpurtDialect.cpp
-  lib/LegacyCleanupContinuations.cpp
   lib/ContinuationsStatsReport.cpp
   lib/LgcCpsDialect.cpp
   lib/LgcCpsJumpInliner.cpp
@@ -38,6 +37,7 @@ add_llvm_library(LLVMRaytracing
   lib/PipelineState.cpp
   lib/PayloadAccessQualifiers.cpp
   lib/RemoveTypesMetadata.cpp
+  lib/SpecializeDriverShaders.cpp
 
   DEPENDS
   intrinsics_gen

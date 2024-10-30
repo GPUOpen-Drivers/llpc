@@ -78,6 +78,7 @@ static void setGfx10BaseInfo(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().waveSize = 64;
 
   targetInfo->getGpuProperty().numShaderEngines = 4;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 10;
   targetInfo->getGpuProperty().maxSgprsAvailable = 104;
   targetInfo->getGpuProperty().maxVgprsAvailable = 256;
 
@@ -91,20 +92,14 @@ static void setGfx10BaseInfo(TargetInfo *targetInfo) {
   // TODO: Accept gsOnChipDefaultPrimsPerSubgroup from panel option
   targetInfo->getGpuProperty().gsOnChipDefaultPrimsPerSubgroup = 64;
 
-  targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 4096;
-
-  // TODO: Accept gsOnChipDefaultLdsSizePerSubgroup from panel option
-  targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192;
-
   targetInfo->getGpuProperty().ldsSizePerThreadGroup = 16384;
 
   targetInfo->getGpuProperty().maxSgprsAvailable = 102;
   targetInfo->getGpuProperty().supportsDpp = true;
 
   targetInfo->getGpuProperty().maxUserDataCount = 32;
-  targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 0; // GFX9+ does not use this
+  targetInfo->getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup = 8192;
   targetInfo->getGpuProperty().tessFactorBufferSizePerSe = 8192;
-  targetInfo->getGpuProperty().numShaderEngines = 4;
   targetInfo->getGpuProperty().maxMsaaRasterizerSamples = 16;
 }
 
@@ -154,7 +149,6 @@ static void setGfx1010Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx10.waFixBadImageDescriptor = 1;
 }
 
-#if LLPC_BUILD_NAVI12
 // gfx1011
 //
 // @param [in/out] targetInfo : Target info
@@ -180,7 +174,6 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
 }
-#endif
 
 // gfx1012
 //
@@ -188,6 +181,7 @@ static void setGfx1011Info(TargetInfo *targetInfo) {
 static void setGfx1012Info(TargetInfo *targetInfo) {
   setGfx10Info(targetInfo);
 
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 14;
   targetInfo->getGpuProperty().supportsXnack = 1;
 
   targetInfo->getGpuWorkarounds().gfx10.waShaderInstPrefetch0 = 1;
@@ -251,6 +245,7 @@ static void setGfx1032Info(TargetInfo *targetInfo) {
   setGfx103Info(targetInfo);
 
   targetInfo->getGpuProperty().numShaderEngines = 2;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
   targetInfo->getGpuWorkarounds().gfx10.waClearWriteCompressBit = 1;
 }
 
@@ -262,9 +257,9 @@ static void setGfx1034Info(TargetInfo *targetInfo) {
   setGfx103Info(targetInfo);
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
 }
 
-#if LLPC_BUILD_REMBRANDT
 // gfx1035
 //
 // @param [in/out] targetInfo : Target info
@@ -273,11 +268,10 @@ static void setGfx1035Info(TargetInfo *targetInfo) {
   setGfx103Info(targetInfo);
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 6;
   targetInfo->getGpuWorkarounds().gfx10.waClearWriteCompressBit = 1;
 }
-#endif
 
-#if LLPC_BUILD_RAPHAEL || LLPC_BUILD_MENDOCINO
 // gfx1036
 //
 // @param [in/out] targetInfo : Target info
@@ -286,8 +280,8 @@ static void setGfx1036Info(TargetInfo *targetInfo) {
   setGfx103Info(targetInfo);
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 2;
 }
-#endif
 
 // gfx11
 //
@@ -313,9 +307,9 @@ static void setGfx1100Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
 
   targetInfo->getGpuProperty().numShaderEngines = 6;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
 }
 
-#if LLPC_BUILD_NAVI32
 // gfx1101
 //
 // @param [in/out] targetInfo : Target info
@@ -325,8 +319,8 @@ static void setGfx1101Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
 
   targetInfo->getGpuProperty().numShaderEngines = 3;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 10;
 }
-#endif
 
 // gfx1102
 //
@@ -338,9 +332,9 @@ static void setGfx1102Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
 
   targetInfo->getGpuProperty().numShaderEngines = 2;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
 }
 
-#if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
 // gfx1103
 //
 // @param [in/out] targetInfo : Target info
@@ -350,8 +344,8 @@ static void setGfx1103Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 6;
 }
-#endif
 
 #if LLPC_BUILD_STRIX1
 // gfx1150
@@ -363,6 +357,7 @@ static void setGfx1150Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
 }
 
 // gfx115F
@@ -374,6 +369,7 @@ static void setGfx115FInfo(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
 
   targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
 }
 #endif
 
@@ -386,29 +382,19 @@ struct GpuNameStringMap {
 
 // The supported device list
 static const GpuNameStringMap GpuNameMap[] = {
-    {"gfx1010", "Navi10", &setGfx1010Info}, // gfx1010
-#if LLPC_BUILD_NAVI12
-    {"gfx1011", "Navi12", &setGfx1011Info}, // gfx1011
-#endif
-    {"gfx1012", "Navi14", &setGfx1012Info}, // gfx1012
-    {"gfx1030", "Navi21", &setGfx1030Info}, // gfx1030
-    {"gfx1031", "Navi22", &setGfx1031Info}, // gfx1031
-    {"gfx1032", "Navi23", &setGfx1032Info}, // gfx1032
-    {"gfx1034", "Navi24", &setGfx1034Info}, // gfx1034
-#if LLPC_BUILD_REMBRANDT
+    {"gfx1010", "Navi10", &setGfx1010Info},    // gfx1010
+    {"gfx1011", "Navi12", &setGfx1011Info},    // gfx1011
+    {"gfx1012", "Navi14", &setGfx1012Info},    // gfx1012
+    {"gfx1030", "Navi21", &setGfx1030Info},    // gfx1030
+    {"gfx1031", "Navi22", &setGfx1031Info},    // gfx1031
+    {"gfx1032", "Navi23", &setGfx1032Info},    // gfx1032
+    {"gfx1034", "Navi24", &setGfx1034Info},    // gfx1034
     {"gfx1035", "Rembrandt", &setGfx1035Info}, // gfx1035
-#endif
-#if LLPC_BUILD_RAPHAEL || LLPC_BUILD_MENDOCINO
-    {"gfx1036", "Raphael", &setGfx1036Info}, // gfx1036
-#endif
-    {"gfx1100", "Navi31", &setGfx1100Info}, // gfx1100
-#if LLPC_BUILD_NAVI32
-    {"gfx1101", "Navi32", &setGfx1101Info}, // gfx1101
-#endif
-    {"gfx1102", "Navi33", &setGfx1102Info}, // gfx1102
-#if LLPC_BUILD_PHOENIX1 || LLPC_BUILD_PHOENIX2
-    {"gfx1103", "Phoenix1", &setGfx1103Info}, // gfx1103
-#endif
+    {"gfx1036", "Raphael", &setGfx1036Info},   // gfx1036
+    {"gfx1100", "Navi31", &setGfx1100Info},    // gfx1100
+    {"gfx1101", "Navi32", &setGfx1101Info},    // gfx1101
+    {"gfx1102", "Navi33", &setGfx1102Info},    // gfx1102
+    {"gfx1103", "Phoenix1", &setGfx1103Info},  // gfx1103
 #if LLPC_BUILD_STRIX1
     {"gfx1150", "Strix1", &setGfx1150Info},    // gfx1150
     {"gfx115F", "Strix1 A0", &setGfx115FInfo}, // gfx115F

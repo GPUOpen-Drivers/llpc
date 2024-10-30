@@ -56,6 +56,7 @@ struct GfxIpVersion {
 // Represents the properties of GPU device.
 struct GpuProperty {
   unsigned numShaderEngines;                  // Number of shader engines present
+  unsigned numComputeUnitsPerShaderEngine;    // Number of compute units per shader engine
   unsigned waveSize;                          // Wavefront size
   unsigned ldsSizePerThreadGroup;             // LDS size per thread group in dwords
   unsigned gsOnChipDefaultPrimsPerSubgroup;   // Default target number of primitives per subgroup for GS on-chip mode.

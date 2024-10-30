@@ -1,0 +1,25 @@
+#version 450 core
+
+layout(local_size_x = 64, local_size_y = 1) in;
+
+layout(set = 0, binding = 0) buffer writeonly BufOut {
+    uint o[];
+};
+layout(set = 0, binding = 1) buffer readonly BufData {
+    float v[];
+};
+
+void main() {
+    uint ret = packHalf2x16(vec2(v[gl_LocalInvocationIndex], 0.));
+    o[gl_LocalInvocationIndex] = ret;
+}
+/*
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=CHECK %s
+
+; CHECK-LABEL: {{^// LLPC}} final pipeline module info
+; CHECK: %{{[0-9]+}} = call <2 x half> @llvm.amdgcn.cvt.pkrtz(float %{{[0-9]+}}, float 0.000000e+00)
+
+; CHECK: AMDLLPC SUCCESS
+; END_SHADERTEST
+*/

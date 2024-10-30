@@ -1,12 +1,12 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
-; SHADERTEST: %{{[0-9]+}} = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) @{{.*}}, i32 0, i32 0, i32 %{{[0-9]+}}
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
+; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 %37, <4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

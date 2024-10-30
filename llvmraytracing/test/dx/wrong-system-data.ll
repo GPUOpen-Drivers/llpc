@@ -24,6 +24,7 @@ declare !pointeetys !31 %struct.TraversalData @_AmdAnyHit(i64, %struct.Traversal
 declare i32 @_cont_GetContinuationStackAddr() #0
 
 declare !pointeetys !33 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*) #0
+declare !pointeetys !33 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
 declare %struct.DispatchSystemData @_AmdTraversal(%struct.TraversalData) #0
 

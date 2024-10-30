@@ -53,7 +53,7 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP17:%.*]] = sext i32 [[TMP13]] to i64
 ; CHECK-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr addrspace(4) [[I2]], i64 [[TMP17]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP18]], align 4, !invariant.load [[META10]]
-; CHECK-NEXT:    [[TMP20:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP16]], <4 x i32> [[TMP19]], i1 false, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP20:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP16]], <4 x i32> [[TMP19]], i1 false, i32 0, i32 0)
 ; CHECK-NEXT:    [[I11:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP12]], <4 x float> [[TMP20]])
 ; CHECK-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[I11]]) #[[ATTR6:[0-9]+]]
 ; CHECK-NEXT:    ret void

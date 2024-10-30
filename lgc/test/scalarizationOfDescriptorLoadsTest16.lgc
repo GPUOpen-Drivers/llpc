@@ -48,7 +48,7 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(4) [[I2]], i64 [[TMP15]]
 ; CHECK-NEXT:    [[TMP18:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP16]], align 4, !invariant.load [[META10]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.last.use.v8i32(i32 [[TMP13]], <8 x i32> [[TMP18]])
-; CHECK-NEXT:    call void @llvm.amdgcn.image.store.1d.v4f32.i32(<4 x float> [[TMP12]], i32 15, i32 1, <8 x i32> [[TMP19]], i32 0, i32 0)
+; CHECK-NEXT:    call void @llvm.amdgcn.image.store.1d.v4f32.i32{{(\.v8i32)?}}(<4 x float> [[TMP12]], i32 15, i32 1, <8 x i32> [[TMP19]], i32 0, i32 0)
 ; CHECK-NEXT:    [[IND]] = add i32 [[PHI_IND]], 1
 ; CHECK-NEXT:    [[COND:%.*]] = icmp ne i32 [[IND]], 1000
 ; CHECK-NEXT:    br i1 [[COND]], label [[LOOP]], label [[EXIT:%.*]]

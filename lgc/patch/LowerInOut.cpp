@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerInOut.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchInOutImportExport.
+ * @brief LLPC source file: contains implementation of class lgc::LowerInOut.
  *
  ***********************************************************************************************************************
  */
@@ -44,7 +44,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
 
-#define DEBUG_TYPE "lgc-patch-in-out-import-export"
+#define DEBUG_TYPE "lgc-lower-in-out"
 
 using namespace llvm;
 using namespace lgc;
@@ -55,14 +55,14 @@ namespace lgc {
 constexpr unsigned MaxHsThreadsPerSubgroup = 256;
 
 // =====================================================================================================================
-PatchInOutImportExport::PatchInOutImportExport() {
+LowerInOut::LowerInOut() {
   memset(&m_gfxIp, 0, sizeof(m_gfxIp));
   initPerShader();
 }
 
 // =====================================================================================================================
 // Initialize per-shader members
-void PatchInOutImportExport::initPerShader() {
+void LowerInOut::initPerShader() {
   m_clipDistance = nullptr;
   m_cullDistance = nullptr;
   m_primitiveId = nullptr;
@@ -84,7 +84,7 @@ void PatchInOutImportExport::initPerShader() {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses LowerInOut::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
   auto getPostDominatorTree = [&](Function &f) -> PostDominatorTree & {
@@ -92,7 +92,7 @@ PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisMana
     return fam.getResult<PostDominatorTreeAnalysis>(f);
   };
 
-  LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
+  LLVM_DEBUG(dbgs() << "Run the pass Lower-In-Out\n");
 
   Patch::init(&module);
 
@@ -175,10 +175,9 @@ PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisMana
   return PreservedAnalyses::none();
 }
 
-void PatchInOutImportExport::processFunction(
-    Function &func, ShaderStageEnum shaderStage, SmallVectorImpl<Function *> &inputCallees,
-    SmallVectorImpl<Function *> &otherCallees,
-    const std::function<PostDominatorTree &(Function &)> &getPostDominatorTree) {
+void LowerInOut::processFunction(Function &func, ShaderStageEnum shaderStage, SmallVectorImpl<Function *> &inputCallees,
+                                 SmallVectorImpl<Function *> &otherCallees,
+                                 const std::function<PostDominatorTree &(Function &)> &getPostDominatorTree) {
   PostDominatorTree &postDomTree = getPostDominatorTree(func);
 
   initPerShader();
@@ -201,7 +200,7 @@ void PatchInOutImportExport::processFunction(
 //
 // @param [in/out] func : LLVM function to be run on
 // @param postDomTree : The PostDominatorTree of the \p func
-void PatchInOutImportExport::markExportDone(Function *func, PostDominatorTree &postDomTree) {
+void LowerInOut::markExportDone(Function *func, PostDominatorTree &postDomTree) {
   SmallVector<CallInst *, 4> expInsts;
 
   Function *expDecl = m_module->getFunction("llvm.amdgcn.exp.f32");
@@ -243,7 +242,7 @@ void PatchInOutImportExport::markExportDone(Function *func, PostDominatorTree &p
 
 // =====================================================================================================================
 // Process a single shader
-void PatchInOutImportExport::processShader() {
+void LowerInOut::processShader() {
   // Initialize the output value for gl_PrimitiveID
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->builtInUsage;
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage.value())->entryArgIdxs;
@@ -482,7 +481,7 @@ void PatchInOutImportExport::processShader() {
 // Visits all "call" instructions against the callee functions in current entry-point function.
 //
 // @param calleeFuncs : a list of candidate callee functions to check
-void PatchInOutImportExport::visitCallInsts(ArrayRef<Function *> calleeFuncs) {
+void LowerInOut::visitCallInsts(ArrayRef<Function *> calleeFuncs) {
   for (auto callee : calleeFuncs) {
     for (auto user : callee->users()) {
       if (CallInst *callInst = dyn_cast<CallInst>(user)) {
@@ -495,7 +494,7 @@ void PatchInOutImportExport::visitCallInsts(ArrayRef<Function *> calleeFuncs) {
 
 // =====================================================================================================================
 // Visits all "ret" instructions in current entry-point function.
-void PatchInOutImportExport::visitReturnInsts() {
+void LowerInOut::visitReturnInsts() {
   for (auto &block : *m_entryPoint)
     if (auto *retInst = dyn_cast<ReturnInst>(block.getTerminator()))
       visitReturnInst(*retInst);
@@ -505,7 +504,7 @@ void PatchInOutImportExport::visitReturnInsts() {
 // Visits "call" instruction.
 //
 // @param callInst : "Call" instruction
-void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
+void LowerInOut::visitCallInst(CallInst &callInst) {
   auto callee = callInst.getCalledFunction();
   if (!callee)
     return;
@@ -1112,7 +1111,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 // Visits "ret" instruction.
 //
 // @param retInst : "Ret" instruction
-void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
+void LowerInOut::visitReturnInst(ReturnInst &retInst) {
   // We only handle the "ret" of shader entry point
   if (!m_shaderStage)
     return;
@@ -1586,8 +1585,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 // @param compIdx : Index used for vector element indexing
 // @param vertexIdx : Input array outermost index used for vertex indexing
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchTcsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
-                                                          Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchTcsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                              Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx && vertexIdx);
 
   auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, location, locOffset, compIdx, vertexIdx, builder);
@@ -1603,8 +1602,8 @@ Value *PatchInOutImportExport::patchTcsGenericInputImport(Type *inputTy, unsigne
 // @param compIdx : Index used for vector element indexing
 // @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchTesGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
-                                                          Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchTesGenericInputImport(Type *inputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                              Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx);
 
   auto ldsOffset = calcLdsOffsetForTesInput(inputTy, location, locOffset, compIdx, vertexIdx, builder);
@@ -1619,8 +1618,8 @@ Value *PatchInOutImportExport::patchTesGenericInputImport(Type *inputTy, unsigne
 // @param compIdx : Index used for vector element indexing
 // @param vertexIdx : Input array outermost index used for vertex indexing
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned location, unsigned compIdx,
-                                                         Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchGsGenericInputImport(Type *inputTy, unsigned location, unsigned compIdx, Value *vertexIdx,
+                                             BuilderBase &builder) {
   assert(vertexIdx);
 
   const unsigned compCount = inputTy->isVectorTy() ? cast<FixedVectorType>(inputTy)->getNumElements() : 1;
@@ -1658,8 +1657,8 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
 // @param coordI: Value of I coordinate
 // @param coordJ: Value of J coordinate
 // @param primMask: Value to fill into m0 register
-Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder, Value *attr, Value *channel,
-                                                           Value *coordI, Value *coordJ, Value *primMask) {
+Value *LowerInOut::performFsFloatInterpolation(BuilderBase &builder, Value *attr, Value *channel, Value *coordI,
+                                               Value *coordJ, Value *primMask) {
   Value *result = nullptr;
   if (m_gfxIp.major >= 11) {
     // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
@@ -1693,9 +1692,8 @@ Value *PatchInOutImportExport::performFsFloatInterpolation(BuilderBase &builder,
 // @param coordJ: Value of J coordinate
 // @param primMask: Value to fill into m0 register
 // @param highHalf : Whether it is a high half in a 16-bit attribute
-Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, Value *attr, Value *channel,
-                                                          Value *coordI, Value *coordJ, Value *primMask,
-                                                          Value *highHalf) {
+Value *LowerInOut::performFsHalfInterpolation(BuilderBase &builder, Value *attr, Value *channel, Value *coordI,
+                                              Value *coordJ, Value *primMask, Value *highHalf) {
   Value *result = nullptr;
   if (m_gfxIp.major >= 11) {
     // llvm.amdgcn.lds.param.load(attr_channel, attr, m0)
@@ -1739,9 +1737,8 @@ Value *PatchInOutImportExport::performFsHalfInterpolation(BuilderBase &builder, 
 // @param primMask : Value to fill into m0 register
 // @param bitWidth : The bitwidth of required data type
 // @param highHalf : Whether it is a high half in a 16-bit attribute
-Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Value *attr, Value *channel,
-                                                      InterpParam interpParam, Value *primMask, unsigned bitWidth,
-                                                      bool highHalf) {
+Value *LowerInOut::performFsParameterLoad(BuilderBase &builder, Value *attr, Value *channel, InterpParam interpParam,
+                                          Value *primMask, unsigned bitWidth, bool highHalf) {
   Value *compValue = nullptr;
 
   if (m_gfxIp.major >= 11) {
@@ -1805,9 +1802,9 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
 // vertex index; unused for "flat" mode or if the input is per-primitive
 // @param highHalf : Whether it is a high half in a 16-bit attribute
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset,
-                                                         Value *compIdx, bool isPerPrimitive, unsigned interpMode,
-                                                         Value *interpValue, bool highHalf, BuilderBase &builder) {
+Value *LowerInOut::patchFsGenericInputImport(Type *inputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                             bool isPerPrimitive, unsigned interpMode, Value *interpValue,
+                                             bool highHalf, BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
   auto &interpInfo = resUsage->inOutUsage.fs.interpInfo;
 
@@ -1970,8 +1967,8 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
 // @param compIdx : Index used for vector element indexing
 // @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchTcsGenericOutputImport(Type *outputTy, unsigned location, Value *locOffset,
-                                                           Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchTcsGenericOutputImport(Type *outputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                               Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx);
   auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, builder);
   return readValueFromLds(true, outputTy, ldsOffset, builder);
@@ -1984,8 +1981,7 @@ Value *PatchInOutImportExport::patchTcsGenericOutputImport(Type *outputTy, unsig
 // @param location : Location of the output
 // @param compIdx : Index used for vector element indexing
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned location, unsigned compIdx,
-                                                        BuilderBase &builder) {
+void LowerInOut::patchVsGenericOutputExport(Value *output, unsigned location, unsigned compIdx, BuilderBase &builder) {
   auto outputTy = output->getType();
 
   if (m_hasTs) {
@@ -2022,8 +2018,8 @@ void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned 
 // @param compIdx : Index used for vector element indexing
 // @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::patchTcsGenericOutputExport(Value *output, unsigned location, Value *locOffset,
-                                                         Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+void LowerInOut::patchTcsGenericOutputExport(Value *output, unsigned location, Value *locOffset, Value *compIdx,
+                                             Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx);
   Type *outputTy = output->getType();
   auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, builder);
@@ -2037,8 +2033,7 @@ void PatchInOutImportExport::patchTcsGenericOutputExport(Value *output, unsigned
 // @param location : Location of the output
 // @param compIdx : Index used for vector element indexing
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::patchTesGenericOutputExport(Value *output, unsigned location, unsigned compIdx,
-                                                         BuilderBase &builder) {
+void LowerInOut::patchTesGenericOutputExport(Value *output, unsigned location, unsigned compIdx, BuilderBase &builder) {
   if (m_hasGs) {
     auto outputTy = output->getType();
     assert(outputTy->isIntOrIntVectorTy() || outputTy->isFPOrFPVectorTy());
@@ -2068,8 +2063,8 @@ void PatchInOutImportExport::patchTesGenericOutputExport(Value *output, unsigned
 // @param compIdx : Index used for vector element indexing
 // @param streamId : ID of output vertex stream
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned location, unsigned compIdx,
-                                                        unsigned streamId, BuilderBase &builder) {
+void LowerInOut::patchGsGenericOutputExport(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
+                                            BuilderBase &builder) {
   auto outputTy = output->getType();
 
   // Cast double or double vector to float vector.
@@ -2105,9 +2100,8 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
 // @param vertexOrPrimitiveIdx : Input array outermost index used for vertex or primitive indexing
 // @param isPerPrimitive : Whether the output is per-primitive
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset,
-                                                          Value *compIdx, Value *vertexOrPrimitiveIdx,
-                                                          bool isPerPrimitive, BuilderBase &builder) {
+void LowerInOut::patchMeshGenericOutputExport(Value *output, unsigned location, Value *locOffset, Value *compIdx,
+                                              Value *vertexOrPrimitiveIdx, bool isPerPrimitive, BuilderBase &builder) {
   if (output->getType()->getScalarSizeInBits() == 64)
     compIdx = builder.CreateShl(compIdx, 1);
 
@@ -2122,8 +2116,8 @@ void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigne
 // @param elemIdx : Index used for array/vector element indexing (could be null)
 // @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx,
-                                                          Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchTcsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx, Value *vertexIdx,
+                                              BuilderBase &builder) {
   Value *input = PoisonValue::get(inputTy);
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::TessControl)->entryArgIdxs.tcs;
@@ -2212,8 +2206,8 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
 // @param elemIdx : Index used for array/vector element indexing (could be null)
 // @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx,
-                                                          Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchTesBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx, Value *vertexIdx,
+                                              BuilderBase &builder) {
   Value *input = PoisonValue::get(inputTy);
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval)->entryArgIdxs.tes;
@@ -2339,8 +2333,8 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
 // @param builtInId : ID of the built-in variable
 // @param vertexIdx : Input array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *vertexIdx,
-                                                         BuilderBase &builder) {
+Value *LowerInOut::patchGsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *vertexIdx,
+                                             BuilderBase &builder) {
   Value *input = nullptr;
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
@@ -2394,7 +2388,7 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
 // @param inputTy : Type of input value
 // @param builtInId : ID of the built-in variable
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, BuilderBase &builder) {
+Value *LowerInOut::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, BuilderBase &builder) {
   // Handle work group size built-in
   if (builtInId == BuiltInWorkgroupSize) {
     // WorkgroupSize is a constant vector supplied by mesh shader mode.
@@ -2450,8 +2444,8 @@ Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsign
 // @param builtInId : ID of the built-in variable
 // @param generalVal : Sample ID, only needed for BuiltInSamplePosOffset; InterpLoc, only needed for BuiltInBaryCoord
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *generalVal,
-                                                         BuilderBase &builder) {
+Value *LowerInOut::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *generalVal,
+                                             BuilderBase &builder) {
   Value *input = PoisonValue::get(inputTy);
 
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
@@ -2799,7 +2793,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 // @param inputTy : Type of BuiltInSamplePosOffset
 // @param sampleId : Sample ID
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::getSamplePosOffset(Type *inputTy, Value *sampleId, BuilderBase &builder) {
+Value *LowerInOut::getSamplePosOffset(Type *inputTy, Value *sampleId, BuilderBase &builder) {
   // Gets the offset of sample position relative to the pixel center for the specified sample ID
   Value *numSamples = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInNumSamples, nullptr, builder);
   Value *patternIdx = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInSamplePatternIdx, nullptr, builder);
@@ -2820,7 +2814,7 @@ Value *PatchInOutImportExport::getSamplePosOffset(Type *inputTy, Value *sampleId
 //
 // @param inputTy : Type of BuiltInSamplePosition
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::getSamplePosition(Type *inputTy, BuilderBase &builder) {
+Value *LowerInOut::getSamplePosition(Type *inputTy, BuilderBase &builder) {
   Value *sampleId = patchFsBuiltInInputImport(builder.getInt32Ty(), BuiltInSampleId, nullptr, builder);
   Value *input = patchFsBuiltInInputImport(inputTy, BuiltInSamplePosOffset, sampleId, builder);
   return builder.CreateFAdd(input, ConstantFP::get(inputTy, 0.5));
@@ -2834,8 +2828,8 @@ Value *PatchInOutImportExport::getSamplePosition(Type *inputTy, BuilderBase &bui
 // @param elemIdx : Index used for array/vector element indexing (could be null)
 // @param vertexIdx : Output array outermost index used for vertex indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInId, Value *elemIdx,
-                                                           Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInId, Value *elemIdx, Value *vertexIdx,
+                                               BuilderBase &builder) {
   Value *output = PoisonValue::get(outputTy);
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
@@ -2938,7 +2932,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
 // @param builder : the builder to use
-void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
+void LowerInOut::patchVsBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   auto outputTy = output->getType();
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
@@ -3104,8 +3098,8 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 // @param elemIdx : Index used for array/vector element indexing (could be null)
 // @param vertexIdx : Output array outermost index used for vertex indexing (could be null)
 // @param builder : the builder to use
-void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, Value *elemIdx,
-                                                         Value *vertexIdx, BuilderBase &builder) {
+void LowerInOut::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, Value *elemIdx, Value *vertexIdx,
+                                             BuilderBase &builder) {
   auto outputTy = output->getType();
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
@@ -3220,7 +3214,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
 // @param builder : the builder to use
-void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
+void LowerInOut::patchTesBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   auto &builtInUsage = resUsage->builtInUsage.tes;
   auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
@@ -3335,8 +3329,8 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 // @param builtInId : ID of the built-in variable
 // @param streamId : ID of output vertex stream
 // @param builder : the builder to use
-void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned builtInId, unsigned streamId,
-                                                        BuilderBase &builder) {
+void LowerInOut::patchGsBuiltInOutputExport(Value *output, unsigned builtInId, unsigned streamId,
+                                            BuilderBase &builder) {
   if (streamId != m_pipelineState->getRasterizerState().rasterStream)
     return; // Skip built-in export if this stream is not the rasterization stream.
 
@@ -3390,9 +3384,8 @@ void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned 
 // @param vertexOrPrimitiveIdx : Output array outermost index used for vertex or primitive indexing
 // @param isPerPrimitive : Whether the output is per-primitive
 // @param builder : the builder to use
-void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigned builtInId, Value *elemIdx,
-                                                          Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
-                                                          BuilderBase &builder) {
+void LowerInOut::patchMeshBuiltInOutputExport(Value *output, unsigned builtInId, Value *elemIdx,
+                                              Value *vertexOrPrimitiveIdx, bool isPerPrimitive, BuilderBase &builder) {
   // Handle primitive indices built-ins
   if (builtInId == BuiltInPrimitivePointIndices || builtInId == BuiltInPrimitiveLineIndices ||
       builtInId == BuiltInPrimitiveTriangleIndices) {
@@ -3484,7 +3477,7 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
 // @param builder : the builder to use
-void PatchInOutImportExport::patchFsBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
+void LowerInOut::patchFsBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   switch (builtInId) {
   case BuiltInFragDepth: {
     m_fragDepth = output;
@@ -3515,8 +3508,7 @@ void PatchInOutImportExport::patchFsBuiltInOutputExport(Value *output, unsigned 
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
 // @param builder : the builder to use
-void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, unsigned builtInId,
-                                                                BuilderBase &builder) {
+void LowerInOut::patchCopyShaderBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   switch (builtInId) {
   case BuiltInPosition:
   case BuiltInPointSize: {
@@ -3575,8 +3567,8 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
 // @param xfbOffset : Transform feedback offset
 // @param streamId : Output stream ID
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuffer, unsigned xfbOffset,
-                                                  unsigned streamId, BuilderBase &builder) {
+void LowerInOut::patchXfbOutputExport(Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned streamId,
+                                      BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader);
 
@@ -3640,9 +3632,9 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
 // @param bufBase : Buffer base offset
 // @param coherent : Buffer coherency
 // @param builder : The IR builder to create and insert IR instruction
-unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &storeValues, unsigned startIdx,
-                                                    unsigned valueOffset, Value *bufDesc, Value *storeOffset,
-                                                    Value *bufBase, CoherentFlag coherent, BuilderBase &builder) {
+unsigned LowerInOut::combineBufferStore(const std::vector<Value *> &storeValues, unsigned startIdx,
+                                        unsigned valueOffset, Value *bufDesc, Value *storeOffset, Value *bufBase,
+                                        CoherentFlag coherent, BuilderBase &builder) {
   Type *storeTys[4] = {
       builder.getInt32Ty(),
       FixedVectorType::get(builder.getInt32Ty(), 2),
@@ -3696,9 +3688,8 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
 // @param bufBase : Buffer base offset
 // @param coherent : Buffer coherency
 // @param builder : The IR builder to create and insert IR instruction
-unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadValues, unsigned startIdx, Value *bufDesc,
-                                                   Value *loadOffset, Value *bufBase, CoherentFlag coherent,
-                                                   BuilderBase &builder) {
+unsigned LowerInOut::combineBufferLoad(std::vector<Value *> &loadValues, unsigned startIdx, Value *bufDesc,
+                                       Value *loadOffset, Value *bufBase, CoherentFlag coherent, BuilderBase &builder) {
   Type *loadTyps[4] = {
       builder.getInt32Ty(),
       FixedVectorType::get(builder.getInt32Ty(), 2),
@@ -3748,8 +3739,8 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
 // @param xfbStride : Transform feedback stride
 // @param streamId : Output stream ID
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset,
-                                                         unsigned xfbStride, unsigned streamId, BuilderBase &builder) {
+void LowerInOut::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset,
+                                             unsigned xfbStride, unsigned streamId, BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader);
   assert(xfbBuffer < MaxTransformFeedbackBuffers);
@@ -3869,8 +3860,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
 // @param location : Output location
 // @param compIdx : Output component index
 // @param builder : the builder to use
-void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned location, unsigned compIdx,
-                                                  BuilderBase &builder) {
+void LowerInOut::storeValueToEsGsRing(Value *storeValue, unsigned location, unsigned compIdx, BuilderBase &builder) {
   auto storeTy = storeValue->getType();
 
   Type *elemTy = storeTy;
@@ -3937,8 +3927,8 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
 // @param compIdx : Input component index
 // @param vertexIdx : Vertex index
 // @param builder : the builder to use
-Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned location, unsigned compIdx,
-                                                     Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::loadValueFromEsGsRing(Type *loadTy, unsigned location, unsigned compIdx, Value *vertexIdx,
+                                         BuilderBase &builder) {
   Type *elemTy = loadTy;
   if (loadTy->isArrayTy())
     elemTy = cast<ArrayType>(loadTy)->getElementType();
@@ -3984,8 +3974,8 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
 // @param compIdx : Output component index
 // @param streamId : Output stream ID
 // @param builder : the builder to use
-void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned location, unsigned compIdx,
-                                                  unsigned streamId, BuilderBase &builder) {
+void LowerInOut::storeValueToGsVsRing(Value *storeValue, unsigned location, unsigned compIdx, unsigned streamId,
+                                      BuilderBase &builder) {
   auto storeTy = storeValue->getType();
 
   Type *elemTy = storeTy;
@@ -4105,8 +4095,8 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
 // @param compIdx : Output component index
 // @param esGsOffset : ES-GS ring offset in bytes
 // @param builder : the builder to use
-Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, unsigned compIdx, Value *esGsOffset,
-                                                           BuilderBase &builder) {
+Value *LowerInOut::calcEsGsRingOffsetForOutput(unsigned location, unsigned compIdx, Value *esGsOffset,
+                                               BuilderBase &builder) {
   // ES -> GS ring is always on-chip on GFX10+
   // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
   assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
@@ -4126,8 +4116,8 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, un
 // @param compIdx : Input Component index
 // @param vertexIdx : Vertex index
 // @param builder : the builder to use
-Value *PatchInOutImportExport::calcEsGsRingOffsetForInput(unsigned location, unsigned compIdx, Value *vertexIdx,
-                                                          BuilderBase &builder) {
+Value *LowerInOut::calcEsGsRingOffsetForInput(unsigned location, unsigned compIdx, Value *vertexIdx,
+                                              BuilderBase &builder) {
   // ES -> GS ring is always on-chip on GFX10+
   assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
@@ -4172,8 +4162,8 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForInput(unsigned location, uns
 // @param vertexIdx : Vertex index
 // @param gsVsOffset : ES-GS ring offset in bytes
 // @param builder : the builder to use
-Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, unsigned compIdx, unsigned streamId,
-                                                           Value *vertexIdx, Value *gsVsOffset, BuilderBase &builder) {
+Value *LowerInOut::calcGsVsRingOffsetForOutput(unsigned location, unsigned compIdx, unsigned streamId, Value *vertexIdx,
+                                               Value *gsVsOffset, BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
 
   Value *ringOffset = nullptr;
@@ -4227,7 +4217,7 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
 // @param readTy : Type of value read from LDS
 // @param ldsOffset : Start offset to do LDS read operations
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Value *ldsOffset, BuilderBase &builder) {
+Value *LowerInOut::readValueFromLds(bool offChip, Type *readTy, Value *ldsOffset, BuilderBase &builder) {
   assert(readTy->isSingleValueType());
 
   // Read dwords from LDS
@@ -4309,7 +4299,7 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
 // @param writeValue : Value written to LDS
 // @param ldsOffset : Start offset to do LDS write operations
 // @param builder : The IR builder to create and insert IR instruction
-void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Value *ldsOffset, BuilderBase &builder) {
+void LowerInOut::writeValueToLds(bool offChip, Value *writeValue, Value *ldsOffset, BuilderBase &builder) {
   auto writeTy = writeValue->getType();
   assert(writeTy->isSingleValueType());
 
@@ -4375,8 +4365,7 @@ void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Va
 // @param location : Base location of the output
 // @param compIdx : Index used for vector element indexing
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::calcLdsOffsetForVsOutput(Type *outputTy, unsigned location, unsigned compIdx,
-                                                        BuilderBase &builder) {
+Value *LowerInOut::calcLdsOffsetForVsOutput(Type *outputTy, unsigned location, unsigned compIdx, BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Vertex);
 
   // attribOffset = location * 4 + compIdx
@@ -4414,8 +4403,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForVsOutput(Type *outputTy, unsigned
 // @param compIdx : Index used for vector element indexing (could be null)
 // @param vertexIdx : Vertex indexing
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::calcLdsOffsetForTcsInput(Type *inputTy, unsigned location, Value *locOffset,
-                                                        Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::calcLdsOffsetForTcsInput(Type *inputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                            Value *vertexIdx, BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::TessControl);
 
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs;
@@ -4467,8 +4456,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsInput(Type *inputTy, unsigned 
 // @param compIdx : Index used for vector element indexing (could be null)
 // @param vertexIdx : Vertex indexing
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigned location, Value *locOffset,
-                                                         Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::calcLdsOffsetForTcsOutput(Type *outputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                             Value *vertexIdx, BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::TessControl);
 
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs;
@@ -4537,8 +4526,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
 // @param compIdx : Index used for vector element indexing (could be null)
 // @param vertexIdx : Vertex indexing
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned location, Value *locOffset,
-                                                        Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
+Value *LowerInOut::calcLdsOffsetForTesInput(Type *inputTy, unsigned location, Value *locOffset, Value *compIdx,
+                                            Value *vertexIdx, BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::TessEval);
 
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
@@ -4609,10 +4598,9 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
 // @param outVertexStride : Vertex stride of output patch in (dwords)
 // @param patchConstCount : Count of output patch constants
 // @param tessFactorStride : Stride of tessellation factors (dwords)
-unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride,
-                                                              unsigned outVertexCount, unsigned outVertexStride,
-                                                              unsigned patchConstCount,
-                                                              unsigned tessFactorStride) const {
+unsigned LowerInOut::calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride,
+                                                  unsigned outVertexCount, unsigned outVertexStride,
+                                                  unsigned patchConstCount, unsigned tessFactorStride) const {
   unsigned maxThreadCountPerThreadGroup = MaxHsThreadsPerSubgroup;
 
   // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
@@ -4695,8 +4683,8 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
 // @param location : Location of the output
 // @param compIdx : Index used for vector element indexing
 // @param builder : the builder to use
-void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsigned location, unsigned compIdx,
-                                                           BuilderBase &builder) {
+void LowerInOut::addExportInstForGenericOutput(Value *output, unsigned location, unsigned compIdx,
+                                               BuilderBase &builder) {
   // Check if the shader stage is valid to use "exp" instruction to export output
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
   const bool useExpInst = ((m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
@@ -4791,7 +4779,7 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
 // @param builder : the builder to use
-void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsigned builtInId, BuilderBase &builder) {
+void LowerInOut::addExportInstForBuiltInOutput(Value *output, unsigned builtInId, BuilderBase &builder) {
   const auto poison = PoisonValue::get(builder.getFloatTy());
 
   switch (builtInId) {
@@ -4866,7 +4854,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
 // @param centroidIj : Centroid I/J provided by hardware natively
 // @param centerIj : Center I/J provided by hardware natively
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::adjustCentroidIj(Value *centroidIj, Value *centerIj, BuilderBase &builder) {
+Value *LowerInOut::adjustCentroidIj(Value *centroidIj, Value *centerIj, BuilderBase &builder) {
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
   auto primMask = getFunctionArgument(m_entryPoint, entryArgIdxs.primMask);
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs;
@@ -4888,7 +4876,7 @@ Value *PatchInOutImportExport::adjustCentroidIj(Value *centroidIj, Value *center
 // Get Subgroup local invocation Id
 //
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::getSubgroupLocalInvocationId(BuilderBase &builder) {
+Value *LowerInOut::getSubgroupLocalInvocationId(BuilderBase &builder) {
   Value *subgroupLocalInvocationId =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
@@ -4904,7 +4892,7 @@ Value *PatchInOutImportExport::getSubgroupLocalInvocationId(BuilderBase &builder
 // =====================================================================================================================
 // Creates the LGC intrinsic "lgc.swizzle.thread.group" to swizzle thread group for optimization purposes.
 //
-void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
+void LowerInOut::createSwizzleThreadGroupFunction() {
 
   // Generate IR instructions to swizzle thread groups with repeating N x N tiles of morton patterns. If the X or Y
   // dimensions are not divisible by N, thread groups along the right and bottom sections of the dispatch get row-major
@@ -5229,7 +5217,7 @@ void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
 //
 // @param shadingRate : LGC shading rate
 // @param builder : the builder to use
-void PatchInOutImportExport::exportShadingRate(Value *shadingRate, BuilderBase &builder) {
+void LowerInOut::exportShadingRate(Value *shadingRate, BuilderBase &builder) {
   assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   Value *hwShadingRate = nullptr;
@@ -5307,7 +5295,7 @@ void PatchInOutImportExport::exportShadingRate(Value *shadingRate, BuilderBase &
 
 // =====================================================================================================================
 // Gets HW primitive type from ancillary bits.
-Value *PatchInOutImportExport::getPrimType(BuilderBase &builder) {
+Value *LowerInOut::getPrimType(BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Fragment);
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
   auto ancillary = getFunctionArgument(m_entryPoint, entryArgIdxs.ancillary);
@@ -5320,7 +5308,7 @@ Value *PatchInOutImportExport::getPrimType(BuilderBase &builder) {
 // Gets HW line stipple value from lineStipple value.
 //
 // @param builder : the builder to use
-Value *PatchInOutImportExport::getLineStipple(BuilderBase &builder) {
+Value *LowerInOut::getLineStipple(BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Fragment);
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Fragment)->entryArgIdxs.fs;
   auto line_stipple = getFunctionArgument(m_entryPoint, entryArgIdxs.lineStipple);
@@ -5332,7 +5320,7 @@ Value *PatchInOutImportExport::getLineStipple(BuilderBase &builder) {
 // Gets HW shading rate and converts them to LGC definitions.
 //
 // @param builder : the builder to use
-Value *PatchInOutImportExport::getShadingRate(BuilderBase &builder) {
+Value *LowerInOut::getShadingRate(BuilderBase &builder) {
   assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   assert(m_shaderStage == ShaderStage::Fragment);
@@ -5388,7 +5376,7 @@ Value *PatchInOutImportExport::getShadingRate(BuilderBase &builder) {
 //
 // @param location : Vertex attribute location
 // @param attribValues : Values of this vertex attribute to export
-void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRef<Value *> attribValues) {
+void LowerInOut::recordVertexAttribExport(unsigned location, ArrayRef<Value *> attribValues) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader); // Valid shader stages
   assert(location <= MaxInOutLocCount);             // 32 attributes at most
@@ -5427,7 +5415,7 @@ void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRe
 // Exports vertex attributes that were recorded previously
 //
 // @param builder : the builder to use
-void PatchInOutImportExport::exportVertexAttribs(BuilderBase &builder) {
+void LowerInOut::exportVertexAttribs(BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader); // Valid shader stages
   if (m_attribExports.empty()) {
@@ -5458,12 +5446,9 @@ void PatchInOutImportExport::exportVertexAttribs(BuilderBase &builder) {
       for (unsigned i = 0; i < 4; ++i)
         attribValue = builder.CreateInsertElement(attribValue, attribExport.second[i], i);
       // NOTE: Create a call if we export vertex attribute through memory. This call will be expanded when NGG primitive
-      // shader is generated. The arguments are: buffer descriptor of attribute ring, attribute location, and attribute
-      // export value.
+      // shader is generated. The arguments are: attribute location, and attribute export value.
       builder.CreateNamedCall(lgcName::NggAttributeThroughMemory, builder.getVoidTy(),
-                              {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(),
-                               builder.getInt32(attribExport.first), attribValue},
-                              {});
+                              {builder.getInt32(attribExport.first), attribValue}, {});
     }
   }
 }

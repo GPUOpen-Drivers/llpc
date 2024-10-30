@@ -52,7 +52,7 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP13:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.v4i32(i32 [[TMP12]], <4 x i32> [[I9]])
 ; CHECK-NEXT:    [[TMP14:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32(i32 [[TMP13]], <8 x i32> [[I10]])
 ; CHECK-NEXT:    [[TMP15:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP13]], <4 x i32> [[I9]])
-; CHECK-NEXT:    [[TMP16:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP14]], <4 x i32> [[TMP15]], i1 false, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP16:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP14]], <4 x i32> [[TMP15]], i1 false, i32 0, i32 0)
 ; CHECK-NEXT:    [[I11:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP13]], <4 x float> [[TMP16]])
 ; CHECK-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[I11]]) #[[ATTR6:[0-9]+]]
 ; CHECK-NEXT:    [[IND]] = add i32 [[PHI_IND]], 1

@@ -206,7 +206,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         if (TARGET llvm-dialects-example)
             set_property(TARGET llvm-dialects-example PROPERTY FOLDER Misc)
         endif()
-        if (LLVM_OPTIMIZED_TABLEGEN)
+        if (NOT WIN32 AND LLVM_OPTIMIZED_TABLEGEN)
+#if _WIN32
+            # These targets don't exist on Windows when CMake is first invoked.
+            # They are created later at build time, when the cross-compilation takes place.
+#endif
             set_property(TARGET llvm_nm_target PROPERTY FOLDER Misc)
             set_property(TARGET llvm_readobj_target PROPERTY FOLDER Misc)
             set_property(TARGET llvm-min-tblgen-host PROPERTY FOLDER Misc)
@@ -215,9 +219,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             set_property(TARGET CREATE_LLVM_NATIVE PROPERTY FOLDER Misc)
         endif()
 #if _WIN32
-        if (MSVC)
-            # We can't use LLVM_OPTIMIZED_TABLEGEN on Windows, and the 32-bit llvm-tblgen can easily
-            # to run out of memory. Tell the linker to allow addresses larger than 2GB.
+        if(MSVC)
+            # The 32-bit llvm-tblgen can easily run out of memory. Tell the linker to allow addresses larger than 2GB.
             set_property(TARGET llvm-tblgen PROPERTY LINK_FLAGS "/LARGEADDRESSAWARE")
         endif()
 #endif

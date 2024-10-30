@@ -43,8 +43,17 @@ defm CooperativeMatrixElementType : AttrEnum<"CooperativeMatrixElementType">;
 defm CooperativeMatrixLayout : AttrEnum<"CooperativeMatrixLayout">;
 defm CooperativeMatrixArithOp : AttrEnum<"CooperativeMatrixArithOp">;
 
-class LgcOp<string mnemonic_, list<Trait> traits_ = []>
+def NoDivergenceSource : LlvmEnumAttributeTrait<"NoDivergenceSource">;
+
+class DivergentLgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
+
+class LgcOp<string mnemonic_, list<Trait> traits_ = []>
+    : DivergentLgcOp<mnemonic_, traits_
+#ifdef LLVM_HAVE_NODIVERGENCESOURCE_ATTR
+                                        # [NoDivergenceSource]
+#endif
+                                                              >;
 
 def BufferAddrToPtrOp : LgcOp<"buffer.addr.to.ptr", [Memory<[]>, WillReturn]> {
   let arguments = (ins I64:$address);
@@ -69,6 +78,18 @@ def BufferDescToPtrOp : LgcOp<"buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
 
     The descriptor must be a null descriptor or a valid descriptor for a storage buffer aka raw buffer, i.e. a buffer
     for which the indexing feature of BUFFER_LOAD_* instructions is never used.
+  }];
+}
+
+def ConvertToStridedBufferPointerOp : LgcOp<"convert.to.strided.buffer.pointer", [Memory<[]>, WillReturn]> {
+  let arguments = (ins BufferPointer:$ptr, AttrI32:$stride);
+  let results = (outs BufferStridedPointer:$result);
+
+  let summary = "convert a fat buffer pointer into a strided buffer pointer";
+  let description = [{
+    Given a buffer pointer and a stride, returns an indexed buffer pointer to the start of the buffer.
+
+    Adjusts the stride and number of elements in the descriptor.
   }];
 }
 
@@ -100,6 +121,20 @@ def StridedIndexAddOp : LgcOp<"strided.index.add", [Memory<[]>, WillReturn]> {
   let description = [{
     Given a strided buffer pointer and a delta index, adds the delta index to the current index
     and returns a pointer to the location pointed to by the new index.
+  }];
+}
+
+def BufferIndexOp : LgcOp<"buffer.index", [Memory<[]>, WillReturn]> {
+  let arguments = (ins BufferPointer:$ptr, AttrI32:$stride, I32:$index);
+  let results = (outs BufferPointer:$marked);
+
+  let summary = "mark a runtime array for potential conversion to a strided buffer";
+  let description = [{
+    Mark the given array as a candidate for strided buffer pointers.
+    If the runtime array represents a (RW)StructuredBuffer, we can use indexed access to its elements
+    in some cases. In other cases, we prefer to manually calculate the address.
+
+    If it is not a StructuredBuffer, we can proceed as usual.
   }];
 }
 
@@ -262,7 +297,7 @@ def SetMeshPrimitiveCulledOp : LgcOp<"set.mesh.primitive.culled", [Memory<[]>]> 
   }];
 }
 
-def GetMeshBuiltinInputOp : LgcOp<"get.mesh.builtin.input", [Memory<[]>, WillReturn]> {
+def GetMeshBuiltinInputOp : DivergentLgcOp<"get.mesh.builtin.input", [Memory<[]>, WillReturn]> {
   let arguments = (ins AttrI32:$builtin);
   let results = (outs value:$result);
 
@@ -324,7 +359,7 @@ def GenericLocationOp : OpClass<LgcDialect> {
   }];
 }
 
-def InputImportGenericOp : LgcOp<"input.import.generic", [Memory<[]>, WillReturn]> {
+def InputImportGenericOp : DivergentLgcOp<"input.import.generic", [Memory<[]>, WillReturn]> {
   let superclass = GenericLocationOp;
 
   let arguments = (ins GenericLocationOp);
@@ -341,7 +376,7 @@ def InputImportGenericOp : LgcOp<"input.import.generic", [Memory<[]>, WillReturn
 }
 
 // TODO: Consider restricting the memory effect to inaccessible memory only.
-def OutputImportGenericOp : LgcOp<"output.import.generic", [Memory<[(read)]>, WillReturn]> {
+def OutputImportGenericOp : DivergentLgcOp<"output.import.generic", [Memory<[(read)]>, WillReturn]> {
   let superclass = GenericLocationOp;
 
   let arguments = (ins GenericLocationOp);
@@ -357,7 +392,7 @@ def OutputImportGenericOp : LgcOp<"output.import.generic", [Memory<[(read)]>, Wi
   }];
 }
 
-def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, WillReturn]> {
+def InputImportInterpolatedOp : DivergentLgcOp<"input.import.interpolated", [Memory<[]>, WillReturn]> {
   let superclass = GenericLocationOp;
 
   let arguments = (ins GenericLocationOp, AttrI32:$interp_mode, value:$interp_value);
@@ -530,7 +565,7 @@ def SubgroupRotateOp : LgcOp<"subgroup.rotate", [NoUnwind, Convergent]> {
   }];
 }
 
-def CooperativeRowAccLoadOp : LgcOp<"cooperative.rowacc.load", [Memory<[(read)]>, WillReturn]> {
+def CooperativeRowAccLoadOp : DivergentLgcOp<"cooperative.rowacc.load", [Memory<[(read)]>, WillReturn]> {
   let arguments = (ins value:$pointer, I32:$stride, CooperativeMatrixElementType:$elem_type, CooperativeMatrixMemoryAccess:$memory_access);
   let results = (outs value:$result);
 
@@ -573,7 +608,7 @@ def CooperativeRowAccStoreOp : LgcOp<"cooperative.rowacc.store", [Memory<[(write
   }];
 }
 
-def CooperativeRowAccAccumulateModeOp : LgcOp<"cooperative.rowacc.accumulate.mode", [Memory<[]>, WillReturn]> {
+def CooperativeRowAccAccumulateModeOp : DivergentLgcOp<"cooperative.rowacc.accumulate.mode", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$row_acc, CooperativeMatrixElementType:$elem_type);
   let results = (outs (eq $row_acc):$result);
 
@@ -588,7 +623,7 @@ def CooperativeRowAccAccumulateModeOp : LgcOp<"cooperative.rowacc.accumulate.mod
   }];
 }
 
-def CooperativeRowAccFinalizeModeOp : LgcOp<"cooperative.rowacc.finalize.mode", [Memory<[]>, WillReturn]> {
+def CooperativeRowAccFinalizeModeOp : DivergentLgcOp<"cooperative.rowacc.finalize.mode", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$row_acc, CooperativeMatrixElementType:$elem_type);
   let results = (outs (eq $row_acc):$result);
 
@@ -603,7 +638,7 @@ def CooperativeRowAccFinalizeModeOp : LgcOp<"cooperative.rowacc.finalize.mode", 
   }];
 }
 
-def CooperativeRowAccSplatOp : LgcOp<"cooperative.rowacc.splat", [Memory<[]>, WillReturn]> {
+def CooperativeRowAccSplatOp : DivergentLgcOp<"cooperative.rowacc.splat", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$scalar, CooperativeMatrixElementType:$elem_type);
   let results = (outs value:$result);
 
@@ -618,7 +653,7 @@ def CooperativeRowAccSplatOp : LgcOp<"cooperative.rowacc.splat", [Memory<[]>, Wi
   }];
 }
 
-def CooperativeRowAccSumAccumulateOp : LgcOp<"cooperative.rowacc.sum.accumulate", [Memory<[]>, WillReturn]> {
+def CooperativeRowAccSumAccumulateOp : DivergentLgcOp<"cooperative.rowacc.sum.accumulate", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$matrix, CooperativeMatrixElementType:$matrix_elem_type, CooperativeMatrixLayout:$matrix_layout, value:$row_acc, CooperativeMatrixElementType:$row_acc_elem_type, AttrI1:$is_signed);
   let results = (outs value:$result);
 
@@ -637,7 +672,7 @@ def CooperativeRowAccSumAccumulateOp : LgcOp<"cooperative.rowacc.sum.accumulate"
   }];
 }
 
-def CooperativeRowAccScalarOp : LgcOp<"cooperative.rowacc.scalar", [Memory<[]>, WillReturn]> {
+def CooperativeRowAccScalarOp : DivergentLgcOp<"cooperative.rowacc.scalar", [Memory<[]>, WillReturn]> {
   let arguments = (ins CooperativeMatrixArithOp:$binop, value:$row_acc, CooperativeMatrixElementType:$elem_type, value:$scalar, AttrI1:$accumulate_mode);
   let results = (outs (eq $row_acc):$result);
 
@@ -653,7 +688,7 @@ def CooperativeRowAccScalarOp : LgcOp<"cooperative.rowacc.scalar", [Memory<[]>, 
   }];
 }
 
-def CooperativeRowAccExpandOp : LgcOp<"cooperative.rowacc.expand", [Memory<[]>, WillReturn]> {
+def CooperativeRowAccExpandOp : DivergentLgcOp<"cooperative.rowacc.expand", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$row_acc, CooperativeMatrixElementType:$row_acc_elem_type, CooperativeMatrixElementType:$matrix_elem_type, CooperativeMatrixLayout:$matrix_layout, AttrI1:$col_major);
   let results = (outs value:$result);
 
@@ -707,7 +742,7 @@ def CooperativeMatrixLengthOp : LgcOp<"cooperative.matrix.length", [Memory<[]>, 
   }];
 }
 
-def CooperativeMatrixLoadOp : LgcOp<"cooperative.matrix.load", [Memory<[(read)]>, Convergent, WillReturn]> {
+def CooperativeMatrixLoadOp : DivergentLgcOp<"cooperative.matrix.load", [Memory<[(read)]>, Convergent, WillReturn]> {
   let arguments = (ins value:$pointer, value:$stride, AttrI1:$col_major, CooperativeMatrixElementType:$elem_type,
                    CooperativeMatrixLayout:$layout, AttrI32:$memory_access, AttrI32:$alignment);
   let results = (outs value:$result);
@@ -762,7 +797,7 @@ def CooperativeMatrixStoreOp : LgcOp<"cooperative.matrix.store", [Memory<[(write
   }];
 }
 
-def CooperativeMatrixFillOp : LgcOp<"cooperative.matrix.fill", [Memory<[]>, WillReturn]> {
+def CooperativeMatrixFillOp : DivergentLgcOp<"cooperative.matrix.fill", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$scalar, CooperativeMatrixElementType:$elem_type, CooperativeMatrixLayout:$layout);
   let results = (outs value:$result);
 
@@ -778,7 +813,7 @@ def CooperativeMatrixFillOp : LgcOp<"cooperative.matrix.fill", [Memory<[]>, Will
   }];
 }
 
-def CooperativeMatrixExtractOp : LgcOp<"cooperative.matrix.extract", [Memory<[]>, WillReturn]> {
+def CooperativeMatrixExtractOp : DivergentLgcOp<"cooperative.matrix.extract", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$matrix, value:$index, CooperativeMatrixElementType:$elem_type, CooperativeMatrixLayout:$layout);
   let results = (outs value:$result);
 
@@ -795,7 +830,7 @@ def CooperativeMatrixExtractOp : LgcOp<"cooperative.matrix.extract", [Memory<[]>
   }];
 }
 
-def CooperativeMatrixInsertOp : LgcOp<"cooperative.matrix.insert", [Memory<[]>, WillReturn]> {
+def CooperativeMatrixInsertOp : DivergentLgcOp<"cooperative.matrix.insert", [Memory<[]>, WillReturn]> {
   let arguments = (ins value:$matrix, value:$insert_value, value:$index, CooperativeMatrixElementType:$elem_type, CooperativeMatrixLayout:$layout);
   let results = (outs value:$result);
 
@@ -813,7 +848,8 @@ def CooperativeMatrixInsertOp : LgcOp<"cooperative.matrix.insert", [Memory<[]>, 
   }];
 }
 
-def CooperativeMatrixConvertOp : LgcOp<"cooperative.matrix.convert", [Memory<[(read)]>, Convergent, WillReturn]> {
+def CooperativeMatrixConvertOp : DivergentLgcOp<"cooperative.matrix.convert", [Memory<[(read)]>, Convergent,
+    WillReturn]> {
   let arguments = (ins AttrI32:$cast_op, value:$source, CooperativeMatrixElementType:$src_elem_type, CooperativeMatrixElementType:$dst_elem_type,
                    CooperativeMatrixLayout:$src_layout, CooperativeMatrixLayout:$dst_layout);
   let results = (outs value:$result);
@@ -833,7 +869,7 @@ def CooperativeMatrixConvertOp : LgcOp<"cooperative.matrix.convert", [Memory<[(r
   }];
 }
 
-def CooperativeMatrixTransposeOp : LgcOp<"cooperative.matrix.transpose", [Convergent, WillReturn]> {
+def CooperativeMatrixTransposeOp : DivergentLgcOp<"cooperative.matrix.transpose", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix, CooperativeMatrixElementType:$elem_type, CooperativeMatrixLayout:$layout);
   let results = (outs value:$result);
 
@@ -849,7 +885,7 @@ def CooperativeMatrixTransposeOp : LgcOp<"cooperative.matrix.transpose", [Conver
   }];
 }
 
-def CooperativeMatrixBinaryOp : LgcOp<"cooperative.matrix.binary", [Convergent, WillReturn]> {
+def CooperativeMatrixBinaryOp : DivergentLgcOp<"cooperative.matrix.binary", [Convergent, WillReturn]> {
   let arguments = (ins CooperativeMatrixArithOp:$arith_op, value:$lhs, value:$rhs, CooperativeMatrixElementType:$elem_type,
                    CooperativeMatrixLayout:$layout);
   let results = (outs value:$result);
@@ -869,7 +905,7 @@ def CooperativeMatrixBinaryOp : LgcOp<"cooperative.matrix.binary", [Convergent, 
   }];
 }
 
-def CooperativeMatrixTimesScalarOp : LgcOp<"cooperative.matrix.times.scalar", [Convergent, WillReturn]> {
+def CooperativeMatrixTimesScalarOp : DivergentLgcOp<"cooperative.matrix.times.scalar", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix, value:$scalar, CooperativeMatrixElementType:$elem_type,
                    CooperativeMatrixLayout:$layout);
   let results = (outs value:$result);
@@ -887,7 +923,7 @@ def CooperativeMatrixTimesScalarOp : LgcOp<"cooperative.matrix.times.scalar", [C
   }];
 }
 
-def CooperativeMatrixMulAddOp : LgcOp<"cooperative.matrix.muladd", [Convergent, WillReturn]> {
+def CooperativeMatrixMulAddOp : DivergentLgcOp<"cooperative.matrix.muladd", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix_a, value:$matrix_b, value:$matrix_c, AttrI1:$is_signed_a, AttrI1:$is_signed_b,
                    AttrI1:$is_sat_or_opsel, AttrI1:$is_tied, CooperativeMatrixElementType:$matrix_a_elem_type,
                    CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type);
@@ -919,7 +955,7 @@ def CooperativeMatrixMulAddOp : LgcOp<"cooperative.matrix.muladd", [Convergent, 
   }];
 }
 
-def CooperativeMatrixPackOp : LgcOp<"cooperative.matrix.pack", [Memory<[(read)]>, WillReturn]> {
+def CooperativeMatrixPackOp : DivergentLgcOp<"cooperative.matrix.pack", [Memory<[(read)]>, WillReturn]> {
   let arguments = (ins value:$matrix_c_lo, value:$matrix_c_hi);
   let results = (outs value:$result);
 
@@ -934,7 +970,7 @@ def CooperativeMatrixPackOp : LgcOp<"cooperative.matrix.pack", [Memory<[(read)]>
   }];
 }
 
-def CooperativeMatrixUnPackOp : LgcOp<"cooperative.matrix.unpack", [Memory<[(read)]>, WillReturn]> {
+def CooperativeMatrixUnPackOp : DivergentLgcOp<"cooperative.matrix.unpack", [Memory<[(read)]>, WillReturn]> {
   let arguments = (ins value:$packed_matrix, AttrI1:$get_upper_half);
   let results = (outs value:$result);
 
@@ -952,7 +988,7 @@ def CooperativeMatrixUnPackOp : LgcOp<"cooperative.matrix.unpack", [Memory<[(rea
   }];
 }
 
-def SparsityIndexLoadOp : LgcOp<"sparsityindex.load", [Memory<[(read)]>, Convergent, WillReturn]> {
+def SparsityIndexLoadOp : DivergentLgcOp<"sparsityindex.load", [Memory<[(read)]>, Convergent, WillReturn]> {
   let arguments = (ins value:$pointer, value:$stride, AttrI1:$col_major, AttrI32:$memory_access);
   let results = (outs value:$result);
 
@@ -974,7 +1010,7 @@ def SparsityIndexLoadOp : LgcOp<"sparsityindex.load", [Memory<[(read)]>, Converg
   }];
 }
 
-def SparseCooperativeMatrixMulAddOp : LgcOp<"sparseCooperativeMatrix.muladd", [Convergent, WillReturn]> {
+def SparseCooperativeMatrixMulAddOp : DivergentLgcOp<"sparseCooperativeMatrix.muladd", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix_a, value:$sparse_index, value:$matrix_b, value:$matrix_c, AttrI1:$is_signed_a, AttrI1:$is_signed_b,
                    AttrI1:$is_sat, CooperativeMatrixElementType:$accu_elem_type,
                    CooperativeMatrixElementType:$factor_elem_type);

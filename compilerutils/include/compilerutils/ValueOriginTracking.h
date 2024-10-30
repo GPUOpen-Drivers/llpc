@@ -106,9 +106,12 @@ namespace ValueTracking {
 struct SliceStatus {
   // As the actual enum is contained within the struct, its values don't leak into the containing namespace,
   // and it's not possible to implicitly cast a SliceStatus to an int, so it's as good as an enum class.
+  // The UndefOrPoison case always originates from a `poison` or `undef` value.
+  // We must be careful with freeze instructions operating on such values, see FreezeHandlingMode.
   enum StatusEnum : uint32_t { Constant = 0x1, Dynamic = 0x2, UndefOrPoison = 0x4 };
   StatusEnum S = {};
 
+  // Intentionally allow implicit conversion:
   SliceStatus(StatusEnum S) : S{S} {}
 
   static SliceStatus makeEmpty() { return static_cast<StatusEnum>(0); }
@@ -188,6 +191,45 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const ValueInfo &VI);
 // constant and then always propagated, allowing to replace the argument by the initial constant.
 class ValueOriginTracker {
 public:
+  // Configuration options for ValueOriginTracker.
+  struct Options {
+    unsigned BytesPerSlice = 4;
+    unsigned MaxBytesPerValue = 512;
+
+    // Freeze instructions are problematic for value origin tracking.
+    //
+    // While `freeze poison` are intended to help optimization by allowing it to pick any value, we cannot just
+    // treat `freeze poison` as UndefOrPoison, because an optimization relying on that would need to ensure
+    // other users of the optimized `freeze poison` observe the same value picked by optimization, and value origin
+    // tracking does not allow to query which `freeze poison` instructions a particular slice originates from.
+    // Instead, the only safe way to treat `freeze poison` is dynamic.
+    //
+    // In some cases, e.g. when not optimizing based on the analysis result, and instead just using it for sanity
+    // checking in testing, treating `freeze poison` as UndefOrPoison however is the intended result, and if
+    // value origin tracking implicitly considered all `freeze poison` as dynamic, then client code would need to
+    // propagate the intended UndefOrPoison semantics manually.
+    //
+    // The FreezeHandlingMode enum allows to avoid that, allowing the client to specify how `freeze poison` and
+    // `freeze undef` should be handled.
+    //
+    // If we want to optimize based on `freeze poison`, one option would be eliminating all freeze instructions by some
+    // constant (e.g. `zeroinitializer`) before running the analysis, as some LLVM transforms like instcombine do.
+    // This ensures that not only the analysis sees a common constant value for `freeze poison`, but also ensures other
+    // uses of `freeze poison` observe the same value.
+    //
+    // As a less conservative potential future improvement, we could instead explicitly keep track of FrozenPoison
+    // slices in value origin tracking, and when merging FrozenPoison with constants, recording which `freeze poison`
+    // values need to be replaced by which constants to allow that.
+    enum class FreezeHandlingMode {
+      // Treat slices in freeze instructions that are UndefOrPoison in the freeze operand as dynamic.
+      Dynamic = 0,
+      // Always forward value infos of freeze operands for freeze instructions.
+      // In particular, `freeze poison` is always reported as UndefOrPoison.
+      Forward
+    };
+    FreezeHandlingMode FreezeMode = FreezeHandlingMode::Dynamic;
+  };
+
   using ValueInfo = ValueTracking::ValueInfo;
   // In some cases, client code has additional information on where values originate from, or
   // where they should be assumed to originate from just for the purpose of the analysis.
@@ -225,10 +267,9 @@ public:
   // Also, only a single status on assumptions is allowed.
   using ValueOriginAssumptions = llvm::DenseMap<llvm::Instruction *, ValueInfo>;
 
-  ValueOriginTracker(const llvm::DataLayout &DL, unsigned BytesPerSlice = 4, unsigned MaxBytesPerValue = 512,
+  ValueOriginTracker(const llvm::DataLayout &DL, Options Opts,
                      ValueOriginAssumptions OriginAssumptions = ValueOriginAssumptions{})
-      : DL{DL}, BytesPerSlice{BytesPerSlice}, MaxBytesPerValue{MaxBytesPerValue},
-        OriginAssumptions(std::move(OriginAssumptions)) {}
+      : DL{DL}, Opts{Opts}, OriginAssumptions(std::move(OriginAssumptions)) {}
 
   // Computes a value info for the given value.
   // If the value has been seen before, returns a cache hit from the ValueInfos map.
@@ -247,8 +288,7 @@ public:
 private:
   struct ValueInfoBuilder;
   const llvm::DataLayout &DL;
-  unsigned BytesPerSlice = 0;
-  unsigned MaxBytesPerValue = 0;
+  Options Opts;
   ValueOriginAssumptions OriginAssumptions;
   llvm::DenseMap<llvm::Value *, ValueInfo> ValueInfos;
 

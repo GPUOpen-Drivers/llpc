@@ -46,7 +46,7 @@ namespace Llpc {
 // Represents LLPC context for ray tracing pipeline compilation. Derived from the base class Llpc::Context.
 class RayTracingContext : public PipelineContext {
 public:
-  RayTracingContext(GfxIpVersion gfxIp, const RayTracingPipelineBuildInfo *pipelineInfo,
+  RayTracingContext(GfxIpVersion gfxIp, const char *apiName, const RayTracingPipelineBuildInfo *pipelineInfo,
                     const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() = default;

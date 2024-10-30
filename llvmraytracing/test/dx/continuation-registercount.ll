@@ -1,9 +1,9 @@
 ; RUN: grep -v MAX_REG_10 %s | \
-; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
+; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
 ; RUN:    FileCheck -check-prefixes=COMMON,MAX30 %s
 ;
 ; RUN: grep -v MAX_REG_30 %s | \
-; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
+; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
 ; RUN:    FileCheck -check-prefixes=COMMON,MAX10 %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
@@ -82,6 +82,8 @@ define void @_cont_SetTriangleHitAttributes(%struct.SystemData* %data, %struct.B
   store %struct.BuiltInTriangleIntersectionAttributes %val, %struct.BuiltInTriangleIntersectionAttributes* %addr, align 4
   ret void
 }
+
+declare !pointeetys !35 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
 ; Function Attrs: alwaysinline
 define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #0 !pointeetys !35 {

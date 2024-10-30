@@ -62,8 +62,6 @@
 #endif
 #endif
 
-#define CONTINUATIONS_LGC_STACK_LOWERING 1
-
 //=====================================================================================================================
 // Continuation intrinsics
 //
@@ -156,6 +154,11 @@ GPURT_DECL uint64_t _AmdGetResumePointAddr() DUMMY_GENERIC_FUNC(0)
 // ------------------
 // Returns the address of the caller function making this intrinsic call, after inlining and continuation function splitting.
 GPURT_DECL uint64_t _AmdGetCurrentFuncAddr() DUMMY_GENERIC_FUNC(0)
+//
+// GetShaderRecordIndex
+// --------
+// Returns the shader record index of the current caller.
+GPURT_DECL uint32_t _AmdGetShaderRecordIndex() DUMMY_GENERIC_FUNC(0)
 //
 //=====================================================================================================================
 // GetShaderKind

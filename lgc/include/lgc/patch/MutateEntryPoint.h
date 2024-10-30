@@ -46,6 +46,8 @@ namespace lgc {
 
 class UserDataOp;
 
+constexpr unsigned MemcpyScopeWorkGroup = 2;
+
 // =====================================================================================================================
 // The entry-point mutation pass
 class MutateEntryPoint : public Patch, public llvm::PassInfoMixin<MutateEntryPoint> {
@@ -54,6 +56,9 @@ public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Patch LLVM for entry-point mutation"; }
+
+  static void processGroupMemcpy(GroupMemcpyOp &groupMemcpyOp, BuilderBase &builder, llvm::Value *threadIndex,
+                                 unsigned scopeSize);
 
 private:
   // A shader entry-point user data argument
@@ -166,8 +171,8 @@ private:
 
   bool isComputeWithCalls() const;
 
-  void processGroupMemcpy(llvm::Module &module);
-  void lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
+  void processCsGroupMemcpy(llvm::Module &module);
+  void lowerCsGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
 
   void processDriverTableLoad(llvm::Module &module);
   void lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp);

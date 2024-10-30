@@ -221,7 +221,7 @@ enum {
   SourceIdx       = 2,
   LineIdx         = 3,
   ColumnIdx       = 4,
-  ParentIdx       = 5,
+  ScopeIdx        = 5,
   LinkageNameIdx  = 6,
   SizeIdx         = 7,
   FlagsIdx        = 8,
@@ -237,12 +237,11 @@ enum {
   SourceIdx       = 2,
   LineIdx         = 3,
   ColumnIdx       = 4,
-  ParentIdx       = 5,
-  OffsetIdx       = 6,
-  SizeIdx         = 7,
-  FlagsIdx        = 8,
-  ValueIdx        = 9,
-  MinOperandCount = 9
+  OffsetIdx       = 5,
+  SizeIdx         = 6,
+  FlagsIdx        = 7,
+  ValueIdx        = 8,
+  MinOperandCount = 8
 };
 }
 

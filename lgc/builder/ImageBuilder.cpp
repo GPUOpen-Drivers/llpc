@@ -2117,12 +2117,17 @@ void BuilderImpl::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx)
   InsertPointGuard guard(*this);
   SetInsertPoint(imageInst);
   Value *origDesc = imageInst->getOperand(descIdx);
-  const unsigned elemCount = cast<FixedVectorType>(origDesc->getType())->getNumElements();
-  Value *newDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), elemCount));
-  for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
-    Value *elem = CreateExtractElement(origDesc, elemIdx);
-    elem = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, elem);
-    newDesc = CreateInsertElement(newDesc, elem, elemIdx);
+  Value *newDesc;
+  if (isReadFirstLaneTypeSupported(origDesc->getType())) {
+    newDesc = CreateUnaryIntrinsic(Intrinsic::amdgcn_readfirstlane, origDesc);
+  } else {
+    const unsigned elemCount = cast<FixedVectorType>(origDesc->getType())->getNumElements();
+    newDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), elemCount));
+    for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
+      Value *elem = CreateExtractElement(origDesc, elemIdx);
+      elem = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, elem);
+      newDesc = CreateInsertElement(newDesc, elem, elemIdx);
+    }
   }
   imageInst->setOperand(descIdx, newDesc);
 }

@@ -955,12 +955,13 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
            << "\n";
   dumpFile << glStatePrefix << "enableFragColor = " << options->getGlState().enableFragColor << "\n";
   dumpFile << glStatePrefix << "disableBaseVertex = " << options->getGlState().disableBaseVertex << "\n";
-  dumpFile << glStatePrefix << "enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
-  dumpFile << glStatePrefix << "disablePerCompFetch = " << options->disablePerCompFetch << "\n";
   dumpFile << glStatePrefix << "enablePolygonStipple = " << options->getGlState().enablePolygonStipple << "\n";
   dumpFile << glStatePrefix << "enableLineSmooth = " << options->getGlState().enableLineSmooth << "\n";
   dumpFile << glStatePrefix << "emulateWideLineStipple = " << options->getGlState().emulateWideLineStipple << "\n";
   dumpFile << glStatePrefix << "enablePointSmooth = " << options->getGlState().enablePointSmooth << "\n";
+  dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
+  dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
+  dumpFile << "options.optimizePointSizeWrite = " << options->optimizePointSizeWrite << "\n";
 
   // Output compile time constant info
   if (options->compileConstInfo) {
@@ -1943,6 +1944,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().emulateWideLineStipple);
   hasher->Update(options->getGlState().enablePointSmooth);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
+  hasher->Update(options->optimizePointSizeWrite);
 }
 
 // =====================================================================================================================

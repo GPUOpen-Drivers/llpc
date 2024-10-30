@@ -8,6 +8,8 @@
 
 declare i32 @lgc.rt.shader.index()
 
+declare !pointeetys !8 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
+
 declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 define i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hitKind) #0 !pointeetys !20 {
@@ -55,7 +57,7 @@ define void @callable(%struct.Payload* %payload) !pointeetys !22 !lgc.rt.shaders
 ; CHECK-NEXT:    store i32 [[TMP4]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], [8 x i32] poison, [1 x i32] [[TMP6]]), !continuation.registercount [[META10]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], [8 x i32] poison, [1 x i32] [[TMP6]]), !continuation.registercount [[META10]]
 ; CHECK-NEXT:    unreachable
 ;
 entry:

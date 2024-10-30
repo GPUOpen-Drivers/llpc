@@ -30,6 +30,7 @@
  */
 #include "MeshTaskShader.h"
 #include "ShaderMerger.h"
+#include "lgc/patch/MutateEntryPoint.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/util/Debug.h"
 #include "lgc/util/WorkgroupLayout.h"
@@ -432,7 +433,7 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
 
   unsigned sharedVarLdsSizeInDwords = 0;
   for (auto meshSharedVar : meshSharedVars) {
-    assert(meshSharedVar->getAlignment() == 4); // Must be 1 dword
+    assert(meshSharedVar->getAlignment() % 4 == 0); // Must be multiple of 1 dword
     const auto sizeInBytes =
         meshSharedVar->getParent()->getDataLayout().getTypeAllocSize(meshSharedVar->getValueType());
     assert(sizeInBytes % 4 == 0); // Must be multiple of 4
@@ -508,7 +509,7 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
     if (!meshSharedVars.empty()) {
       LLPC_OUTS("Shared Variables:\n");
       for (auto meshSharedVar : meshSharedVars) {
-        assert(meshSharedVar->getAlignment() == 4); // Must be 1 dword
+        assert(meshSharedVar->getAlignment() % 4 == 0); // Must be multiple of 1 dword
         const auto sizeInBytes =
             meshSharedVar->getParent()->getDataLayout().getTypeAllocSize(meshSharedVar->getValueType());
         assert(sizeInBytes % 4 == 0); // Must be multiple of 4
@@ -602,6 +603,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
 
   static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<GroupMemcpyOp>(&MeshTaskShader::lowerGroupMemcpy)
                             .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
                             .add<EmitMeshTasksOp>(&MeshTaskShader::lowerEmitMeshTasks)
                             .build();
@@ -1172,6 +1174,46 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
   // Mesh shader processing is done. We can safely update its input/output usage with final results.
   updateMeshShaderInOutUsage();
+}
+
+// =====================================================================================================================
+// Lower GroupMemcpyOp - copy memory using all threads in a workgroup.
+//
+// @param groupMemcpyOp : Call instruction to do group memory copy
+void MeshTaskShader::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
+  Function *entryPoint = groupMemcpyOp.getFunction();
+  auto stage = getShaderStage(entryPoint);
+  m_builder.SetInsertPoint(&groupMemcpyOp);
+
+  unsigned scopeSize = 0;
+  Value *threadIndex = nullptr;
+
+  auto scope = groupMemcpyOp.getScope();
+  if (scope == MemcpyScopeWorkGroup) {
+    unsigned workgroupSize[3] = {};
+    auto shaderModes = m_pipelineState->getShaderModes();
+    if (stage == ShaderStage::Task) {
+      Module &module = *groupMemcpyOp.getModule();
+      workgroupSize[0] = shaderModes->getComputeShaderMode(module).workgroupSizeX;
+      workgroupSize[1] = shaderModes->getComputeShaderMode(module).workgroupSizeY;
+      workgroupSize[2] = shaderModes->getComputeShaderMode(module).workgroupSizeZ;
+    } else if (stage == ShaderStage::Mesh) {
+      workgroupSize[0] = shaderModes->getMeshShaderMode().workgroupSizeX;
+      workgroupSize[1] = shaderModes->getMeshShaderMode().workgroupSizeY;
+      workgroupSize[2] = shaderModes->getMeshShaderMode().workgroupSizeZ;
+    } else {
+      llvm_unreachable("Invalid shade stage!");
+    }
+
+    scopeSize = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+    threadIndex = m_waveThreadInfo.threadIdInSubgroup;
+  } else {
+    llvm_unreachable("Unsupported scope!");
+  }
+
+  MutateEntryPoint::processGroupMemcpy(groupMemcpyOp, m_builder, threadIndex, scopeSize);
+
+  m_callsToRemove.push_back(&groupMemcpyOp);
 }
 
 // =====================================================================================================================

@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "ProcessGpuRtLibrary.h"
 #include "llpcPipelineContext.h"
 #include "spirvExt.h"
 #include "lgc/LgcContext.h"
@@ -121,6 +122,7 @@ public:
   // Sets triple and data layout in specified module from the context's target machine.
   void setModuleTargetMachine(llvm::Module *module);
 
+  GpurtKey buildGpurtKey();
   void ensureGpurtLibrary();
   void ensureGfxRuntimeLibrary();
 
@@ -147,16 +149,6 @@ private:
   std::unique_ptr<llvm_dialects::DialectContext> m_dialectContext;
 
   unsigned m_useCount = 0; // Number of times this context is used.
-
-  struct GpurtKey {
-    unsigned gpurtFeatureFlags;
-    bool hwIntersectRay;
-
-    bool operator==(const GpurtKey &other) const {
-      return gpurtFeatureFlags == other.gpurtFeatureFlags && hwIntersectRay == other.hwIntersectRay;
-    }
-    bool operator!=(const GpurtKey &other) const { return !(*this == other); }
-  };
 
   GpurtKey m_currentGpurtKey;
 };

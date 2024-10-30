@@ -33,6 +33,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "compilerutils/ArgPromotion.h"
+#include "compilerutils/DxilUtils.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/LgcRtDialect.h"
@@ -60,29 +61,16 @@ static Function *transformFunction(Function &F) {
     // Local scope for Name which is invalidated at the end.
     auto Name = F.getName();
     LLVM_DEBUG(dbgs() << "Transforming function " << Name << "\n");
-    std::string NewName = Name.str();
-
-    // Unmangle declarations because they cannot be renamed in the dx api
-    if (Name.contains('@')) {
-      // Extract unmangled name
-      auto Start = Name.find('?') + 1;
-      auto End = Name.find('@', Start);
-      if (Start == 0 || End == StringRef::npos || Start > Name.size() || End > Name.size()) {
-        report_fatal_error(Twine("Failed to unmangle function name: Failed to extract from '") + Name +
-                           "' (start: " + Twine(Start) + ", end: " + Twine(End) + ")");
-      }
-
-      // Copy name, otherwise it will be deleted before it's set
-      NewName = Name.substr(Start, End - Start).str();
-    }
+    // Copy name, otherwise it will be deleted before it is set
+    std::string NewName = CompilerUtils::dxil::tryDemangleFunctionName(Name.str()).str();
 
     LLVM_DEBUG(dbgs() << "  Set new name " << NewName << "\n");
+    F.setName(NewName);
 
     if (NewName == ContDriverFunc::TraversalName)
       lgc::rt::setLgcRtShaderStage(&F, lgc::rt::RayTracingShaderStage::Traversal);
     else if (NewName == ContDriverFunc::KernelEntryName)
       lgc::rt::setLgcRtShaderStage(&F, lgc::rt::RayTracingShaderStage::KernelEntry);
-    F.setName(NewName);
   }
 
   // Unpack the inner type of @class.matrix types
@@ -183,6 +171,19 @@ static void handleIsLlpc(Function &Func) {
   llvm::replaceCallsToFunction(Func, *FalseConst);
 }
 
+static void handleGetShaderRecordIndex(llvm_dialects::Builder &B, Function &Func) {
+  assert(Func.arg_empty()
+         // bool
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
+
+  llvm::forEachCall(Func, [&](CallInst &CInst) {
+    B.SetInsertPoint(&CInst);
+    auto *ShaderIndexCall = B.create<lgc::rt::ShaderIndexOp>();
+    CInst.replaceAllUsesWith(ShaderIndexCall);
+    CInst.eraseFromParent();
+  });
+}
+
 llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
                                                           llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the dxil-cont-intrinsic-prepare pass\n");
@@ -190,6 +191,8 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
   AnalysisManager.getResult<DialectContextAnalysis>(M);
 
   SmallVector<Function *> Funcs(make_pointer_range(M.functions()));
+
+  llvm_dialects::Builder B{M.getContext()};
 
   for (auto *F : Funcs) {
     auto Name = F->getName();
@@ -206,6 +209,9 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
       } else if (Name.contains("IsLlpc")) {
         ShouldTransform = false;
         handleIsLlpc(*F);
+      } else if (Name.contains("GetShaderRecordIndex")) {
+        ShouldTransform = false;
+        handleGetShaderRecordIndex(B, *F);
       }
     }
 
@@ -215,7 +221,7 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
 
   fixupDxilMetadata(M);
 
-  earlyDriverTransform(M);
+  earlyGpurtTransform(M);
 
   return PreservedAnalyses::none();
 }

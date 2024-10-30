@@ -112,9 +112,6 @@ Function *getSetLocalRootIndex(Module &M);
 /// Get intrinsic to convert a dx handle to an acceleration struct address.
 Function *getAccelStructAddr(Module &M, Type *HandleTy);
 
-/// Get the await intrinsic.
-Function *getContinuationAwait(Module &M, Type *TokenTy, StructType *RetTy);
-
 /// Get function that returns the global memory base address if the continuation
 /// stack lives in global memory.
 Function *getContinuationStackGlobalMemBase(Module &M);
@@ -149,7 +146,7 @@ void terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall);
 ///
 /// Replace intrinsics called by gpurt code that can be replaced early.
 /// Returns whether something changed.
-bool earlyDriverTransform(Module &M);
+bool earlyGpurtTransform(Module &M);
 
 /// Given a number NumI32s of 4-byte values and the number of reserved
 /// registers, return the amount of dynamic storage required to store that many
@@ -160,14 +157,6 @@ uint64_t computePayloadSpillSize(uint64_t NumI32s, uint64_t NumReservedRegisters
 // The implementation performs I32 copies, plus a copy
 // of individual bytes at the end if NumBytes is not a multiple of 4.
 void copyBytes(IRBuilder<> &B, Value *Dst, Value *Src, uint64_t NumBytes);
-
-class LegacyCleanupContinuationsPass : public llvm::PassInfoMixin<LegacyCleanupContinuationsPass> {
-public:
-  LegacyCleanupContinuationsPass() {}
-  llvm::PreservedAnalyses run(llvm::Module &Module, llvm::ModuleAnalysisManager &AnalysisManager);
-
-  static llvm::StringRef name() { return "legacy continuation cleanup"; }
-};
 
 class CleanupContinuationsPass : public llvm::PassInfoMixin<CleanupContinuationsPass> {
 public:

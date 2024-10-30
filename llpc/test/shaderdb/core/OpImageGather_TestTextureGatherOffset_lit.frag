@@ -36,9 +36,9 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.gather.v4f32(i32 9, i32 512, ptr addrspace(4) {{.*}}, ptr addrspace(4) {{.*}}, i32 293, <2 x float> <float 1.000000e+00, float 1.000000e+00>, i32 0, float 0.000000e+00, <2 x i32> <i32 1, i32 1>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2d.v4f32.f32(i32 4,{{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000,{{.*}}, i1 false, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2darray.v4f32.f32(i32 8,{{.*}}, float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0.000000e+00,{{.*}}, i1 false, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2d.v4f32.f16(i32 1, i32 257, half 0xH3C00, half 0xH3C00, <8 x i32> %{{.*}}, <4 x i32> %{{.*}}, i1 true, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 4,{{.*}}, float 0x3FB99999A0000000, float 0x3FB99999A0000000,{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2darray.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 8,{{.*}}, float 0x3FC99999A0000000, float 0x3FC99999A0000000, float 0.000000e+00,{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.gather4.lz.o.2d.v4f32.f16{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 1, i32 257, half 0xH3C00, half 0xH3C00, <8 x i32> %{{.*}}, <4 x i32> %{{.*}}, i1 true, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -541,6 +541,7 @@ private:
 #endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizePointSizeWrite, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_compileTimeConstants, MemberTypeCompileConstInfo, true);
       return addrTableInitializer;
     }();

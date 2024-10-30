@@ -8,7 +8,7 @@
 declare i64 @_AmdGetFuncAddr()
 
 declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
-
+declare !pointeetys !8 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !11 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
 define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !8 {

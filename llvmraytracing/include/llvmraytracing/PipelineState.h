@@ -52,6 +52,7 @@
  */
 #pragma once
 
+#include "llvmraytracing/SpecializeDriverShaders.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
@@ -88,6 +89,7 @@ private:
   // The maximum occurring number of payload registers in the pipeline, which will be taken into account for Traversal
   // module so that it sees the correct maximum payload size of a pipeline.
   unsigned MaxUsedPayloadRegisterCount = 0;
+  llvm::SpecializeDriverShadersState SDSState;
 };
 
 } // namespace llvmraytracing

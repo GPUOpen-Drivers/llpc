@@ -166,6 +166,7 @@ static constexpr char SgprCount[] = ".sgpr_count";
 static constexpr char VgprLimit[] = ".vgpr_limit";
 static constexpr char SgprLimit[] = ".sgpr_limit";
 static constexpr char ThreadgroupDimensions[] = ".threadgroup_dimensions";
+static constexpr char OrigThreadgroupDimensions[] = ".orig_threadgroup_dimensions";
 static constexpr char WavefrontSize[] = ".wavefront_size";
 static constexpr char UsesUavs[] = ".uses_uavs";
 static constexpr char UsesRovs[] = ".uses_rovs";
@@ -441,9 +442,7 @@ static constexpr char UseVtxVrsRate[] = ".use_vtx_vrs_rate";
 static constexpr char BypassVtxRateCombiner[] = ".bypass_vtx_rate_combiner";
 static constexpr char BypassPrimRateCombiner[] = ".bypass_prim_rate_combiner";
 static constexpr char UseVtxGsCutFlag[] = ".use_vtx_gs_cut_flag";
-#if PAL_BUILD_GFX11
 static constexpr char UseVtxFsrSelect[] = ".use_vtx_fsr_select";
-#endif
 }; // namespace PaClVsOutCntlMetadataKey
 
 namespace GeNggSubgrpCntlMetadataKey {
@@ -993,7 +992,6 @@ typedef enum SWIZZLE_MODE_ENUM {
   SW_VAR_R__GFX10CORE = 0x0000000f,
   SW_VAR_S_X__GFX10CORE = 0x0000001d,
   SW_VAR_D_X__GFX10CORE = 0x0000001e,
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI32 || CHIP_HDR_NAVI33 || CHIP_HDR_PHOENIX1 || CHIP_HDR_STRIX1
   SW_256KB_Z__GFX11 = 0x0000000c,
   SW_256KB_S__GFX11 = 0x0000000d,
   SW_256KB_D__GFX11 = 0x0000000e,
@@ -1002,7 +1000,6 @@ typedef enum SWIZZLE_MODE_ENUM {
   SW_256KB_S_X__GFX11 = 0x0000001d,
   SW_256KB_D_X__GFX11 = 0x0000001e,
   SW_256KB_R_X__GFX11 = 0x0000001f,
-#endif
 } SWIZZLE_MODE_ENUM;
 
 } // namespace lgc

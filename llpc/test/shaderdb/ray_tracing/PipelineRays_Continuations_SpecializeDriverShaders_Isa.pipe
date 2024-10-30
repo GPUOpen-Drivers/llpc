@@ -1,0 +1,40 @@
+; Check that driver shader specialization (SDS) works on LLPC raytracing pipelines.
+;
+; This test consists of two files:
+;  * ./PipelineRays_Continuations_SpecializeDriverShaders.pipe
+;    This file defines the actual pipeline, and uses debug output to check analysis details.
+;    Thus, it only runs with assertions enabled.
+;  * ./PipelineRays_Continuations_SpecializeDriverShaders_Isa.pipe
+;    This file uses the above pipeline, and checks Traversal ISA.
+;    It does not rely on debug builds.
+;
+; RUN: amdllpc -gfxip 11.0 -filetype=asm -o - %S/PipelineRays_Continuations_SpecializeDriverShaders.pipe | FileCheck %s
+
+; Check Traversal ISA
+; Due to the way FileCheck works, and because we don't know in which order the backend will make use of the constants,
+; we have to check for the constants using DAG directives.
+; We'd like to also check that no unexpected constants show up, but adding NOT directives in between DAG directives would
+; fix an order of the DAG ones, so we only check that there are no unexpected constants before the first expected one,
+; and after the last expected one.
+;
+; CHECK-LABEL: .type	_cs_,@function
+; CHECK-NEXT: _cs_:
+;
+; CHECK-NOT: 0x{{0*}}beef2
+; CHECK-NOT: 0x{{0*}}beef5
+; CHECK-NOT: 0x{{0*}}beef6
+; CHECK-NOT: 0x{{0*}}beef7
+;
+; CHECK-DAG: 0x{{0*}}beef1
+; CHECK-DAG: 0x{{0*}}beef3
+; CHECK-DAG: 0x{{0*}}beef4
+; Common tMin value:
+; CHECK-DAG: 0x{{0*}}deadbeef
+;
+; CHECK-NOT: 0x{{0*}}beef2
+; CHECK-NOT: 0x{{0*}}beef5
+; CHECK-NOT: 0x{{0*}}beef6
+; CHECK-NOT: 0x{{0*}}beef7
+;
+; Ensure the above only applies to Traversal ISA:
+; CHECK-LABEL: .Lfunc_end{{.*}}:

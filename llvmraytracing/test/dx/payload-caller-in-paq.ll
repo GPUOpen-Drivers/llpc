@@ -58,11 +58,11 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr [[TMP10]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [10 x i32] poison, [1 x i32] [[TMP12]]), !continuation.registercount [[META32:![0-9]+]], !waitmask [[META33:![0-9]+]], !continuation.returnedRegistercount [[META25:![0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } @await(ptr [[TMP17]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa12i32a3i32s(i64 4, i32 8, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]], [10 x i32] poison, [1 x i32] [[TMP12]]), !continuation.registercount [[META32:![0-9]+]], !waitmask [[META13]], !continuation.returnedRegistercount [[META25:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [12 x i32], [3 x i32] } [[TMP20]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [3 x i32] [[TMP15]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_MYPAYLOAD]] poison, ptr [[TMP4]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = freeze [[STRUCT_MYPAYLOAD]] poison
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_MYPAYLOAD]] [[TMP27]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP19]], ptr [[TMP14]], align 4
@@ -85,10 +85,10 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE:       .split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = load float, ptr [[TMP6]], align 8, !tbaa [[TBAA28]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4, !tbaa [[TBAA34:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4, !tbaa [[TBAA33:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = sitofp i32 [[TMP44]] to float
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load double, ptr [[TMP46]], align 8, !tbaa [[TBAA36:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load double, ptr [[TMP46]], align 8, !tbaa [[TBAA35:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = fptrunc double [[TMP47]] to float
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP49]], i8 0

@@ -30,8 +30,12 @@
  */
 #include "LowerAccessChain.h"
 #include "SPIRVInternal.h"
+#include "llpcDialect.h"
 #include "lgc/Builder.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <stack>
@@ -57,6 +61,11 @@ PreservedAnalyses LowerAccessChain::run(Module &module, ModuleAnalysisManager &a
   // Invoke handling of "getelementptr", "load" and "store" instructions
   visit(m_module);
 
+  // Remove dead "getelementptr" and custom "gep"
+  for (auto *inst : m_removeGeps)
+    inst->eraseFromParent();
+  m_removeGeps.clear();
+
   return PreservedAnalyses::none();
 }
 
@@ -68,33 +77,34 @@ PreservedAnalyses LowerAccessChain::run(Module &module, ModuleAnalysisManager &a
 // One of the examples may be a type in which we have a multiple nested structures.
 // { { [4 x float] } }
 //
-// @param gep : Getelementptr instruction.
-void LowerAccessChain::tryToAddMissingIndicesBetweenGVandGEP(GEPOperator *gep) {
+// @param gep : Custom structural gep instruction.
+void LowerAccessChain::tryToAddMissingIndicesBetweenGVandGEP(CallInst *callInst) {
+  auto *gep = cast<StructuralGepOp>(callInst);
 
   // We are interested only in address spaces which are used while doing global value lowering for store and load.
-  const unsigned addrSpace = gep->getType()->getPointerAddressSpace();
-  if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
-    return;
+  Value *base = gep->getBasePointer();
+  [[maybe_unused]] const unsigned addrSpace = base->getType()->getPointerAddressSpace();
+  assert(addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output);
 
-  GlobalValue *gv = dyn_cast<GlobalValue>(gep->getPointerOperand());
+  GlobalValue *gv = dyn_cast<GlobalValue>(base);
   if (!gv)
     return;
 
   // No missing indices, types are the same.
-  if (gep->getSourceElementType() == gv->getValueType())
+  Type *baseType = gep->getBaseType();
+  if (baseType == gv->getValueType())
     return;
 
   SmallVector<Value *, 8> idxs;
   idxs.push_back(m_builder->getInt32(0));
-  appendZeroIndexToMatchTypes(idxs, gep->getSourceElementType(), gv->getValueType());
+  appendZeroIndexToMatchTypes(idxs, baseType, gv->getValueType());
 
-  for (unsigned i = 2; i != gep->getNumOperands(); ++i)
-    idxs.push_back(gep->getOperand(i));
+  for (auto *idx : gep->getIndices())
+    idxs.push_back(idx);
 
-  Value *newGep = m_builder->CreateGEP(gv->getValueType(), gv, idxs);
+  Value *newGep = m_builder->create<StructuralGepOp>(gv, gv->getValueType(), gep->getInbound(), idxs);
   gep->replaceAllUsesWith(newGep);
-  if (Instruction *inst = dyn_cast<Instruction>(gep))
-    inst->eraseFromParent();
+  m_removeGeps.emplace_back(gep);
 }
 
 // =====================================================================================================================
@@ -102,7 +112,7 @@ void LowerAccessChain::tryToAddMissingIndicesBetweenGVandGEP(GEPOperator *gep) {
 //
 // @param loadInst : "Load" instruction
 void LowerAccessChain::visitLoadInst(LoadInst &loadInst) {
-  if (GEPOperator *gep = dyn_cast<GEPOperator>(loadInst.getPointerOperand())) {
+  if (auto *gep = dyn_cast<StructuralGepOp>(loadInst.getPointerOperand())) {
     m_builder->SetInsertPoint(&loadInst);
     tryToAddMissingIndicesBetweenGVandGEP(gep);
   }
@@ -113,7 +123,7 @@ void LowerAccessChain::visitLoadInst(LoadInst &loadInst) {
 //
 // @param storeInst : "Store" instruction
 void LowerAccessChain::visitStoreInst(StoreInst &storeInst) {
-  if (GEPOperator *gep = dyn_cast<GEPOperator>(storeInst.getPointerOperand())) {
+  if (auto *gep = dyn_cast<StructuralGepOp>(storeInst.getPointerOperand())) {
     m_builder->SetInsertPoint(&storeInst);
     tryToAddMissingIndicesBetweenGVandGEP(gep);
   }
@@ -127,18 +137,31 @@ void LowerAccessChain::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst)
   // NOTE: Here, we try to coalesce chained "getelementptr" instructions (created from multi-level access chain).
   // Because the metadata is always decorated on top-level pointer value (actually a global variable).
   const unsigned addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
-  if (addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output) {
-    GetElementPtrInst *gep = tryToCoalesceChain(&getElemPtrInst, addrSpace);
-    if (GEPOperator *gepOp = dyn_cast<GEPOperator>(gep)) {
-      m_builder->SetInsertPoint(gep);
-      tryToAddMissingIndicesBetweenGVandGEP(gepOp);
-    }
+  assert(addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output);
+  if (addrSpace == SPIRAS_Private) {
+    m_builder->SetInsertPoint(&getElemPtrInst);
+    tryToCoalesceChain(&getElemPtrInst);
   }
 }
 
 // =====================================================================================================================
-// Tries to coalesce chained "getelementptr" instructions (created from multi-level access chain) from bottom to top
-// in the type hierarchy.
+// Visits custom "getelementptr" instruction.
+//
+// @param getElemPtrInst : Custom "Getelementptr" instruction
+void LowerAccessChain::visitCallInst(CallInst &callInst) {
+  auto *structuralGep = dyn_cast<StructuralGepOp>(&callInst);
+  if (!structuralGep)
+    return;
+  [[maybe_unused]] const unsigned addrSpace = structuralGep->getBasePointer()->getType()->getPointerAddressSpace();
+  assert(addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output);
+  m_builder->SetInsertPoint(&callInst);
+  auto *gep = tryToCoalesceChain(structuralGep);
+  tryToAddMissingIndicesBetweenGVandGEP(cast<StructuralGepOp>(gep));
+}
+
+// =====================================================================================================================
+// Tries to coalesce chained custom GEP or "gelelementptr" instructions (created from multi-level access chain) from
+// bottom to top in the type hierarchy.
 //
 // e.g.
 //      %x = getelementptr %blockType, %blockType addrspace(N)* @block, i32 0, i32 L, i32 M
@@ -149,105 +172,112 @@ void LowerAccessChain::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst)
 //      %y = getelementptr %blockType, %blockType addrspace(N)* @block, i32 0, i32 L, i32 M, i32 N
 //
 //
-// @param getElemPtr : "getelementptr" instruction in the bottom to do coalescing
-// @param addrSpace : Address space of the pointer value of "getelementptr"
-GetElementPtrInst *LowerAccessChain::tryToCoalesceChain(GetElementPtrInst *getElemPtr, unsigned addrSpace) {
-  GetElementPtrInst *coalescedGetElemPtr = getElemPtr;
+// @param getElemPtr : "getelementptr" or custom "gep" instruction in the bottom to do coalescing
+Instruction *LowerAccessChain::tryToCoalesceChain(Instruction *getElemPtr) {
+  const bool isCustomGep = isa<StructuralGepOp>(getElemPtr);
+  auto getBasePointer = [=](Operator *gep) {
+    return isCustomGep ? cast<StructuralGepOp>(gep)->getBasePointer() : cast<GEPOperator>(gep)->getPointerOperand();
+  };
+  auto getBaseType = [=](Operator *gep) {
+    return isCustomGep ? cast<StructuralGepOp>(gep)->getBaseType() : cast<GEPOperator>(gep)->getSourceElementType();
+  };
+  auto getIndices = [=]<typename UnaryFunc>(Operator *gep, UnaryFunc &&stlRangeOp) {
+    using IterTy = decltype(std::declval<StructuralGepOp>().getIndices().begin());
+    auto range = isCustomGep ? cast<StructuralGepOp>(gep)->getIndices()
+                             : llvm::make_range(static_cast<IterTy>(cast<GEPOperator>(gep)->indices().begin()),
+                                                static_cast<IterTy>(cast<GEPOperator>(gep)->indices().end()));
+    return stlRangeOp(range);
+  };
 
-  std::stack<GEPOperator *> chainedInsts;       // Order: from top to bottom
-  std::stack<GetElementPtrInst *> removedInsts; // Order: from bottom to top
+  std::stack<Operator *> chainedInsts;    // Order: from top to bottom
+  std::stack<Instruction *> removedInsts; // Order: from bottom to top
 
-  // Collect chained "getelementptr" instructions and constants from bottom to top.
-  auto ptrVal = cast<GEPOperator>(getElemPtr);
+  // Collect chained "getelementptr" or custom "gep" instructions and constants from bottom to top.
+  auto *ptrVal = cast<Operator>(getElemPtr);
   for (;;) {
     chainedInsts.push(ptrVal);
-    ptrVal = dyn_cast<GEPOperator>(ptrVal->getOperand(0));
-    if (!ptrVal)
+    auto *basePointer = getBasePointer(ptrVal);
+    if (!isa<StructuralGepOp>(basePointer) && !isa<GEPOperator>(basePointer))
       break;
+    assert((isa<StructuralGepOp>(basePointer) && isCustomGep) || (isa<GEPOperator>(basePointer) && !isCustomGep));
+    ptrVal = cast<Operator>(basePointer);
   }
 
+  if (chainedInsts.size() <= 1)
+    return getElemPtr;
+
   // If there are more than one "getelementptr" instructions/constants, do coalescing
-  if (chainedInsts.size() > 1) {
-    SmallVector<Value *, 8> idxs;
-    unsigned startOperand = 1;
-    Value *basePtr = nullptr;
-    Type *coalescedType = nullptr;
+  SmallVector<Value *, 8> indices;
+  Value *basePtr = getBasePointer(chainedInsts.top());
+  Type *coalescedType = getBaseType(chainedInsts.top());
 
-    do {
-      ptrVal = chainedInsts.top();
-      chainedInsts.pop();
+  while (!chainedInsts.empty()) {
+    ptrVal = chainedInsts.top();
+    chainedInsts.pop();
 
-      if (coalescedType) {
-        Type *currentLevelGEPSourceType = ptrVal->getSourceElementType();
-        Type *oneLevelAboveGEPRetType = GetElementPtrInst::getIndexedType(coalescedType, idxs);
-        if (currentLevelGEPSourceType != oneLevelAboveGEPRetType) {
-          // For Opaque Pointers some of GEPs (all zero-index) will be removed and since Source Type of the coalesced
-          // GEP is equal to the top of chained GEPs, this will lead to accessing wrong place in memory.
-          //
-          // Example:
-          // %1 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
-          // addrspace(5) %381, i32 0, i32 1
-          //
-          // %2 = getelementptr [3 x [4 x { <3 x i32>, <3 x i32> }]], ptr addrspace(5) %1, i32 0, i32 0
-          // ^^^ all zero-index GEP, lack of this instruction for opaque pointers
-          //
-          // %3 = getelementptr [4 x { <3 x i32>, <3 x i32> }], ptraddrspace(5) %2, i32 0, i32 0
-          // ^^^ all zero-index GEP, lack of this instruction for opaque pointers
-          //
-          // %4 = getelementptr { <3 x i32>, <3 x i32> }, ptr addrspace(5) %3, i32 0, i32 1
-          //
-          //
-          // Result after Lower Access Chain:
-          //
-          // In case of non opaque pointers
-          // %5 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
-          // addrspace(5) %381, i32 0, i32 1, i32 0, i32 0, i32 1
-          //
-          // For opaque pointers
-          // %5 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
-          // addrspace(5) %381, i32 0, i32 1, i32 1
-          //
-          // We need to compare two chained GEP instructions and see if return Type of one is the same as Source
-          // Type of the other. If Types are not the same than we need to add
-          // missing zero-index elements to the "idxs" which are used to create new (coalesced) GEP instruction.
-          appendZeroIndexToMatchTypes(idxs, currentLevelGEPSourceType, oneLevelAboveGEPRetType);
-        }
-      }
-
-      for (unsigned i = startOperand; i != ptrVal->getNumOperands(); ++i)
-        idxs.push_back(ptrVal->getOperand(i));
-      // NOTE: For subsequent "getelementptr" instructions/constants, we skip the first two operands. The first
-      // operand is the pointer value from which the element pointer is constructed. And the second one is always
-      // 0 to dereference the pointer value.
-      startOperand = 2;
-
-      if (!basePtr) {
-        basePtr = ptrVal->getOperand(0);
-        coalescedType = ptrVal->getSourceElementType();
-      }
-
-      if (auto inst = dyn_cast<GetElementPtrInst>(ptrVal))
-        removedInsts.push(inst);
-    } while (!chainedInsts.empty());
-
-    // Create the coalesced "getelementptr" instruction (do combining)
-    coalescedGetElemPtr = GetElementPtrInst::Create(coalescedType, basePtr, idxs, "", getElemPtr);
-    getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
-
-    // Remove dead "getelementptr" instructions where possible.
-    while (!removedInsts.empty()) {
-      GetElementPtrInst *inst = removedInsts.top();
-      if (inst->user_empty()) {
-        if (inst == getElemPtr) {
-          // We cannot remove the current instruction that InstWalker is on. Just stop it using its
-          // pointer operand, and it will be DCEd later.
-          auto &operand = inst->getOperandUse(0);
-          operand = PoisonValue::get(operand->getType());
-        } else
-          inst->eraseFromParent();
-      }
-      removedInsts.pop();
+    Type *currentLevelGEPSourceType = getBaseType(ptrVal);
+    Type *oneLevelAboveGEPRetType = GetElementPtrInst::getIndexedType(coalescedType, indices);
+    if (currentLevelGEPSourceType != oneLevelAboveGEPRetType) {
+      // For Opaque Pointers some of GEPs (all zero-index) will be removed and since Source Type of the coalesced
+      // GEP is equal to the top of chained GEPs, this will lead to accessing wrong place in memory.
+      //
+      // Example:
+      // %1 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
+      // addrspace(5) %381, i32 0, i32 1
+      //
+      // %2 = getelementptr [3 x [4 x { <3 x i32>, <3 x i32> }]], ptr addrspace(5) %1, i32 0, i32 0
+      // ^^^ all zero-index GEP, lack of this instruction for opaque pointers
+      //
+      // %3 = getelementptr [4 x { <3 x i32>, <3 x i32> }], ptraddrspace(5) %2, i32 0, i32 0
+      // ^^^ all zero-index GEP, lack of this instruction for opaque pointers
+      //
+      // %4 = getelementptr { <3 x i32>, <3 x i32> }, ptr addrspace(5) %3, i32 0, i32 1
+      //
+      //
+      // Result after Lower Access Chain:
+      //
+      // In case of non opaque pointers
+      // %5 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
+      // addrspace(5) %381, i32 0, i32 1, i32 0, i32 0, i32 1
+      //
+      // For opaque pointers
+      // %5 = getelementptr { i64, [3 x [4 x { <3 x i32>, <3 x i32> }]], [3 x [4 x i32]] }, ptr
+      // addrspace(5) %381, i32 0, i32 1, i32 1
+      //
+      // We need to compare two chained GEP instructions and see if return Type of one is the same as Source
+      // Type of the other. If Types are not the same than we need to add
+      // missing zero-index elements to the "idxs" which are used to create new (coalesced) GEP instruction.
+      appendZeroIndexToMatchTypes(indices, currentLevelGEPSourceType, oneLevelAboveGEPRetType);
     }
+
+    // NOTE: For subsequent "getelementptr" instructions/constants, we skip the first index due to it's always 0 to
+    // dereference the pointer value.
+    const unsigned skipCount = basePtr == getBasePointer(ptrVal) ? 0 : 1;
+    for (auto *idx : getIndices(ptrVal, [=](auto range) {
+           assert(llvm::range_size(range) > 0);
+           return llvm::drop_begin(range, skipCount);
+         }))
+      indices.emplace_back(idx);
+
+    assert(isa<GetElementPtrInst>(ptrVal) || isa<StructuralGepOp>(ptrVal));
+    removedInsts.push(cast<Instruction>(ptrVal));
+  }
+
+  // Create the coalesced "getelementptr" instruction (do combining)
+  auto *coalescedGetElemPtr =
+      isCustomGep ? cast<Instruction>(m_builder->create<StructuralGepOp>(basePtr, coalescedType, false, indices))
+                  : cast<Instruction>(GetElementPtrInst::Create(coalescedType, basePtr, indices, "", getElemPtr));
+  getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
+
+  // Remove dead "getelementptr" instructions where possible.
+  while (!removedInsts.empty()) {
+    Instruction *inst = removedInsts.top();
+    if (inst->user_empty()) {
+      auto *poison = PoisonValue::get(getBasePointer(cast<Operator>(inst))->getType());
+      inst->setOperand(0, poison);
+      m_removeGeps.emplace_back(inst);
+    }
+    removedInsts.pop();
   }
 
   return coalescedGetElemPtr;

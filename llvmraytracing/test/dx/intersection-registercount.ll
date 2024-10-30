@@ -1,4 +1,4 @@
-; RUN: opt --verify-each --report-payload-register-sizes=max -passes='dxil-cont-intrinsic-prepare,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,continuations-stats-report,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
+; RUN: opt --verify-each --report-payload-register-sizes=max -passes='dxil-cont-intrinsic-prepare,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,continuations-stats-report,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: Incoming and max outgoing payload VGPR size of "Intersection" (intersection): 25 and 25 dwords
 
@@ -36,6 +36,8 @@ declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversa
 declare !pointeetys !21 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData*) #0
 
 declare !pointeetys !23 %struct.HitData @_cont_GetCommittedState(%struct.SystemData*) #0
+
+declare !pointeetys !24 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
 define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #0 !pointeetys !24 {
   ret i32 5

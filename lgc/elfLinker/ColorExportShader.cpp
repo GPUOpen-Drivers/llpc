@@ -31,7 +31,7 @@
  */
 
 #include "ColorExportShader.h"
-#include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/FragmentColorExport.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Target/TargetMachine.h"

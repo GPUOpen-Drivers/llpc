@@ -138,10 +138,12 @@ namespace Llpc {
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics IP version info
+// @param apiName : API name from client, "Vulkan" or "OpenGL"
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
-PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash) {
+PipelineContext::PipelineContext(GfxIpVersion gfxIp, const char *apiName, MetroHash::Hash *pipelineHash,
+                                 MetroHash::Hash *cacheHash)
+    : m_gfxIp(gfxIp), m_apiName(apiName), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash) {
 }
 
 // =====================================================================================================================
@@ -220,7 +222,8 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
   if (pipeline) {
     pipeline->set128BitCacheHash(get128BitCacheHashCode(),
                                  VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
-    pipeline->setClient("Vulkan");
+    assert(m_apiName);
+    pipeline->setClient(m_apiName);
     if (getPreRasterHasGs())
       pipeline->setPreRasterHasGs(true);
   }
@@ -296,6 +299,7 @@ Options PipelineContext::computePipelineOptions() const {
     }
   }
 
+  options.robustBufferAccess = getPipelineOptions()->robustBufferAccess;
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.enableExtendedRobustBufferAccess = getPipelineOptions()->extendedRobustness.robustBufferAccess;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
@@ -303,6 +307,7 @@ Options PipelineContext::computePipelineOptions() const {
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
+  options.optimizePointSizeWrite = getPipelineOptions()->optimizePointSizeWrite;
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;

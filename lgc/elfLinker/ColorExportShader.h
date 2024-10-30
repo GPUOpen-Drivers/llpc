@@ -32,7 +32,7 @@
 #pragma once
 
 #include "GlueShader.h"
-#include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/FragmentColorExport.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 

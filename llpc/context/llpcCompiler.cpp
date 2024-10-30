@@ -96,6 +96,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <cassert>
 #include <condition_variable>
@@ -377,8 +378,11 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
   assert(gfxIp.major >= 10); // Only accept GFx10+
   Result result = Result::Success;
 
-  const char *client = options[0];
-  bool ignoreErrors = (strcmp(client, VkIcdName) == 0);
+  StringRef client(options[0]);
+  bool ignoreErrors = (client == VkIcdName);
+
+  // Set API name according to client
+  const char *apiName = (client == VkIcdName || client == VkCompilerName) ? "Vulkan" : "OpenGL";
 
   raw_null_ostream nullStream;
 
@@ -416,7 +420,7 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
 
   if (result == Result::Success) {
     SOptionHash = optionHash;
-    *ppCompiler = new Compiler(gfxIp, optionCount, options, SOptionHash, cache);
+    *ppCompiler = new Compiler(gfxIp, apiName, optionCount, options, SOptionHash, cache);
     assert(*ppCompiler);
   } else {
     *ppCompiler = nullptr;
@@ -437,13 +441,14 @@ bool VKAPI_CALL ICompiler::IsVertexFormatSupported(VkFormat format) {
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics IP version info
+// @param apiName : API name from client, "Vulkan" or "OpenGL"
 // @param optionCount : Count of compilation-option strings
 // @param options : An array of compilation-option strings
 // @param optionHash : Hash code of compilation options
 // @param cache : Pointer to ICache implemented in client
-Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
-                   ICache *cache)
-    : m_gfxIp(gfxIp), m_cache(cache), m_relocatablePipelineCompilations(0) {
+Compiler::Compiler(GfxIpVersion gfxIp, const char *apiName, unsigned optionCount, const char *const *options,
+                   MetroHash::Hash optionHash, ICache *cache)
+    : m_gfxIp(gfxIp), m_apiName(apiName), m_cache(cache), m_relocatablePipelineCompilations(0) {
   for (unsigned i = 0; i < optionCount; ++i)
     m_options.push_back(options[i]);
 
@@ -638,18 +643,93 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorInvalidPointer;
   }
 
-  auto codeSizeOrErr = ShaderModuleHelper::getCodeSize(shaderInfo);
+  // Check if we can get data from cache
+  CacheAccessor cacheAccessor(hash, getInternalCaches());
+  if (cacheAccessor.isInCache()) {
+    BinaryData dataInCache = cacheAccessor.getElfFromCache();
+
+    uint8_t *allocBuf = static_cast<uint8_t *>(
+        shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, dataInCache.codeSize));
+    if (!allocBuf)
+      return Result::ErrorOutOfMemory;
+
+    uint8_t *bufferWritePtr = allocBuf;
+    memcpy(bufferWritePtr, dataInCache.pCode, dataInCache.codeSize);
+
+    ShaderModuleData *shaderModuleData = reinterpret_cast<ShaderModuleData *>(bufferWritePtr);
+    bufferWritePtr += sizeof(ShaderModuleData);
+
+    shaderModuleData->binCode.pCode = bufferWritePtr;
+    bufferWritePtr += shaderModuleData->binCode.codeSize;
+
+    if (shaderInfo->options.pipelineOptions.getGlState().buildResourcesDataForShaderModule &&
+        shaderModuleData->binType == BinaryType::Spirv) {
+      ResourcesNodes *resources = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
+      shaderModuleData->usage.pResources = resources;
+      bufferWritePtr += sizeof(ResourcesNodes);
+
+      resources->pInputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->inputInfoCount * sizeof(ResourceNodeData);
+
+      resources->pOutputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->outputInfoCount * sizeof(ResourceNodeData);
+
+      resources->pUniformBufferInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->uniformBufferInfoCount * sizeof(ResourceNodeData);
+
+      resources->pShaderStorageInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->shaderStorageInfoCount * sizeof(ResourceNodeData);
+
+      resources->pTexturesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->textureInfoCount * sizeof(ResourceNodeData);
+
+      resources->pImagesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->imageInfoCount * sizeof(ResourceNodeData);
+
+      resources->pAtomicCounterInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->atomicCounterInfoCount * sizeof(ResourceNodeData);
+
+      resources->pDefaultUniformInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+      bufferWritePtr += shaderModuleData->usage.pResources->defaultUniformInfoCount * sizeof(ResourceNodeData);
+    }
+
+    shaderOut->pModuleData = shaderModuleData;
+
+    if (shaderModuleData->binType == BinaryType::Spirv && cl::EnablePipelineDump) {
+      // Dump the original input binary, since the offline tool will re-run BuildShaderModule
+      PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
+    }
+
+    return Result::Success;
+  }
+
+  auto codeSizeOrErr = ShaderModuleHelper::getShaderCodeSize(shaderInfo);
   if (Error err = codeSizeOrErr.takeError())
     return errorToResult(std::move(err));
 
   const unsigned codeSize = *codeSizeOrErr;
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
 
-  ShaderModuleData moduleData = {};
   std::vector<unsigned> codeBufferVector(codeSize / sizeof(unsigned));
   MutableArrayRef<unsigned> codeBuffer(codeBufferVector);
+
+  ShaderModuleData moduleData = {};
+  Result result = ShaderModuleHelper::getShaderBinaryType(shaderInfo->shaderBin, moduleData.binType);
+  if (result != Result::Success)
+    return result;
+
   memcpy(moduleData.hash, &hash, sizeof(hash));
-  Result result = ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, moduleData);
+
+  std::unique_ptr<SPIRVModule> module;
+  if (moduleData.binType == BinaryType::Spirv) {
+    // Parser SPIR-V binary
+    std::string spvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
+    std::istringstream spvStream(spvCode);
+    module.reset(SPIRVModule::createSPIRVModule());
+    spvStream >> *module;
+  }
+
+  result = ShaderModuleHelper::getModuleData(shaderInfo, module.get(), codeBuffer, moduleData);
 
   ResourcesNodes resourceNodes = {};
   std::vector<ResourceNodeData> inputSymbolInfo;
@@ -662,9 +742,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   std::vector<ResourceNodeData> defaultUniformSymbolInfo;
   if (shaderInfo->options.pipelineOptions.getGlState().buildResourcesDataForShaderModule &&
       moduleData.binType == BinaryType::Spirv) {
-    buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
-                                   storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
-                                   defaultUniformSymbolInfo, moduleData.usage);
+    buildShaderModuleResourceUsage(shaderInfo, module.get(), resourceNodes, inputSymbolInfo, outputSymbolInfo,
+                                   uniformBufferInfo, storageBufferInfo, textureSymbolInfo, imageSymbolInfo,
+                                   atomicCounterSymbolInfo, defaultUniformSymbolInfo, moduleData.usage);
 
     allocSize += sizeof(ResourcesNodes);
     allocSize += inputSymbolInfo.size() * sizeof(ResourceNodeData);
@@ -692,58 +772,60 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorOutOfMemory;
 
   uint8_t *bufferWritePtr = allocBuf;
-  ShaderModuleData *pShaderModuleData = nullptr;
-  ResourcesNodes *pResourcesNodes = nullptr;
-
   memcpy(bufferWritePtr, &moduleData, sizeof(moduleData));
-  pShaderModuleData = reinterpret_cast<ShaderModuleData *>(bufferWritePtr);
+
+  ShaderModuleData *shaderModuleData = reinterpret_cast<ShaderModuleData *>(bufferWritePtr);
   bufferWritePtr += sizeof(ShaderModuleData);
 
   memcpy(bufferWritePtr, codeBuffer.data(), codeBuffer.size() * sizeof(unsigned));
-  pShaderModuleData->binCode.pCode = bufferWritePtr;
+  shaderModuleData->binCode.pCode = bufferWritePtr;
   bufferWritePtr += codeBuffer.size() * sizeof(unsigned);
 
   if (shaderInfo->options.pipelineOptions.getGlState().buildResourcesDataForShaderModule &&
       moduleData.binType == BinaryType::Spirv) {
     memcpy(bufferWritePtr, &resourceNodes, sizeof(ResourcesNodes));
-    pResourcesNodes = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
-    pShaderModuleData->usage.pResources = pResourcesNodes;
+    ResourcesNodes *resources = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
+    shaderModuleData->usage.pResources = resources;
     bufferWritePtr += sizeof(ResourcesNodes);
 
     memcpy(bufferWritePtr, inputSymbolInfo.data(), inputSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pInputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pInputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += inputSymbolInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, outputSymbolInfo.data(), outputSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pOutputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pOutputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += outputSymbolInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, uniformBufferInfo.data(), uniformBufferInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pUniformBufferInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pUniformBufferInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += uniformBufferInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, storageBufferInfo.data(), storageBufferInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pShaderStorageInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pShaderStorageInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += storageBufferInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, textureSymbolInfo.data(), textureSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pTexturesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pTexturesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += textureSymbolInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, imageSymbolInfo.data(), imageSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pImagesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pImagesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += imageSymbolInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, atomicCounterSymbolInfo.data(), atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pAtomicCounterInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pAtomicCounterInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, defaultUniformSymbolInfo.data(), defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pDefaultUniformInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    resources->pDefaultUniformInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
   }
 
-  shaderOut->pModuleData = pShaderModuleData;
+  shaderOut->pModuleData = shaderModuleData;
+
+  // Add data to cache
+  BinaryData dataToCache = {allocSize, allocBuf};
+  cacheAccessor.setElfInCache(dataToCache);
 
   if (moduleData.binType == BinaryType::Spirv && cl::EnablePipelineDump) {
     // Dump the original input binary, since the offline tool will re-run BuildShaderModule
@@ -975,10 +1057,11 @@ static void getShaderModuleUsageFromInst(SPIRVModule *module, SPIRVFunction *fun
 }
 
 // =====================================================================================================================
-// Parse the spirv binary to build the resource node data for buffers and opaque types, the resource node data will be
-// returned to client driver together with other info of ShaderModuleUsage
+// Analyze the SPIR-V module to build the resource node data for buffers and opaque types, the resource node data will
+// be returned to client driver together with other info of ShaderModuleUsage
 //
-// @param shaderInfo : Input shader info, including spirv binary
+// @param shaderInfo : Input shader info
+// @param module : SPIR-V module
 // @param [out] resourcesNodes : Output of resource usage
 // @param [out] inputSymbolInfos : Output of input symbol infos
 // @param [out] outputSymbolInfo : Output of output symbol infos
@@ -989,18 +1072,12 @@ static void getShaderModuleUsageFromInst(SPIRVModule *module, SPIRVFunction *fun
 // @param [out] atomicCounterSymbolInfo : Output of atomic counter symbol infos
 // @param [out] defaultUniformSymbolInfo : Output of default uniform symbol infos
 void Compiler::buildShaderModuleResourceUsage(
-    const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+    const ShaderModuleBuildInfo *shaderInfo, SPIRVModule *module, Vkgc::ResourcesNodes &resourcesNodes,
     std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
     std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
     std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
     std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo,
     ShaderModuleUsage &shaderModuleUsage) {
-  // Parse the SPIR-V stream.
-  std::string spirvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
-  std::istringstream spirvStream(spirvCode);
-  std::unique_ptr<SPIRVModule> module(SPIRVModule::createSPIRVModule());
-  spirvStream >> *module;
-
   ShaderStage shaderStage = shaderInfo->entryStage;
   std::set<unsigned> texelFetchImageIds;
 
@@ -1009,7 +1086,7 @@ void Compiler::buildShaderModuleResourceUsage(
   SPIRVFunction *func = nullptr;
   for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i) {
     func = module->getFunction(i);
-    getShaderModuleUsageFromInst(module.get(), func, texelFetchImageIds, shaderModuleUsage);
+    getShaderModuleUsageFromInst(module, func, texelFetchImageIds, shaderModuleUsage);
     entryPoint = module->getEntryPoint(func->getId());
     if (entryPoint && entryPoint->getExecModel() == convertToExecModel(shaderStage) &&
         entryPoint->getName() == shaderInfo->pEntryTarget)
@@ -1046,7 +1123,7 @@ void Compiler::buildShaderModuleResourceUsage(
     }
   }
 
-  // Spirv Reader will expand matrix to vector arrays.
+  // SPIR-V Reader will expand matrix to vector arrays.
   // Add more rsrc node here to avoid poison value in vtxFetch.
   if (shaderInfo->entryStage == ShaderStage::ShaderStageVertex) {
     size_t inputSymbolSize = inputSymbolWithArrayInfo.size();
@@ -1229,7 +1306,7 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
   pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, stage);
 
   // Compile
-  GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+  GraphicsContext graphicsContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
   Context *context = acquireContext();
   context->attachPipelineContext(&graphicsContext);
   auto onExit = make_scope_exit([&] { releaseContext(context); });
@@ -1345,7 +1422,10 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
   hasher.Update(pipelineInfo->cbState);
   hasher.Finalize(pipelineHash.bytes);
 
-  GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+  // For color export shader, we don't use this cacheHash to cache ELF (re-calculate cache hash later), but some tools
+  // expect it is not zero, make a simply copy from pipelineHash here, which only affects '.internal_pipeline_hash'.
+  cacheHash = pipelineHash;
+  GraphicsContext graphicsContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
   Context *context = acquireContext();
   context->attachPipelineContext(&graphicsContext);
   LgcContext *builderContext = context->getLgcContext();
@@ -1490,7 +1570,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
       pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
 
-    GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+    GraphicsContext graphicsContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
     Context *context = acquireContext();
     context->attachPipelineContext(&graphicsContext);
 
@@ -1937,6 +2017,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
       }
+
+      context->getBuilder()->SetCurrentDebugLocation(nullptr);
 
       // Add the shader module to the list for the pipeline.
       modulesToLink.push_back(std::move(modules[shaderIndex]));
@@ -2410,7 +2492,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache miss for graphics pipeline.\n");
-    GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+    GraphicsContext graphicsContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
     result = buildGraphicsPipelineInternal(&graphicsContext, shaderInfo, buildUsingRelocatableElf, &candidateElf,
                                            pipelineOut->stageCacheAccesses);
 
@@ -2539,7 +2621,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   ElfPackage candidateElf;
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache miss for compute pipeline.\n");
-    ComputeContext computeContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+    ComputeContext computeContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
     result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
 
@@ -2632,8 +2714,8 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
   if (pipelineInfo->shaderCount > 0)
     representativeShaderInfo = &pipelineInfo->pShaders[0];
 
-  RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, representativeShaderInfo, &pipelineHash, &cacheHash,
-                                      pipelineInfo->indirectStageMask);
+  RayTracingContext rayTracingContext(m_gfxIp, m_apiName, pipelineInfo, representativeShaderInfo, &pipelineHash,
+                                      &cacheHash, pipelineInfo->indirectStageMask);
   auto &summary = rayTracingContext.getRayTracingLibrarySummary();
   summary.knownSetRayFlags = ~0;
   summary.knownUnsetRayFlags = ~0;
@@ -2843,6 +2925,11 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(context->getLgcContext()));
     passMgr->registerModuleAnalysis([&] { return DialectContextAnalysis(false); });
     passMgr->addPass(LowerRaytracingPipelinePass());
+
+    // SpecializeDriverShadersPass relies on allocas introduced by LowerRaytracingPipelinePass being eliminated by SROA
+    passMgr->addPass(createModuleToFunctionPassAdaptor(SROAPass(llvm::SROAOptions::ModifyCFG)));
+    passMgr->addPass(SpecializeDriverShadersPass());
+
     bool success = runPasses(&*passMgr, module.get());
     assert(success);
     (void(success)); // unused

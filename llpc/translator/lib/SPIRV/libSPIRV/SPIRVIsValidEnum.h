@@ -569,8 +569,8 @@ inline bool isValid(spv::Capability V) {
   case CapabilityWorkgroupMemoryExplicitLayoutKHR:
   case CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR:
   case CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR:
-  case CapabilityComputeDerivativeGroupLinearNV:
-  case CapabilityComputeDerivativeGroupQuadsNV:
+  case CapabilityComputeDerivativeGroupLinearKHR:
+  case CapabilityComputeDerivativeGroupQuadsKHR:
   case CapabilityExpectAssumeKHR:
   case CapabilityGroupNonUniformRotateKHR:
   case CapabilityQuadControlKHR:

@@ -40,17 +40,19 @@ using namespace llvm;
 namespace Llpc {
 // =====================================================================================================================
 //
-// @param gfxIP : Graphics Ip version info
+// @param gfxIp : Graphics Ip version info
+// @param apiName : API name from client, "Vulkan" or "OpenGL"
 // @param pipelineInfo : Ray tracing pipeline build info
 // @param traceRayShaderInfo : Trace ray shader info
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
-RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelineBuildInfo *pipelineInfo,
+RayTracingContext::RayTracingContext(GfxIpVersion gfxIp, const char *apiName,
+                                     const RayTracingPipelineBuildInfo *pipelineInfo,
                                      const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                                      MetroHash::Hash *cacheHash, unsigned indirectStageMask)
-    : PipelineContext(gfxIP, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_representativeShaderInfo(),
-      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""), m_callableDataMaxSize(0),
-      m_rayFlagsKnownBits(std::nullopt) {
+    : PipelineContext(gfxIp, apiName, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo),
+      m_representativeShaderInfo(), m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
+      m_callableDataMaxSize(0), m_rayFlagsKnownBits(std::nullopt) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   gpurtShaderLibrary = &pipelineInfo->shaderTraceRay;

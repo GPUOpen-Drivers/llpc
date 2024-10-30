@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  AddLoopMetadata.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchLoopMetadata.
+ * @brief LLPC source file: contains implementation of class lgc::AddLoopMetadata.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/AddLoopMetadata.h"
@@ -35,7 +35,7 @@
 #include "llvm/Support/Debug.h"
 #include <vector>
 
-#define DEBUG_TYPE "lgc-patch-loop-metadata"
+#define DEBUG_TYPE "lgc-add-loop-metadata"
 
 using namespace llvm;
 using namespace lgc;
@@ -54,8 +54,8 @@ typedef OuterAnalysisManagerProxy<ModuleAnalysisManager, Loop, LoopStandardAnaly
 // @param prefixesToRemove : metadata prefixes to be removed
 // @param newMetadata : the new metadata to be added
 // @param conditional : true if the new metadata is only to be added if one or more prefixes was removed
-MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> prefixesToRemove, Metadata *newMetadata,
-                                          bool conditional) {
+MDNode *AddLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> prefixesToRemove, Metadata *newMetadata,
+                                        bool conditional) {
   bool found = false;
   SmallVector<Metadata *, 4> mds;
   // Reserve first location for self reference to the loopId metadata node.
@@ -84,7 +84,7 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
 };
 
 // =====================================================================================================================
-PatchLoopMetadata::PatchLoopMetadata()
+AddLoopMetadata::AddLoopMetadata()
     : m_context(nullptr), m_forceLoopUnrollCount(0), m_disableLoopUnroll(false), m_disableLicmThreshold(0),
       m_unrollHintThreshold(0), m_dontUnrollHintThreshold(0) {
 }
@@ -96,13 +96,13 @@ PatchLoopMetadata::PatchLoopMetadata()
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @param [in/out] loopAnalysisResult : Loop standard analysis results
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchLoopMetadata::run(Loop &loop, LoopAnalysisManager &analysisManager,
-                                         LoopStandardAnalysisResults &loopAnalysisResults, LPMUpdater &) {
+PreservedAnalyses AddLoopMetadata::run(Loop &loop, LoopAnalysisManager &analysisManager,
+                                       LoopStandardAnalysisResults &loopAnalysisResults, LPMUpdater &) {
   Module *module = loop.getHeader()->getModule();
   const auto &mamProxy = analysisManager.getResult<ModuleAnalysisManagerLoopProxy>(loop, loopAnalysisResults);
   PipelineState *pipelineState = mamProxy.getCachedResult<PipelineStateWrapper>(*module)->getPipelineState();
 
-  LLVM_DEBUG(dbgs() << "Run the pass lgc-patch-loop-metadata\n");
+  LLVM_DEBUG(dbgs() << "Run the pass Add-Loop-Metadata\n");
 
   Function *func = loop.getHeader()->getFirstNonPHI()->getFunction();
   PipelineState *mPipelineState = pipelineState;

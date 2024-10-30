@@ -37,6 +37,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.5 | Add optimizePointSizeWrite to PipelineShaderOptions in order to optimize the case PointSize = 1.0.    |
 //  |     75.4 | Add disableGlPositionOpt to PipelineShaderOptions.                                                    |
 //  |     75.3 | Add enableInitUndefZero to GraphicPipelineBuildInfo                                                   |
 //  |     75.2 | Add CompileConstInfo to PipelineShaderOptions.                                                        |
@@ -196,7 +197,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 4
+#define LLPC_INTERFACE_MINOR_VERSION 5
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

@@ -83,13 +83,10 @@ public:
   };
 
 private:
-  void lowerGetResumePointAddr(Function &F);
-
   void handleContStackIntrinsic(FunctionAnalysisManager &FAM, Function &F);
 
   void initializeProcessableFunctionData();
-  bool replaceIntrinsicCalls(Function &F, const FunctionData &Data);
-  bool handleIntrinsicCalls(llvm::ModuleAnalysisManager &AnalysisManager);
+  bool handleContStackIntrinsics(llvm::ModuleAnalysisManager &AnalysisManager);
   bool lowerCpsOps();
   void lowerJumpOp(lgc::cps::JumpOp &JumpOp);
   void lowerAsContinuationReferenceOp(lgc::cps::AsContinuationReferenceOp &AsCrOp);
@@ -152,81 +149,6 @@ static Function *getContinuationGetAddrAndMD(Module &M) {
       if (!IsStart && HasStackSizeMetadata)
         report_fatal_error("Found resume function with stack size metadata!");
     }
-  }
-}
-
-void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
-  auto *GetResumePointAddr = &F;
-
-  assert(GetResumePointAddr->getReturnType()->isIntegerTy(64) && GetResumePointAddr->arg_size() == 0);
-
-  // Search calls to GetResumePointAddr, and lower it to the argument of the
-  // next continue call. Then remove it from that continue call.
-  for (auto &Use : make_early_inc_range(GetResumePointAddr->uses())) {
-    auto *CInst = dyn_cast<CallInst>(Use.getUser());
-    if (!CInst || !CInst->isCallee(&Use) || ToProcess.count(CInst->getFunction()) == 0) {
-      // Non-call use, or call in unknown function. This will likely result in a
-      // remaining non-lowered call reported as error at the end of this
-      // function.
-      continue;
-    }
-
-    // Instead of passing the resume address to the next continue call,
-    // use it as the return value of GetResumePointAddr and remove it from
-    // the continue arguments.
-    auto FoundContinueCall = findDominatedContinueCall(CInst);
-
-    if (!FoundContinueCall) {
-      report_fatal_error("Did not find a continue call after a "
-                         "GetResumePointAddr");
-    }
-    auto *ContinueCall = *FoundContinueCall;
-
-    unsigned ReturnAddrArgNum = 1;
-    Value *ReturnAddr = nullptr;
-
-    if (auto *Jump = dyn_cast<lgc::cps::JumpOp>(ContinueCall)) {
-      ReturnAddrArgNum = 3;
-      ReturnAddr = Jump->getRcr();
-    }
-
-    assert((ReturnAddr->getType() == Builder.getInt64Ty()) && "Unexpected return addr type!");
-
-    SmallVector<Instruction *> MoveInstrs;
-    if (auto *I = dyn_cast<Instruction>(ReturnAddr)) {
-      if (!I->comesBefore(CInst))
-        MoveInstrs.push_back(I);
-    }
-
-    unsigned Done = 0;
-    while (Done < MoveInstrs.size()) {
-      for (auto &O : MoveInstrs[Done]->operands()) {
-        if (auto *I = dyn_cast<Instruction>(O)) {
-          if (!I->comesBefore(CInst))
-            MoveInstrs.push_back(I);
-        }
-      }
-      ++Done;
-    }
-    for (auto I = MoveInstrs.rbegin(), E = MoveInstrs.rend(); I != E; ++I)
-      (*I)->moveBefore(CInst);
-
-    CInst->replaceAllUsesWith(ReturnAddr);
-
-    // Re-create the lgc.ilcps.continue / lgc.cps.jump call without the return address
-    // argument.
-    SmallVector<Value *> Args;
-    for (unsigned I = 0; I < ContinueCall->arg_size(); I++) {
-      if (I != ReturnAddrArgNum)
-        Args.push_back(ContinueCall->getArgOperand(I));
-    }
-
-    Builder.SetInsertPoint(ContinueCall);
-    auto *NewCall = Builder.CreateCall(ContinueCall->getCalledFunction(), Args);
-    NewCall->copyMetadata(*ContinueCall);
-
-    CInst->eraseFromParent();
-    ContinueCall->eraseFromParent();
   }
 }
 
@@ -413,25 +335,11 @@ void DXILContPostProcessPassImpl::initializeProcessableFunctionData() {
   }
 }
 
-bool DXILContPostProcessPassImpl::handleIntrinsicCalls(llvm::ModuleAnalysisManager &AnalysisManager) {
+bool DXILContPostProcessPassImpl::handleContStackIntrinsics(llvm::ModuleAnalysisManager &AnalysisManager) {
   bool Changed = false;
 
   for (auto &F : Mod->functions()) {
-    auto Name = F.getName();
-    if (Name.starts_with("lgc.rt")) {
-      // Search for known HLSL intrinsics
-      llvm::forEachCall(F, [&](CallInst &CInst) {
-        auto Data = ToProcess.find(CInst.getFunction());
-        if (Data != ToProcess.end()) {
-          auto IntrImplEntry = llvm::findIntrImplEntryByIntrinsicCall(&CInst);
-          if (IntrImplEntry == std::nullopt)
-            return;
-
-          Data->second.IntrinsicCalls.push_back(&CInst);
-          Changed = true;
-        }
-      });
-    } else if (Name.contains("ContStack")) {
+    if (F.getName().contains("ContStack")) {
       Changed = true;
 
       auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(*Mod).getManager();
@@ -441,33 +349,6 @@ bool DXILContPostProcessPassImpl::handleIntrinsicCalls(llvm::ModuleAnalysisManag
   }
 
   return Changed;
-}
-
-bool DXILContPostProcessPassImpl::replaceIntrinsicCalls(Function &F, const FunctionData &Data) {
-  if (Data.IntrinsicCalls.empty())
-    return false;
-
-  [[maybe_unused]] auto *FuncTy = F.getFunctionType();
-
-  assert(FuncTy->getNumParams() > Data.SystemDataArgumentIndex && "Missing system data argument");
-  Builder.SetInsertPointPastAllocas(&F);
-
-  // Intrinsics need a pointer, so allocate and store the system data argument
-  Value *SystemDataArgument = F.getArg(Data.SystemDataArgumentIndex);
-  Value *SystemDataPtr = Builder.CreateAlloca(Data.SystemDataTy);
-  SystemDataPtr->setName("system.data.alloca");
-  // Extract the original system data from the { systemData, padding, payload }
-  // struct returned by await.
-  if (!Data.IsStart)
-    SystemDataArgument = Builder.CreateExtractValue(SystemDataArgument, 0);
-  Builder.CreateStore(SystemDataArgument, SystemDataPtr);
-
-  for (auto *Call : Data.IntrinsicCalls)
-    replaceIntrinsicCall(Builder, Data.SystemDataTy, SystemDataPtr,
-                         ShaderStageHelper::dxilShaderKindToRtShaderStage(Data.Kind).value(), Call, GpurtLibrary,
-                         CrossInliner);
-
-  return true;
 }
 
 //
@@ -480,7 +361,6 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
     DXILContPostProcessPassImpl &Self;
     bool &Changed;
     llvm_dialects::Builder &Builder;
-    Function *GetAddrAndMD;
   };
 
   // Note: It is a bit unlucky that we are using both a visitor for
@@ -501,7 +381,7 @@ bool DXILContPostProcessPassImpl::lowerCpsOps() {
                                      })
                                      .build();
 
-  CpsVisitorState State{*this, Changed, Builder, getContinuationGetAddrAndMD(*Mod)};
+  CpsVisitorState State{*this, Changed, Builder};
 
   struct CspCandidateInfo {
     bool RequiresCspArgument = false;
@@ -553,12 +433,12 @@ void DXILContPostProcessPassImpl::lowerJumpOp(lgc::cps::JumpOp &JumpOp) {
 
   SmallVector<Value *> TailArgs{JumpOp.getTail()};
   Value *RetAddr = Builder.CreateZExt(JumpOp.getRcr(), Builder.getInt64Ty());
-  if (auto WaitMask = ContHelper::tryGetWaitMask(JumpOp)) {
-    ContinueOp = Builder.create<lgc::ilcps::WaitContinueOp>(RCR, Builder.getInt64(WaitMask.value()),
-                                                            PoisonValue::get(Builder.getInt32Ty()), RetAddr, TailArgs);
+  if (ContHelper::isWaitAwaitCall(JumpOp)) {
+    ContinueOp =
+        Builder.create<lgc::ilcps::WaitContinueOp>(RCR, Builder.getInt64(-1), JumpOp.getCsp(), RetAddr, TailArgs);
     ContHelper::removeWaitMask(JumpOp);
   } else {
-    ContinueOp = Builder.create<lgc::ilcps::ContinueOp>(RCR, PoisonValue::get(Builder.getInt32Ty()), RetAddr, TailArgs);
+    ContinueOp = Builder.create<lgc::ilcps::ContinueOp>(RCR, JumpOp.getCsp(), RetAddr, TailArgs);
   }
 
   ContinueOp->copyMetadata(JumpOp);
@@ -656,20 +536,11 @@ PreservedAnalyses DXILContPostProcessPassImpl::run(ModuleAnalysisManager &Analys
   initializeProcessableFunctionData();
 
   Changed |= handleAmdInternals();
-  Changed |= handleIntrinsicCalls(AnalysisManager);
+  Changed |= handleContStackIntrinsics(AnalysisManager);
 
   for (auto &[Func, Data] : ToProcess) {
     ContHelper::IncomingRegisterCount::reset(Func);
     ContHelper::ContinuationStateByteCount::reset(Func);
-    Changed |= replaceIntrinsicCalls(*Func, Data);
-  }
-
-  for (auto &F : make_early_inc_range(*Mod)) {
-    auto FuncName = F.getName();
-    if (FuncName.starts_with("_AmdGetResumePointAddr")) {
-      Changed = true;
-      lowerGetResumePointAddr(F);
-    }
   }
 
   Changed |= lowerCpsOps();

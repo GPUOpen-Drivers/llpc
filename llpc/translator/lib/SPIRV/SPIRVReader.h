@@ -116,6 +116,13 @@ public:
 
   Type *transType(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true,
                   LayoutMode layout = LayoutMode::None);
+
+  SmallVector<Type *> transMultiTypes(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true,
+                                      LayoutMode layout = LayoutMode::None);
+
+  bool mapMultiTypes(Type *pt, SPIRVType *t, unsigned matrixStride = 0, bool columnMajor = true,
+                     LayoutMode layout = LayoutMode::None);
+
   template <spv::Op>
   Type *transTypeWithOpcode(SPIRVType *bt, unsigned matrixStride, bool columnMajor, LayoutMode layout);
   Type *transTypeArray(SPIRVType *bt, unsigned matrixStride, bool columnMajor, LayoutMode layout);
@@ -230,7 +237,7 @@ public:
   Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Type *const, Constant *const);
 
   std::pair<Value *, Align> createGepIntoRowMajorMatrix(Type *matrixType, Value *matrixPtr, Align matrixAlign,
-                                                        Value *row, Value *col);
+                                                        Value *row, Value *col, bool inBounds);
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
@@ -296,6 +303,8 @@ private:
   SPIRVToLLVMDbgTran m_dbgTran;
   DenseMap<std::pair<SPIRVValue *, Function *>, SmallVector<Value *>> m_variableMap;
   DenseMap<SPIRVValue *, Value *> m_variableNonImageMap;
+  DenseMap<Type *, Type *> m_multiTypesMap;
+  DenseSet<SPIRVType *> m_spvMultiTypesMap;
 
   // Hash map with correlation between (SPIR-V) OpAccessChain and its returned (dereferenced) type.
   // We have to store base type because opaque-pointers are removing information about dereferenced type.
@@ -318,7 +327,7 @@ private:
 
   bool m_maximallyReconverges = false;
   bool m_hasDemoteToHelper = false;
-
+  bool m_hasSamplerInStruct = false;
   enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
   struct ScratchBoundsCheckData {
     LlvmMemOpType memOpType;
@@ -328,7 +337,6 @@ private:
 
   lgc::CooperativeMatrixElementType mapToBasicType(Type *const ltType);
   lgc::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
-  lgc::CooperativeMatrixLayout getLayout(lgc::CooperativeMatrixElementType elemTy);
   lgc::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
                                                              lgc::CooperativeMatrixElementType elemTy, unsigned rows,
                                                              unsigned columns);

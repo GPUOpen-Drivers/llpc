@@ -101,7 +101,6 @@ Error GraphicsPipelineBuilder::build() {
 Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   CompileInfo &compileInfo = getCompileInfo();
   GraphicsPipelineBuildInfo *pipelineInfo = &compileInfo.gfxPipelineInfo;
-  GraphicsPipelineBuildOut *pipelineOut = &compileInfo.gfxPipelineOut;
 
   // Fill pipeline shader info.
   // clang-format off
@@ -140,19 +139,20 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
                          compileInfo.autoLayoutDesc);
 
   pipelineInfo->pInstance = nullptr; // Placeholder, unused.
-  pipelineInfo->pUserData = &compileInfo.pipelineBuf;
+  pipelineInfo->pUserData = &compileInfo;
   pipelineInfo->pfnOutputAlloc = allocateBuffer;
   pipelineInfo->unlinked = compileInfo.unlinked;
 
-  // NOTE: If number of patch control points is not specified, we set it to 3.
-  if (pipelineInfo->iaState.patchControlPoints == 0)
-    pipelineInfo->iaState.patchControlPoints = 3;
-
-  pipelineInfo->options.robustBufferAccess = compileInfo.robustBufferAccess;
-  pipelineInfo->options.enableRelocatableShaderElf = compileInfo.relocatableShaderElf;
-  pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
-  pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
-  pipelineInfo->options.enableImplicitInvariantExports = compileInfo.enableImplicitInvariantExports;
+  if (compileInfo.robustBufferAccess.has_value())
+    pipelineInfo->options.robustBufferAccess = *compileInfo.robustBufferAccess;
+  if (compileInfo.relocatableShaderElf.has_value())
+    pipelineInfo->options.enableRelocatableShaderElf = *compileInfo.relocatableShaderElf;
+  if (compileInfo.scalarBlockLayout.has_value())
+    pipelineInfo->options.scalarBlockLayout = *compileInfo.scalarBlockLayout;
+  if (compileInfo.scratchAccessBoundsChecks.has_value())
+    pipelineInfo->options.enableScratchAccessBoundsChecks = *compileInfo.scratchAccessBoundsChecks;
+  if (compileInfo.enableImplicitInvariantExports.has_value())
+    pipelineInfo->options.enableImplicitInvariantExports = *compileInfo.enableImplicitInvariantExports;
   if (compileInfo.optimizationLevel.has_value()) {
     pipelineInfo->options.optimizationLevel = static_cast<uint32_t>(compileInfo.optimizationLevel.value());
   }
@@ -162,56 +162,69 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pGraphicsInfo = pipelineInfo;
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
-  auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, {pipelineOut->pipelineBin}); });
+  auto onExit = make_scope_exit([&] {
+    std::vector<BinaryData> binaries;
+    for (const auto &out : compileInfo.gfxPipelineOut)
+      binaries.push_back(out.pipelineBin);
+    runPostBuildActions(pipelineDumpHandle, binaries);
+  });
 
   if (compileInfo.isGraphicsLibrary) {
     Result result = Result::Success;
+    GraphicsPipelineBuildOut pipelineOut = {};
     if (compileInfo.stageMask == 0) {
-      result = getCompiler().BuildColorExportShader(pipelineInfo, compileInfo.fsOutputs.data(), pipelineOut,
+      result = getCompiler().BuildColorExportShader(pipelineInfo, compileInfo.fsOutputs.data(), &pipelineOut,
                                                     pipelineDumpHandle);
 
     } else if (compileInfo.stageMask & Vkgc::ShaderStageBit::ShaderStageFragmentBit) {
       result =
-          getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
+          getCompiler().buildGraphicsShaderStage(pipelineInfo, &pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
     } else {
-      result = getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageVertexProcess,
+      result = getCompiler().buildGraphicsShaderStage(pipelineInfo, &pipelineOut, UnlinkedStageVertexProcess,
                                                       pipelineDumpHandle);
     }
 
     if (result != Result::Success)
       return createResultError(result, "Graphics pipeline compilation failed");
 
-    return pipelineOut->pipelineBin;
+    compileInfo.gfxPipelineOut.emplace_back(pipelineOut);
+    return pipelineOut.pipelineBin;
   }
 
   if (pipelineInfo->enableColorExportShader) {
-    Result result = getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageVertexProcess,
+    GraphicsPipelineBuildOut pipelineOut = {};
+    Result result = getCompiler().buildGraphicsShaderStage(pipelineInfo, &pipelineOut, UnlinkedStageVertexProcess,
                                                            pipelineDumpHandle);
+    compileInfo.gfxPipelineOut.emplace_back(pipelineOut);
+
     if (result == Result::Success) {
-      free(compileInfo.pipelineBuf);
-      compileInfo.pipelineBuf = nullptr;
+      pipelineOut = {};
       result =
-          getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
+          getCompiler().buildGraphicsShaderStage(pipelineInfo, &pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
+      compileInfo.gfxPipelineOut.emplace_back(pipelineOut);
     }
-    if (result == Result::Success && pipelineOut->fsOutputMetaData != nullptr) {
-      void *fsOuts = compileInfo.pipelineBuf;
-      compileInfo.pipelineBuf = nullptr;
-      result = getCompiler().BuildColorExportShader(pipelineInfo, pipelineOut->fsOutputMetaData, pipelineOut,
-                                                    pipelineDumpHandle);
-      free(fsOuts);
+
+    if (result == Result::Success && pipelineOut.fsOutputMetaData != nullptr) {
+      void *fsOutputMetadata = pipelineOut.fsOutputMetaData;
+
+      pipelineOut = {};
+      result = getCompiler().BuildColorExportShader(pipelineInfo, fsOutputMetadata, &pipelineOut, pipelineDumpHandle);
+      compileInfo.gfxPipelineOut.emplace_back(pipelineOut);
     }
 
     if (result != Result::Success)
       return createResultError(result, "Graphics pipeline compilation failed");
 
-    return pipelineOut->pipelineBin;
+    return pipelineOut.pipelineBin;
   }
 
-  Result result = getCompiler().BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
+  GraphicsPipelineBuildOut pipelineOut = {};
+  Result result = getCompiler().BuildGraphicsPipeline(pipelineInfo, &pipelineOut, pipelineDumpHandle);
   if (result != Result::Success)
     return createResultError(result, "Graphics pipeline compilation failed");
 
-  return pipelineOut->pipelineBin;
+  compileInfo.gfxPipelineOut.emplace_back(pipelineOut);
+  return pipelineOut.pipelineBin;
 }
 
 // =====================================================================================================================
@@ -231,7 +244,13 @@ uint64_t GraphicsPipelineBuilder::getPipelineHash(Vkgc::PipelineBuildInfo buildI
 Error GraphicsPipelineBuilder::outputElfs(const StringRef suppliedOutFile) {
   CompileInfo &compileInfo = getCompileInfo();
   const InputSpec &firstInput = compileInfo.inputSpecs.front();
-  return outputElf(compileInfo.gfxPipelineOut.pipelineBin, suppliedOutFile, firstInput.filename);
+
+  for (const auto &pipelineOut : compileInfo.gfxPipelineOut) {
+    if (Error err = outputElf(pipelineOut.pipelineBin, suppliedOutFile, firstInput.filename))
+      return err;
+  }
+
+  return Error::success();
 }
 
 } // namespace StandaloneCompiler

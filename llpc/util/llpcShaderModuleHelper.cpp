@@ -29,10 +29,13 @@
 ***********************************************************************************************************************
 */
 #include "llpcShaderModuleHelper.h"
+#include "SPIRVEntry.h"
+#include "SPIRVFunction.h"
+#include "SPIRVInstruction.h"
+#include "SPIRVModule.h"
 #include "llpcDebug.h"
 #include "llpcError.h"
 #include "llpcUtil.h"
-#include "spirvExt.h"
 #include "vkgcUtil.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
@@ -42,6 +45,7 @@
 using namespace llvm;
 using namespace MetroHash;
 using namespace spv;
+using namespace SPIRV;
 using namespace Util;
 
 using Vkgc::SpirvHeader;
@@ -56,245 +60,256 @@ opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in S
 } // namespace llvm
 
 namespace Llpc {
+
 // =====================================================================================================================
-// Returns the shader module usage for the given Spir-V binary.
+// Returns the shader module usage for the given SPIR-V module.
 //
-// @param spvBinCode : SPIR-V binary data
+// @param module : SPIR-V module
 // @returns : Shader module usage info
-ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData *spvBinCode) {
-  const unsigned *code = reinterpret_cast<const unsigned *>(spvBinCode->pCode);
-  const unsigned *end = code + spvBinCode->codeSize / sizeof(unsigned);
-  const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
-
+ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(SPIRVModule *module) {
+  assert(module);
   ShaderModuleUsage shaderModuleUsage = {};
-  // Parse SPIR-V instructions
-  std::unordered_set<unsigned> capabilities;
-  bool hasIndexDecoration = false;
 
-  while (codePos < end) {
-    unsigned opCode = (codePos[0] & OpCodeMask);
-    unsigned wordCount = (codePos[0] >> WordCountShift);
-    assert(wordCount > 0 && codePos + wordCount <= end && "Invalid SPIR-V binary\n");
+  // Helper to set corresponding usage based on the specified built-in
+  auto processBuiltIn = [&](BuiltIn builtIn, bool structMember) {
+    switch (builtIn) {
+    case BuiltInPointSize:
+      // NOTE: When any member of gl_PerVertex is used, its other members will be added to SPIR-V in the annotation
+      // section. We are unable to determine their actual usage unless we parse the AccessChain instruction.
+      if (!structMember)
+        shaderModuleUsage.usePointSize = true;
+      break;
+    case BuiltInPrimitiveShadingRateKHR:
+    case BuiltInShadingRateKHR:
+      shaderModuleUsage.useShadingRate = true;
+      break;
+    case BuiltInSamplePosition:
+      shaderModuleUsage.useSampleInfo = true;
+      break;
+    case BuiltInFragCoord:
+      shaderModuleUsage.useFragCoord = true;
+      break;
+    case BuiltInViewportIndex:
+    case BuiltInPointCoord:
+    case BuiltInLayer:
+      shaderModuleUsage.useGenericBuiltIn = true;
+      break;
+    case BuiltInClipDistance:
+    case BuiltInCullDistance:
+      // NOTE: When any member of gl_PerVertex is used, its other members will be added to SPIR-V in the annotation
+      // section. We are unable to determine their actual usage unless we parse the AccessChain instruction.
+      if (!structMember)
+        shaderModuleUsage.useGenericBuiltIn = true;
+      break;
+    case BuiltInBaryCoordKHR:
+    case BuiltInBaryCoordNoPerspKHR:
+      shaderModuleUsage.useBarycentric = true;
+      break;
+    case BuiltInLaunchIdKHR:
+      shaderModuleUsage.rtSystemValueUsage.ray.launchId = true;
+      break;
+    case BuiltInLaunchSizeKHR:
+      shaderModuleUsage.rtSystemValueUsage.ray.launchSize = true;
+      break;
+    case BuiltInWorldRayOriginKHR:
+      shaderModuleUsage.rtSystemValueUsage.ray.worldRayOrigin = true;
+      break;
+    case BuiltInWorldRayDirectionKHR:
+      shaderModuleUsage.rtSystemValueUsage.ray.worldRayDirection = true;
+      break;
+    case BuiltInIncomingRayFlagsKHR:
+      shaderModuleUsage.rtSystemValueUsage.ray.flags = true;
+      break;
+    case BuiltInRayTminKHR:
+      shaderModuleUsage.rtSystemValueUsage.ray.tMin = true;
+      break;
+    case BuiltInHitTNV:
+      shaderModuleUsage.rtSystemValueUsage.ray.tCurrent = true;
+      break;
+    case BuiltInObjectRayOriginKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.objectRayOrigin = true;
+      break;
+    case BuiltInObjectRayDirectionKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.objectRayDirection = true;
+      break;
+    case BuiltInPrimitiveId:
+      shaderModuleUsage.useGenericBuiltIn = true;
+      shaderModuleUsage.rtSystemValueUsage.primitive.primitiveIndex = true;
+      break;
+    case BuiltInInstanceId:
+      shaderModuleUsage.rtSystemValueUsage.primitive.instanceID = true;
+      break;
+    case BuiltInInstanceCustomIndexKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.instanceIndex = true;
+      break;
+    case BuiltInObjectToWorldKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.objectToWorld = true;
+      break;
+    case BuiltInWorldToObjectKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.worldToObject = true;
+      break;
+    case BuiltInHitKindKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.hitKind = true;
+      break;
+    case BuiltInHitTriangleVertexPositionsKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.hitTrianglePosition = true;
+      break;
+    case BuiltInRayGeometryIndexKHR:
+      shaderModuleUsage.rtSystemValueUsage.primitive.geometryIndex = true;
+      break;
+    default:
+      break;
+    }
+  };
 
-    // Parse each instruction and find those we are interested in
-    switch (opCode) {
-    case OpCapability: {
-      assert(wordCount == 2);
-      auto capability = static_cast<Capability>(codePos[1]);
-      capabilities.insert(capability);
-      break;
-    }
-    case OpExtInst: {
-      auto extInst = static_cast<GLSLstd450>(codePos[4]);
-      switch (extInst) {
-      case GLSLstd450InterpolateAtSample:
-        shaderModuleUsage.useSampleInfo = true;
-        break;
-      case GLSLstd450NMin:
-      case GLSLstd450NMax:
-        shaderModuleUsage.useIsNan = true;
-        break;
-      default:
-        break;
-      }
-      break;
-    }
-    case OpExtension: {
-      StringRef extName = reinterpret_cast<const char *>(&codePos[1]);
-      if (extName == "SPV_AMD_shader_ballot") {
-        shaderModuleUsage.useSubgroupSize = true;
-      }
-      break;
-    }
-    case OpExecutionMode: {
-      auto execMode = static_cast<ExecutionMode>(codePos[2]);
-      switch (execMode) {
-      case ExecutionModeOriginUpperLeft:
-        shaderModuleUsage.originUpperLeft = true;
-        break;
-      case ExecutionModePixelCenterInteger:
-        shaderModuleUsage.pixelCenterInteger = true;
-        break;
-      case ExecutionModeXfb:
-        shaderModuleUsage.enableXfb = true;
-      default: {
-        break;
-      }
-      }
-      break;
-    }
-    case OpDecorate:
-    case OpMemberDecorate: {
-      auto decoration =
-          (opCode == OpDecorate) ? static_cast<Decoration>(codePos[2]) : static_cast<Decoration>(codePos[3]);
-      if (decoration == DecorationInvariant) {
-        shaderModuleUsage.useInvariant = true;
-      }
-      if (decoration == DecorationBuiltIn) {
-        auto builtIn = (opCode == OpDecorate) ? static_cast<BuiltIn>(codePos[3]) : static_cast<BuiltIn>(codePos[4]);
-        switch (builtIn) {
-        case BuiltInPointSize: {
-          shaderModuleUsage.usePointSize = true;
-          break;
-        }
-        case BuiltInPrimitiveShadingRateKHR:
-        case BuiltInShadingRateKHR: {
-          shaderModuleUsage.useShadingRate = true;
-          break;
-        }
-        case BuiltInSamplePosition: {
-          shaderModuleUsage.useSampleInfo = true;
-          break;
-        }
-        case BuiltInFragCoord: {
-          shaderModuleUsage.useFragCoord = true;
-          break;
-        }
-        case BuiltInViewportIndex:
-        case BuiltInPointCoord:
-        case BuiltInLayer:
-        case BuiltInClipDistance:
-        case BuiltInCullDistance: {
-          shaderModuleUsage.useGenericBuiltIn = true;
-          break;
-        }
-        case BuiltInBaryCoordKHR:
-        case BuiltInBaryCoordNoPerspKHR: {
-          shaderModuleUsage.useBarycentric = true;
-          break;
-        }
-        case BuiltInPrimitiveId: {
-          shaderModuleUsage.useGenericBuiltIn = true;
-          shaderModuleUsage.rtSystemValueUsage.primitive.primitiveIndex = 1;
-          break;
-        }
-        case BuiltInInstanceId: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.instanceID = 1;
-          break;
-        }
-        case BuiltInLaunchIdKHR: {
-          shaderModuleUsage.rtSystemValueUsage.ray.launchId = 1;
-          break;
-        }
-        case BuiltInLaunchSizeKHR: {
-          shaderModuleUsage.rtSystemValueUsage.ray.launchSize = 1;
-          break;
-        }
-        case BuiltInWorldRayOriginKHR: {
-          shaderModuleUsage.rtSystemValueUsage.ray.worldRayOrigin = 1;
-          break;
-        }
-        case BuiltInWorldRayDirectionKHR: {
-          shaderModuleUsage.rtSystemValueUsage.ray.worldRayDirection = 1;
-          break;
-        }
-        case BuiltInObjectRayOriginKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.objectRayOrigin = 1;
-          break;
-        }
-        case BuiltInObjectRayDirectionKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.objectRayDirection = 1;
-          break;
-        }
-        case BuiltInRayTminKHR: {
-          shaderModuleUsage.rtSystemValueUsage.ray.tMin = 1;
-          break;
-        }
-        case BuiltInInstanceCustomIndexKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.instanceIndex = 1;
-          break;
-        }
-        case BuiltInObjectToWorldKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.objectToWorld = 1;
-          break;
-        }
-        case BuiltInWorldToObjectKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.worldToObject = 1;
-          break;
-        }
-        case BuiltInHitTNV: {
-          shaderModuleUsage.rtSystemValueUsage.ray.tCurrent = 1;
-          break;
-        }
-        case BuiltInHitKindKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.hitKind = 1;
-          break;
-        }
-        case BuiltInHitTriangleVertexPositionsKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.hitTrianglePosition = 1;
-          break;
-        }
-        case BuiltInIncomingRayFlagsKHR: {
-          shaderModuleUsage.rtSystemValueUsage.ray.flags = 1;
-          break;
-        }
-        case BuiltInRayGeometryIndexKHR: {
-          shaderModuleUsage.rtSystemValueUsage.primitive.geometryIndex = 1;
-          break;
-        }
-        default: {
-          break;
-        }
-        }
-      } else if (decoration == DecorationIndex) {
-        hasIndexDecoration = true;
-      } else if (decoration == DecorationPerVertexKHR)
-        shaderModuleUsage.useBarycentric = true;
-      break;
-    }
-    case OpSpecConstantTrue:
-    case OpSpecConstantFalse:
-    case OpSpecConstant:
-    case OpSpecConstantComposite:
-    case OpSpecConstantOp: {
+  // Set usage relevant to constants
+  for (unsigned i = 0; i < module->getNumConstants(); ++i) {
+    auto constant = module->getConstant(i);
+
+    // Built-in decoration could be applied to constant
+    SPIRVWord builtIn = SPIRVWORD_MAX;
+    if (constant->hasDecorate(DecorationBuiltIn, 0, &builtIn))
+      processBuiltIn(static_cast<BuiltIn>(builtIn), false);
+
+    if (constant->getOpCode() == OpSpecConstantTrue || constant->getOpCode() == OpSpecConstantFalse ||
+        constant->getOpCode() == OpSpecConstant || constant->getOpCode() == OpSpecConstantComposite ||
+        constant->getOpCode() == OpSpecConstantOp)
       shaderModuleUsage.useSpecConstant = true;
-      break;
-    }
-    case OpTraceNV:
-    case OpTraceRayKHR: {
-      shaderModuleUsage.hasTraceRay = true;
-      break;
-    }
-    case OpExecuteCallableNV:
-    case OpExecuteCallableKHR:
-      shaderModuleUsage.hasExecuteCallable = true;
-      break;
-    case OpIsNan: {
-      shaderModuleUsage.useIsNan = true;
-      break;
-    }
-    default: {
-      break;
-    }
-    }
-    codePos += wordCount;
   }
 
-  // Without any DecorationIndex, it needs to disableDualSource
-  if (hasIndexDecoration == false)
+  // Set usage relevant to variables
+  bool hasIndexDecorate = false;
+
+  for (unsigned i = 0; i < module->getNumVariables(); ++i) {
+    auto variable = module->getVariable(i);
+    if (variable->hasDecorate(DecorationIndex))
+      hasIndexDecorate = true;
+
+    if (variable->hasDecorate(DecorationInvariant))
+      shaderModuleUsage.useInvariant = true;
+
+    // Built-in decoration applied to variable
+    SPIRVWord builtIn = SPIRVWORD_MAX;
+    if (variable->hasDecorate(DecorationBuiltIn, 0, &builtIn))
+      processBuiltIn(static_cast<BuiltIn>(builtIn), false);
+
+    auto variableType = variable->getType()->getPointerElementType(); // Dereference to variable value type
+    if (variableType && variableType->isTypeStruct()) {
+      // Struct type, built-in decoration could be applied to struct member
+      for (unsigned j = 0; j < variableType->getStructMemberCount(); ++j) {
+        if (variableType->hasMemberDecorate(j, DecorationInvariant))
+          shaderModuleUsage.useInvariant = true;
+
+        builtIn = SPIRVWORD_MAX;
+        if (variableType->hasMemberDecorate(j, DecorationBuiltIn, 0, &builtIn))
+          processBuiltIn(static_cast<BuiltIn>(builtIn), true);
+      }
+    }
+  }
+
+  if (!hasIndexDecorate)
     shaderModuleUsage.disableDualSource = true;
 
-  if (capabilities.find(CapabilityVariablePointersStorageBuffer) != capabilities.end())
+  // Set usage relevant to instructions
+  for (unsigned i = 0; i < module->getNumFunctions(); ++i) {
+    auto func = module->getFunction(i);
+    for (unsigned j = 0; j < func->getNumBasicBlock(); ++j) {
+      auto block = func->getBasicBlock(j);
+      for (unsigned k = 0; k < block->getNumInst(); ++k) {
+        auto inst = block->getInst(k);
+        switch (inst->getOpCode()) {
+        case OpExtInst: {
+          auto extInst = static_cast<SPIRVExtInst *>(inst);
+          if (extInst->getExtOp() == GLSLstd450InterpolateAtSample)
+            shaderModuleUsage.useSampleInfo = true;
+          else if (extInst->getExtOp() == GLSLstd450NMin || extInst->getExtOp() == GLSLstd450NMax)
+            shaderModuleUsage.useIsNan = true;
+          break;
+        }
+        case OpTraceNV:
+        case OpTraceRayKHR:
+          shaderModuleUsage.hasTraceRay = true;
+          break;
+        case OpExecuteCallableNV:
+        case OpExecuteCallableKHR:
+          shaderModuleUsage.hasExecuteCallable = true;
+          break;
+        case OpIsNan:
+          shaderModuleUsage.useIsNan = true;
+          break;
+        case OpAccessChain: {
+          auto accessChain = static_cast<SPIRVAccessChain *>(inst);
+          auto base = accessChain->getBase();
+          auto baseType = base->getType()->getPointerElementType(); // Dereference to base value type
+
+          // NOTE: When any member of gl_PerVertex is used, its other members will be added to SPIR-V in the annotation
+          // section. We are unable to determine their actual usage unless we parse the AccessChain instruction.
+          // This has impacts on Position, PointSize, ClipDistance, and CullDistance.
+          if (base->getType()->getPointerStorageClass() == StorageClassOutput && baseType && baseType->isTypeStruct()) {
+            // We find an output struct variable, further check its member built-in decorations.
+            const auto index = static_cast<SPIRVConstant *>(accessChain->getIndices()[0])->getZExtIntValue();
+            SPIRVWord builtIn = SPIRVWORD_MAX;
+            if (baseType->hasMemberDecorate(index, DecorationBuiltIn, 0, &builtIn)) {
+              switch (builtIn) {
+              case BuiltInPointSize:
+                shaderModuleUsage.usePointSize = true;
+                break;
+              case BuiltInClipDistance:
+              case BuiltInCullDistance:
+                shaderModuleUsage.useGenericBuiltIn = true;
+                break;
+              default:
+                break;
+              }
+            }
+          }
+          break;
+        }
+        default:
+          break;
+        }
+      }
+    }
+  }
+
+  // Set usage relevant to execution modes
+  for (unsigned i = 0; i < module->getNumFunctions(); ++i) {
+    auto func = module->getFunction(i);
+    if (module->getEntryPoint(func->getId())) {
+      if (func->getExecutionMode(ExecutionModeOriginUpperLeft))
+        shaderModuleUsage.originUpperLeft = true;
+
+      if (func->getExecutionMode(ExecutionModePixelCenterInteger))
+        shaderModuleUsage.pixelCenterInteger = true;
+
+      if (func->getExecutionMode(ExecutionModeXfb))
+        shaderModuleUsage.enableXfb = true;
+    }
+  }
+
+  // Set usage relevant to capabilities
+  if (module->hasCapability(CapabilityVariablePointersStorageBuffer))
     shaderModuleUsage.enableVarPtrStorageBuf = true;
 
-  if (capabilities.find(CapabilityVariablePointers) != capabilities.end())
+  if (module->hasCapability(CapabilityVariablePointers))
     shaderModuleUsage.enableVarPtr = true;
 
-  if (capabilities.find(CapabilityRayQueryKHR) != capabilities.end())
+  if (module->hasCapability(CapabilityRayQueryKHR))
     shaderModuleUsage.enableRayQuery = true;
 
-  if ((!shaderModuleUsage.useSubgroupSize) &&
-          ((capabilities.count(CapabilityGroupNonUniform) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformVote) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformArithmetic) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformBallot) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformShuffle) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformShuffleRelative) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformClustered) > 0) ||
-           (capabilities.count(CapabilityGroupNonUniformQuad) > 0) ||
-           (capabilities.count(CapabilitySubgroupBallotKHR) > 0) ||
-           (capabilities.count(CapabilitySubgroupVoteKHR) > 0) || (capabilities.count(CapabilityGroups) > 0)) ||
-      (capabilities.count(CapabilityGroupNonUniformRotateKHR) > 0)) {
+  if (module->getExtension().count("SPV_AMD_shader_ballot") > 0)
+    shaderModuleUsage.useSubgroupSize = true;
+
+  if (!shaderModuleUsage.useSubgroupSize &&
+      (module->hasCapability(CapabilityGroupNonUniform) || module->hasCapability(CapabilityGroupNonUniformVote) ||
+       module->hasCapability(CapabilityGroupNonUniformArithmetic) ||
+       module->hasCapability(CapabilityGroupNonUniformBallot) ||
+       module->hasCapability(CapabilityGroupNonUniformShuffle) ||
+       module->hasCapability(CapabilityGroupNonUniformShuffleRelative) ||
+       module->hasCapability(CapabilityGroupNonUniformClustered) ||
+       module->hasCapability(CapabilityGroupNonUniformQuad) || module->hasCapability(CapabilitySubgroupBallotKHR) ||
+       module->hasCapability(CapabilitySubgroupVoteKHR) || module->hasCapability(CapabilityGroups) ||
+       module->hasCapability(CapabilityGroupNonUniformRotateKHR))) {
     shaderModuleUsage.useSubgroupSize = true;
   }
 
@@ -565,19 +580,15 @@ Result ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary, BinaryTy
 // will point to the data in trimmed code.  It should not be resized or deallocated while moduleData is still needed.
 //
 // @param shaderInfo : Shader module build info
+// @param module : SPIR-V module (valid when the binary type is SPIR-V)
 // @param codeBuffer [out] : A buffer to hold the trimmed code if it is needed.
 // @param moduleData [out] : If successful, the module data for the module.  Undefined if unsuccessful.
 // @return : Success if the data was read.  The appropriate error otherwise.
-Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo,
+Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo, SPIRVModule *module,
                                          llvm::MutableArrayRef<unsigned> codeBuffer,
                                          Vkgc::ShaderModuleData &moduleData) {
-  const BinaryData &shaderBinary = shaderInfo->shaderBin;
-  Result result = ShaderModuleHelper::getShaderBinaryType(shaderBinary, moduleData.binType);
-  if (result != Result::Success)
-    return result;
-
   if (moduleData.binType == BinaryType::Spirv) {
-    moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
+    moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(module);
     moduleData.usage.isInternalRtShader = shaderInfo->options.pipelineOptions.internalRtShaders;
     auto codeOrErr = getShaderCode(shaderInfo, codeBuffer);
     if (Error err = codeOrErr.takeError())
@@ -593,8 +604,8 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
                   "Expecting the cacheHash entry in the module data to be the same size as the MetroHash hash!");
     memcpy(moduleData.cacheHash, cacheHash.dwords, sizeof(cacheHash));
   } else {
-    moduleData.binCode = shaderBinary;
-    memcpy(codeBuffer.data(), shaderBinary.pCode, shaderBinary.codeSize);
+    moduleData.binCode = shaderInfo->shaderBin;
+    memcpy(codeBuffer.data(), shaderInfo->shaderBin.pCode, shaderInfo->shaderBin.codeSize);
   }
 
   return Result::Success;
@@ -627,9 +638,11 @@ Expected<BinaryData> ShaderModuleHelper::getShaderCode(const ShaderModuleBuildIn
 }
 
 // =====================================================================================================================
+// Get shader code size. If SPIR-V binary is trimmed, get the new size.
+//
 // @param shaderInfo : Shader module build info
 // @return : The number of bytes need to hold the code for this shader module.
-Expected<unsigned> ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
+Expected<unsigned> ShaderModuleHelper::getShaderCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
   BinaryType binaryType;
   Result result = ShaderModuleHelper::getShaderBinaryType(shaderBinary, binaryType);
@@ -638,9 +651,9 @@ Expected<unsigned> ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *
 
   bool trimDebugInfo =
       binaryType != BinaryType::LlvmBc && cl::TrimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
-
   if (!trimDebugInfo)
     return shaderBinary.codeSize;
+
   return ShaderModuleHelper::trimSpirvDebugInfo(&shaderBinary, {});
 }
 

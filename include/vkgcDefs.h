@@ -536,6 +536,8 @@ struct PipelineOptions {
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
   bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
   bool reserved21;
+  bool optimizePointSizeWrite;        ///< If set, the write of PointSize in the last vertex processing stage will be
+                                      ///< eliminated if the write value is 1.0.
   CompileConstInfo *compileConstInfo; ///< Compile time constant data.
 };
 

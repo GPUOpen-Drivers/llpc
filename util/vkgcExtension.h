@@ -85,6 +85,7 @@ enum Extension : unsigned {
   KHR_EXPECT_ASSUME,
   KHR_SHADER_QUAD_CONTROL,
   KHR_SUBGROUP_ROTATE,
+  KHR_COMPUTE_SHADER_DERIVATIVES,
   ExtensionCount,
 };
 

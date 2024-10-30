@@ -41,12 +41,13 @@ namespace Llpc {
 // =====================================================================================================================
 //
 // @param gfxIp : Graphics Ip version info
+// @param apiName : API name from client, "Vulkan" or "OpenGL"
 // @param pipelineInfo : Compute pipeline build info
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
-ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo,
+ComputeContext::ComputeContext(GfxIpVersion gfxIp, const char *apiName, const ComputePipelineBuildInfo *pipelineInfo,
                                MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
+    : PipelineContext(gfxIp, apiName, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   gpurtShaderLibrary = &pipelineInfo->shaderLibrary;

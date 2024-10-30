@@ -81,7 +81,7 @@ layout(location = 7) in float16_t v8;
             export.generic.*.v4f32                            |
                        |                                      |
                        ----------------------------------------
-                       |       (PatchInOutImportExport pass)  |
+                       |       (LowerInOut pass)              |
         exp.f32(i32 immarg 32, i32 immarg 15)       interp.p1.f16(,,,highHalf,)
         exp.f32(i32 immarg 33, i32 immarg 15)       interp.p2.f16(,,,highHalf,)
         exp.f32(i32 immarg 34, i32 immarg 15)       interp.mov.* (ubfe for 16-bit)
@@ -106,7 +106,7 @@ union InOutLocationInfo {
   uint16_t u16All;
 };
 
-// In llpcPatchResourceCollect.h
+// In CollectResourceUsage.h
 // Represents the wrapper of input/output location info, along with handlers
 struct InOutLocation {
   uint16_t asIndex() const { return locationInfo.u16All; }
@@ -197,7 +197,7 @@ Scalarization is done before processShader() in the resource collect pass. Hence
 ### 4.5 Re-vectorization
 Fragment shader input instructions do not benefit from re-vectorization.
 Output instructions of the previous shader stage do benefit from re-vectorization, since export instructions are expensive. In general, we should strive to combine export instructions as much as possible. Furthermore, parameter exports should generally be done at the end of the hardware vertex or primitive shader stage.
-Therefore, this part of the feature changes the PatchInOutImportExport to handle exporting of generic outputs from the last geometry stage differently as follows:
+Therefore, this part of the feature changes the LowerInOut to handle exporting of generic outputs from the last geometry stage differently as follows:
 1. For every generic output component, insert an alloca instruction in the function entry block.
 2. Lower all output.export.generic calls into stores to the corresponding alloca'd variable.
 3. Build export intrinsics for all alloca'd variables before the function's return statement.

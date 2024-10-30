@@ -67,6 +67,8 @@
 namespace Llpc {
 namespace StandaloneCompiler {
 
+using Vkgc::optional_bool;
+
 // Represents the module info for a shader module.
 struct ShaderModuleData {
   Llpc::ShaderStage shaderStage;          // Shader stage
@@ -74,7 +76,6 @@ struct ShaderModuleData {
   Llpc::BinaryData spirvBin;              // SPIR-V binary codes
   Llpc::ShaderModuleBuildInfo shaderInfo; // Info to build shader modules
   Llpc::ShaderModuleBuildOut shaderOut;   // Output of building shader modules
-  void *shaderBuf;                        // Allocation buffer of building shader modules
   bool disableDoAutoLayout;               // Indicates whether to disable auto layout of descriptors
 };
 
@@ -88,23 +89,23 @@ struct CompileInfo {
   std::vector<uint32_t> fsOutputs;                                           // Fragment outputs
   llvm::SmallVector<StandaloneCompiler::ShaderModuleData> shaderModuleDatas; // ShaderModule Data
   Llpc::GraphicsPipelineBuildInfo gfxPipelineInfo;                           // Info to build graphics pipeline
-  Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                             // Output of building graphics pipeline
+  llvm::SmallVector<Llpc::GraphicsPipelineBuildOut> gfxPipelineOut;          // Output of building graphics pipeline
   Llpc::ComputePipelineBuildInfo compPipelineInfo;                           // Info to build compute pipeline
   Llpc::ComputePipelineBuildOut compPipelineOut;                             // Output of building compute pipeline
   RayTracingPipelineBuildInfo rayTracePipelineInfo;                          // Info to build ray tracing pipeline
   RayTracingPipelineBuildOut rayTracingPipelineOut;                          // Output of building ray tracing pipeline
   unsigned bvhNodeStride;
-  void *pipelineBuf;                   // Allocation buffer of building pipeline
-  void *pipelineInfoFile;              // VFX-style file containing pipeline info
-  bool unlinked;                       // Whether to generate unlinked shader/part-pipeline ELF
-  bool relocatableShaderElf;           // Whether to enable relocatable shader compilation
-  bool scalarBlockLayout;              // Whether to enable scalar block layout
-  bool doAutoLayout;                   // Whether to auto layout descriptors
-  bool autoLayoutDesc;                 // Whether to automatically create descriptor layout based on resource usages
-  bool robustBufferAccess;             // Whether to enable robust buffer access
-  bool scratchAccessBoundsChecks;      // Whether to enable scratch access bounds checks
-  bool enableImplicitInvariantExports; // Whether to enable implicit marking of position exports as invariant
-  VfxPipelineType pipelineType;        // Pipeline type
+  llvm::SmallVector<std::unique_ptr<char[]>> pipelineBufs; // Allocation buffers of building pipeline
+  void *pipelineInfoFile;                                  // VFX-style file containing pipeline info
+  bool unlinked;                                           // Whether to generate unlinked shader/part-pipeline ELF
+  optional_bool relocatableShaderElf;                      // Whether to enable relocatable shader compilation
+  optional_bool scalarBlockLayout;                         // Whether to enable scalar block layout
+  bool doAutoLayout;                                       // Whether to auto layout descriptors
+  bool autoLayoutDesc;                     // Whether to automatically create descriptor layout based on resource usages
+  optional_bool robustBufferAccess;        // Whether to enable robust buffer access
+  optional_bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
+  optional_bool enableImplicitInvariantExports; // Whether to enable implicit marking of position exports as invariant
+  VfxPipelineType pipelineType;                 // Pipeline type
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
   // Old version of the code
   std::optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler

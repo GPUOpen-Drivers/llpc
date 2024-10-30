@@ -28,6 +28,7 @@
  * @brief LLPC source file: contains implementation of LLPC internal-use utility functions.
  ***********************************************************************************************************************
  */
+#include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_os_ostream.h"
@@ -205,6 +206,14 @@ bool canBitCast(const Type *ty1, const Type *ty2) {
   return valid;
 }
 
+// Checks if the type is supported on amdgcn_readfirstlane in the backend.
+//
+// @param ty : Type to check
+bool isReadFirstLaneTypeSupported(const llvm::Type *ty) {
+  return ty->isVectorTy() ? cast<VectorType>(ty)->getElementType()->isIntegerTy(32)
+                          : ty->isFloatTy() || ty->isIntegerTy(32) || ty->isIntegerTy(1);
+}
+
 // =====================================================================================================================
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
 //
@@ -238,7 +247,7 @@ Type *getVgprTy(Type *ty) {
 // =====================================================================================================================
 // Helper function to create LLVM Function and update NewDbgInfoFormat flag
 llvm::Function *createFunctionHelper(llvm::FunctionType *ty, llvm::GlobalValue::LinkageTypes linkage,
-                                     llvm::Module *module, const llvm::Twine &name) {
+                                     llvm::Module *module, bool createDbgInfo, const llvm::Twine &name) {
 
   llvm::Function *func = Function::Create(ty, linkage, name);
 
@@ -246,7 +255,31 @@ llvm::Function *createFunctionHelper(llvm::FunctionType *ty, llvm::GlobalValue::
   func->setIsNewDbgInfoFormat(module->IsNewDbgInfoFormat);
 #endif
 
+  if (createDbgInfo) {
+    DIBuilder debugBuilder(*module);
+    DIFile *fileContext = debugBuilder.createFile("internal", "");
+    debugBuilder.createCompileUnit(dwarf::DW_LANG_C99, fileContext, "lgc", false, StringRef(), 0);
+    DISubprogram *funcContext =
+        debugBuilder.createFunction(fileContext, func->getName(), StringRef(), fileContext, 0,
+                                    debugBuilder.createSubroutineType(debugBuilder.getOrCreateTypeArray({})), 0,
+                                    DINode::DIFlags::FlagArtificial, DISubprogram::SPFlagDefinition);
+    func->setSubprogram(funcContext);
+  }
+
   return func;
 }
 
+// =====================================================================================================================
+// Helper function to call LLVM Function and set debug location
+llvm::CallInst *callFunctionHelper(llvm::Function *func, llvm::ArrayRef<llvm::Value *> args,
+                                   llvm::BasicBlock *insertAtEnd) {
+  BuilderBase builder(insertAtEnd);
+  CallInst *call = builder.CreateCall(func, args);
+  if (func->getSubprogram()) {
+    DISubprogram *SP = call->getParent()->getParent()->getSubprogram();
+    DILocation *loc = DILocation::get(SP->getContext(), SP->getScopeLine(), 0, SP);
+    call->setDebugLoc(loc);
+  }
+  return call;
+}
 } // namespace lgc

@@ -512,6 +512,8 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityCooperativeMatrixKHR, "CooperativeMatrixKHR");
   add(CapabilityComputeDerivativeGroupLinearNV, "ComputeDerivativeGroupLinearNV");
   add(CapabilityComputeDerivativeGroupQuadsNV, "ComputeDerivativeGroupQuadsNV");
+  add(CapabilityComputeDerivativeGroupLinearKHR, "ComputeDerivativeGroupLinearKHR");
+  add(CapabilityComputeDerivativeGroupQuadsKHR, "ComputeDerivativeGroupQuadsKHR");
   add(CapabilityExpectAssumeKHR, "ExpectAssumeKHR");
   add(CapabilityGroupNonUniformRotateKHR, "GroupNonUniformRotateKHR");
   add(CapabilityQuadControlKHR, "QuadControlKHR");

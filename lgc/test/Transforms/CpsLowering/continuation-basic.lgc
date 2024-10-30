@@ -16,7 +16,7 @@ define void @test({i32} %state, i32 %arg, ptr %table) !lgc.cps !0 !lgc.shadersta
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 ; CHECK-NEXT:    [[TMP7:%.*]] = bitcast i64 [[TMP6]] to <2 x i32>
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i8, ptr addrspace(5) [[VSP]], i32 -4
-; CHECK-NEXT:    [[CPS_STATE:%.*]] = load { i32 }, ptr addrspace(5) [[TMP8]], align 4
+; CHECK-NEXT:    [[CPS_STATE:%.*]] = load { i32 }, ptr addrspace(5) [[TMP8]], align 4, !amdgpu.last.use [[META4:![0-9]+]]
 ; CHECK-NEXT:    [[TMP9:%.*]] = ptrtoint ptr addrspace(5) [[TMP8]] to i32
 ; CHECK-NEXT:    store i32 [[TMP9]], ptr addrspace(5) [[TMP0]], align 4
 ; CHECK-NEXT:    [[V:%.*]] = extractvalue { i32 } [[CPS_STATE]], 0
@@ -53,7 +53,7 @@ define void @test({i32} %state, i32 %arg, ptr %table) !lgc.cps !0 !lgc.shadersta
 ; CHECK-NEXT:    [[TMP32:%.*]] = icmp ne i32 [[TMP31]], 0
 ; CHECK-NEXT:    [[TMP33:%.*]] = select i1 [[TMP32]], i32 [[TMP31]], i32 [[TMP29]]
 ; CHECK-NEXT:    [[TMP34:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP33]], i1 true)
-; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 [[TMP18]], i32 [[TMP34]])
+; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.readlane.i32(i32 [[TMP18]], i32 [[TMP34]])
 ; CHECK-NEXT:    [[TMP36:%.*]] = icmp eq i32 [[TMP18]], [[TMP35]]
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP36]])
 ; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP35]])
@@ -99,7 +99,7 @@ entry:
   %then.arg = add i32 %arg, 1
   %v.then = mul i32 %v, 2
   %state.then = insertvalue {i32} poison, i32 %v.then, 0
-  call void (i32, i32, { i32 }, ...) @lgc.cps.jump(i32 %cr.then, i32 2, {i32} %state.then, i32 %then.arg)
+  call void (i32, i32, { i32 }, ...) @lgc.cps.jump(i32 %cr.then, i32 2, {i32} %state.then, i32 poison, i32 %then.arg)
   unreachable
 }
 

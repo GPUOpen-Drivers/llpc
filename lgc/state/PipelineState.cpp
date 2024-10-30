@@ -32,7 +32,7 @@
 #include "lgc/CommonDefs.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
-#include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/FragmentColorExport.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/TargetInfo.h"
@@ -1311,19 +1311,18 @@ unsigned PipelineState::getNumPatchControlPoints() const {
 // =====================================================================================================================
 // Gets wave size for the specified shader stage
 //
-// NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
-//
 // @param stage : Shader stage
 unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
+  if (m_waveSize.empty()) {
+    setAllShadersDefaultWaveSize();
+  }
+
   if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
     stage = ShaderStage::Geometry;
   }
 
   assert(ShaderStageMask(ShaderStagesNative).contains(stage));
-  if (!m_waveSize[stage])
-    setShaderDefaultWaveSize(stage);
-
   return getMergedShaderWaveSize(stage);
 }
 
@@ -1491,16 +1490,25 @@ unsigned PipelineState::getShaderHwStageMask(ShaderStageEnum stage) {
 // @param stage : Shader stage
 // @returns : Subgroup size of the specified shader stage
 unsigned PipelineState::getShaderSubgroupSize(ShaderStageEnum stage) {
+  if (m_subgroupSize.empty()) {
+    setAllShadersDefaultWaveSize();
+  }
+
   if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
     stage = ShaderStage::Geometry;
   }
 
   assert(stage <= ShaderStage::Compute);
-  if (!m_subgroupSize[stage])
-    setShaderDefaultWaveSize(stage);
-
+  assert(m_subgroupSize[stage]);
   return m_subgroupSize[stage];
+}
+
+// =====================================================================================================================
+// Set the default wave size for all shader stages.
+void PipelineState::setAllShadersDefaultWaveSize() {
+  for (auto stage : ShaderStagesNative)
+    setShaderDefaultWaveSize(stage);
 }
 
 // =====================================================================================================================
@@ -1508,20 +1516,19 @@ unsigned PipelineState::getShaderSubgroupSize(ShaderStageEnum stage) {
 //
 // @param stage : Shader stage
 void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
-  ShaderStageEnum checkingStage = stage;
   if (stage == ShaderStage::Geometry && !hasShaderStage(ShaderStage::Geometry)) {
     // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
-    // In such cases, we check the property of VS or TES.
-    checkingStage = hasShaderStage(ShaderStage::TessEval) ? ShaderStage::TessEval : ShaderStage::Vertex;
+    // In such cases, we check the property of VS or TES, and this will be handled in getMergedShaderWaveSize.
+    return;
   }
 
-  if (checkingStage == ShaderStage::Compute) {
+  if (stage == ShaderStage::Compute) {
     const unsigned subgroupSize = m_shaderModes.getComputeShaderMode().subgroupSize;
-    m_waveSize[checkingStage] = subgroupSize;
-    m_subgroupSize[checkingStage] = subgroupSize;
+    m_waveSize[stage] = subgroupSize;
+    m_subgroupSize[stage] = subgroupSize;
   }
 
-  if (!m_waveSize[checkingStage]) {
+  if (!m_waveSize[stage]) {
     unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
     unsigned subgroupSize = waveSize;
 
@@ -1532,7 +1539,7 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
     //  4) If gl_SubgroupSize is not used in the (mesh/task/compute) shader, and the workgroup size is
     //     not larger than 32, use wave size 32.
 
-    if (checkingStage == ShaderStage::Fragment) {
+    if (stage == ShaderStage::Fragment) {
       // Per programming guide, it's recommended to use wave64 for fragment shader.
       waveSize = 64;
     } else if (hasShaderStage(ShaderStage::Geometry)) {
@@ -1551,11 +1558,11 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
     if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({11}))
       waveSize = 64;
 
-    unsigned waveSizeOption = getShaderOptions(checkingStage).waveSize;
+    unsigned waveSizeOption = getShaderOptions(stage).waveSize;
     if (waveSizeOption != 0) {
       waveSize = waveSizeOption;
 
-      if (checkingStage == ShaderStage::Geometry && getTargetInfo().getGfxIpVersion().major == 10) {
+      if (stage == ShaderStage::Geometry && getTargetInfo().getGfxIpVersion().major == 10) {
         // Legacy (non-GS) HW path for GS does not support wave32 mode. Ignore the settings.
         waveSize = 64;
       }
@@ -1563,14 +1570,13 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
 
     // Note: the conditions below override the tuning option.
     // If workgroup size is not larger than 32, use wave size 32.
-    if (checkingStage == ShaderStage::Mesh || checkingStage == ShaderStage::Task ||
-        checkingStage == ShaderStage::Compute) {
+    if (stage == ShaderStage::Mesh || stage == ShaderStage::Task || stage == ShaderStage::Compute) {
       unsigned workGroupSize;
-      if (checkingStage == ShaderStage::Mesh) {
+      if (stage == ShaderStage::Mesh) {
         auto &mode = m_shaderModes.getMeshShaderMode();
         workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
       } else {
-        assert(checkingStage == ShaderStage::Task || checkingStage == ShaderStage::Compute);
+        assert(stage == ShaderStage::Task || stage == ShaderStage::Compute);
         auto &mode = m_shaderModes.getComputeShaderMode();
         workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
       }
@@ -1582,11 +1588,11 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
     // If subgroup size is used in any shader in the pipeline, use the specified subgroup size.
     if (m_shaderModes.getAnyUseSubgroupSize()) {
       // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
-      subgroupSize = getShaderOptions(checkingStage).subgroupSize;
+      subgroupSize = getShaderOptions(stage).subgroupSize;
       // The driver only sets waveSize if a size is requested by an app. We may want to change that in the driver to
       // set subgroupSize instead.
       if (subgroupSize == 0)
-        subgroupSize = getShaderOptions(checkingStage).waveSize;
+        subgroupSize = getShaderOptions(stage).waveSize;
       if (subgroupSize == 0)
         subgroupSize = waveSize;
 
@@ -1600,12 +1606,8 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
     assert(waveSize == 32 || waveSize == 64);
     assert(waveSize <= subgroupSize);
 
-    m_waveSize[checkingStage] = waveSize;
-    m_subgroupSize[checkingStage] = subgroupSize;
-  }
-  if (stage != checkingStage) {
-    m_waveSize[stage] = m_waveSize[checkingStage];
-    m_subgroupSize[stage] = m_subgroupSize[checkingStage];
+    m_waveSize[stage] = waveSize;
+    m_subgroupSize[stage] = subgroupSize;
   }
 }
 
@@ -1613,7 +1615,7 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
 // Whether WGP mode is enabled for the given shader stage
 //
 // @param stage : Shader stage
-bool PipelineState::getShaderWgpMode(ShaderStageEnum stage) const {
+bool PipelineState::getShaderWgpMode(ShaderStageEnum stage) {
   if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
     stage = ShaderStage::Geometry;
@@ -1621,7 +1623,20 @@ bool PipelineState::getShaderWgpMode(ShaderStageEnum stage) const {
 
   assert(ShaderStageMask(ShaderStagesNative).contains(stage));
 
-  return m_shaderOptions.lookup(stage).wgpMode;
+  bool wgpMode = m_shaderOptions.lookup(stage).wgpMode;
+  if (!wgpMode) {
+    if (getTargetInfo().getGpuProperty().numComputeUnitsPerShaderEngine > 2) {
+      // Waves will be distributed across both CUs in a WGP with WGP_MODE=1. This is problematic if any
+      // CUs are reserved on devices with only a single WGP (2 CUs).
+      if (m_nggControl.enableNgg && m_nggControl.passthroughMode) {
+        // Performance tests show that NGG passthrough performs best in WGP mode on HW GS.
+        if (!hasShaderStage(ShaderStage::Geometry) && (stage == ShaderStage::Vertex || stage == ShaderStage::TessEval))
+          wgpMode = true;
+      }
+    }
+  }
+
+  return wgpMode;
 }
 
 // =====================================================================================================================
@@ -2011,6 +2026,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
     case lgc::PrimitiveType::TriangleFan:
     case lgc::PrimitiveType::TriangleListAdjacency:
     case lgc::PrimitiveType::TriangleStripAdjacency:
+    case lgc::PrimitiveType::Rect:
       return 3;
     case lgc::PrimitiveType::Patch:
       return 1;

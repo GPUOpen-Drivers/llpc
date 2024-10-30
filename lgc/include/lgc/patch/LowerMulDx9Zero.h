@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerMulDx9Zero.h
- * @brief LLPC header file: contains declaration of class lgc::PatchMulDx9Zero.
+ * @brief LLPC header file: contains declaration of class lgc::LowerMulDx9Zero.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -43,9 +43,9 @@ namespace lgc {
 // ((b==0.0 ? 0.0 : a) * (a==0.0 ? 0.0 : b)) or
 // ((b==0.0 ? 0.0 : a) * (a==0.0 ? 0.0 : b)) or
 // fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
-class PatchMulDx9Zero final : public llvm::InstVisitor<PatchMulDx9Zero>, public llvm::PassInfoMixin<PatchMulDx9Zero> {
+class LowerMulDx9Zero final : public llvm::InstVisitor<LowerMulDx9Zero>, public llvm::PassInfoMixin<LowerMulDx9Zero> {
 public:
-  explicit PatchMulDx9Zero();
+  explicit LowerMulDx9Zero();
 
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 

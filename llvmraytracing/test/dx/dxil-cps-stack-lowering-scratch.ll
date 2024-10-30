@@ -41,18 +41,20 @@ AllocaSpillBB:
   call void @amd.dx.setLocalRootIndex(i32 5)
   %ptr = getelementptr i8, ptr addrspace(32) %1, i32 9
   store i32 99, ptr addrspace(32) %ptr
+  %csp = ptrtoint ptr addrspace(32) %ptr to i32
   %dis_data.i.fca.0.insert = insertvalue %struct.DispatchSystemData poison, i32 %.fca.0.extract, 0
   %gep.payload = getelementptr i32, ptr %payload.serialization.alloca, i32 0
   store i32 undef, ptr %gep.payload, align 4
   %3 = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @called.resume.0)
   %payload.reload = load [1 x i32], ptr %payload.serialization.alloca, align 4
-  call void (...) @lgc.cps.jump(i32 2, i32 2, %struct.type %cont.state, i64 %3, %struct.DispatchSystemData %dis_data.i.fca.0.insert, {} poison, [1 x i32] %payload.reload), !continuation.registercount !16
+  call void (...) @lgc.cps.jump(i32 2, i32 2, %struct.type %cont.state, i32 %csp, i64 %3, %struct.DispatchSystemData %dis_data.i.fca.0.insert, {} poison, [1 x i32] %payload.reload), !continuation.registercount !16
   unreachable
 }
 
 define void @called.resume.0({} %cont.state, i32 %returnAddr, %struct.type %0, { %struct.DispatchSystemData, {}, [1 x i32] } %1) !lgc.rt.shaderstage !15 !lgc.cps !16 !continuation !17 {
 entryresume.0:
   %2 = call ptr addrspace(32) @lgc.cps.peek(i32 8)
+  %csp = ptrtoint ptr addrspace(32) %2 to i32
   %payload.serialization.alloca = alloca [1 x i32], align 4
   %payload = extractvalue  { %struct.DispatchSystemData, {}, [1 x i32] } %1, 2
   store [1 x i32] %payload, ptr %payload.serialization.alloca, align 4
@@ -68,7 +70,7 @@ entryresume.0:
   %.fca.0.insert = insertvalue %struct.DispatchSystemData poison, i32 %.fca.0.extract3, 0
   call void @lgc.cps.free(i32 8)
   %payload.reload = load [1 x i32], ptr %payload.serialization.alloca, align 4
-  call void (...) @lgc.cps.jump(i32 %return.addr.reload, i32 2, %struct.type %0, i64 poison, %struct.DispatchSystemData %.fca.0.insert, {} poison, [1 x i32] %payload.reload), !continuation.registercount !16
+  call void (...) @lgc.cps.jump(i32 %return.addr.reload, i32 2, %struct.type %0, i32 %csp, i64 poison, %struct.DispatchSystemData %.fca.0.insert, {} poison, [1 x i32] %payload.reload), !continuation.registercount !16
   unreachable
 }
 

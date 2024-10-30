@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerInOut.h
- * @brief LLPC header file: contains declaration of class lgc::PatchInOutImportExport.
+ * @brief LLPC header file: contains declaration of class lgc::LowerInOut.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -43,9 +43,9 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for input import and output export.
-class PatchInOutImportExport : public Patch, public llvm::PassInfoMixin<PatchInOutImportExport> {
+class LowerInOut : public Patch, public llvm::PassInfoMixin<LowerInOut> {
 public:
-  PatchInOutImportExport();
+  LowerInOut();
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

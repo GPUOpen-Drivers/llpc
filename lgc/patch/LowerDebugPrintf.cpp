@@ -75,7 +75,7 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
     return PreservedAnalyses::all();
 
   const ResourceNode *node = nullptr;
-  // LLpc node type is DescriptorBuffer
+  // Llpcfe debugPrintf node type is DescriptorMutable, LLpc node type is DescriptorBuffer
   // So use ResourceNodeType::Unknown to match different node type.
   std::tie(m_topNode, node) =
       pipelineState->findResourceNode(ResourceNodeType::Unknown, InternalDescriptorSetId, PrintfBufferBindingId);

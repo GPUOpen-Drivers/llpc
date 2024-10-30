@@ -410,6 +410,26 @@ struct ValueOriginTracker::ValueInfoBuilder {
     assert(Result.Slices.size() == NumSlices);
     return Result;
   }
+
+  // Create a value info for a freeze instruction.
+  // For freeze, we must be careful to preserve freeze semantics on UndefOrPoison slices:
+  // In contrast to undef/poison, all uses of a freeze instruction are guaranteed to observe the same value.
+  ValueInfo createFreeze(const ValueInfo &FrozenValueInfo, Options::FreezeHandlingMode FreezeMode) const {
+    using Mode = Options::FreezeHandlingMode;
+    if (FreezeMode == Mode::Forward)
+      return FrozenValueInfo;
+
+    assert(FreezeMode == Mode::Dynamic);
+
+    ValueInfo Result = FrozenValueInfo;
+    for (unsigned SliceIdx = 0; SliceIdx < Result.Slices.size(); ++SliceIdx) {
+      SliceInfo &SI = Result.Slices[SliceIdx];
+      if (SI.Status.contains(SliceStatus::UndefOrPoison))
+        SI = getDynamicSlice(SliceIdx);
+    }
+
+    return Result;
+  }
 };
 
 // Implement status printing also here, because for multi-bit status we want to interleave the printing
@@ -485,7 +505,7 @@ ValueInfo ValueOriginTracker::computeConstantValueInfo(ValueInfoBuilder &VIB, ll
     return VIB.createDynamic();
 
   auto Ty = CV->getType();
-  unsigned BitsPerSlice = 8 * BytesPerSlice;
+  unsigned BitsPerSlice = 8 * Opts.BytesPerSlice;
   // Don't bother with dynamic vectors
   auto *VectorTy = dyn_cast<FixedVectorType>(Ty);
   auto *ArrayTy = dyn_cast<ArrayType>(Ty);
@@ -588,7 +608,7 @@ ValueInfo ValueOriginTracker::computeValueInfoFromAssumption(ValueInfoBuilder &V
 // treating dependencies on earlier loop iterations as dynamic. Thus, for PHI nodes, if dependencies have not yet
 // been analyzed, we assume loop dependencies and give up.
 ValueInfo ValueOriginTracker::computeValueInfo(llvm::Value *V) {
-  ValueInfoBuilder VIB{DL, V, BytesPerSlice, MaxBytesPerValue};
+  ValueInfoBuilder VIB{DL, V, Opts.BytesPerSlice, Opts.MaxBytesPerValue};
   if (isa<UndefValue>(V)) {
     return VIB.createUndef();
   }
@@ -610,13 +630,18 @@ ValueInfo ValueOriginTracker::computeValueInfo(llvm::Value *V) {
 
   switch (Inst->getOpcode()) {
   case Instruction::AddrSpaceCast:
-  case Instruction::BitCast:
-  case Instruction::Freeze: {
-    // Just forward the operand for size-preserving type conversions and freeze
+  case Instruction::BitCast: {
+    // Just forward the operand for size-preserving type conversions
     auto *Op = Inst->getOperand(0);
     auto It = ValueInfos.find(Op);
     assert(It != ValueInfos.end());
     return It->second;
+  }
+  case Instruction::Freeze: {
+    auto *Op = Inst->getOperand(0);
+    auto It = ValueInfos.find(Op);
+    assert(It != ValueInfos.end());
+    return VIB.createFreeze(It->second, Opts.FreezeMode);
   }
   case Instruction::ExtractElement: {
     auto *EE = cast<ExtractElementInst>(Inst);

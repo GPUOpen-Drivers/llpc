@@ -34,6 +34,7 @@
 #include "compilerutils/DxilToLlvm.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
+#include "llvmraytracing/SpecializeDriverShaders.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
@@ -112,10 +113,6 @@ void llvm::replaceCallsToFunction(Function &F, Value &Replacement) {
   });
 }
 
-bool llvm::isLgcRtOp(const llvm::Function *F) {
-  return F && F->getName().starts_with("lgc.rt.");
-}
-
 void llvm::moveFunctionBody(Function &OldFunc, Function &NewFunc) {
   while (!OldFunc.empty()) {
     BasicBlock *BB = &OldFunc.front();
@@ -125,7 +122,7 @@ void llvm::moveFunctionBody(Function &OldFunc, Function &NewFunc) {
 }
 
 std::optional<llvm::GpuRtIntrinsicEntry> llvm::findIntrImplEntryByIntrinsicCall(CallInst *Call) {
-  if (!isLgcRtOp(Call->getCalledFunction()))
+  if (!lgc::rt::LgcRtDialect::isDialectOp(*Call->getCalledFunction()))
     return std::nullopt;
 
   auto ImplEntry = LgcRtGpuRtMap.find(*Call);
@@ -140,7 +137,7 @@ bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
 
   for (Function &F : make_early_inc_range(*Mod)) {
     if (F.isDeclaration() && F.user_empty()) {
-      if (!OnlyIntrinsics || (isLgcRtOp(&F) || F.getName().starts_with("dx.op."))) {
+      if (!OnlyIntrinsics || (lgc::rt::LgcRtDialect::isDialectOp(F) || F.getName().starts_with("dx.op."))) {
         F.eraseFromParent();
         DidChange = true;
       }
@@ -153,7 +150,7 @@ bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
 bool ContHelper::isRematerializableLgcRtOp(CallInst &CInst, std::optional<lgc::rt::RayTracingShaderStage> Kind) {
   using namespace lgc::rt;
   Function *Callee = CInst.getCalledFunction();
-  if (!llvm::isLgcRtOp(Callee))
+  if (!LgcRtDialect::isDialectOp(*Callee))
     return false;
 
   // Always rematerialize
@@ -510,6 +507,9 @@ void ContHelper::addContinuationPasses(ModulePassManager &MPM) {
   // Convert the system data struct to a value, so it isn't stored in the
   // continuation state
   MPM.addPass(createModuleToFunctionPassAdaptor(SROAPass(llvm::SROAOptions::ModifyCFG)));
+
+  MPM.addPass(SpecializeDriverShadersPass());
+
   MPM.addPass(LowerAwaitPass());
 
   MPM.addPass(CoroEarlyPass());
@@ -517,7 +517,7 @@ void ContHelper::addContinuationPasses(ModulePassManager &MPM) {
   MPM.addPass(createModuleToFunctionPassAdaptor(CoroElidePass()));
   MPM.addPass(CoroCleanupPass());
 
-  MPM.addPass(LegacyCleanupContinuationsPass());
+  MPM.addPass(DXILCleanupContinuationsPass());
   MPM.addPass(ContinuationsStatsReportPass());
   MPM.addPass(DXILContPostProcessPass());
 
@@ -833,6 +833,7 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *
   }
 
   // Tolerate Replacement returning a single-element struct containing a value of the right type.
+  // That happens when the called function is _cont_ObjectToWorld4x3 (and possibly others) from LLPCFE.
   if (!Call->getType()->isVoidTy() && Call->getType() != Replacement->getType()) {
     assert(cast<StructType>(Replacement->getType())->getNumElements() == 1);
     Replacement = B.CreateExtractValue(Replacement, 0);
@@ -851,7 +852,6 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *
 static bool replaceEnqueueIntrinsic(Function &F) {
   bool Changed = false;
   StringRef FuncName = F.getName();
-  bool IsEnqueueCall = FuncName.contains("EnqueueCall");
   bool IsWaitEnqueue = FuncName.contains("WaitEnqueue");
   llvm_dialects::Builder B{F.getContext()};
 
@@ -860,15 +860,7 @@ static bool replaceEnqueueIntrinsic(Function &F) {
     CallInst *NewCall = nullptr;
     Value *WaitMask = nullptr;
     Value *RetAddr = nullptr;
-    if (IsEnqueueCall) {
-      // Add the current function as return address to the call.
-      // Used when Traversal calls AnyHit or Intersection.
-      RetAddr = B.create<lgc::cps::AsContinuationReferenceOp>(B.getInt64Ty(), CInst.getFunction());
-      // Handle WaitEnqueueCall.
-      if (IsWaitEnqueue)
-        WaitMask = CInst.getArgOperand(1);
-
-    } else if (IsWaitEnqueue) {
+    if (IsWaitEnqueue) {
       // Handle WaitEnqueue.
       WaitMask = CInst.getArgOperand(1);
       RetAddr = CInst.getArgOperand(2);
@@ -883,10 +875,16 @@ static bool replaceEnqueueIntrinsic(Function &F) {
     // defined in the LgcCpsDialect.
     const uint32_t DummyLevelsArg = -1;
     Value *DummyContState = PoisonValue::get(StructType::get(B.getContext()));
-    NewCall = B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyContState, RetAddr, TailArgs);
+    Value *DummyCsp = PoisonValue::get(B.getInt32Ty());
+    NewCall =
+        B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyContState, DummyCsp, RetAddr, TailArgs);
 
-    if (WaitMask)
-      ContHelper::setWaitMask(*NewCall, cast<ConstantInt>(WaitMask)->getSExtValue());
+    if (WaitMask) {
+      // The only supported wait mask is a constant -1. We don't enforce having a constant here because the SPIR-V
+      // build of GPURT isn't optimized.
+      assert(!isa<ConstantInt>(WaitMask) || cast<ConstantInt>(WaitMask)->getSExtValue() == -1);
+      ContHelper::setWaitMask(*NewCall);
+    }
 
     // NOTE: Inlining ExitRayGen in LowerRaytracingPipeline can cause continue
     // ops whose name is suffixed .cloned.*, which don't get picked up by the
@@ -908,19 +906,10 @@ static void handleContinuationStackIsGlobal(Function &Func, ContStackAddrspace S
          // bool
          && Func.getFunctionType()->getReturnType()->isIntegerTy(1));
 
-  auto *IsGlobal = ConstantInt::getBool(Func.getContext(), StackAddrspace == ContStackAddrspace::Global);
+  auto *IsGlobal = ConstantInt::getBool(Func.getContext(), StackAddrspace == ContStackAddrspace::Global ||
+                                                               StackAddrspace == ContStackAddrspace::GlobalLLPC);
 
   llvm::replaceCallsToFunction(Func, *IsGlobal);
-}
-
-static void handleContinuationsGetFlags(Function &Func, uint32_t Flags) {
-  assert(Func.arg_empty()
-         // i32
-         && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
-
-  auto *FlagsConst = ConstantInt::get(IntegerType::get(Func.getContext(), 32), Flags);
-
-  llvm::replaceCallsToFunction(Func, *FlagsConst);
 }
 
 static void handleGetRtip(Function &Func, uint32_t RtipLevel) {
@@ -1082,7 +1071,7 @@ void llvm::terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall) {
   Type *FuncRetTy = CompleteCall->getFunction()->getReturnType();
   // For functions returning a value, return a poison. Resume functions
   // and other shaders will simply return a void value when this helper is being
-  // called from LegacyCleanupContinuations. These will be treated as
+  // called from CleanupContinuations. These will be treated as
   // continuation.complete by the translator.
   ReturnInst *Ret = nullptr;
   if (FuncRetTy->isVoidTy())
@@ -1099,21 +1088,20 @@ void llvm::terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall) {
   // - Remove the complete call.
   // This is intended to work for _AmdComplete appearing in conditional code
   // or the unreachable inserted by various passes before
-  // LegacyCleanupContinuations.
+  // CleanupContinuations.
   SplitBlock(CompleteCall->getParent(), CompleteCall);
   // Remove the branch to the split block.
   Ret->getParent()->getTerminator()->eraseFromParent();
   CompleteCall->eraseFromParent();
 }
 
-bool llvm::earlyDriverTransform(Module &M) {
+bool llvm::earlyGpurtTransform(Module &M) {
   // Import StackAddrspace from metadata if set, otherwise from default
   auto StackAddrspaceMD = ContHelper::tryGetStackAddrspace(M);
   auto StackAddrspace = StackAddrspaceMD.value_or(ContHelper::DefaultStackAddrspace);
 
   // Import from metadata if set
   auto RtipLevel = ContHelper::Rtip::tryGetValue(&M);
-  auto Flags = ContHelper::Flags::tryGetValue(&M);
   SmallVector<ContSetting> GpurtSettings;
   ContHelper::getGpurtSettings(M, GpurtSettings);
 
@@ -1129,12 +1117,6 @@ bool llvm::earlyDriverTransform(Module &M) {
     if (Name.starts_with("_AmdContinuationStackIsGlobal")) {
       Changed = true;
       handleContinuationStackIsGlobal(F, StackAddrspace);
-    } else if (Name.starts_with("_AmdContinuationsGetFlags")) {
-      Changed = true;
-      if (!Flags)
-        report_fatal_error("Tried to get continuation flags but it is not "
-                           "available on the module");
-      handleContinuationsGetFlags(F, *Flags);
     } else if (Name.starts_with("_AmdGetRtip")) {
       Changed = true;
       if (!RtipLevel)

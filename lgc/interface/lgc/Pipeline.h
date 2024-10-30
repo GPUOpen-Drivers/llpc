@@ -197,11 +197,14 @@ union Options {
     bool disableSampleCoverageAdjust;              // Disable the adjustment of sample coverage
     bool forceFragColorDummyExport;                // Force dummy export is added to fragment shader color export.
     unsigned reserved22;
-    bool dynamicTopology; // Whether primitive topology is dynamic.
+    bool dynamicTopology;    // Whether primitive topology is dynamic.
+    bool robustBufferAccess; // Enable the core robust buffer access
     bool reserved23;
-    bool forceUserDataSpill;    // Whether to force all user data to be spilled (Currently only for RT).
-    bool enableMapClipDistMask; // For OGL only, whether to remap the clip distances.
-    unsigned clipPlaneMask;     // For OGL only, defines the bitmask for enabling/disabling clip planes.
+    bool forceUserDataSpill;     // Whether to force all user data to be spilled (Currently only for RT).
+    bool optimizePointSizeWrite; // Optimize the write of PointSize in the last vertex processing stage by
+                                 // eliminating it if the write value is 1.0.
+    bool enableMapClipDistMask;  // For OGL only, whether to remap the clip distances.
+    unsigned clipPlaneMask;      // For OGL only, defines the bitmask for enabling/disabling clip planes.
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -710,6 +713,9 @@ struct ComputeShaderMode {
   unsigned subgroupSize;               // Override for the wave size if it is non-zero
   DerivativeMode derivativeMode;       // derivativeMode for computeShader
   unsigned noLocalInvocationIdInCalls; // For compute with calls, assume local invocation ID is never used in callees
+  unsigned origWorkgroupSizeX;         // X dimension of original workgroup size. 0 means no original size
+  unsigned origWorkgroupSizeY;         // Y dimension of original workgroup size. If X is non-zero, Y must be non-zero
+  unsigned origWorkgroupSizeZ;         // Z dimension of original workgroup size. If X is non-zero, Z must be non-zero
 };
 
 // Enum passed to Pipeline::irLink to give information on whether this is a whole or part pipeline.

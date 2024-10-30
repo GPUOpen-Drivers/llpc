@@ -2051,12 +2051,18 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::Tanh:
     case BuilderOpcode::SubgroupBallotBitCount:
     case BuilderOpcode::SubgroupBallotBitExtract:
-    case BuilderOpcode::SubgroupBallotExclusiveBitCount:
     case BuilderOpcode::SubgroupBallotFindLsb:
     case BuilderOpcode::SubgroupBallotFindMsb:
-    case BuilderOpcode::SubgroupBallotInclusiveBitCount:
     case BuilderOpcode::SamplerFeedbackDesc:
-      // Functions that don't access memory.
+      // Functions that don't access memory, and are not a source of divergence.
+      func->setDoesNotAccessMemory();
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 514862
+      func->addFnAttr(Attribute::NoDivergenceSource);
+#endif
+      break;
+    case BuilderOpcode::SubgroupBallotExclusiveBitCount:
+    case BuilderOpcode::SubgroupBallotInclusiveBitCount:
+      // Functions that don't access memory, and could be a source of divergence.
       func->setDoesNotAccessMemory();
       break;
     case BuilderOpcode::ImageSample:
@@ -2070,13 +2076,21 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageLoad:
     case BuilderOpcode::ImageLoadWithFmask:
     case BuilderOpcode::LoadPushConstantsPtr:
+      // Functions that only read memory and are not a source of divergence.
+      func->setOnlyReadsMemory();
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 514862
+      func->addFnAttr(Attribute::NoDivergenceSource);
+#endif
+      // Must be marked as returning for DCE.
+      func->addFnAttr(Attribute::WillReturn);
+      break;
     case BuilderOpcode::ReadBaryCoord:
     case BuilderOpcode::ReadBuiltInInput:
     case BuilderOpcode::ReadBuiltInOutput:
     case BuilderOpcode::ReadGenericInput:
     case BuilderOpcode::ReadGenericOutput:
     case BuilderOpcode::ReadPerVertexInput:
-      // Functions that only read memory.
+      // Functions that only read memory and could be a source of divergence.
       func->setOnlyReadsMemory();
       // Must be marked as returning for DCE.
       func->addFnAttr(Attribute::WillReturn);
@@ -2087,8 +2101,13 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
       break;
     case BuilderOpcode::ImageAtomic:
     case BuilderOpcode::ImageAtomicCompareSwap:
+      // Functions that read and write memory and could be a source of divergence.
+      break;
     case BuilderOpcode::WriteXfbOutput:
-      // Functions that read and write memory.
+      // Functions that read and write memory and are not a source of divergence.
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 514862
+      func->addFnAttr(Attribute::NoDivergenceSource);
+#endif
       break;
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
@@ -2120,6 +2139,10 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
       break;
     case BuilderOpcode::SubgroupWriteInvocation:
     case BuilderOpcode::DemoteToHelperInvocation:
+    case BuilderOpcode::IsHelperInvocation:
+      // TODO: These functions have not been classified yet, other than that we do not want to mark
+      // as NoDivergenceSource.
+      break;
     case BuilderOpcode::EmitVertex:
     case BuilderOpcode::EndPrimitive:
     case BuilderOpcode::ImageGetLod:
@@ -2127,13 +2150,16 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageQueryLevels:
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
-    case BuilderOpcode::IsHelperInvocation:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:
     case BuilderOpcode::WriteBuiltInOutput:
     case BuilderOpcode::WriteGenericOutput:
     case BuilderOpcode::ImageBvhIntersectRay:
-      // TODO: These functions have not been classified yet.
+      // TODO: These functions have not been classified yet, other than that we want to mark
+      // as NoDivergenceSource.
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 514862
+      func->addFnAttr(Attribute::NoDivergenceSource);
+#endif
       break;
     default:
       llvm_unreachable("Should never be called!");

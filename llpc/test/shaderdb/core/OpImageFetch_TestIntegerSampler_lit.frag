@@ -22,8 +22,8 @@ void main()
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 1, i32 1536, {{.*}}, <2 x i32> <i32 0, i32 1>, i32 0)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.load.2d.v4i32.i16(i32 15, i16 0, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !{{.*}}
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.load.2d.v4i32.i16(i32 15, i16 0, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !{{.*}}
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.load.2d.v4i32.i16{{(\.v8i32)?}}(i32 15, i16 0, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !{{.*}}
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.image.load.2d.v4i32.i16{{(\.v8i32)?}}(i32 15, i16 0, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

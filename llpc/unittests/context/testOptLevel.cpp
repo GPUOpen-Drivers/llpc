@@ -63,7 +63,7 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
     GraphicsPipelineBuildInfo pipelineInfo = {};
     pipelineInfo.options.optimizationLevel = static_cast<uint32_t>(optLevel);
 
-    GraphicsContext graphicsContext(GfxIp, &pipelineInfo, &pipelineHash, &cacheHash);
+    GraphicsContext graphicsContext(GfxIp, "Vulkan", &pipelineInfo, &pipelineHash, &cacheHash);
 
     context.attachPipelineContext(&graphicsContext);
 
@@ -97,7 +97,7 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
     ComputePipelineBuildInfo pipelineInfo = {};
     pipelineInfo.options.optimizationLevel = static_cast<uint32_t>(optLevel);
 
-    ComputeContext computeContext(GfxIp, &pipelineInfo, &pipelineHash, &cacheHash);
+    ComputeContext computeContext(GfxIp, "Vulkan", &pipelineInfo, &pipelineHash, &cacheHash);
 
     context.attachPipelineContext(&computeContext);
 

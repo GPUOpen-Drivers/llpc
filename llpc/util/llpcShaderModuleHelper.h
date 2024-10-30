@@ -35,6 +35,12 @@
 #include <llvm/Support/Error.h>
 #include <vector>
 
+namespace SPIRV {
+
+class SPIRVModule;
+
+} // namespace SPIRV
+
 namespace Llpc {
 
 // Represents the information of one shader entry in ShaderModuleData
@@ -55,7 +61,7 @@ struct ShaderEntryName {
 // Represents LLPC shader module helper class
 class ShaderModuleHelper {
 public:
-  static ShaderModuleUsage getShaderModuleUsageInfo(const BinaryData *spvBinCode);
+  static ShaderModuleUsage getShaderModuleUsageInfo(SPIRV::SPIRVModule *module);
 
   static llvm::Expected<unsigned> trimSpirvDebugInfo(const BinaryData *spvBin,
                                                      llvm::MutableArrayRef<unsigned> codeBuffer);
@@ -70,9 +76,9 @@ public:
 
   static bool isLlvmBitcode(const BinaryData *shaderBin);
   static Result getShaderBinaryType(BinaryData shaderBinary, BinaryType &binaryType);
-  static Result getModuleData(const ShaderModuleBuildInfo *shaderInfo, llvm::MutableArrayRef<unsigned> codeBuffer,
-                              Vkgc::ShaderModuleData &moduleData);
-  static llvm::Expected<unsigned> getCodeSize(const ShaderModuleBuildInfo *shaderInfo);
+  static Result getModuleData(const ShaderModuleBuildInfo *shaderInfo, SPIRV::SPIRVModule *module,
+                              llvm::MutableArrayRef<unsigned> codeBuffer, Vkgc::ShaderModuleData &moduleData);
+  static llvm::Expected<unsigned> getShaderCodeSize(const ShaderModuleBuildInfo *shaderInfo);
   static llvm::Expected<BinaryData> getShaderCode(const ShaderModuleBuildInfo *shaderInfo,
                                                   llvm::MutableArrayRef<unsigned int> &codeBuffer);
 };

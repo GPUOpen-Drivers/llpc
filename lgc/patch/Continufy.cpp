@@ -32,6 +32,7 @@
 
 #include "lgc/patch/Continufy.h"
 #include "compilerutils/CompilerUtils.h"
+#include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
@@ -174,6 +175,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
         SmallVector<Value *> tailArgs = {PoisonValue::get(builder.getInt32Ty())};
         tailArgs.append(call.arg_begin(), call.arg_end());
         auto *newCall = builder.create<AwaitOp>(call.getType(), continuationRef, 1u << (unsigned)calleeLevel, tailArgs);
+        ContHelper::ReturnedRegisterCount::setValue(newCall, 0);
         call.replaceAllUsesWith(newCall);
         tobeErased.push_back(&call);
       }
@@ -195,7 +197,8 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
             tailArgs.push_back(retValue);
 
           builder.create<JumpOp>(fnPtr->getArg(1), getReturnedLevels(currentRtStage.value()),
-                                 PoisonValue::get(StructType::get(context, {})) /* state */, poisonI32, tailArgs);
+                                 PoisonValue::get(StructType::get(context, {})) /* state */, poisonI32 /* csp */,
+                                 poisonI32 /* rcr */, tailArgs);
         }
 
         builder.CreateUnreachable();

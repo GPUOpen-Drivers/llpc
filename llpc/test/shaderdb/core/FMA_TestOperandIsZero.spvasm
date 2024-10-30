@@ -1,7 +1,7 @@
 ; Test on fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc --disable-fma=false -stop-after=lgc-patch-mul-dx9-zero %gfxip -o - %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc --disable-fma=false -stop-after=lgc-lower-mul-dx9-zero %gfxip -o - %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: @lgc.shader.FS.main(
 ; SHADERTEST: call nnan float @llvm.amdgcn.fma.legacy(float {{.*}}, float {{.*}}, float {{.*}})
 ; SHADERTEST: call nnan float @llvm.amdgcn.fma.legacy(float {{.*}}, float {{.*}}, float {{.*}})

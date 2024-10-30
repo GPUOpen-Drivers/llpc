@@ -116,12 +116,12 @@ During implementation, some interfaces and structures should be changed as follo
 1. Replace `ResourceUsage::builtInUsage.cs.workgroupLayout` with a `ResourceUsage::builtInUsage.cs.foldWorkgroupXY` boolean. The `Gfx[69]ConfigBuilder` will use this boolean instead of `workgroupLayout`.
 2. Add `ComputeShaderMode::derivatives` field with three enum values: `None`, `Linear`, `Quads`. This field is populated by the SPIRV reader.
 3. Change the `InOutBuilder` to always insert a call to `lgc.reconfigure.local.invocation.id` for `BuiltInLocalInvocationId`. Remove `lgc.swizzle.local.invocation.id`.
-4. `PatchInOutImportExport::processShader` will handle `lgc.reconfigure.local.invocation.id` similar to today. However:
+4. `LowerInOut::processShader` will handle `lgc.reconfigure.local.invocation.id` similar to today. However:
    * Take the `ComputeShaderMode::derivatives` field into account when determining the workgroup layout to use
    * Integrate `swizzleLocalInvocationIdIn8x4`; basically, the decision of micro- vs. macro-tiling becomes explicitly orthogonal. Instead of `WorkgroupLayout::{Linear, Quads, SexagintiQuads}` and then 8x4 swizzling, there is only `Linear` vs. `Quads` for the micro-tiling and then `Linear` vs. `Block8` for the macro-tiling.
    * The `forceCsThreadIdSwizzling` pipeline option can stay the same for compatibility, it is simply used as an input to the determination of which layout to use.
 
-Note that all decision-making is centralized in one place, which is `PatchInOutImportExport`: the inputs of pipeline options as well as derivatives mode are used once to determine the workgroup layout.
+Note that all decision-making is centralized in one place, which is `LowerInOut`: the inputs of pipeline options as well as derivatives mode are used once to determine the workgroup layout.
 
 # Issues
 ## Helper invocations support

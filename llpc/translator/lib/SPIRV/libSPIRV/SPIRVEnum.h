@@ -213,6 +213,8 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityCooperativeMatrixKHR, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearNV, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupQuadsNV, {CapabilityShader});
+  ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearKHR, {CapabilityShader});
+  ADD_VEC_INIT(CapabilityComputeDerivativeGroupQuadsKHR, {CapabilityShader});
   ADD_VEC_INIT(CapabilityQuadControlKHR, {CapabilityShader});
 }
 

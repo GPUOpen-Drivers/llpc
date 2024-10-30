@@ -77,7 +77,6 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .add(&LowerGpuRt::visitFloatWithRoundMode)
                             .add(&LowerGpuRt::visitGpurtDispatchThreadIdFlatOp)
-                            .add(&LowerGpuRt::visitContinuationStackIsGlobalOp)
                             .add(&LowerGpuRt::visitWaveScanOp)
                             .add(&LowerGpuRt::visitGetKnownSetRayFlagsOp)
                             .add(&LowerGpuRt::visitGetKnownUnsetRayFlagsOp)
@@ -238,13 +237,12 @@ void LowerGpuRt::visitGetStackStride(GpurtGetStackStrideOp &inst) {
 void LowerGpuRt::visitStackRead(GpurtStackReadOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackIndex = inst.getIndex();
-  Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
   if (inst.getUseExtraStack()) {
     auto ldsStackSize = m_builder->getInt32(m_workGroupSize * MaxLdsStackEntries);
     stackIndex = m_builder->CreateAdd(stackIndex, ldsStackSize);
   }
 
-  Value *stackAddr = m_builder->CreateGEP(stackTy, m_stack, {stackIndex});
+  Value *stackAddr = m_builder->CreateGEP(m_builder->getInt32Ty(), m_stack, {stackIndex});
   Value *stackData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
 
   inst.replaceAllUsesWith(stackData);
@@ -260,13 +258,12 @@ void LowerGpuRt::visitStackWrite(GpurtStackWriteOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackIndex = inst.getIndex();
   Value *stackData = inst.getValue();
-  Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
   if (inst.getUseExtraStack()) {
     auto ldsStackSize = m_builder->getInt32(m_workGroupSize * MaxLdsStackEntries);
     stackIndex = m_builder->CreateAdd(stackIndex, ldsStackSize);
   }
 
-  auto stackArrayAddr = m_builder->CreateGEP(stackTy, m_stack, {stackIndex});
+  auto stackArrayAddr = m_builder->CreateGEP(m_builder->getInt32Ty(), m_stack, {stackIndex});
   m_builder->CreateStore(stackData, stackArrayAddr);
 
   inst.replaceAllUsesWith(m_builder->getInt32(0));
@@ -526,18 +523,6 @@ void LowerGpuRt::visitGpurtDispatchThreadIdFlatOp(GpurtDispatchThreadIdFlatOp &i
   }
 
   inst.replaceAllUsesWith(flatDispatchId);
-  m_callsToLower.push_back(&inst);
-  m_funcsToLower.insert(inst.getCalledFunction());
-}
-
-// =====================================================================================================================
-// Visit "GpurtContinuationStackIsGlobalOp" instruction
-//
-// @param inst : The dialect instruction to process
-void LowerGpuRt::visitContinuationStackIsGlobalOp(GpurtContinuationStackIsGlobalOp &inst) {
-  m_builder->SetInsertPoint(&inst);
-  bool isGlobal = m_pipelineState->getOptions().cpsFlags & CpsFlagStackInGlobalMem;
-  inst.replaceAllUsesWith(m_builder->getInt1(isGlobal));
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

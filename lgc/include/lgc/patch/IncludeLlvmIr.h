@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  IncludeLlvmIr.h
- * @brief LLPC header file: contains declaration of class lgc::PatchLlvmIrInclusion.
+ * @brief LLPC header file: contains declaration of class lgc::IncludeLlvmIr.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -37,7 +37,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
-class PatchLlvmIrInclusion : public Patch, public llvm::PassInfoMixin<PatchLlvmIrInclusion> {
+class IncludeLlvmIr : public Patch, public llvm::PassInfoMixin<IncludeLlvmIr> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

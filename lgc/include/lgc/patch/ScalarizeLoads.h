@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  ScalarizeLoads.h
- * @brief LLPC header file: contains declaration of class lgc::PatchLoadScalarizer.
+ * @brief LLPC header file: contains declaration of class lgc::ScalarizeLoads.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -40,10 +40,9 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for scalarize load.
-class PatchLoadScalarizer final : public llvm::InstVisitor<PatchLoadScalarizer>,
-                                  public llvm::PassInfoMixin<PatchLoadScalarizer> {
+class ScalarizeLoads final : public llvm::InstVisitor<ScalarizeLoads>, public llvm::PassInfoMixin<ScalarizeLoads> {
 public:
-  explicit PatchLoadScalarizer();
+  explicit ScalarizeLoads();
 
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 

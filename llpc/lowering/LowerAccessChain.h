@@ -32,7 +32,6 @@
 
 #include "Lowering.h"
 #include "llvm/IR/InstVisitor.h"
-#include "llvm/IR/Operator.h"
 #include "llvm/IR/PassManager.h"
 
 namespace Llpc {
@@ -47,15 +46,18 @@ public:
   virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
   virtual void visitLoadInst(llvm::LoadInst &loadInst);
   virtual void visitStoreInst(llvm::StoreInst &storeInst);
+  virtual void visitCallInst(llvm::CallInst &callInst);
 
   static llvm::StringRef name() { return "Lower SPIR-V access chain"; }
 
 private:
-  llvm::GetElementPtrInst *tryToCoalesceChain(llvm::GetElementPtrInst *getElemPtr, unsigned addrSpace);
+  llvm::Instruction *tryToCoalesceChain(llvm::Instruction *getElemPtr);
   void appendZeroIndexToMatchTypes(llvm::SmallVectorImpl<llvm::Value *> &indexOperands, llvm::Type *typeToMatch,
                                    llvm::Type *baseType);
 
-  void tryToAddMissingIndicesBetweenGVandGEP(llvm::GEPOperator *gep);
+  void tryToAddMissingIndicesBetweenGVandGEP(llvm::CallInst *callInst);
+
+  llvm::SmallVector<llvm::Instruction *, 8> m_removeGeps;
 };
 
 } // namespace Llpc

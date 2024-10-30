@@ -30,7 +30,7 @@ void main()
 //.
 // CHECK: attributes #[[ATTR0]] = { alwaysinline nounwind "denormal-fp-math-f32"="preserve-sign" }
 // CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind willreturn memory(read) }
-// CHECK: attributes #[[ATTR2:[0-9]+]] = { nounwind }
+// CHECK: attributes #[[ATTR2:[0-9]+]] = {{{.*}} nounwind }
 //.
 // CHECK: [[META0:![0-9]+]] = !{!"Vulkan"}
 // CHECK: [[META1:![0-9]+]] = !{i32 1}
