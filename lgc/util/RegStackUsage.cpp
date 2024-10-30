@@ -83,27 +83,38 @@ static const struct {
 
 static const MsgPackScanner::Spec msgPackScannerSpec(&items);
 
+template <typename T> class OptionalPOD {
+public:
+  T &value() {
+    assert(haveValue);
+    return val;
+  }
+
+  const T &value() const {
+    assert(haveValue);
+    return val;
+  }
+
+  T value_or(T other) const { return (haveValue ? val : other); }
+
+  bool hasValue() const { return haveValue; }
+
+  void operator=(const T other) {
+    val = other;
+    haveValue = true;
+  }
+
+private:
+  T val = {};
+  bool haveValue = false;
+};
+
 // Struct for reg/stack usage.
 struct Usage {
   unsigned maxRecursionDepth;
   unsigned callableShaderCount;
   unsigned backendStackSize;
-  std::optional<unsigned> frontendStackSize;
-  unsigned stackFrameSizeInBytes;
-  unsigned scratchMemorySize;
-  unsigned ldsSize;
-  unsigned sgprCount;
-  unsigned vgprCount;
-  bool cpsGlobal;
-  bool scratchEn;
-  bool memOrdered;
-};
-
-struct UsageTemp {
-  unsigned maxRecursionDepth;
-  unsigned callableShaderCount;
-  unsigned backendStackSize;
-  unsigned frontendStackSize;
+  OptionalPOD<unsigned> frontendStackSize;
   unsigned stackFrameSizeInBytes;
   unsigned scratchMemorySize;
   unsigned ldsSize;
@@ -120,7 +131,7 @@ struct UsageTemp {
   stream << "  maxRecursionDepth " << usage.maxRecursionDepth << "\n"
          << "  callableShaderCount " << usage.callableShaderCount << "\n"
          << "  backendStackSize " << usage.backendStackSize << "\n"
-         << "  frontendStackSize " << usage.frontendStackSize << "\n"
+         << "  frontendStackSize " << usage.frontendStackSize.value() << "\n"
          << "  stackFrameSizeInBytes " << usage.stackFrameSizeInBytes << "\n"
          << "  scratchMemorySize " << usage.scratchMemorySize << "\n"
          << "  ldsSize " << usage.ldsSize << "\n"
@@ -311,20 +322,7 @@ RegStackUsageImpl::RegStackUsageImpl(const llvm::Module &module) : m_msgPackScan
   if (namedNode && namedNode->getNumOperands() >= 1) {
     StringRef str = dyn_cast<MDString>(namedNode->getOperand(0)->getOperand(0))->getString();
     assert(str.size() == sizeof(m_usage));
-    UsageTemp usage;
-    memcpy(&usage, str.data(), sizeof(m_usage));
-    m_usage.maxRecursionDepth = usage.maxRecursionDepth;
-    m_usage.callableShaderCount = usage.callableShaderCount;
-    m_usage.backendStackSize = usage.backendStackSize;
-    m_usage.frontendStackSize = usage.frontendStackSize;
-    m_usage.stackFrameSizeInBytes = usage.stackFrameSizeInBytes;
-    m_usage.scratchMemorySize = usage.scratchMemorySize;
-    m_usage.ldsSize = usage.ldsSize;
-    m_usage.sgprCount = usage.sgprCount;
-    m_usage.vgprCount = usage.vgprCount;
-    m_usage.cpsGlobal = usage.cpsGlobal;
-    m_usage.scratchEn = usage.scratchEn;
-    m_usage.memOrdered = usage.memOrdered;
+    memcpy(&m_usage, str.data(), sizeof(m_usage));
   }
 }
 
@@ -346,7 +344,7 @@ void RegStackUsageImpl::merge(const RegStackUsageImpl &shaderUsage) {
   // For backend stack usage (scratch used within a func in continuations) and frontend stack usage (CPS stack),
   // take the maximum of multiple modules.
   m_usage.backendStackSize = std::max(m_usage.backendStackSize, shaderUsage.m_usage.backendStackSize);
-  if (m_usage.frontendStackSize || shaderUsage.m_usage.frontendStackSize) {
+  if (m_usage.frontendStackSize.hasValue() || shaderUsage.m_usage.frontendStackSize.hasValue()) {
     m_usage.frontendStackSize =
         std::max(m_usage.frontendStackSize.value_or(0), shaderUsage.m_usage.frontendStackSize.value_or(0));
   }
@@ -388,7 +386,7 @@ void RegStackUsageImpl::finalize(unsigned frontendGlobalAlignment) {
 #ifndef NDEBUG
   m_finalized = true;
 #endif
-  if (m_usage.frontendStackSize) {
+  if (m_usage.frontendStackSize.hasValue()) {
     // Continuations support.
     // Currently this uses a universal whole-pipeline frontendCallDepth and multiplies it in to frontendStackSize.
     // The calculation could be made more sophisticated by:
@@ -440,7 +438,7 @@ void RegStackUsageImpl::finalize(unsigned frontendGlobalAlignment) {
 // @param startOffset : Start offset of the ELF in the buffer
 //
 void RegStackUsageImpl::updateAndWrite(const Usage &usage, SmallVectorImpl<char> &elfBuffer, size_t startOffset) {
-  if (usage.frontendStackSize) {
+  if (usage.frontendStackSize.hasValue()) {
     // Set backendStackSize even if 0, otherwise PAL gives the driver a junk value.
     m_msgPackScanner.set(items.csBackendStackSize, usage.backendStackSize);
     m_msgPackScanner.set(items.csFrontendStackSize, usage.frontendStackSize.value());
