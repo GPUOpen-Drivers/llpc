@@ -74,7 +74,9 @@
 #include "llvm/Transforms/IPO/InferFunctionAttrs.h"
 #include "llvm/Transforms/IPO/SCCP.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 511856
 #include "llvm/Transforms/Instrumentation.h"
+#endif
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
@@ -108,7 +110,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
   if (lowerFlag.isInternalRtShader)
-    passMgr.addPass(ProcessGpuRtLibrary());
+    passMgr.addPass(ProcessGpuRtLibrary(context->buildGpurtKey()));
 
   // Lower SPIR-V CFG merges before inlining
   passMgr.addPass(LowerCfgMerges());

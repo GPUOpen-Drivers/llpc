@@ -35,12 +35,53 @@
 #include "llvm/IR/PassManager.h"
 
 namespace Llpc {
+
+// =====================================================================================================================
+// Key that fully determines the cached GPURT library module.
+//
+// Code run during the one-time specialization of the GPURT library module must only depend on fields in this structure.
+// In particular, it must not depend directly on any fields from the pipeline context -- such fields must be passed
+// through the GpurtKey structure so that we can reliably test whether a cached GPURT module can be reused.
+struct GpurtKey {
+  Vkgc::RtIpVersion rtipVersion;
+  unsigned gpurtFeatureFlags;
+  llvm::SmallVector<uint32_t, 4> bvhResDesc;
+
+  struct {
+    bool valid;
+    uint32_t cpsFlags;
+    std::vector<Vkgc::GpurtOption> options; // sorted by nameHash
+  } rtPipeline;
+
+  // Returns true if this key is equal to or (strictly) _refines_ the other key. A key with RT pipeline settings
+  // can refine a key without if all the general settings (outside of rtPipeline) are equal.
+  bool refines(const GpurtKey &other) const {
+    if (!rtPipeline.valid && other.rtPipeline.valid)
+      return false;
+    if (rtPipeline.valid && other.rtPipeline.valid) {
+      if (rtPipeline.cpsFlags != other.rtPipeline.cpsFlags)
+        return false;
+      if (!llvm::equal(rtPipeline.options, other.rtPipeline.options,
+                       [](const Vkgc::GpurtOption &lhs, const Vkgc::GpurtOption &rhs) {
+                         return lhs.nameHash == rhs.nameHash && lhs.value == rhs.value;
+                       }))
+        return false;
+    }
+    return rtipVersion == other.rtipVersion && gpurtFeatureFlags == other.gpurtFeatureFlags &&
+           llvm::equal(bvhResDesc, other.bvhResDesc);
+  }
+};
+
 class ProcessGpuRtLibrary : public SpirvLower, public llvm::PassInfoMixin<ProcessGpuRtLibrary> {
 public:
-  ProcessGpuRtLibrary();
+  ProcessGpuRtLibrary(const GpurtKey &key);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
 private:
+  // The key holding all the information necessary for specializing the GPURT module. No other state may be used to
+  // affect the specialization, in particular no state from the pipeline context.
+  const GpurtKey m_gpurtKey;
+
   typedef void (ProcessGpuRtLibrary::*LibraryFuncPtr)(llvm::Function *);
   struct LibraryFunctionTable {
     llvm::DenseMap<llvm::StringRef, LibraryFuncPtr> m_libFuncPtrs;
@@ -63,6 +104,7 @@ private:
   void createGetTriangleCompressionMode(llvm::Function *func);
   void createLoadDwordAtAddr(llvm::Function *func);
   void createLoadDwordAtAddrx2(llvm::Function *func);
+  void createLoadDwordAtAddrx3(llvm::Function *func);
   void createLoadDwordAtAddrx4(llvm::Function *func);
   void createConstantLoadDwordAtAddr(llvm::Function *func);
   void createConstantLoadDwordAtAddrx2(llvm::Function *func);
@@ -99,9 +141,8 @@ private:
   void createContStackStore(llvm::Function *func);
   void createFloatOpWithRoundMode(llvm::Function *func);
   void createEnqueue(llvm::Function *func);
-  void createContinuationStackIsGlobal(llvm::Function *func);
-  void createGetRtip(llvm::Function *func);
   void createIsLlpc(llvm::Function *func);
+  void createGetShaderRecordIndex(llvm::Function *func);
   void createShaderMarker(llvm::Function *func);
   void createWaveScan(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);

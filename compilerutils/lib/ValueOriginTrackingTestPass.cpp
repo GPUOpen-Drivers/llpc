@@ -39,11 +39,16 @@ namespace {
 
 cl::opt<unsigned> BytesPerSliceOption("value-origin-tracking-test-bytes-per-slice", cl::init(4));
 cl::opt<unsigned> MaxBytesPerValueOption("value-origin-tracking-test-max-bytes-per-value", cl::init(512));
+cl::opt<unsigned>
+    FreezeModeOption("value-origin-tracking-test-freeze-mode",
+                     cl::init(static_cast<unsigned>(ValueOriginTracker::Options::FreezeHandlingMode::Dynamic)));
 
 // Parse assumptions made via calls to the assume function.
 ValueOriginTracker::ValueOriginAssumptions parseAssumptions(Module &Module, Function &AssumeFunc) {
   ValueOriginTracker::ValueOriginAssumptions Result;
+  SmallVector<Instruction *> ToBeRemoved;
   forEachCall(AssumeFunc, [&](CallInst &AssumptionCall) {
+    ToBeRemoved.push_back(&AssumptionCall);
     unsigned NumArgs = AssumptionCall.arg_size();
     // We expect one arg for the value, and two per slice.
     if (NumArgs % 2 != 1)
@@ -82,6 +87,9 @@ ValueOriginTracker::ValueOriginAssumptions parseAssumptions(Module &Module, Func
     if (!Inserted)
       report_fatal_error("value with duplicate assumption");
   });
+  // Ensure assume calls are removed before starting the analysis, ensuring they don't impact it.
+  for (auto *Inst : ToBeRemoved)
+    Inst->eraseFromParent();
   return Result;
 }
 
@@ -101,30 +109,62 @@ llvm::PreservedAnalyses ValueOriginTrackingTestPass::run(llvm::Module &Module,
     Assumptions = parseAssumptions(Module, *AssumeFunc);
   }
 
-  ValueOriginTracker VOT{Module.getDataLayout(), BytesPerSliceOption.getValue(), MaxBytesPerValueOption.getValue(),
-                         Assumptions};
-
-  auto Prefix = "[VOT]: ";
+  ValueOriginTracker::Options Opts{};
+  Opts.FreezeMode = static_cast<ValueOriginTracker::Options::FreezeHandlingMode>(FreezeModeOption.getValue());
+  Opts.BytesPerSlice = BytesPerSliceOption.getValue();
+  Opts.MaxBytesPerValue = MaxBytesPerValueOption.getValue();
+  ValueOriginTracker VOT{Module.getDataLayout(), Opts, Assumptions};
 
   // Traverse all functions instead of the users of AnalyzeFunc to group output by function
+  // First collect values to be analyzed, then remove analyze calls, and then do the actual analysis.
+  // This ensures analysis calls don't interfere with the analysis, e.g. when freeze handling depends on the number of
+  // users.
+  SmallVector<Instruction *> ToBeRemoved;
+  struct AnalyzeCallsInfo {
+    SmallVector<Value *> Operands;
+  };
+  struct FunctionInfo {
+    Function *F;
+    SmallVector<AnalyzeCallsInfo> AnalyzeCalls;
+  };
+  SmallVector<FunctionInfo> ToBeAnalyzed;
+
   for (auto &F : Module) {
     if (F.isDeclaration())
       continue;
+    ToBeAnalyzed.push_back({});
+    auto &FuncInfo = ToBeAnalyzed.back();
+    FuncInfo.F = &F;
 
-    outs() << Prefix << F.getName() << "\n";
     for (auto &BB : F) {
       for (auto &I : BB) {
         auto *CI = dyn_cast<CallInst>(&I);
         if (!CI || CI->getCalledOperand() != AnalyzeFunc) {
           continue;
         }
+        ToBeRemoved.push_back(CI);
+        FuncInfo.AnalyzeCalls.push_back({});
+        auto &AnalyzeInfo = FuncInfo.AnalyzeCalls.back();
 
         for (Value *Op : CI->data_ops()) {
-          auto VI = VOT.getValueInfo(Op);
-          outs() << Prefix << "(" << *Op << "): " << VI << "\n";
+          AnalyzeInfo.Operands.push_back(Op);
         }
-        outs() << "\n";
       }
+    }
+  }
+
+  for (auto *Inst : ToBeRemoved)
+    Inst->eraseFromParent();
+
+  auto Prefix = "[VOT]: ";
+  for (const auto &FuncInfo : ToBeAnalyzed) {
+    outs() << Prefix << FuncInfo.F->getName() << "\n";
+    for (const auto &AnalyzeInfo : FuncInfo.AnalyzeCalls) {
+      for (Value *Op : AnalyzeInfo.Operands) {
+        auto VI = VOT.getValueInfo(Op);
+        outs() << Prefix << "(" << *Op << "): " << VI << "\n";
+      }
+      outs() << "\n";
     }
   }
   return PreservedAnalyses::all();

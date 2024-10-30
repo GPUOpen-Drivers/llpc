@@ -46,6 +46,7 @@ entryPoint = main
 [GraphicsPipelineState]
 colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
 colorBuffer[0].channelWriteMask = 15
+options.enableImplicitInvariantExports = 1
 
 [VertexInputState]
 binding[0].binding = 0

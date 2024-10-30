@@ -281,8 +281,54 @@ define <8 x i32> @test_i32_cd_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMode
   ret <8 x i32> %a
 }
 
+define <2 x i32> @test_i4_ab_layout(ptr addrspace(7) %ptr) !spirv.ExecutionModel !8 !lgc.shaderstage !9 {
+; CHECK-LABEL: @test_i4_ab_layout(
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
+; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 [[TMP1]])
+; CHECK-NEXT:    [[TMP3:%.*]] = srem i32 [[TMP2]], 16
+; CHECK-NEXT:    [[TMP4:%.*]] = mul i32 [[TMP3]], 128
+; CHECK-NEXT:    [[TMP5:%.*]] = add i32 0, [[TMP4]]
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 0
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR:%.*]], i32 [[TMP6]]
+; CHECK-NEXT:    [[TMP8:%.*]] = load atomic i8, ptr addrspace(7) [[TMP7]] unordered, align 16
+; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <8 x i8> poison, i8 [[TMP8]], i64 0
+; CHECK-NEXT:    [[TMP10:%.*]] = add i32 [[TMP5]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP10]]
+; CHECK-NEXT:    [[TMP12:%.*]] = load atomic i8, ptr addrspace(7) [[TMP11]] unordered, align 1
+; CHECK-NEXT:    [[TMP13:%.*]] = insertelement <8 x i8> [[TMP9]], i8 [[TMP12]], i64 1
+; CHECK-NEXT:    [[TMP14:%.*]] = add i32 [[TMP5]], 2
+; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP14]]
+; CHECK-NEXT:    [[TMP16:%.*]] = load atomic i8, ptr addrspace(7) [[TMP15]] unordered, align 2
+; CHECK-NEXT:    [[TMP17:%.*]] = insertelement <8 x i8> [[TMP13]], i8 [[TMP16]], i64 2
+; CHECK-NEXT:    [[TMP18:%.*]] = add i32 [[TMP5]], 3
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP18]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load atomic i8, ptr addrspace(7) [[TMP19]] unordered, align 1
+; CHECK-NEXT:    [[TMP21:%.*]] = insertelement <8 x i8> [[TMP17]], i8 [[TMP20]], i64 3
+; CHECK-NEXT:    [[TMP22:%.*]] = add i32 [[TMP5]], 4
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP22]]
+; CHECK-NEXT:    [[TMP24:%.*]] = load atomic i8, ptr addrspace(7) [[TMP23]] unordered, align 4
+; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <8 x i8> [[TMP21]], i8 [[TMP24]], i64 4
+; CHECK-NEXT:    [[TMP26:%.*]] = add i32 [[TMP5]], 5
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP26]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load atomic i8, ptr addrspace(7) [[TMP27]] unordered, align 1
+; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <8 x i8> [[TMP25]], i8 [[TMP28]], i64 5
+; CHECK-NEXT:    [[TMP30:%.*]] = add i32 [[TMP5]], 6
+; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP30]]
+; CHECK-NEXT:    [[TMP32:%.*]] = load atomic i8, ptr addrspace(7) [[TMP31]] unordered, align 2
+; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <8 x i8> [[TMP29]], i8 [[TMP32]], i64 6
+; CHECK-NEXT:    [[TMP34:%.*]] = add i32 [[TMP5]], 7
+; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(7) [[PTR]], i32 [[TMP34]]
+; CHECK-NEXT:    [[TMP36:%.*]] = load atomic i8, ptr addrspace(7) [[TMP35]] unordered, align 1
+; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <8 x i8> [[TMP33]], i8 [[TMP36]], i64 7
+; CHECK-NEXT:    [[TMP38:%.*]] = bitcast <8 x i8> [[TMP37]] to <2 x i32>
+; CHECK-NEXT:    ret <2 x i32> [[TMP38]]
+;
+  %a = call <2 x i32> (...) @lgc.cooperative.matrix.load__v2i32(ptr addrspace(7) %ptr, i32 128, i1 true, i32 10, i32 0, i32 2, i32 16)
+  ret <2 x i32> %a
+}
 declare <8 x float> @lgc.cooperative.matrix.load__v8f32(...)
 declare <8 x i32> @lgc.cooperative.matrix.load__v8i32(...)
+declare <2 x i32> @lgc.cooperative.matrix.load__v2i32(...)
 
 !llpc.compute.mode = !{!0}
 !lgc.client = !{!1}

@@ -53,7 +53,7 @@ using namespace llvm;
 using namespace lgc::rt;
 
 namespace Llpc {
-ProcessGpuRtLibrary::ProcessGpuRtLibrary() {
+ProcessGpuRtLibrary::ProcessGpuRtLibrary(const GpurtKey &key) : m_gpurtKey(key) {
 }
 
 // =====================================================================================================================
@@ -64,6 +64,23 @@ ProcessGpuRtLibrary::ProcessGpuRtLibrary() {
 PreservedAnalyses ProcessGpuRtLibrary::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-gpurt-library\n");
   SpirvLower::init(&module);
+
+  // Imbue the module with settings from the GPURT key.
+  ContHelper::setStackAddrspace(module, m_gpurtKey.rtPipeline.cpsFlags & Vkgc::CpsFlag::CpsFlagStackInGlobalMem
+                                            ? ContStackAddrspace::GlobalLLPC
+                                            : ContStackAddrspace::ScratchLLPC);
+
+  // The version is encoded as <major><minor> in decimal digits, so 11 is rtip 1.1, 20 is rtip 2.0
+  ContHelper::setRtip(module, m_gpurtKey.rtipVersion.major * 10 + m_gpurtKey.rtipVersion.minor);
+
+  SmallVector<ContSetting> contSettings;
+  for (auto &option : m_gpurtKey.rtPipeline.options) {
+    ContSetting setting;
+    setting.NameHash = option.nameHash;
+    setting.Value = option.value;
+    contSettings.push_back(setting);
+  }
+  ContHelper::setGpurtSettings(module, contSettings);
 
   // Process each function.
   SmallVector<std::pair<Function *, SmallBitVector>> argPromotionsFuncs;
@@ -123,6 +140,9 @@ PreservedAnalyses ProcessGpuRtLibrary::run(Module &module, ModuleAnalysisManager
   for (Function *func : maybeRtFuncs)
     processLibraryFunction(func);
 
+  // Implement builtins whose implementation is generic, i.e. not specific to LGC.
+  earlyGpurtTransform(module);
+
   return PreservedAnalyses::none();
 }
 
@@ -141,6 +161,7 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRayGetTriangleCompressionMode"] = &ProcessGpuRtLibrary::createGetTriangleCompressionMode;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddr"] = &ProcessGpuRtLibrary::createLoadDwordAtAddr;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2"] = &ProcessGpuRtLibrary::createLoadDwordAtAddrx2;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx3"] = &ProcessGpuRtLibrary::createLoadDwordAtAddrx3;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4"] = &ProcessGpuRtLibrary::createLoadDwordAtAddrx4;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConstantLoadDwordAtAddr"] =
       &ProcessGpuRtLibrary::createConstantLoadDwordAtAddr;
@@ -184,9 +205,8 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["_AmdContStackFree"] = &ProcessGpuRtLibrary::createContStackFree;
   m_libFuncPtrs["_AmdContStackGetPtr"] = &ProcessGpuRtLibrary::createContStackGetPtr;
   m_libFuncPtrs["_AmdContStackSetPtr"] = &ProcessGpuRtLibrary::createContStackSetPtr;
-  m_libFuncPtrs["_AmdContinuationStackIsGlobal"] = &ProcessGpuRtLibrary::createContinuationStackIsGlobal;
-  m_libFuncPtrs["_AmdGetRtip"] = &ProcessGpuRtLibrary::createGetRtip;
   m_libFuncPtrs["_AmdIsLlpc"] = &ProcessGpuRtLibrary::createIsLlpc;
+  m_libFuncPtrs["_AmdGetShaderRecordIndex"] = &ProcessGpuRtLibrary::createGetShaderRecordIndex;
 }
 
 // =====================================================================================================================
@@ -209,24 +229,8 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     m_builder->SetInsertPoint(clearBlock(func));
     createEnqueue(func);
     return;
-  } else if (funcName.starts_with("_AmdGetUninitialized")) {
-    m_builder->SetInsertPoint(clearBlock(func));
-    Value *FrozenPoison = m_builder->CreateFreeze(PoisonValue::get(func->getReturnType()));
-    m_builder->CreateRet(FrozenPoison);
-    return;
   } else if (funcName.starts_with("_AmdRestoreSystemData")) {
     // We don't need this, leave it as dummy function so that it does nothing.
-    return;
-  } else if (funcName.starts_with("_AmdGetSetting")) {
-    auto rtContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
-    SmallVector<ContSetting> contSettings;
-    for (unsigned i = 0; i < rtContext->getRayTracingPipelineBuildInfo()->gpurtOptionCount; i++) {
-      ContSetting setting;
-      setting.NameHash = rtContext->getRayTracingPipelineBuildInfo()->pGpurtOptions[i].nameHash;
-      setting.Value = rtContext->getRayTracingPipelineBuildInfo()->pGpurtOptions[i].value;
-      contSettings.push_back(setting);
-    }
-    ContHelper::handleGetSetting(*func, contSettings);
     return;
   } else if (funcName.starts_with("_AmdValueI32Count")) {
     ContHelper::handleValueI32Count(*func, *m_builder);
@@ -240,9 +244,6 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
       ContHelper::handleValueGetI32(*newFunc, *m_builder);
     else
       ContHelper::handleValueSetI32(*newFunc, *m_builder);
-    return;
-  } else if (funcName.starts_with("_AmdComplete")) {
-    ContHelper::handleComplete(*func);
     return;
   }
 
@@ -265,12 +266,15 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     return;
   }
 
-  bool isAmdAwaitLike = funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait");
   // NOTE: GPURT now preserves all function names started with "_Amd", but some of them are not intrinsics, e.g.,
   // "_AmdSystemData.IsTraversal", which are methods of system data structs. Skip those to let them be inlined
   // automatically.
   bool isAmdIntrinsic = funcName.starts_with("_Amd") && !funcName.contains(".");
   if (funcName.starts_with("_cont_") || isAmdIntrinsic) {
+    // TODO: Once we remove createEnqueue, also handle _AmdEnqueue* and _AmdWaitEnqueue* here.
+    bool isAmdAwaitLike =
+        isAmdIntrinsic && (funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait"));
+
     // This function is provided by GPURT to the compiler.
     if (!isAmdIntrinsic)
       func->setLinkage(GlobalValue::WeakAnyLinkage);
@@ -289,7 +293,7 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
         continue;
 
       // Change the pointer type to its value type for non-struct types.
-      // Amd*Await, use value types for all arguments.
+      // Amd*Await use value types for all arguments.
       // For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
       if (!isa<StructType>(argTy.getPointerElementType()) || isAmdAwaitLike ||
           (funcName == ContDriverFunc::SetTriangleHitAttributesName && argNo == 1))
@@ -302,15 +306,21 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     if (isAmdIntrinsic)
       newFunc->deleteBody();
 
-    if (newFunc->getName().starts_with("_AmdWaitAwait")) {
+    // Fixup WaitAwait by removing the wait mask, and fixup [Wait]AwaitTraversal by adding a dummy return address.
+    // AwaitTraversal doesn't have a return address in HLSL because the return address is written to system data.
+    bool isWaitAwait = newFunc->getName().starts_with("_AmdWaitAwait");
+    bool isNonWaitAwait = newFunc->getName().starts_with("_AmdAwait");
+    bool isAwaitTraversal = (isWaitAwait || isNonWaitAwait) && newFunc->getName().contains("Traversal");
+    if (isWaitAwait || isAwaitTraversal) {
       llvm::forEachCall(*newFunc, [&](CallInst &CInst) {
         SmallVector<Value *> args(CInst.args());
-        // NOTE: Theoretically we should remove the wait mask so that the function signature matches
-        // _AmdAwait*(addr, returnAddr, SystemData, ...). However, _AmdWaitAwaitTraversal's arguments are defined as
-        // (addr, waitMask, SystemData, ...), thus we need to keep the waitMask as a dummy returnAddr so that
-        // LowerRaytracingPipeline can handle it correctly.
-        if (!newFunc->getName().starts_with("_AmdWaitAwaitTraversal"))
+        // Remove wait mask
+        if (isWaitAwait)
           args.erase(args.begin() + 1);
+
+        // Add dummy return address
+        if (isAwaitTraversal)
+          args.insert(args.begin() + 1, PoisonValue::get(m_builder->getInt64Ty()));
 
         m_builder->SetInsertPoint(&CInst);
         auto *newValue = m_builder->CreateNamedCall("_AmdAwait", CInst.getType(), args, {});
@@ -448,6 +458,15 @@ void ProcessGpuRtLibrary::createLoadDwordAtAddrx2(Function *func) {
 }
 
 // =====================================================================================================================
+// Fill in function to global load 3 dwords at given address
+//
+// @param func : The function to process
+void ProcessGpuRtLibrary::createLoadDwordAtAddrx3(Function *func) {
+  auto int32x3Ty = FixedVectorType::get(m_builder->getInt32Ty(), 3);
+  createLoadDwordAtAddrWithType(func, int32x3Ty, SPIRAS_Global);
+}
+
+// =====================================================================================================================
 // Fill in function to global load 4 dwords at given address
 //
 // @param func : The function to process
@@ -550,9 +569,8 @@ void ProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *func, 
 //
 // @param func : The function to create
 void ProcessGpuRtLibrary::createIntersectBvh(Function *func) {
-  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
-  assert(rtState->bvhResDesc.dataSizeInDwords != 0);
-  if (rtState->bvhResDesc.dataSizeInDwords < 4)
+  assert(m_gpurtKey.bvhResDesc.size() != 0);
+  if (m_gpurtKey.bvhResDesc.size() < 4)
     return;
 
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
@@ -615,17 +633,15 @@ void ProcessGpuRtLibrary::createIntersectBvh(Function *func) {
 // @param expansion : Box expansion
 // @param boxSortMode : Box sort mode
 Value *ProcessGpuRtLibrary::createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode) {
-  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
-  assert(rtState->bvhResDesc.dataSizeInDwords == 4);
+  assert(m_gpurtKey.bvhResDesc.size() == 4);
 
   // Construct image descriptor from rtstate.
   Value *bvhSrd = PoisonValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 4));
-  bvhSrd =
-      m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[0]), uint64_t(0));
-  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[2]), 2u);
-  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[3]), 3u);
+  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(m_gpurtKey.bvhResDesc[0]), uint64_t(0));
+  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(m_gpurtKey.bvhResDesc[2]), 2u);
+  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(m_gpurtKey.bvhResDesc[3]), 3u);
 
-  Value *bvhSrdDw1 = m_builder->getInt32(rtState->bvhResDesc.descriptorData[1]);
+  Value *bvhSrdDw1 = m_builder->getInt32(m_gpurtKey.bvhResDesc[1]);
 
   if (expansion) {
     const unsigned BvhSrdBoxExpansionShift = 23;
@@ -942,6 +958,9 @@ void ProcessGpuRtLibrary::createContStackStore(llvm::Function *func) {
 // =====================================================================================================================
 // Fill in function to enqueue shader
 //
+// TODO: Once the handling of local root indices and continuation reference bit sizes has been unified, remove this
+//       method in favor of letting earlyGpurtTransform do everything.
+//
 // @param func : The function to create
 void ProcessGpuRtLibrary::createEnqueue(Function *func) {
   auto funcName = func->getName();
@@ -965,25 +984,12 @@ void ProcessGpuRtLibrary::createEnqueue(Function *func) {
   }
 
   // TODO: pass the levelMask correctly.
-  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(StructType::get(*m_context, {})), retAddr, tailArgs);
+  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(StructType::get(*m_context, {})),
+                                 PoisonValue::get(m_builder->getInt32Ty()), retAddr, tailArgs);
   m_builder->CreateUnreachable();
-}
 
-// Fill in function to check whether continuation stack is global
-//
-// @param func : The function to create
-void ProcessGpuRtLibrary::createContinuationStackIsGlobal(llvm::Function *func) {
-  m_builder->CreateRet(m_builder->create<GpurtContinuationStackIsGlobalOp>());
-}
-
-// =====================================================================================================================
-// Fill in function to get RTIP
-//
-// @param func : The function to create
-void ProcessGpuRtLibrary::createGetRtip(llvm::Function *func) {
-  auto rtip = m_context->getPipelineContext()->getRayTracingState()->rtIpVersion;
-  // The version is encoded as <major><minor> in decimal digits, so 11 is rtip 1.1, 20 is rtip 2.0
-  m_builder->CreateRet(m_builder->getInt32(rtip.major * 10 + rtip.minor));
+  // Clear the name so that earlyGpurtTransform doesn't try to handle the function.
+  func->setName({});
 }
 
 // =====================================================================================================================
@@ -993,6 +999,14 @@ void ProcessGpuRtLibrary::createGetRtip(llvm::Function *func) {
 void ProcessGpuRtLibrary::createIsLlpc(llvm::Function *func) {
   auto *trueConst = ConstantInt::getTrue(func->getContext());
   m_builder->CreateRet(trueConst);
+}
+
+// =====================================================================================================================
+// Fill in function to get the current functions shader record index
+//
+// @param func : The function to create
+void ProcessGpuRtLibrary::createGetShaderRecordIndex(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<lgc::rt::ShaderIndexOp>());
 }
 
 // =====================================================================================================================

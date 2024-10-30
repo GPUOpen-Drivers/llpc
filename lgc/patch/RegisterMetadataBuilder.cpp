@@ -518,6 +518,9 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     case PrimitiveType::TriangleStripAdjacency:
       gsOutputPrimitiveType = TRISTRIP;
       break;
+    case PrimitiveType::Rect:
+      gsOutputPrimitiveType = RECTLIST__GFX10PLUS;
+      break;
     case PrimitiveType::Patch:
       gsOutputPrimitiveType = POINTLIST;
       break;
@@ -1054,6 +1057,20 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStageEnum shaderStage) {
   getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TidigCompCnt] = tidigCompCnt;
 
   setThreadgroupDimensions(workgroupSizes);
+
+  // Only check X dimension of original size
+  if (computeMode.origWorkgroupSizeX) {
+    if (foldWorkgroupXY) {
+      workgroupSizes[0] = computeMode.origWorkgroupSizeX * computeMode.origWorkgroupSizeY;
+      workgroupSizes[1] = computeMode.origWorkgroupSizeZ;
+      workgroupSizes[2] = 1;
+    } else {
+      workgroupSizes[0] = computeMode.origWorkgroupSizeX;
+      workgroupSizes[1] = computeMode.origWorkgroupSizeY;
+      workgroupSizes[2] = computeMode.origWorkgroupSizeZ;
+    }
+    setOrigThreadgroupDimensions(workgroupSizes);
+  }
 }
 
 // =====================================================================================================================

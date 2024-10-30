@@ -43,7 +43,7 @@ def ContinuationReference : TgConstant<(or I32, I64)>, Type;
 
 // =====================================================================================================================
 def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
-    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, value:$state, ContinuationReference:$rcr, varargs:$tail);
+    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, value:$state, I32:$csp, ContinuationReference:$rcr, varargs:$tail);
     let results = (outs);
 
     let summary = "Jump to a CPS function.";
@@ -52,6 +52,7 @@ def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
             * target, the continuation reference
             * levels, a bitmask of levels in which target may run
             * state, which is pushed to the continuation stack before jumping,
+            * csp, continuation stack pointer,
             * rcr, a continuation reference the called function can potentially return to
             * an arbitrary set of arguments appended to the tail of the argument list.
     }];

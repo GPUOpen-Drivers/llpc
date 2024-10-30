@@ -235,7 +235,7 @@ cl::opt<bool> EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
 // -enable-implicit-invariant-exports: allow implicit marking of position exports as invariant
 cl::opt<bool> EnableImplicitInvariantExports("enable-implicit-invariant-exports",
                                               cl::desc("Enable implicit marking of position exports as invariant"),
-                                              cl::init(true));
+                                              cl::init(false));
 
 // -enable-forceCsThreadIdSwizzling: force cs thread id swizzling
 cl::opt<bool> ForceCsThreadIdSwizzling("force-compute-shader-thread-id-swizzling",
@@ -526,6 +526,7 @@ static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap
   // Create internal cache
   cache = ShaderCacheWrap::Create(argc, argv);
 
+  strcpy(argv[0], VkCompilerName); // The first argument is the client, modify it to Vulkan standalone compiler name
   Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler, cache);
   if (result != Result::Success)
     return result;
@@ -556,11 +557,16 @@ static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap
 // @param [out] compileInfo : Compilation info of LLPC standalone tool
 static void initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxIp = ParsedGfxIp;
-  compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
-  compileInfo->robustBufferAccess = RobustBufferAccess;
-  compileInfo->scalarBlockLayout = ScalarBlockLayout;
-  compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
-  compileInfo->enableImplicitInvariantExports = EnableImplicitInvariantExports;
+  if (EnableRelocatableShaderElf.getNumOccurrences())
+    compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
+  if (RobustBufferAccess.getNumOccurrences())
+    compileInfo->robustBufferAccess = RobustBufferAccess;
+  if (ScalarBlockLayout.getNumOccurrences())
+    compileInfo->scalarBlockLayout = ScalarBlockLayout;
+  if (EnableScratchAccessBoundsChecks.getNumOccurrences())
+    compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
+  if (EnableImplicitInvariantExports.getNumOccurrences())
+    compileInfo->enableImplicitInvariantExports = EnableImplicitInvariantExports;
   compileInfo->bvhNodeStride = BvhNodeStride;
   compileInfo->enableColorExportShader = EnableColorExportShader;
 
@@ -760,6 +766,9 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs, bool
       compileInfo.pipelineType = VfxPipelineTypeCompute;
     } else {
       compileInfo.pipelineType = VfxPipelineTypeGraphics;
+
+      auto &info = compileInfo.gfxPipelineInfo;
+      info.iaState.patchControlPoints = 3;
     }
   }
 

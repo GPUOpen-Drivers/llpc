@@ -366,12 +366,6 @@ def GpurtInitStaticIdOp : GpurtOp<"init.static.id", [Memory<[]>, WillReturn]> {
   let summary = "Initialize (generate) a ray static ID";
 }
 
-def GpurtContinuationStackIsGlobalOp : GpurtOp<"continuation.stack.is.global", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs I1:$result);
-  let summary = "Check whether continuation stack is global";
-}
-
 def GpurtGetRayQueryDispatchIdOp : GpurtOp<"get.ray.query.dispatch.id", [Memory<[(read InaccessibleMem)]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs V3I32:$dispatchId);

@@ -341,7 +341,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .vgpr_count:     0x9
 ; CHECK-NEXT:         .vgpr_limit:     0x100
 ; CHECK-NEXT:         .wavefront_size: 0x40
-; CHECK-NEXT:         .wgp_mode:       false
+; CHECK-NEXT:         .wgp_mode:       true
 ; CHECK-NEXT:       .ps:
 ; CHECK-NEXT:         .checksum_value: 0x2cbaf88c
 ; CHECK-NEXT:         .debug_mode:     false
@@ -349,7 +349,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .float_mode:     0xc0
 ; CHECK-NEXT:         .ieee_mode:      false
 ; CHECK-NEXT:         .image_op:       true
-; CHECK:         .mem_ordered:    true
+; CHECK:              .mem_ordered:    true
 ; CHECK-NEXT:         .scratch_en:     false
 ; CHECK-NEXT:         .scratch_memory_size: 0
 ; CHECK-NEXT:         .sgpr_count:     0x11

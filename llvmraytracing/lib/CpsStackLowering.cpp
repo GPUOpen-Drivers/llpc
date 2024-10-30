@@ -120,7 +120,11 @@ void CpsStackLowering::visitGetElementPtr(GetElementPtrInst &GEP) {
   unsigned BitWidth = DL.getIndexSizeInBits(GEP.getPointerAddressSpace());
 
   APInt ConstantOffset{BitWidth, 0};
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 513542
   MapVector<Value *, APInt> VariableOffsets;
+#else
+  SmallMapVector<Value *, APInt, 4> VariableOffsets;
+#endif
 
   [[maybe_unused]] bool Success = GEP.collectOffset(DL, BitWidth, VariableOffsets, ConstantOffset);
   assert(Success && "CpsStackLowering::visitGetElementPtr: GEP.collectOffset "

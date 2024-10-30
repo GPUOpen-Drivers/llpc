@@ -403,7 +403,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
       // However, in some cases, the builtInUsage field is used in NggPrimShader and/or Gfx*ConfigBuilder
       // (both run later on) to tell that the input is in use. For those cases, we must keep the builtInUsage
       // field, and set it here.
-      // Add code here as built-ins are moved from PatchInOutImportExport to InOutBuilder.
+      // Add code here as built-ins are moved from LowerInOut to InOutBuilder.
       auto &builtInUsage = pipelineState->getShaderResourceUsage(stage.value())->builtInUsage;
       switch (stage.value()) {
       case ShaderStage::Vertex:

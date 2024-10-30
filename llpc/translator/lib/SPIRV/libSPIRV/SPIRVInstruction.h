@@ -1544,22 +1544,26 @@ class SPIRVExtInst : public SPIRVFunctionCallGeneric<OpExtInst, 5> {
 public:
   SPIRVExtInst(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet, SPIRVWord TheEntryPoint,
                const std::vector<SPIRVWord> &TheArgs, SPIRVBasicBlock *BB)
-      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB), ExtSetId(TheBuiltinSet), ExtOp(TheEntryPoint) {
+      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB), ExtSetId(TheBuiltinSet), ScopeId(SPIRVWORD_MAX),
+        ExtOp(TheEntryPoint) {
     setExtSetKindById();
     validate();
   }
   SPIRVExtInst(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet, SPIRVWord TheEntryPoint,
                const std::vector<SPIRVValue *> &TheArgs, SPIRVBasicBlock *BB)
-      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB), ExtSetId(TheBuiltinSet), ExtOp(TheEntryPoint) {
+      : SPIRVFunctionCallGeneric(TheType, TheId, TheArgs, BB), ExtSetId(TheBuiltinSet), ScopeId(SPIRVWORD_MAX),
+        ExtOp(TheEntryPoint) {
     setExtSetKindById();
     validate();
   }
   SPIRVExtInst(SPIRVExtInstSetKind SetKind = SPIRVEIS_Count, unsigned ExtOC = SPIRVWORD_MAX)
-      : ExtSetId(SPIRVWORD_MAX), ExtOp(ExtOC), ExtSetKind(SetKind) {}
+      : ExtSetId(SPIRVWORD_MAX), ScopeId(SPIRVWORD_MAX), ExtOp(ExtOC), ExtSetKind(SetKind) {}
   void setExtSetId(unsigned Set) { ExtSetId = Set; }
   void setExtOp(unsigned ExtOC) { ExtOp = ExtOC; }
+  void setScope(unsigned scope) { ScopeId = scope; }
   SPIRVId getExtSetId() const { return ExtSetId; }
   SPIRVWord getExtOp() const { return ExtOp; }
+  SPIRVWord getScope() const { return ScopeId; }
   SPIRVExtInstSetKind getExtSetKind() const { return ExtSetKind; }
   void setExtSetKindById() {
     assert(Module && "Invalid module");
@@ -1612,6 +1616,13 @@ public:
         unsigned dbgCol = Module->get<SPIRVConstant>(Args[3])->getZExtIntValue();
         SPIRVLine *line = Module->add(new SPIRVLine(Module, Args[0], dbgLn, dbgCol));
         Module->setCurrentLine(line);
+      } else if (ExtOpDebug == NonSemanticShaderDebugInfo100DebugTypeComposite) {
+        using namespace SPIRVDebug::Operand::TypeComposite;
+        // The parent Scope of the member is implicit from DebugTypeComposite lists.
+        for (unsigned idx = FirstMemberIdx; idx < Args.size(); idx++) {
+          auto member = static_cast<SPIRVExtInst *>(Module->getEntry(Args[idx]));
+          member->setScope(Args[ScopeIdx]);
+        }
       }
     }
   }
@@ -1623,6 +1634,7 @@ public:
 
 protected:
   SPIRVId ExtSetId;
+  SPIRVWord ScopeId;
   union {
     SPIRVWord ExtOp;
     GLSLExtOpKind ExtOpGLSL;

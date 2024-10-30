@@ -32,9 +32,11 @@
 #include "LoweringUtil.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcDialect.h"
 #include "llpcGraphicsContext.h"
 #include "lgc/Builder.h"
 #include "lgc/Pipeline.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 
 #define DEBUG_TYPE "lower-gl-compatibility"
@@ -346,10 +348,7 @@ void LowerGlCompatibility::collectEmulationResource() {
       for (auto md : mds) {
         if (md.IsLoc) {
           if (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex) {
-            if (isStructureOrArrayOfStructure)
-              m_out = &global;
-            else
-              m_clipVertex = &global;
+            m_clipVertex = &global;
           }
           if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor) {
             if (isStructureOrArrayOfStructure)
@@ -404,31 +403,17 @@ void LowerGlCompatibility::collectEmulationResource() {
       // Check to see if the value has been stored.
       bool beenModified = false;
       User *gep = nullptr;
-      if (auto *gepConst = dyn_cast<ConstantExpr>(user)) {
-        auto operandsCount = gepConst->getNumOperands();
-        // Skip the first indices, and the access chain target.
-        for (size_t index = 2; index < operandsCount; index++) {
-          auto *pIndex = dyn_cast<ConstantInt>(gepConst->getOperand(index));
-          if (pIndex) {
-            indexOperands.push_back(pIndex);
-          }
-        }
-        gep = gepConst;
-      } else if (auto *gepInst = dyn_cast<GetElementPtrInst>(user)) {
+      assert(!isa<ConstantExpr>(user) && !isa<GetElementPtrInst>(user));
+      if (auto *gepInst = dyn_cast<StructuralGepOp>(user)) {
         // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
-        for (auto index = gepInst->idx_begin(); index != gepInst->idx_end(); index++) {
-          // Skip the first indices, it should be 0 in most of time.
-          if (index == gepInst->idx_begin()) {
-            assert(cast<ConstantInt>(gepInst->idx_begin())->isZero() && "Non-zero GEP first index\n");
-            continue;
-          }
-          indexOperands.push_back(m_builder->CreateZExtOrTrunc(index->get(), m_builder->getInt32Ty()));
-        }
+        assert(cast<ConstantInt>(*gepInst->getIndices().begin())->isZero() && "Non-zero GEP first index\n");
+        for (auto *idx : llvm::drop_begin(gepInst->getIndices()))
+          indexOperands.push_back(m_builder->CreateZExtOrTrunc(idx, m_builder->getInt32Ty()));
         gep = gepInst;
       }
       if (gep != nullptr) {
         for (User *gepUser : gep->users()) {
-          assert(!isa<GetElementPtrInst>(gepUser));
+          assert(!isa<StructuralGepOp>(gepUser));
           beenModified |= isa<StoreInst>(gepUser);
         }
         decodeInOutMetaRecursivelyByIndex(glOut->getValueType(), inOutMetaConst, indexOperands, mds);

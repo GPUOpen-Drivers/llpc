@@ -118,7 +118,7 @@ enum class PipelineType {
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext {
 public:
-  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
+  PipelineContext(GfxIpVersion gfxIp, const char *apiName, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~PipelineContext() = default;
 
   // Returns the pipeline type
@@ -244,6 +244,7 @@ protected:
   virtual lgc::Options computePipelineOptions() const;
 
   GfxIpVersion m_gfxIp;                  // Graphics IP version info
+  const char *m_apiName;                 // API name from client, "Vulkan" or "OpenGL"
   MetroHash::Hash m_pipelineHash;        // Pipeline hash code
   MetroHash::Hash m_cacheHash;           // Cache hash code
   ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values

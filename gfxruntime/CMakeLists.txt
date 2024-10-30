@@ -39,6 +39,7 @@ find_package(Python3
 # Locate dxc binary.
 #if _WIN32
 if(WIN32)
+    set(DXC_PATH "$ENV{DK_ROOT}/DirectXShaderCompiler/8c9d92b/bin")
     if (NOT EXISTS "${DXC_PATH}")
         message(FATAL_ERROR "Unable to find DirectXShaderCompiler directory: ${DXC_PATH}")
     endif()

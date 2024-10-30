@@ -9,7 +9,7 @@
 ; SHADERTEST: define dllexport amdgpu_ps { <4 x float>, i32 } @_amdgpu_ps_main({{.*}}, i32 inreg noundef %userdata3, i32 inreg noundef %userdata4, {{.*}})
 ; SHADERTEST: [[pushConst0:%[.a-zA-Z0-9]+]] = bitcast i32 %userdata3 to float
 ; SHADERTEST: [[pushConst1:%[.a-zA-Z0-9]+]] = bitcast i32 %userdata4 to float
-; SHADERTEST: @llvm.amdgcn.image.gather4.lz.2d.sl_v4f32i32s.f32({{.*}}, float [[pushConst0]], float [[pushConst1]], {{.*}})
+; SHADERTEST: @llvm.amdgcn.image.gather4.lz.2d.sl_v4f32i32s.f32{{(\.v8i32)?}}{{(\.v4i32)?}}({{.*}}, float [[pushConst0]], float [[pushConst1]], {{.*}})
 
 ; Check that those parameters are passed in as s2 and s3.
 ; SHADERTEST-LABEL: _amdgpu_ps_main:

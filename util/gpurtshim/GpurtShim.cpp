@@ -51,9 +51,7 @@ static Pal::RayTracingIpLevel getRtIpLevel(RtIpVersion rtIpVersion) {
       {{0, 0}, Pal::RayTracingIpLevel::_None},
       {{1, 0}, Pal::RayTracingIpLevel::RtIp1_0},
       {{1, 1}, Pal::RayTracingIpLevel::RtIp1_0},
-#if PAL_BUILD_GFX11
       {{2, 0}, Pal::RayTracingIpLevel::RtIp2_0},
-#endif
   };
   // clang-format on
 

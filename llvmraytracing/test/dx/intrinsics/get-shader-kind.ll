@@ -8,6 +8,7 @@
 %struct.TraversalData = type { i32 }
 declare i32 @_AmdGetShaderKind()
 
+declare !pointeetys !3 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !3 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare !pointeetys !5 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.DispatchSystemData*)
 declare !pointeetys !6 i32 @_cont_HitKind(%struct.DispatchSystemData*, %struct.HitData*)
@@ -47,7 +48,7 @@ define void @MyMiss(%struct.Payload* %payload) !pointeetys !1 !lgc.rt.shaderstag
 ; CHECK-NEXT:    store i32 [[TMP8]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], [8 x i32] poison, [1 x i32] [[TMP10]]), !continuation.registercount [[META5]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], [8 x i32] poison, [1 x i32] [[TMP10]]), !continuation.registercount [[META5]]
 ; CHECK-NEXT:    unreachable
 ;
   %1 = call i32 @_AmdGetShaderKind()

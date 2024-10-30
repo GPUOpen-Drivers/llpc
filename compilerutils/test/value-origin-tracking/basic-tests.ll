@@ -131,8 +131,9 @@ define void @testPoison() {
 ; CHECK: (double poison): UndefOrPoison; UndefOrPoison
   call void @analyze(double poison)
 
+; See freeze-mode.ll for detailed freeze tests.
   %freezePoison = freeze i32 poison
-; CHECK: (  %freezePoison = {{.*}}): UndefOrPoison
+; CHECK: (  %freezePoison = {{.*}}): Dynamic
   call void @analyze(i32 %freezePoison)
 
   %freezeNonPoison = freeze i32 5

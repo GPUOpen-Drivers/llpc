@@ -326,9 +326,6 @@ public:
   // Gets Util::Abi::HardwareStageFlagBits for the given shader stage
   unsigned getShaderHwStageMask(ShaderStageEnum stage);
 
-  // Set the default wave size for the specified shader stage
-  void setShaderDefaultWaveSize(ShaderStageEnum stage);
-
   // Set the wave size for the specified shader stage
   void setShaderWaveSize(ShaderStageEnum stage, unsigned waveSize) {
     assert(waveSize == 32 || waveSize == 64);
@@ -336,7 +333,7 @@ public:
   }
 
   // Whether WGP mode is enabled for the given shader stage
-  bool getShaderWgpMode(ShaderStageEnum stage) const;
+  bool getShaderWgpMode(ShaderStageEnum stage);
 
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
@@ -609,6 +606,11 @@ private:
 
   // ABI Shader Map
   void buildAbiHwShaderMap();
+
+  // Set the default wave size for the specified shader stage
+  void setShaderDefaultWaveSize(ShaderStageEnum stage);
+  // Set the default wave size for all shader stages.
+  void setAllShadersDefaultWaveSize();
 
   std::string m_lastError; // Error to be reported by getLastError()
   bool m_emitLgc = false;  // Whether -emit-lgc is on

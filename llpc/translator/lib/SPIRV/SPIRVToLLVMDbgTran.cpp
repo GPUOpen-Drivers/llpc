@@ -308,7 +308,7 @@ DICompositeType *SPIRVToLLVMDbgTran::transTypeComposite(const SPIRVExtInst *Debu
   StringRef Name = getString(Ops[NameIdx]);
   DIFile *File = getFile(Ops[SourceIdx]);
   unsigned LineNo = getConstant(Ops[LineIdx]);
-  DIScope *ParentScope = getScope(BM->getEntry(Ops[ParentIdx]));
+  DIScope *ParentScope = getScope(BM->getEntry(Ops[ScopeIdx]));
 
   uint64_t Size = 0;
   SPIRVEntry *SizeEntry = BM->getEntry(Ops[SizeIdx]);
@@ -327,7 +327,7 @@ DICompositeType *SPIRVToLLVMDbgTran::transTypeComposite(const SPIRVExtInst *Debu
   DINode::DIFlags Flags = mapToDIFlags(getConstant(Ops[FlagsIdx]));
 
   DICompositeType *CT = nullptr;
-  switch (Ops[TagIdx]) {
+  switch (getConstant(Ops[TagIdx])) {
   case SPIRVDebug::Class:
     CT = Builder.createClassType(ParentScope, Name, File, LineNo, Size, Align, 0, Flags, DerivedFrom,
                                  DINodeArray() /*elements*/,
@@ -367,7 +367,7 @@ DINode *SPIRVToLLVMDbgTran::transTypeMember(const SPIRVExtInst *DebugInst) {
   DIFile *File = getFile(Ops[SourceIdx]);
   unsigned LineNo = getConstant(Ops[LineIdx]);
   StringRef Name = getString(Ops[NameIdx]);
-  DIScope *Scope = getScope(BM->getEntry(Ops[ParentIdx]));
+  DIScope *Scope = getScope(BM->getEntry(DebugInst->getScope()));
   DIType *BaseType = transDebugInst<DIType>(BM->get<SPIRVExtInst>(Ops[TypeIdx]));
   uint64_t OffsetInBits = BM->get<SPIRVConstant>(Ops[OffsetIdx])->getZExtIntValue();
 
@@ -590,8 +590,8 @@ MDNode *SPIRVToLLVMDbgTran::transGlobalVariable(const SPIRVExtInst *DebugInst) {
   if (Ops.size() > MinOperandCount) {
     StaticMemberDecl = transDebugInst<DIDerivedType>(BM->get<SPIRVExtInst>(Ops[StaticMemberDeclarationIdx]));
   }
-  bool IsLocal = Ops[FlagsIdx] & SPIRVDebug::FlagIsLocal;
-  bool IsDefinition = Ops[FlagsIdx] & SPIRVDebug::FlagIsDefinition;
+  bool IsLocal = getConstant(Ops[FlagsIdx]) & SPIRVDebug::FlagIsLocal;
+  bool IsDefinition = getConstant(Ops[FlagsIdx]) & SPIRVDebug::FlagIsDefinition;
   MDNode *VarDecl = nullptr;
   if (IsDefinition) {
     VarDecl = Builder.createGlobalVariableExpression(Parent, Name, LinkageName, File, LineNo, Ty, IsLocal, IsDefinition,

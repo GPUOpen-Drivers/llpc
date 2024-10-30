@@ -34,6 +34,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/util/Debug.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -549,6 +550,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
 
   // Assign names to ES, GS and copy shader main functions
   Module *module = nullptr;
+  bool createDbgInfo = false;
   if (esMain) {
     module = esMain->getParent();
 
@@ -558,6 +560,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
     esMain->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     esMain->addFnAttr(Attribute::AlwaysInline);
     m_esHandlers.main = esMain;
+    createDbgInfo |= esMain->getSubprogram() != nullptr;
   }
 
   if (gsMain) {
@@ -569,6 +572,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
     gsMain->setDLLStorageClass(GlobalValue::DefaultStorageClass);
     gsMain->addFnAttr(Attribute::AlwaysInline);
     m_gsHandlers.main = gsMain;
+    createDbgInfo |= gsMain->getSubprogram() != nullptr;
 
     assert(copyShader); // Copy shader must be present
     copyShader->setName(NggCopyShader);
@@ -583,8 +587,8 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
   uint64_t inRegMask = 0;
   auto primShaderTy = getPrimShaderType(inRegMask);
 
-  Function *primShader =
-      createFunctionHelper(primShaderTy, GlobalValue::ExternalLinkage, module, lgcName::NggPrimShaderEntryPoint);
+  Function *primShader = createFunctionHelper(primShaderTy, GlobalValue::ExternalLinkage, module, createDbgInfo,
+                                              lgcName::NggPrimShaderEntryPoint);
   primShader->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   primShader->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
@@ -1018,8 +1022,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
     if (m_gfxIp.major >= 11) {
-      // Record attribute ring base ([14:0])
-      m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+      if (!m_pipelineState->exportAttributeByExportInstruction())
+        prepareAttribRingAccess(userData);
 
       if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
@@ -1344,8 +1348,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
     if (m_gfxIp.major >= 11) {
-      // Record attribute ring base ([14:0])
-      m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+      if (!m_pipelineState->exportAttributeByExportInstruction())
+        prepareAttribRingAccess(userData);
 
       if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
@@ -2042,8 +2046,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
     if (m_gfxIp.major >= 11) {
-      // Record attribute ring base ([14:0])
-      m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
+      if (!m_pipelineState->exportAttributeByExportInstruction())
+        prepareAttribRingAccess(userData);
 
       if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
@@ -2531,6 +2535,54 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 }
 
 // =====================================================================================================================
+// Prepare attribute ring access by collecting attribute count, modifying the STRIDE field of attribute ring buffer
+// descriptor, and calculating subgroup's attribute ring base offset.
+//
+// @param userData : User data
+void NggPrimShader::prepareAttribRingAccess(Value *userData) {
+  assert(m_gfxIp.major >= 11);                                    // For GFX11+
+  assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
+
+  ShaderStageEnum shaderStage =
+      m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
+  const unsigned attribCount = m_pipelineState->getShaderResourceUsage(shaderStage)->inOutUsage.expCount;
+  if (attribCount == 0)
+    return; // No vertex attribute exports
+
+  // attribRingBase[14:0]
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
+  Value *attribRingBase =
+      getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+  attribRingBase = m_builder.CreateAnd(attribRingBase, 0x7FFF);
+
+  static const unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
+  m_attribRingBaseOffset =
+      m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity), "attribRingBaseOffset");
+
+  assert(userData->getType()->isVectorTy());
+  auto globalTablePtrValue = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0));
+  auto globalTablePtr = makePointer(globalTablePtrValue, PointerType::get(m_builder.getContext(), ADDR_SPACE_CONST));
+
+  m_attribRingBufDesc = readValueFromCb(FixedVectorType::get(m_builder.getInt32Ty(), 4), globalTablePtr,
+                                        m_builder.getInt32(SiDrvTableOffChipParamCache));
+
+  // Modify the field STRIDE of attribute ring buffer descriptor
+  if (attribCount >= 2) {
+    // STRIDE = WORD1[30:16], STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
+    // We override the value if there are more attributes.
+    auto descWord1 = m_builder.CreateExtractElement(m_attribRingBufDesc, 1);
+    auto stride = m_builder.getInt32(attribCount * SizeOfVec4);
+    if ((attribCount & 1) == 0) {
+      // Clear the bit that was set in STRIDE by the driver.
+      descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);
+    }
+    descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
+    m_attribRingBufDesc = m_builder.CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
+  }
+  m_attribRingBufDesc->setName("attribRingBufDesc");
+}
+
+// =====================================================================================================================
 // Load stream-out info including stream-out buffer descriptors and buffer offsets.
 //
 // @param userData : User data
@@ -2559,18 +2611,6 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
       }
     }
     return userDataIndex;
-  };
-
-  // Helper to make a pointer from its integer address value and the type
-  auto makePointer = [&](Value *ptrValue, Type *ptrTy) {
-    Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-    pc = m_builder.CreateBitCast(pc, FixedVectorType::get(m_builder.getInt32Ty(), 2));
-
-    Value *ptr = m_builder.CreateInsertElement(pc, ptrValue, static_cast<uint64_t>(0));
-    ptr = m_builder.CreateBitCast(ptr, m_builder.getInt64Ty());
-    ptr = m_builder.CreateIntToPtr(ptr, ptrTy);
-
-    return ptr;
   };
 
   const auto gsOrEsMain = m_hasGs ? m_gsHandlers.main : m_esHandlers.main;
@@ -2687,7 +2727,7 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
     } else {
       assert(primitiveType == PrimitiveType::TriangleList || primitiveType == PrimitiveType::TriangleStrip ||
              primitiveType == PrimitiveType::TriangleFan || primitiveType == PrimitiveType::TriangleListAdjacency ||
-             primitiveType == PrimitiveType::TriangleStripAdjacency);
+             primitiveType == PrimitiveType::TriangleStripAdjacency || primitiveType == PrimitiveType::Rect);
       provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
                                  ? m_nggInputs.vertexIndex0
                                  : m_nggInputs.vertexIndex2;
@@ -3198,7 +3238,7 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 
   assert(esArgs.size() == m_esHandlers.main->arg_size()); // Must have visit all arguments of ES entry point
 
-  CallInst *esCall = m_builder.CreateCall(m_esHandlers.main, esArgs);
+  CallInst *esCall = callFunctionHelper(m_esHandlers.main, esArgs, m_builder.GetInsertBlock());
   esCall->setCallingConv(CallingConv::AMDGPU_ES);
 }
 
@@ -3384,7 +3424,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
 
   assert(partEsArgs.size() == partEs->arg_size()); // Must have visit all arguments of the part ES
 
-  CallInst *partEsCall = m_builder.CreateCall(partEs, partEsArgs);
+  CallInst *partEsCall = callFunctionHelper(partEs, partEsArgs, m_builder.GetInsertBlock());
   partEsCall->setCallingConv(CallingConv::AMDGPU_ES);
   return partEsCall;
 }
@@ -3838,15 +3878,9 @@ void NggPrimShader::runCopyShader(ArrayRef<Argument *> args) {
   if (m_gfxIp.major >= 11) {
     if (!m_pipelineState->exportAttributeByExportInstruction())
       appendAttributeThroughMemoryArguments(copyShaderArgs);
-
-    // Global table
-    auto userData = args[NumSpecialSgprInputs];
-    assert(userData->getType()->isVectorTy());
-    auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0)); // The first user data SGPRs
-    copyShaderArgs.push_back(globalTable);
   }
 
-  // Relative vertex index in subgroup
+  // Relative vertex index in subgroup (to access GS-VS ring, without vertex compaction)
   copyShaderArgs.push_back(vertexIndex);
 
   CallInst *copyShaderCall = m_builder.CreateCall(m_gsHandlers.copyShader, copyShaderArgs);
@@ -6085,32 +6119,31 @@ Value *NggPrimShader::ballot(Value *value) {
 
 // =====================================================================================================================
 // Export vertex attribute through memory (ATM) by handing the calls. We mutate the argument list of the target function
-// by adding two additional arguments (one is attribute ring base and the other is relative vertex index in subgroup).
-// Also, we expand all export calls by replacing it with real instructions that do vertex attribute exporting through
-// memory.
+// by adding three additional arguments (attribute ring buffer descriptor, attribute ring base offset, and relative
+// vertex index in subgroup). Also, we expand all export calls by replacing it with real instructions that do vertex
+// attribute exporting through memory.
 //
 // @param [in/out] target : Target function to process vertex attribute export
 void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
   assert(m_gfxIp.major >= 11);                                    // For GFX11+
   assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
 
-  ShaderStageEnum shaderStage =
-      m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
-  const unsigned attribCount = m_pipelineState->getShaderResourceUsage(shaderStage)->inOutUsage.expCount;
-  if (attribCount == 0)
-    return; // No vertex attribute exports
+  if (!m_attribRingBufDesc && !m_attribRingBaseOffset)
+    return; // No ATM, no attributes to export
 
   IRBuilder<>::InsertPointGuard guard(m_builder);
 
   //
   // Mutate the argument list by adding two additional arguments
   //
-  auto newTarget = addFunctionArgs(target, nullptr,
-                                   {
-                                       m_builder.getInt32Ty(), // Attribute ring base (SGPR)
-                                       m_builder.getInt32Ty()  // Relative vertex index in subgroup (VGPR)
-                                   },
-                                   {"attribRingBase", "vertexIndex"}, 0x1);
+  auto newTarget =
+      addFunctionArgs(target, nullptr,
+                      {
+                          FixedVectorType::get(m_builder.getInt32Ty(), 4), // Attribute ring buffer descriptor (4 SGPRs)
+                          m_builder.getInt32Ty(),                          // Attribute ring base offset (SGPR)
+                          m_builder.getInt32Ty()                           // Relative vertex index in subgroup (VGPR)
+                      },
+                      {"attribRingBufDesc", "attribRingBaseOffset", "vertexIndex"}, 0x3);
 
   // Original function is no longer needed
   assert(target->use_empty());
@@ -6121,18 +6154,13 @@ void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
   //
   // Expand vertex attribute export calls by replacing them with real instructions
   //
-  Value *attribRingBufDesc = nullptr;
 
-  // Always the first two arguments, added by us
-  auto attribRingBase = target->getArg(0);
-  auto vertexIndex = target->getArg(1);
+  // Always the first three arguments, added by us
+  auto attribRingBufDesc = target->getArg(0);
+  auto attribRingBaseOffset = target->getArg(1);
+  auto vertexIndex = target->getArg(2);
 
   m_builder.SetInsertPointPastAllocas(target);
-
-  // ringOffset = attribRingBase * 32 * 16
-  //            = attribRingBase * 512
-  static const unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
-  auto ringOffset = m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity));
 
   SmallVector<CallInst *, 8> removedCalls;
 
@@ -6145,45 +6173,21 @@ void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
         if (call->getParent()->getParent() != target)
           continue; // Export call doesn't belong to targeted function, skip
 
-        // NOTE: We always set the insert point before the terminator of the basic block to which this call belongs.
-        // This is because we might modify attribute ring buffer descriptor and this modified descriptor will be used
-        // by subsequent ring buffer store instructions that do vertex attribute exporting.
-        m_builder.SetInsertPoint(call->getParent()->getTerminator());
-
-        if (!attribRingBufDesc) {
-          attribRingBufDesc = call->getArgOperand(0); // Initialize it if necessary
-
-          // Fixup the STRIDE field if necessary, STRIDE = WORD1[30:16].
-          //
-          // STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
-          // We override the value if there are more attributes.
-          if (attribCount > 1) {
-            auto descWord1 = m_builder.CreateExtractElement(attribRingBufDesc, 1);
-            auto stride = m_builder.getInt32(attribCount * SizeOfVec4);
-            if ((attribCount & 1) == 0) {
-              // Clear the bit that was set in STRIDE by the driver.
-              descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);
-            }
-            descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
-            attribRingBufDesc = m_builder.CreateInsertElement(attribRingBufDesc, descWord1, 1);
-          }
-        }
-
-        const unsigned location = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-        auto attribValue = call->getArgOperand(2);
+        m_builder.SetInsertPoint(call);
 
         // Export vertex attributes
-        assert(attribValue->getType() == FixedVectorType::get(m_builder.getFloatTy(), 4)); // Must be <4 xfloat>
-
+        const unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
         auto locationOffset = m_builder.getInt32(location * SizeOfVec4);
+
+        auto attribValue = call->getArgOperand(1);
+        assert(attribValue->getType() == FixedVectorType::get(m_builder.getFloatTy(), 4)); // Must be <4 xfloat>
 
         CoherentFlag coherent = {};
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
           coherent.bits.glc = true;
-          coherent.bits.slc = true;
         }
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
-                                  {attribValue, attribRingBufDesc, vertexIndex, locationOffset, ringOffset,
+                                  {attribValue, attribRingBufDesc, vertexIndex, locationOffset, attribRingBaseOffset,
                                    m_builder.getInt32(coherent.u32All)});
 
         removedCalls.push_back(call);
@@ -6234,6 +6238,7 @@ void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
 
     // Before the first export call, add s_wait_vscnt 0 to make sure the completion of all attributes being written
     // to the attribute ring buffer
+    assert(!exportCalls.empty()); // Position export is always present
     m_builder.SetInsertPoint(exportCalls[0]);
     m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
   }
@@ -6247,23 +6252,21 @@ void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
 
 // =====================================================================================================================
 // Append additional arguments to the argument list for attribute-through-memory (ATM) of the specified shader stage.
-// Currently, two arguments are required to do attribute-through-memory: (1) the attribute ring base; (2) relative
-// vertex index in NGG subgroup.
+// Currently, three arguments are required to do attribute-through-memory:
+//   (1) Attribute ring buffer descriptor;
+//   (2) Attribute ring base offset;
+//   (3) Relative vertex index in NGG subgroup.
 //
 // @param [in/out] args : The arguments that will be appended to
 void NggPrimShader::appendAttributeThroughMemoryArguments(SmallVectorImpl<llvm::Value *> &args) {
   assert(m_gfxIp.major >= 11);                                    // For GFX11+
   assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
 
-  const auto attribCount =
-      m_pipelineState
-          ->getShaderResourceUsage(m_hasGs ? ShaderStage::Geometry
-                                           : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex))
-          ->inOutUsage.expCount;
-  if (attribCount == 0)
-    return; // No attributes
+  if (!m_attribRingBufDesc && !m_attribRingBaseOffset)
+    return; // No ATM, no attributes to export
 
-  args.push_back(m_nggInputs.attribRingBase);
+  args.push_back(m_attribRingBufDesc);
+  args.push_back(m_attribRingBaseOffset);
   args.push_back(m_nggInputs.threadIdInSubgroup);
 }
 
@@ -7379,13 +7382,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   //
   if (m_hasGs) {
     // Copy shader has fixed argument layout
-    Value *userData = args[NumSpecialSgprInputs];
-    assert(userData->getType()->isVectorTy());
-
-    auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0));
-    return m_builder.CreateCall(xfbFetcher,
-                                {globalTable,                      // Global table
-                                 m_nggInputs.threadIdInSubgroup}); // Relative vertex index in subgroup
+    return m_builder.CreateCall(xfbFetcher, {m_nggInputs.threadIdInSubgroup});
   }
 
   Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
@@ -7861,6 +7858,24 @@ Value *NggPrimShader::createUBfe(Value *value, unsigned offset, unsigned count) 
     return m_builder.CreateAnd(value, (1U << count) - 1); // Just need mask
 
   return m_builder.CreateAnd(m_builder.CreateLShr(value, offset), (1U << count) - 1);
+}
+
+// =====================================================================================================================
+// Make 64-bit pointer of specified type from 32-bit integer value, extending it with PC.
+//
+// @param ptrValue : 32-bit integer value to extend
+// @param ptrTy : Type that result pointer needs to be
+Value *NggPrimShader::makePointer(Value *ptrValue, Type *ptrTy) {
+  assert(ptrValue->getType()->isIntegerTy(32)); // Must be i32
+
+  Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+  pc = m_builder.CreateBitCast(pc, FixedVectorType::get(m_builder.getInt32Ty(), 2));
+
+  Value *ptr = m_builder.CreateInsertElement(pc, ptrValue, static_cast<uint64_t>(0));
+  ptr = m_builder.CreateBitCast(ptr, m_builder.getInt64Ty());
+  ptr = m_builder.CreateIntToPtr(ptr, ptrTy);
+
+  return ptr;
 }
 
 // =====================================================================================================================

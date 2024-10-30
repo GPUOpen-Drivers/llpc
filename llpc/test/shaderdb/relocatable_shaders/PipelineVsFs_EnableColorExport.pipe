@@ -105,7 +105,7 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[TMP18:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP9]], align 4, !invariant.load !11
 ; SHADERTEST-NEXT:    [[TMP19:%.*]] = extractelement <2 x float> [[TMP16]], i64 0
 ; SHADERTEST-NEXT:    [[TMP20:%.*]] = extractelement <2 x float> [[TMP16]], i64 1
-; SHADERTEST-NEXT:    [[TMP21:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[TMP19]], float [[TMP20]], <8 x i32> [[TMP17]], <4 x i32> [[TMP18]], i1 false, i32 0, i32 0)
+; SHADERTEST-NEXT:    [[TMP21:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float [[TMP19]], float [[TMP20]], <8 x i32> [[TMP17]], <4 x i32> [[TMP18]], i1 false, i32 0, i32 0)
 ; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[TMP21]]) #[[ATTR5:[0-9]+]]
 ; SHADERTEST-NEXT:    ret void
 ;

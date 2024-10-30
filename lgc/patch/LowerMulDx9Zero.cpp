@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerMulDx9Zero.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchMulDx9Zero.
+ * @brief LLPC source file: contains implementation of class lgc::LowerMulDx9Zero.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerMulDx9Zero.h"
@@ -38,7 +38,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "lgc-patch-mul-dx9-zero"
+#define DEBUG_TYPE "lgc-lower-mul-dx9-zero"
 
 using namespace lgc;
 using namespace llvm;
@@ -46,7 +46,7 @@ using namespace PatternMatch;
 
 namespace lgc {
 // =====================================================================================================================
-PatchMulDx9Zero::PatchMulDx9Zero() : m_changed(false) {
+LowerMulDx9Zero::LowerMulDx9Zero() : m_changed(false) {
 }
 
 // =====================================================================================================================
@@ -58,8 +58,8 @@ PatchMulDx9Zero::PatchMulDx9Zero() : m_changed(false) {
 // fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchMulDx9Zero::run(Function &function, FunctionAnalysisManager &analysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass Patch-Mul-Dx9Zero-Opt\n");
+PreservedAnalyses LowerMulDx9Zero::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the pass Lower-Mul-Dx9Zero-Opt\n");
 
   m_builder = std::make_unique<IRBuilder<>>(function.getContext());
 
@@ -72,7 +72,7 @@ PreservedAnalyses PatchMulDx9Zero::run(Function &function, FunctionAnalysisManag
 // Visits call instruction.
 //
 // @param callInst : Call instruction
-void PatchMulDx9Zero::visitCallInst(CallInst &callInst) {
+void LowerMulDx9Zero::visitCallInst(CallInst &callInst) {
   auto callee = callInst.getCalledFunction();
   if (!callee)
     return;
@@ -103,7 +103,7 @@ void PatchMulDx9Zero::visitCallInst(CallInst &callInst) {
 // Visits binary operator instruction.
 //
 // @param binaryOp : Binary operator instruction
-void PatchMulDx9Zero::visitBinaryOperator(BinaryOperator &binaryOp) {
+void LowerMulDx9Zero::visitBinaryOperator(BinaryOperator &binaryOp) {
   Instruction::BinaryOps opCode = binaryOp.getOpcode();
 
   // Replace mul with amdgcn_fmul_legacy intrinsic when detect patterns like:
@@ -132,7 +132,7 @@ void PatchMulDx9Zero::visitBinaryOperator(BinaryOperator &binaryOp) {
 // with DX9 zero semantics. If so, returns a pair of operands for the new multiply.
 // @param lhs : left operand for the operation
 // @param rhs:  right operand for the operation
-std::optional<std::pair<Value *, Value *>> PatchMulDx9Zero::isMulDx9Zero(Value *lhs, Value *rhs) {
+std::optional<std::pair<Value *, Value *>> LowerMulDx9Zero::isMulDx9Zero(Value *lhs, Value *rhs) {
   Value *lhsCmpValue = nullptr;
   Value *lhsFalseValue = nullptr;
   Value *rhsCmpValue = nullptr;

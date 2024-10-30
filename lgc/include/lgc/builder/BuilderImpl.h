@@ -648,6 +648,33 @@ public:
 
   // -------------------------------------------------------------------------------------------------------------------
   // Builder implementation subclass for subgroup operations
+protected:
+  struct SubgroupHelperLaneState {
+    std::optional<bool> excludeHelperLanes;
+    std::optional<bool> requireHelperLanes;
+
+    bool excluded() const { return excludeHelperLanes && *excludeHelperLanes; }
+    bool included() const { return excludeHelperLanes && !*excludeHelperLanes; }
+    bool required() const { return requireHelperLanes && *requireHelperLanes; }
+
+    static SubgroupHelperLaneState get(std::optional<bool> exclude = std::nullopt,
+                                       std::optional<bool> require = std::nullopt) {
+      return SubgroupHelperLaneState{
+          .excludeHelperLanes = exclude,
+          .requireHelperLanes = require,
+      };
+    }
+    static SubgroupHelperLaneState get(ShaderStageEnum stage, PipelineState *const pipelineState) {
+      if (stage != ShaderStage::Fragment)
+        return SubgroupHelperLaneState::get();
+      const auto &fragmentMode = pipelineState->getShaderModes()->getFragmentShaderMode();
+      return SubgroupHelperLaneState{
+          .excludeHelperLanes = !!fragmentMode.waveOpsExcludeHelperLanes,
+          .requireHelperLanes = !!fragmentMode.waveOpsRequireHelperLanes,
+      };
+    }
+  };
+
 public:
   // Create a get wave size query.
   llvm::Value *CreateGetWaveSize(const llvm::Twine &instName = "");
@@ -665,7 +692,9 @@ public:
 
   // Create a subgroup broadcast first.
   llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName = "") {
-    return createSubgroupBroadcastFirst(value, m_shaderStage.value(), instName);
+    const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+    const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+    return createSubgroupBroadcastFirst(state, value, instName);
   }
 
   // Create a subgroup ballot.
@@ -696,7 +725,9 @@ public:
   // Create a subgroup shuffle.
   llvm::Value *CreateSubgroupShuffle(llvm::Value *const value, llvm::Value *const index,
                                      const llvm::Twine &instName = "") {
-    return createSubgroupShuffle(value, index, m_shaderStage.value(), instName);
+    const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+    const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+    return createSubgroupShuffle(state, value, index, stage, instName);
   }
 
   // Create a subgroup shuffle xor.
@@ -786,7 +817,6 @@ private:
 
   llvm::Value *createDsSwizzle(llvm::Value *const value, uint16_t dsPattern);
   llvm::Value *createWwm(llvm::Value *const value);
-  llvm::Value *createWqm(llvm::Value *const value) { return createWqm(value, m_shaderStage.value()); }
   llvm::Value *createThreadMask();
   llvm::Value *createThreadMaskedSelect(llvm::Value *const threadMask, uint64_t andMask, llvm::Value *const value1,
                                         llvm::Value *const value2);
@@ -794,21 +824,19 @@ private:
   uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
 
-  llvm::Value *createGroupBallot(llvm::Value *const value);
-  // Create a traditional loop for subgroup shuffle.
-  llvm::Value *createShuffleLoop(llvm::Value *const value, llvm::Value *const index, ShaderStageEnum shaderStage,
-                                 const llvm::Twine &instName = "");
-
 protected:
+  llvm::Value *createGroupBallot(const SubgroupHelperLaneState &state, llvm::Value *const value);
+  // Create a traditional loop for subgroup shuffle.
+  llvm::Value *createShuffleLoop(const SubgroupHelperLaneState &state, llvm::Value *const value,
+                                 llvm::Value *const index, const llvm::Twine &instName = "");
   // The subgroup operation with explicit shader stage as parameter.
   llvm::Value *createFindMsb(llvm::Value *const mask);
-  llvm::Value *createGroupBallotAllActive(llvm::Value *const value);
-  llvm::Value *createGroupBallot(llvm::Value *const value, ShaderStageEnum shaderStage);
-  llvm::Value *createSubgroupBroadcastFirst(llvm::Value *const value, ShaderStageEnum shaderStage,
+  llvm::Value *createSubgroupBroadcastFirst(const SubgroupHelperLaneState &status, llvm::Value *const value,
                                             const llvm::Twine &instName);
-  llvm::Value *createSubgroupShuffle(llvm::Value *const value, llvm::Value *const index, ShaderStageEnum shaderStage,
+  llvm::Value *createSubgroupShuffle(const SubgroupHelperLaneState &status, llvm::Value *const value,
+                                     llvm::Value *const index, ShaderStageEnum shaderStage,
                                      const llvm::Twine &instName);
-  llvm::Value *createWqm(llvm::Value *const value, ShaderStageEnum shaderStage);
+  llvm::Value *createWqm(llvm::Value *const value);
 };
 
 } // namespace lgc

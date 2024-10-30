@@ -31,7 +31,7 @@
 #pragma once
 
 #include "lgc/LgcDialect.h"
-#include "lgc/patch/PatchPreparePipelineAbi.h"
+#include "lgc/patch/PreparePipelineAbi.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -98,6 +98,7 @@ private:
 
   void processTaskShader(llvm::Function *entryPoint);
   void processMeshShader(llvm::Function *entryPoint);
+  void lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
   void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
   void lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp);
   void lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp);

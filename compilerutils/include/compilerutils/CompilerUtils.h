@@ -92,7 +92,20 @@ struct CrossModuleInlinerResult {
 // One CrossModuleInliner instance must only be used for a single target module, otherwise things can go wrong.
 class CrossModuleInliner {
 public:
-  CrossModuleInliner() = default;
+  // Callback passed to getGlobalInModule, that tries to find an existing GlobalValue in the target module or copies it
+  // to the target module.
+  using GetGlobalInModuleTy = std::function<llvm::GlobalValue &(CrossModuleInliner &inliner,
+                                                                llvm::GlobalValue &sourceGV, llvm::Module &targetGv)>;
+
+  CrossModuleInliner(GetGlobalInModuleTy getGlobalInModuleCallback = defaultGetGlobalInModuleFunc);
+
+  // Do not allow copy but allow moving
+  CrossModuleInliner(const CrossModuleInliner &) = delete;
+  CrossModuleInliner(CrossModuleInliner &&);
+  CrossModuleInliner &operator=(const CrossModuleInliner &) = delete;
+  CrossModuleInliner &operator=(CrossModuleInliner &&);
+
+  ~CrossModuleInliner() noexcept;
 
   // Inline a call to a function even if the called function is in a different module.
   // If the result of that function call should be used, a use must exist before calling this function.
@@ -118,19 +131,21 @@ public:
   // target module.
   llvm::GlobalValue *findCopiedGlobal(llvm::GlobalValue &sourceGv, llvm::Module &targetModule);
 
+  // Default implementation that finds global values using getCrossModuleName.
+  static llvm::GlobalValue &defaultGetGlobalInModuleFunc(CrossModuleInliner &inliner, llvm::GlobalValue &sourceGv,
+                                                         llvm::Module &targetModule);
+
   static std::string getCrossModuleName(llvm::GlobalValue &gv);
 
 private:
   // Checks that we haven't processed a different target module earlier.
-  void checkTargetModule(llvm::Module &targetModule) {
-    if (lastUsedTargetModule == nullptr)
-      lastUsedTargetModule = &targetModule;
-    else
-      assert(lastUsedTargetModule == &targetModule);
-  }
+  void checkTargetModule(llvm::Module &targetModule);
 
-  llvm::SmallDenseMap<llvm::GlobalValue *, llvm::GlobalValue *> mappedGlobals;
-  llvm::Module *lastUsedTargetModule = nullptr; // used to check that we don't use different target modules
+  struct Impl;
+  class CrossModuleValueMaterializer;
+
+  // Split into Impl class, so we don’t need to include everything in this header.
+  std::unique_ptr<Impl> impl;
 };
 
 // Essentially RAUW for pointers for the case that these use different address
@@ -140,6 +155,13 @@ private:
 // The caller has to handle the erasure afterwards.
 void replaceAllPointerUses(llvm::IRBuilder<> *builder, llvm::Value *oldPointerValue, llvm::Value *newPointerValue,
                            llvm::SmallVectorImpl<llvm::Instruction *> &toBeRemoved);
+
+// Create a GEP if idx is non-null, otherwise return the pointer.
+llvm::Value *simplifyingCreateConstGEP1_32(llvm::IRBuilder<> &builder, llvm::Type *ty, llvm::Value *ptr, uint32_t idx);
+
+// Create an inbounds GEP if idx is non-null, otherwise return the pointer.
+llvm::Value *simplifyingCreateConstInBoundsGEP1_32(llvm::IRBuilder<> &builder, llvm::Type *ty, llvm::Value *ptr,
+                                                   uint32_t idx);
 } // namespace CompilerUtils
 
 namespace llvm {

@@ -226,6 +226,7 @@ private:
   void buildPrimShaderWithGs(llvm::Function *entryPoint);
 
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
+  void prepareAttribRingAccess(llvm::Value *userData);
   void loadStreamOutBufferInfo(llvm::Value *userData);
   void distributePrimitiveId(llvm::Value *primitiveId);
 
@@ -319,6 +320,7 @@ private:
 
   llvm::BasicBlock *createBlock(llvm::Function *parent, const llvm::Twine &blockName = "");
   llvm::Value *createUBfe(llvm::Value *value, unsigned offset, unsigned count);
+  llvm::Value *makePointer(llvm::Value *ptrValue, llvm::Type *ptrTy);
   llvm::PHINode *createPhi(llvm::ArrayRef<std::pair<llvm::Value *, llvm::BasicBlock *>> incomings,
                            const llvm::Twine &name = "");
   void createFenceAndBarrier();
@@ -354,7 +356,6 @@ private:
     llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
-    llvm::Value *attribRingBase;                                 // Attribute ring base for this subgroup
     std::pair<llvm::Value *, llvm::Value *> primShaderTableAddr; // Primitive shader table address <low, high>
 
     // VGPRs
@@ -406,9 +407,13 @@ private:
   unsigned m_maxThreadsPerSubgroup = 0; // Maximum number of threads in a NGG subgroup
   unsigned m_maxWavesPerSubgroup = 0;   // Maximum number of waves in a NGG subgroup
 
+  llvm::Value *m_attribRingBufDesc = nullptr;    // Attribute ring buffer descriptor
+  llvm::Value *m_attribRingBaseOffset = nullptr; // Subgroup's attribute ring base offset (in bytes)
+
   llvm::Value *m_streamOutControlBufPtr = nullptr;                      // Stream-out control buffer pointer
   llvm::Value *m_streamOutBufDescs[MaxTransformFeedbackBuffers] = {};   // Stream-out buffer descriptors
   llvm::Value *m_streamOutBufOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out buffer offsets
+
   llvm::Value *m_verticesPerPrimitive = nullptr; // If topology is dynamic, it is a SGPR value from user data
                                                  // ComplexData; otherwise it is a constant.
 

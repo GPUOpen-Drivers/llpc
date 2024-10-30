@@ -33,6 +33,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcDialect.h"
 #include "llpcGraphicsContext.h"
 #include "llpcRayTracingContext.h"
 #include "compilerutils/CompilerUtils.h"
@@ -396,11 +397,11 @@ void LowerGlobals::handleCallInst(bool checkEmitCall, bool checkInterpCall) {
 
           GlobalVariable *gv = nullptr;
           SmallVector<Value *, 6> indexOperands;
-          if (auto getElemPtr = dyn_cast<GEPOperator>(loadSrc)) {
+          if (auto getElemPtr = dyn_cast<StructuralGepOp>(loadSrc)) {
             // The interpolant is an element of the input
-            for (auto &index : getElemPtr->indices())
+            for (auto *index : getElemPtr->getIndices())
               indexOperands.push_back(m_builder->CreateZExtOrTrunc(index, m_builder->getInt32Ty()));
-            gv = cast<GlobalVariable>(getElemPtr->getPointerOperand());
+            gv = cast<GlobalVariable>(getElemPtr->getBasePointer());
           } else {
             gv = cast<GlobalVariable>(loadSrc);
           }
@@ -447,7 +448,10 @@ static bool hasPrimitiveIdx(const Constant &metaVal) {
   if (inOutMeta.IsBuiltIn) {
     unsigned builtInId = inOutMeta.Value;
     return (builtInId == spv::BuiltInPerPrimitive || builtInId == spv::BuiltInPrimitivePointIndicesEXT ||
-            builtInId == spv::BuiltInPrimitiveLineIndicesEXT || builtInId == spv::BuiltInPrimitiveTriangleIndicesEXT);
+            builtInId == spv::BuiltInPrimitiveLineIndicesEXT || builtInId == spv::BuiltInPrimitiveTriangleIndicesEXT ||
+            builtInId == spv::BuiltInPrimitiveId || builtInId == spv::BuiltInLayer || // HLSL style per-primitive data
+            builtInId == spv::BuiltInViewportIndex || builtInId == spv::BuiltInPrimitiveShadingRateKHR ||
+            builtInId == spv::BuiltInCullPrimitiveEXT);
   }
 
   return static_cast<bool>(inOutMeta.PerPrimitive);
@@ -556,6 +560,22 @@ void LowerGlobals::lowerInOut(llvm::GlobalVariable *globalVar) {
       }
     }
 
+    SmallVector<Value *, 8> indices;
+    // No longer necessary to keep the structural geps for In/Out variables, replace them with LLVM gep.
+    for (auto *user : llvm::make_early_inc_range(globalVar->users())) {
+      if (!isa<StructuralGepOp>(user))
+        continue;
+      auto *sGep = cast<StructuralGepOp>(user);
+      for (auto *idx : sGep->getIndices())
+        indices.emplace_back(idx);
+      // NOTE: FoldGEP (all zero-index) will be removed, causing `replaceAllPointerUses` crash. Please don't use builder
+      // interface, or fix the issue.
+      auto *gep = GetElementPtrInst::Create(sGep->getBaseType(), sGep->getBasePointer(), indices, "", sGep);
+      sGep->replaceAllUsesWith(gep);
+      sGep->eraseFromParent();
+      indices.clear();
+    }
+
     SmallVector<Instruction *> toErase;
     CompilerUtils::replaceAllPointerUses(m_builder, globalVar, proxy, toErase);
     for (auto inst : toErase)
@@ -580,13 +600,11 @@ void LowerGlobals::lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, llvm:
   for (User *user : llvm::make_early_inc_range(current->users())) {
     Instruction *inst = cast<Instruction>(user);
 
-    if (auto *gep = dyn_cast<GetElementPtrInst>(inst)) {
-      // TODO: As LLVM is moving away from GEPs towards ptradds, we need a better solution, probably by adding our
-      //       own "structured GEP" operation.
-      assert(cast<ConstantInt>(gep->idx_begin()[0])->isNullValue());
+    if (auto *gep = dyn_cast<StructuralGepOp>(inst)) {
+      assert(cast<ConstantInt>(*gep->getIndices().begin())->isNullValue());
 
-      for (unsigned i = 1, e = gep->getNumIndices(); i < e; ++i)
-        indexStack.push_back(m_builder->CreateZExtOrTrunc(gep->idx_begin()[i], m_builder->getInt32Ty()));
+      for (auto *idx : llvm::drop_begin(gep->getIndices()))
+        indexStack.push_back(m_builder->CreateZExtOrTrunc(idx, m_builder->getInt32Ty()));
 
       lowerInOutUsersInPlace(globalVar, gep, indexStack);
 
@@ -609,7 +627,8 @@ void LowerGlobals::lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, llvm:
       auto indexOperands = ArrayRef(indexStack);
 
       // If the input/output is arrayed, the outermost index might be used for vertex indexing
-      if (inOutTy->isArrayTy() && (hasVertexIdx(*inOutMetaVal) || hasPrimitiveIdx(*inOutMetaVal))) {
+      if (inOutTy->isArrayTy() &&
+          (hasVertexIdx(*inOutMetaVal) || (m_shaderStage == ShaderStageMesh && hasPrimitiveIdx(*inOutMetaVal)))) {
         if (!indexOperands.empty()) {
           vertexOrPrimitiveIdx = indexOperands.front();
           indexOperands = indexOperands.drop_front();
@@ -1530,9 +1549,10 @@ void LowerGlobals::lowerBufferBlock() {
           if (inst->getFunction() != func)
             continue;
 
-          if (auto *GEP = dyn_cast<GetElementPtrInst>(inst)) {
-            for (auto *gepUser : GEP->users())
-              worklist.push_back(gepUser);
+          // treat buffer index ops the same as geps
+          if (isa<GetElementPtrInst, lgc::BufferIndexOp>(inst)) {
+            for (auto *user : inst->users())
+              worklist.push_back(user);
             continue;
           }
 

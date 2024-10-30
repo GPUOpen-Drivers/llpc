@@ -311,6 +311,17 @@ void ConfigBuilderBase::setThreadgroupDimensions(llvm::ArrayRef<unsigned> values
 }
 
 // =====================================================================================================================
+// Set original thread group dimensions
+//
+// @param values : Values to set
+void ConfigBuilderBase::setOrigThreadgroupDimensions(llvm::ArrayRef<unsigned> values) {
+  auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Cs);
+  auto &arrayNode = hwShaderNode[Util::Abi::HardwareStageMetadataKey::OrigThreadgroupDimensions].getArray(true);
+  for (unsigned i = 0; i < values.size(); ++i)
+    arrayNode[i] = values[i];
+}
+
+// =====================================================================================================================
 // Set stream-out vertex strides
 //
 // @param values : Values to set

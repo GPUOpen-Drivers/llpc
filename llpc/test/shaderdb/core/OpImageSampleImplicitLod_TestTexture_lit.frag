@@ -37,11 +37,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.b.1d.v4f32.f32.f32({{.*}}, float 0x3FD99999A0000000, float 1.000000e+00, {{.*}})
-; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.b.1d.v4f32.f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}({{.*}}, float 0x3FD99999A0000000, float 1.000000e+00, {{.*}})
+; SHADERTEST: call <8 x i32> @llvm.amdgcn.readfirstlane.v8i32
 ; SHADERTEST: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f16(i32 15, half 0xH3800, half 0xH3800, <8 x i32> %{{.*}}, <4 x i32> %{{.*}}, i1 false, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f16{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, half 0xH3800, half 0xH3800, <8 x i32> %{{.*}}, <4 x i32> %{{.*}}, i1 false, i32 0, i32 0)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

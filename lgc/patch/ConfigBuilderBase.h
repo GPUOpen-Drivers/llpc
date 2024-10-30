@@ -85,6 +85,7 @@ protected:
   void setLdsSizeByteSize(Util::Abi::HardwareStage hwStage, unsigned value);
   void setNggSubgroupSize(unsigned value);
   void setThreadgroupDimensions(llvm::ArrayRef<unsigned> values);
+  void setOrigThreadgroupDimensions(llvm::ArrayRef<unsigned> values);
   void setStreamOutVertexStrides(llvm::ArrayRef<unsigned> values);
   unsigned setupFloatingPointMode(ShaderStageEnum shaderStage);
 

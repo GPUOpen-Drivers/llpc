@@ -38,8 +38,8 @@ namespace Llpc {
 // Represents LLPC context for compute pipeline compilation. Derived from the base class Llpc::Context.
 class ComputeContext : public PipelineContext {
 public:
-  ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo, MetroHash::Hash *pipelineHash,
-                 MetroHash::Hash *cacheHash);
+  ComputeContext(GfxIpVersion gfxIp, const char *apiName, const ComputePipelineBuildInfo *pipelineInfo,
+                 MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~ComputeContext() = default;
 
   virtual PipelineType getPipelineType() const override { return PipelineType::Compute; }

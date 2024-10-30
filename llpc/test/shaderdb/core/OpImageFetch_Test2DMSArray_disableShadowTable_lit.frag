@@ -9,7 +9,7 @@
 
 // SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 // "i32 2" is provided sample number
-// SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2darraymsaa.v4f32.i32(i32 15, {{.*}}, {{.*}}, {{.*}}, i32 2, <8 x i32> %{{[0-9]*}}, i32 0, i32 0)
+// SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2darraymsaa.v4f32.i32{{(\.v8i32)?}}(i32 15, {{.*}}, {{.*}}, {{.*}}, i32 2, <8 x i32> %{{[0-9]*}}, i32 0, i32 0)
 // SHADERTEST: AMDLLPC SUCCESS
 // END_SHADERTEST
 

@@ -7,6 +7,7 @@ declare i64 @_AmdGetFuncAddrMyFunc()
 
 %struct.TraversalData = type { }
 
+declare !pointeetys !8 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare !pointeetys !12 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 

@@ -6,6 +6,8 @@
 
 declare void @Use(i64)
 declare i64 @_AmdGetCurrentFuncAddr()
+
+declare !pointeetys !2 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !2 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 define void @MyRayGen() {

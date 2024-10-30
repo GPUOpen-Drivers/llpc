@@ -126,13 +126,17 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
   }
 
   pipelineInfo->pInstance = nullptr; // Placeholder, unused.
-  pipelineInfo->pUserData = &compileInfo.pipelineBuf;
+  pipelineInfo->pUserData = &compileInfo;
   pipelineInfo->pfnOutputAlloc = allocateBuffer;
   pipelineInfo->unlinked = compileInfo.unlinked;
-  pipelineInfo->options.robustBufferAccess = compileInfo.robustBufferAccess;
-  pipelineInfo->options.enableRelocatableShaderElf = compileInfo.relocatableShaderElf;
-  pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
-  pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
+  if (compileInfo.robustBufferAccess.has_value())
+    pipelineInfo->options.robustBufferAccess = *compileInfo.robustBufferAccess;
+  if (compileInfo.relocatableShaderElf.has_value())
+    pipelineInfo->options.enableRelocatableShaderElf = *compileInfo.relocatableShaderElf;
+  if (compileInfo.scalarBlockLayout.has_value())
+    pipelineInfo->options.scalarBlockLayout = *compileInfo.scalarBlockLayout;
+  if (compileInfo.scratchAccessBoundsChecks.has_value())
+    pipelineInfo->options.enableScratchAccessBoundsChecks = *compileInfo.scratchAccessBoundsChecks;
   pipelineInfo->options.forceCsThreadIdSwizzling = compileInfo.compPipelineInfo.options.forceCsThreadIdSwizzling;
   pipelineInfo->options.overrideThreadGroupSizeX = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeX;
   pipelineInfo->options.overrideThreadGroupSizeY = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeY;

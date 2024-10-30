@@ -23,6 +23,8 @@ declare i32 @lgc.rt.shader.index()
 
 declare i32 @_cont_GetContinuationStackAddr()
 
+declare !pointeetys !13 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
+
 define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) !pointeetys !13 {
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define i32 @_cont_GetLocalRootIndex(
 ; LOWERRAYTRACINGPIPELINE-CPS-SAME: ptr [[DATA:%.*]]) {
@@ -60,7 +62,7 @@ define internal void @Callable(%struct.Payload* %payload) !pointeetys !23 !lgc.r
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[SHADER_INDEX]], ptr @debug_global, align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]]), !continuation.registercount [[META8:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]]), !continuation.registercount [[META8:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 entry:
@@ -73,7 +75,7 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) !pointe
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %callable.addr = call i32 @_AmdGetFuncAddrCallable()
   %ret.addr = call i32 @get.ret.addr()
-  call void (...) @lgc.cps.jump(i32 %callable.addr, i32 2, {} poison, i32 %ret.addr, i32 999, %struct.DispatchSystemData %dis_data, {} poison, [0 x i32] poison, [0 x i32] poison)
+  call void (...) @lgc.cps.jump(i32 %callable.addr, i32 2, {} poison, i32 poison, i32 %ret.addr, i32 999, %struct.DispatchSystemData %dis_data, {} poison, [0 x i32] poison, [0 x i32] poison)
   unreachable
 }
 
@@ -88,7 +90,7 @@ define void @main() {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @Callable)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RET_ADDR_I:%.*]] = call i32 @get.ret.addr()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[TMP2]], i32 2, {} poison, i32 [[RET_ADDR_I]], i32 999, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], {} poison, [0 x i32] poison, [0 x i32] poison)
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[TMP2]], i32 2, {} poison, i32 poison, i32 [[RET_ADDR_I]], i32 999, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], {} poison, [0 x i32] poison, [0 x i32] poison)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE-CPS:       _cont_CallShader.exit:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @lgc.cps.complete()
@@ -108,7 +110,7 @@ define void @main() {
 ; JUMP-INLINER-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], ptr [[SYSTEM_DATA_ALLOCA_I]], align 4
 ; JUMP-INLINER-CPS-NEXT:    store i32 999, ptr @debug_global, align 4
 ; JUMP-INLINER-CPS-NEXT:    [[TMP2:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA_I]], align 4
-; JUMP-INLINER-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RET_ADDR_I]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP2]]), !continuation.registercount [[META8]]
+; JUMP-INLINER-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RET_ADDR_I]], i32 6, {} poison, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP2]]), !continuation.registercount [[META8]]
 ; JUMP-INLINER-CPS-NEXT:    unreachable
 ; JUMP-INLINER-CPS:       Callable.exit:
 ; JUMP-INLINER-CPS-NEXT:    unreachable

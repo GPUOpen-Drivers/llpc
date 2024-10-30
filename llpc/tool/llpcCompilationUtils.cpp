@@ -96,12 +96,13 @@ namespace StandaloneCompiler {
 // @returns : Pointer to the allocated memory
 void *VKAPI_CALL allocateBuffer(void *instance, void *userData, size_t size) {
   (void)instance;
-  void *allocBuf = malloc(size);
+  auto allocOwner = std::make_unique<char[]>(size);
+  void *allocBuf = allocOwner.get();
   memset(allocBuf, 0, size);
 
   assert(userData);
-  auto *outBuf = reinterpret_cast<void **>(userData);
-  *outBuf = allocBuf;
+  auto *info = reinterpret_cast<CompileInfo *>(userData);
+  info->pipelineBufs.push_back(std::move(allocOwner));
   return allocBuf;
 }
 
@@ -115,11 +116,9 @@ void cleanupCompileInfo(CompileInfo *compileInfo) {
     // It will be freed when we close the VFX doc.
     if (!compileInfo->pipelineInfoFile)
       delete[] reinterpret_cast<const char *>(compileInfo->shaderModuleDatas[i].spirvBin.pCode);
-
-    free(compileInfo->shaderModuleDatas[i].shaderBuf);
   }
 
-  free(compileInfo->pipelineBuf);
+  compileInfo->pipelineBufs.clear();
 
   if (compileInfo->pipelineInfoFile)
     Vfx::vfxCloseDoc(compileInfo->pipelineInfoFile);
@@ -348,7 +347,7 @@ Error buildShaderModules(ICompiler *compiler, CompileInfo *compileInfo) {
     ShaderModuleBuildOut *shaderOut = &shaderModuleData.shaderOut;
 
     shaderInfo->pInstance = nullptr; // Placeholder, unused.
-    shaderInfo->pUserData = &shaderModuleData.shaderBuf;
+    shaderInfo->pUserData = compileInfo;
     shaderInfo->pfnOutputAlloc = allocateBuffer;
     shaderInfo->shaderBin = shaderModuleData.spirvBin;
 

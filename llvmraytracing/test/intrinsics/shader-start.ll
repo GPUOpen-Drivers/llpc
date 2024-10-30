@@ -6,6 +6,7 @@
 %struct.HitData = type { float, i32 }
 %struct.BuiltInTriangleIntersectionAttributes = type { <2 x float> }
 
+declare !pointeetys !8 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare !pointeetys !13 i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hitKind)
 declare !pointeetys !15 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
@@ -21,7 +22,7 @@ define void @main() !lgc.rt.shaderstage !10 {
 ; CHECK-NEXT:    store i32 123, ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], [8 x i32] poison, [30 x i32] [[TMP2]]), !continuation.registercount [[META0]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], [8 x i32] poison, [30 x i32] [[TMP2]]), !continuation.registercount [[META0]]
 ; CHECK-NEXT:    unreachable
 ;
 entry:

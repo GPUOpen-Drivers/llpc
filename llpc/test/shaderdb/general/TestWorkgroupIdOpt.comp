@@ -32,7 +32,7 @@ void main()
 // CHECK: attributes #[[ATTR0]] = { alwaysinline nounwind memory(readwrite) "amdgpu-flat-work-group-size"="256,256" "amdgpu-memory-bound"="false" "amdgpu-no-workgroup-id-y" "amdgpu-no-workgroup-id-z" "amdgpu-prealloc-sgpr-spill-vgprs" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" "amdgpu-work-group-info-arg-no"="3" "denormal-fp-math-f32"="preserve-sign" "target-features"=",+wavefrontsize64,+cumode,+enable-flat-scratch" }
 // CHECK: attributes #[[ATTR1:[0-9]+]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 // CHECK: attributes #[[ATTR2:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(inaccessiblemem: write) }
-// CHECK: attributes #[[ATTR3:[0-9]+]] = { nounwind willreturn memory(none) }
+// CHECK: attributes #[[ATTR3:[0-9]+]] = {{{.*}} nounwind willreturn memory(none) }
 // CHECK: attributes #[[ATTR4:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(write) }
 //.
 // CHECK: [[META0:![0-9]+]] = !{i32 16, i32 16, i32 1}

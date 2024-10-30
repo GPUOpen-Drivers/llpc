@@ -366,6 +366,8 @@ Type *BuilderCommon::transCooperativeMatrixElementType(CooperativeMatrixElementT
   case CooperativeMatrixElementType::Float8:
   case CooperativeMatrixElementType::BFloat8:
     return getInt8Ty();
+  case CooperativeMatrixElementType::Int4:
+    return getIntNTy(4);
   default:
     llvm_unreachable("The element type is not supported.");
   }
@@ -381,15 +383,44 @@ Type *BuilderCommon::getCooperativeMatrixTy(CooperativeMatrixElementType elemTyp
   // types at the LGC level, and parameterize the type using both the element type and the layout.
 
   Type *wordTy = transCooperativeMatrixElementType(elemType)->isIntOrIntVectorTy() ? getInt32Ty() : getFloatTy();
+  unsigned nDwords = 0;
+  (void)(nDwords);
   switch (layout) {
   case CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout:
   case CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout:
   case CooperativeMatrixLayout::AccumulatorMatrixLayout:
     return FixedVectorType::get(wordTy, 8);
   case CooperativeMatrixLayout::FactorMatrixLayout:
+    if (elemType == CooperativeMatrixElementType::Int4)
+      return FixedVectorType::get(wordTy, 2);
     if (elemType == CooperativeMatrixElementType::Int8)
       return FixedVectorType::get(wordTy, 4);
     return FixedVectorType::get(wordTy, 8);
+  default:
+    llvm_unreachable("Type is not supported!");
+  }
+}
+
+// =====================================================================================================================
+// Get the bit width of the cooperativeMatrix element type
+//
+// @param elemType : the matrix element type
+unsigned BuilderCommon::getBitWidthOfCooperativeMatrixElement(CooperativeMatrixElementType elemType) {
+  switch (elemType) {
+  case lgc::CooperativeMatrixElementType::Float16:
+  case lgc::CooperativeMatrixElementType::Float16Packed:
+  case lgc::CooperativeMatrixElementType::BFloat16:
+  case lgc::CooperativeMatrixElementType::Int16:
+    return 16;
+  case lgc::CooperativeMatrixElementType::Float32:
+  case lgc::CooperativeMatrixElementType::Int32:
+    return 32;
+  case lgc::CooperativeMatrixElementType::Int8:
+  case lgc::CooperativeMatrixElementType::Float8:
+  case lgc::CooperativeMatrixElementType::BFloat8:
+    return 8;
+  case lgc::CooperativeMatrixElementType::Int4:
+    return 4;
   default:
     llvm_unreachable("Type is not supported!");
   }
@@ -401,24 +432,6 @@ Type *BuilderCommon::getCooperativeMatrixTy(CooperativeMatrixElementType elemTyp
 // @param elemType : the matrix element type
 // @param bitWidth : the specified bit width
 bool BuilderCommon::isTypeNCooperativeMatrix(CooperativeMatrixElementType elemType, unsigned bitWidth) {
-  unsigned width = 0;
-  switch (elemType) {
-  case lgc::CooperativeMatrixElementType::Float16:
-  case lgc::CooperativeMatrixElementType::BFloat16:
-  case lgc::CooperativeMatrixElementType::Int16:
-    width = 16;
-    break;
-  case lgc::CooperativeMatrixElementType::Float32:
-  case lgc::CooperativeMatrixElementType::Int32:
-    width = 32;
-    break;
-  case lgc::CooperativeMatrixElementType::Int8:
-  case lgc::CooperativeMatrixElementType::Float8:
-  case lgc::CooperativeMatrixElementType::BFloat8:
-    width = 8;
-    break;
-  default:
-    break;
-  }
+  unsigned width = getBitWidthOfCooperativeMatrixElement(elemType);
   return width == bitWidth;
 }

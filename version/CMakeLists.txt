@@ -41,19 +41,7 @@ endif()
 target_compile_definitions(llpc_version INTERFACE
   LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION}
   # Hardcode the endian-ness define. Our register headers expect it anyway
-  LITTLEENDIAN_CPU
-  CHIP_HDR_NAVI14
-  CHIP_HDR_NAVI21
-  CHIP_HDR_NAVI22
-  CHIP_HDR_NAVI23
-  CHIP_HDR_NAVI24
-#if VKI_BUILD_NAVI31
-  CHIP_HDR_NAVI31
-#endif
-#if VKI_BUILD_NAVI33
-  CHIP_HDR_NAVI33
-#endif
-  CHIP_HDR_RENOIR)
+  LITTLEENDIAN_CPU)
 
 # Mark llpc_version as an installable target for which *.cmake files are created
 # that a hypothetical external user could include to import the target, either
@@ -76,57 +64,15 @@ if (NOT DISABLE_LLPC_VERSION_USES_LLVM)
 endif()
 
 ### Cached Config-related Options ######################################################################################
-#if VKI_BUILD_NAVI12
-option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
-if (LLPC_BUILD_NAVI12)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_NAVI12 CHIP_HDR_NAVI12)
-endif()
-#endif
-#if VKI_BUILD_NAVI32
-option(LLPC_BUILD_NAVI32 "LLPC support for NAVI32?" ON)
-if (LLPC_BUILD_NAVI32)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_NAVI32 CHIP_HDR_NAVI32)
-endif()
-#endif
-#if VKI_BUILD_REMBRANDT
-option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" ON)
-if (LLPC_BUILD_REMBRANDT)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_REMBRANDT CHIP_HDR_REMBRANDT)
-endif()
-#endif
-#if VKI_BUILD_RAPHAEL
-option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" ON)
-if (LLPC_BUILD_RAPHAEL)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_RAPHAEL CHIP_HDR_RAPHAEL)
-endif()
-#endif
-#if VKI_BUILD_MENDOCINO
-option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" ON)
-if (LLPC_BUILD_MENDOCINO)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_MENDOCINO CHIP_HDR_MENDOCINO)
-endif()
-#endif
-#if VKI_BUILD_PHOENIX1
-option(LLPC_BUILD_PHOENIX1 "LLPC support for PHOENIX1?" ON)
-if (LLPC_BUILD_PHOENIX1)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_PHOENIX1 CHIP_HDR_PHOENIX1)
-endif()
-#endif
-#if VKI_BUILD_PHOENIX2
-option(LLPC_BUILD_PHOENIX2 "LLPC support for PHOENIX2?" OFF)
-if (LLPC_BUILD_PHOENIX2)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_PHOENIX2 CHIP_HDR_PHOENIX2)
-endif()
-#endif
 #if VKI_BUILD_STRIX1
 option(LLPC_BUILD_STRIX1 "LLPC support for STRIX1?" ON)
 if (LLPC_BUILD_STRIX1)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_STRIX1 CHIP_HDR_STRIX1)
+  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_STRIX1)
 endif()
 #endif
 #if VKI_BUILD_GFX115
 option(LLPC_BUILD_GFX115 "LLPC support for GFX11.5?" ON)
 if (LLPC_BUILD_GFX115)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_GFX115 CHIP_HDR_GFX115)
+  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_GFX115)
 endif()
 #endif

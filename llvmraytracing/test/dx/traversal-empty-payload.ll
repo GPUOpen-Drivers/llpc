@@ -13,6 +13,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 !continuation.maxUsedPayloadRegisterCount = !{!8} ; EMPTY_PAYLOAD
 
 declare !pointeetys !4 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !4 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
 declare !pointeetys !6 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
@@ -33,12 +34,12 @@ define void @_cont_Traversal(%struct.TraversalData %data) #1 !lgc.rt.shaderstage
 6:                                                ; preds = %0
   %7 = load %struct.SystemData, ptr %5, align 4
   %8 = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @_cont_Traversal)
-  call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i64 %8, %struct.SystemData %7), !waitmask !9
+  call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i32 poison, i64 %8, %struct.SystemData %7), !waitmask !9
   unreachable
 
 9:                                                ; preds = %0
   %10 = load %struct.SystemData, ptr %5, align 4
-  call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, %struct.SystemData %10), !waitmask !9
+  call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i32 poison, i64 poison, %struct.SystemData %10), !waitmask !9
   unreachable
 }
 
@@ -71,16 +72,16 @@ attributes #2 = { nounwind }
 ; EMPTYPAYLOAD:       7:
 ; EMPTYPAYLOAD-NEXT:    [[TMP8:%.*]] = load [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP6]], align 4
 ; EMPTYPAYLOAD-NEXT:    [[TMP9:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @_cont_Traversal)
-; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i64 [[TMP9]], [[STRUCT_SYSTEMDATA]] [[TMP8]]), !waitmask [[META5:![0-9]+]], !continuation.registercount [[META0]]
+; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 1, i32 -1, {} poison, i32 poison, i64 [[TMP9]], [[STRUCT_SYSTEMDATA]] [[TMP8]]), !waitmask [[META5:![0-9]+]], !continuation.registercount [[META0]]
 ; EMPTYPAYLOAD-NEXT:    unreachable
 ; EMPTYPAYLOAD:       10:
 ; EMPTYPAYLOAD-NEXT:    [[TMP13:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[TMP6]], align 4
-; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i64 poison, [[STRUCT_SYSTEMDATA]] [[TMP13]]), !waitmask [[META5]], !continuation.registercount [[META0]]
+; EMPTYPAYLOAD-NEXT:    call void (...) @lgc.cps.jump(i64 0, i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_SYSTEMDATA]] [[TMP13]]), !waitmask [[META5]], !continuation.registercount [[META0]]
 ; EMPTYPAYLOAD-NEXT:    unreachable
 ;
 ;
 ; EMPTYPAYLOAD-ALL-LABEL: define void @_cont_Traversal(
-; EMPTYPAYLOAD-ALL-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [0 x i32] [[PADDING:%.*]], [0 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META4:![0-9]+]] {
+; EMPTYPAYLOAD-ALL-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_TRAVERSALDATA:%.*]] [[TMP0:%.*]], [0 x i32] [[PADDING:%.*]], [0 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META4:![0-9]+]] !continuation.state [[META0]] {
 ; EMPTYPAYLOAD-ALL-NEXT:  AllocaSpillBB:
 ; EMPTYPAYLOAD-ALL-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; EMPTYPAYLOAD-ALL-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4

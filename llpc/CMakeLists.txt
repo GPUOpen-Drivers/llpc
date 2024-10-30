@@ -49,31 +49,37 @@ if(ICD_BUILD_LLPC)
     add_lgc_projects()
 
     # Set other LLVM settings.
-    set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING Force)
-    set(LLVM_BUILD_TESTS OFF CACHE BOOL Force)
-    set(LLVM_BUILD_TOOLS ${LLPC_BUILD_LLVM_TOOLS} CACHE BOOL Force)
-    set(LLVM_BUILD_UTILS OFF CACHE BOOL Force)
-    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL Force)
-    set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL Force)
-    set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL Force)
     set(LLVMRAYTRACING_BUILD_TESTS ${LLPC_BUILD_TESTS})
-    set(LLVM_INCLUDE_TESTS ${LLPC_BUILD_TESTS} CACHE BOOL Force)
-    set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
-    set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
-    set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
-    set(LLVM_RAM_PER_TABLEGEN_JOB 10000 CACHE STRING Force)
-    set(LLVM_RAM_PER_LINK_JOB 5000 CACHE STRING Force)
-    if (NOT WIN32)
+    set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING "LLVM targets to build")
+    set(LLVM_BUILD_TESTS OFF CACHE BOOL "LLVM build tests")
+    set(LLVM_BUILD_TOOLS ${LLPC_BUILD_LLVM_TOOLS} CACHE BOOL "LLVM build tools")
+    set(LLVM_BUILD_UTILS OFF CACHE BOOL "LLVM build utils")
+    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "LLVM include docs")
+    set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "LLVM include examples")
+    set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL "LLVM include go tests")
+    set(LLVM_INCLUDE_TESTS ${LLPC_BUILD_TESTS} CACHE BOOL "LLVM include tests")
+    set(LLVM_INCLUDE_TOOLS ON CACHE BOOL "LLVM include tools")
+    set(LLVM_INCLUDE_UTILS ON CACHE BOOL "LLVM include utils")
+    set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "LLVM enable terminfo")
+    set(LLVM_RAM_PER_TABLEGEN_JOB 4000 CACHE STRING "LLVM RAM per tablegen job")
+    set(LLVM_RAM_PER_LINK_JOB 5000 CACHE STRING "LLVM RAM per link job")
+    if(CMAKE_BUILD_TYPE_DEBUG)
         # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
+        set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "Build optimized llvm-tblgen")
 #if _WIN32
-        # Don't enable this on Windows, because the required "cross compile" setup doesn't work
-        # in the internal CMake setup on Windows.
+        if(LLVM_OPTIMIZED_TABLEGEN AND WIN32 AND (CMAKE_GENERATOR MATCHES "Ninja"))
+            # LLVM implements the Release build of llvm-tblgen as a cross-compile target, which fails to find
+            # our DK-based toolchain (created with amd_generate_msvc_toolchain). However, we can inject the toolchain
+            # argument into LLVM's add_custom_target that sets up this cross-compile build.
+            # See: llvm-project/llvm/cmake/modules/CrossCompile.cmake
+            set(CROSS_TOOLCHAIN_FLAGS_NATIVE "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" CACHE STRING
+                "Toolchain flags for native build" FORCE)
+        endif()
 #endif
-        set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
     endif()
 
     # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
-    set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL Force)
+    set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL "LLVM build LLVM-C dylib")
 
     if(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
         set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
@@ -142,6 +148,29 @@ endif()
 include(../cmake/CompilerFlags.cmake)
 set_compiler_options(llpcinternal ${LLPC_ENABLE_WERROR})
 
+### TableGen for LLPC dialect ########################################################################################
+if (ICD_BUILD_LLPC)
+    if (EXISTS ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
+      set(LLPC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
+    else()
+      set(LLPC_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
+    endif()
+    set(LLPC_TABLEGEN_TARGET llvm-dialects-tblgen)
+    set(LLVM_TARGET_DEFINITIONS include/LlpcDialect.td)
+
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include")
+    tablegen(LLPC include/LlpcDialect.h.inc -gen-dialect-decls --dialect llpc
+        EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+        )
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include/context")
+    tablegen(LLPC include/context/LlpcDialect.cpp.inc -gen-dialect-defs --dialect llpc
+        EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+        )
+
+    add_public_tablegen_target(LlpcDialectTableGen)
+    add_dependencies(llpcinternal LlpcDialectTableGen)
+endif()
+
 ### Defines/Includes/Sources ###########################################################################################
 if(ICD_BUILD_LLPC)
     list(APPEND CMAKE_MODULE_PATH
@@ -192,6 +221,7 @@ target_include_directories(llpcinternal
         translator/lib/SPIRV/libSPIRV
         util
         ../util
+        ${PROJECT_BINARY_DIR}/include
         ${XGL_PAL_PATH}/inc/core
         ${XGL_PAL_PATH}/inc/util
         ${LLVM_INCLUDE_DIRS}
@@ -207,72 +237,123 @@ if(ICD_BUILD_LLPC)
 # llpc/context
     target_sources(llpcinternal PRIVATE
         context/llpcCompiler.cpp
-        context/llpcContext.cpp
+        context/llpcCompiler.h
         context/llpcComputeContext.cpp
+        context/llpcComputeContext.h
+        context/llpcContext.cpp
+        context/llpcContext.h
+        context/llpcDialect.cpp
+        context/llpcDialect.h
         context/llpcGraphicsContext.cpp
+        context/llpcGraphicsContext.h
         context/llpcPipelineContext.cpp
+        context/llpcPipelineContext.h
         context/llpcRayTracingContext.cpp
+        context/llpcRayTracingContext.h
     )
 
 # llpc/lowering
     target_sources(llpcinternal PRIVATE
-        lowering/Lowering.cpp
         lowering/LowerAccessChain.cpp
-        lowering/LowerCfgMerges.cpp
-        lowering/LowerConstImmediateStore.cpp
-        lowering/LowerGlobals.cpp
-        lowering/LowerInstMetaRemove.cpp
-        lowering/LowerMath.cpp
-        lowering/LowerMemoryOp.cpp
-        lowering/LowerPostInline.cpp
-        lowering/LowerRayTracing.cpp
-        lowering/LowerTerminator.cpp
-        lowering/LowerTranslator.cpp
-        lowering/LoweringUtil.cpp
-        lowering/ProcessGpuRtLibrary.cpp
-        lowering/LowerInternalLibraryIntrinsic.cpp
-        lowering/LowerGlCompatibility.cpp
-        lowering/ScalarReplacementOfBuiltins.cpp
-        lowering/LowerCooperativeMatrix.cpp
-        lowering/PrepareContinuations.cpp
+        lowering/LowerAccessChain.h
         lowering/LowerAdvancedBlend.cpp
+        lowering/LowerAdvancedBlend.h
+        lowering/LowerCfgMerges.cpp
+        lowering/LowerCfgMerges.h
+        lowering/LowerConstImmediateStore.cpp
+        lowering/LowerConstImmediateStore.h
+        lowering/LowerCooperativeMatrix.cpp
+        lowering/LowerCooperativeMatrix.h
+        lowering/LowerGlCompatibility.cpp
+        lowering/LowerGlCompatibility.h
+        lowering/LowerGlobals.cpp
+        lowering/LowerGlobals.h
+        lowering/LowerInstMetaRemove.cpp
+        lowering/LowerInstMetaRemove.h
+        lowering/Lowering.cpp
+        lowering/Lowering.h
+        lowering/LowerMath.cpp
+        lowering/LowerMath.h
+        lowering/LowerMemoryOp.cpp
+        lowering/LowerMemoryOp.h
+        lowering/LowerPostInline.cpp
+        lowering/LowerPostInline.h
+        lowering/LowerRayTracing.cpp
+        lowering/LowerRayTracing.h
+        lowering/LowerTerminator.cpp
+        lowering/LowerTerminator.h
+        lowering/LowerTranslator.cpp
+        lowering/LowerTranslator.h
+        lowering/LoweringUtil.cpp
+        lowering/LoweringUtil.h
+        lowering/LowerInternalLibraryIntrinsic.cpp
+        lowering/LowerInternalLibraryIntrinsic.h
+        lowering/ProcessGpuRtLibrary.cpp
+        lowering/ProcessGpuRtLibrary.h
+        lowering/PrepareContinuations.cpp
+        lowering/PrepareContinuations.h
+        lowering/ScalarReplacementOfBuiltins.cpp
+        lowering/ScalarReplacementOfBuiltins.h
         lowering/ProcessGfxRuntimeLibrary.cpp
+        lowering/ProcessGfxRuntimeLibrary.h
     )
 
 # llpc/translator
     target_sources(llpcinternal PRIVATE
         translator/lib/SPIRV/SPIRVReader.cpp
+        translator/lib/SPIRV/SPIRVReader.h
         translator/lib/SPIRV/SPIRVToLLVMDbgTran.cpp
+        translator/lib/SPIRV/SPIRVToLLVMDbgTran.h
         translator/lib/SPIRV/SPIRVUtil.cpp
     )
 
     target_sources(llpcinternal PRIVATE
         translator/lib/SPIRV/libSPIRV/SPIRVBasicBlock.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVBasicBlock.h
         translator/lib/SPIRV/libSPIRV/SPIRVDebug.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVDebug.h
         translator/lib/SPIRV/libSPIRV/SPIRVDecorate.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVDecorate.h
         translator/lib/SPIRV/libSPIRV/SPIRVEntry.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVEntry.h
         translator/lib/SPIRV/libSPIRV/SPIRVFunction.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVFunction.h
         translator/lib/SPIRV/libSPIRV/SPIRVInstruction.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVInstruction.h
         translator/lib/SPIRV/libSPIRV/SPIRVModule.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVModule.h
         translator/lib/SPIRV/libSPIRV/SPIRVStream.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVStream.h
         translator/lib/SPIRV/libSPIRV/SPIRVType.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVType.h
         translator/lib/SPIRV/libSPIRV/SPIRVValue.cpp
+        translator/lib/SPIRV/libSPIRV/SPIRVValue.h
+        translator/lib/SPIRV/libSPIRV/SPIRVUtil.h
     )
 
 # llpc/util
     target_sources(llpcinternal PRIVATE
         util/llpcCacheAccessor.cpp
+        util/llpcCacheAccessor.h
         util/llpcDebug.cpp
+        util/llpcDebug.h
         util/llpcElfWriter.cpp
+        util/llpcElfWriter.h
         util/llpcError.cpp
+        util/llpcError.h
         util/llpcFile.cpp
+        util/llpcFile.h
         util/llpcShaderModuleHelper.cpp
+        util/llpcShaderModuleHelper.h
         util/llpcTimerProfiler.cpp
+        util/llpcTimerProfiler.h
         util/llpcUtil.cpp
+        util/llpcUtil.h
     )
 else()
     target_sources(llpcinternal PRIVATE
         util/llpcUtil.cpp
+        util/llpcUtil.h
     )
 endif()
 
@@ -354,14 +435,23 @@ if(ICD_BUILD_LLPC)
 # Add a common library for standalone compilers based on LLPC.
 add_library(llpc_standalone_compiler
     tool/llpcAutoLayout.cpp
+    tool/llpcAutoLayout.h
     tool/llpcCompilationUtils.cpp
+    tool/llpcCompilationUtils.h
     tool/llpcComputePipelineBuilder.cpp
+    tool/llpcComputePipelineBuilder.h
     tool/llpcGraphicsPipelineBuilder.cpp
+    tool/llpcGraphicsPipelineBuilder.h
     tool/llpcInputUtils.cpp
+    tool/llpcInputUtils.h
     tool/llpcPipelineBuilder.cpp
+    tool/llpcPipelineBuilder.h
     tool/llpcRayTracingPipelineBuilder.cpp
+    tool/llpcRayTracingPipelineBuilder.h
     tool/llpcShaderCache.cpp
+    tool/llpcShaderCache.h
     tool/llpcShaderCacheWrap.cpp
+    tool/llpcShaderCacheWrap.h
 )
 
 add_dependencies(llpc_standalone_compiler llpc)

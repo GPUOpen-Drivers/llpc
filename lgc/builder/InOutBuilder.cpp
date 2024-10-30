@@ -1479,7 +1479,7 @@ Value *BuilderImpl::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   default:
     // Not handled. This should never happen; we need to handle all CS built-ins here because the old way of
     // handling them (caller will handle with lgc.input.import.builtin, which is then lowered in
-    // PatchInOutImportExport) does not work with compute-with-calls.
+    // LowerInOut) does not work with compute-with-calls.
     llvm_unreachable("Unhandled CS built-in");
     return nullptr;
   }
@@ -1513,7 +1513,7 @@ Value *BuilderImpl::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInInstanceId:
     return ShaderInputs::getInput(ShaderInput::InstanceId, builder, *getLgcContext());
   default:
-    // Not handled; caller will handle with lgc.input.import.builtin, which is then lowered in PatchInOutImportExport.
+    // Not handled; caller will handle with lgc.input.import.builtin, which is then lowered in LowerInOut.
     return nullptr;
   }
 }
@@ -1622,7 +1622,7 @@ Type *BuilderImpl::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
 
 // =====================================================================================================================
 // Mark usage of a built-in input. This is only needed where a built-in is handled by generating lgc.import.input
-// to be lowered in PatchInOutImportExport, and not when it is directly generated here using
+// to be lowered in LowerInOut, and not when it is directly generated here using
 // ShaderInputs::getInput() and/or ShaderInputs::getSpecialUserData().
 //
 // @param builtIn : Built-in ID

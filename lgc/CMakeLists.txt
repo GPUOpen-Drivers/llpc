@@ -65,6 +65,12 @@ set_compiler_options(LLVMlgc ${LLPC_ENABLE_WERROR})
 
 ### TableGen for LGC dialect ###########################################################################################
 
+# Determine whether LLVM has the nodivergencesource attribute.
+include(../cmake/LlvmMainRevision.cmake)
+if (${LLVM_MAIN_REVISION} GREATER_EQUAL 514862)
+  set(LGC_TABLEGEN_FLAGS -DLLVM_HAVE_NODIVERGENCESOURCE_ATTR)
+endif()
+
 if (EXISTS ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
   set(LGC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
 else()
@@ -76,13 +82,13 @@ set(LLVM_TARGET_DEFINITIONS interface/lgc/LgcDialect.td)
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/interface/lgc)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/interface/lgc")
 endif()
-tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc
+tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc ${LGC_TABLEGEN_FLAGS}
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
     )
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
-tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
+tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc ${LGC_TABLEGEN_FLAGS}
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
     )
 
@@ -140,7 +146,7 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     patch/ConfigBuilderBase.cpp
     patch/Continufy.cpp
-    patch/FragColorExport.cpp
+    patch/FragmentColorExport.cpp
     patch/LowerDebugPrintf.cpp
     patch/LowerDesc.cpp
     patch/LowerPopsInterlock.cpp
@@ -148,7 +154,8 @@ target_sources(LLVMlgc PRIVATE
     patch/MeshTaskShader.cpp
     patch/NggPrimShader.cpp
     patch/Patch.cpp
-    patch/PatchBufferOp.cpp
+    patch/StructurizeBuffers.cpp
+    patch/LowerBufferOperations.cpp
     patch/CheckShaderCache.cpp
     patch/GenerateCopyShader.cpp
     patch/MutateEntryPoint.cpp
@@ -159,15 +166,15 @@ target_sources(LLVMlgc PRIVATE
     patch/ScalarizeLoads.cpp
     patch/LowerMulDx9Zero.cpp
     patch/AddLoopMetadata.cpp
-    patch/PatchNullFragShader.cpp
-    patch/PatchPeepholeOpt.cpp
-    patch/PatchPreparePipelineAbi.cpp
-    patch/PatchReadFirstLane.cpp
-    patch/PatchResourceCollect.cpp
-    patch/PatchSetupTargetFeatures.cpp
-    patch/TcsPassthroughShader.cpp
+    patch/GenerateNullFragmentShader.cpp
+    patch/PeepholeOptimization.cpp
+    patch/PreparePipelineAbi.cpp
+    patch/LowerReadFirstLane.cpp
+    patch/CollectResourceUsage.cpp
+    patch/SetupTargetFeatures.cpp
+    patch/PassthroughHullShader.cpp
     patch/PatchInitializeWorkgroupMemory.cpp
-    patch/PatchWorkarounds.cpp
+    patch/ApplyWorkarounds.cpp
     patch/ShaderInputs.cpp
     patch/ShaderMerger.cpp
     patch/SystemValues.cpp
@@ -209,7 +216,9 @@ target_sources(LLVMlgc PRIVATE
     util/Internal.cpp
     util/MbStandardInstrumentations.cpp
     util/ModuleBunch.cpp
+    util/MsgPackScanner.cpp
     util/PassManager.cpp
+    util/RegStackUsage.cpp
     util/StartStopTimer.cpp
     util/WorkgroupLayout.cpp
 )

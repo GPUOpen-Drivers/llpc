@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  ScalarizeLoads.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchLoadScalarizer.
+ * @brief LLPC source file: contains implementation of class lgc::ScalarizeLoads.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/ScalarizeLoads.h"
@@ -36,7 +36,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "lgc-patch-load-scalarizer"
+#define DEBUG_TYPE "lgc-scalarizer-loads"
 
 using namespace lgc;
 using namespace llvm;
@@ -44,7 +44,7 @@ using namespace llvm;
 namespace lgc {
 
 // =====================================================================================================================
-PatchLoadScalarizer::PatchLoadScalarizer() {
+ScalarizeLoads::ScalarizeLoads() {
   m_scalarThreshold = 0;
 }
 
@@ -54,7 +54,7 @@ PatchLoadScalarizer::PatchLoadScalarizer() {
 // @param [in/out] function : Function that we will peephole optimize.
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchLoadScalarizer::run(Function &function, FunctionAnalysisManager &analysisManager) {
+PreservedAnalyses ScalarizeLoads::run(Function &function, FunctionAnalysisManager &analysisManager) {
   const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
   PipelineState *pipelineState =
       moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
@@ -89,7 +89,7 @@ PreservedAnalyses PatchLoadScalarizer::run(Function &function, FunctionAnalysisM
 // Visits "load" instruction.
 //
 // @param loadInst : The instruction
-void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
+void ScalarizeLoads::visitLoadInst(LoadInst &loadInst) {
   const unsigned addrSpace = loadInst.getPointerAddressSpace();
   auto loadTy = dyn_cast<FixedVectorType>(loadInst.getType());
 

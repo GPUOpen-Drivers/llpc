@@ -80,33 +80,26 @@ unsigned BuilderImpl::getShaderWaveSize() {
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
   auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
-  return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(getTrue(), shaderStage.value())), getInt32(0));
+  const auto state = SubgroupHelperLaneState::get(shaderStage.value(), m_pipelineState);
+  return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(state, getTrue())), getInt32(0));
 }
 
 // =====================================================================================================================
 // Create a subgroup all call.
 //
+// @param state : The subgroup helper lane state
 // @param value : The value to compare across the subgroup. Must be an integer type.
-// @param shaderStage : shader stage enum.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::createSubgroupAll(Value *const value, ShaderStageEnum shaderStage, const Twine &instName) {
-  bool includeHelperLanes = false;
-  bool requireHelperLanes = false;
-
-  if (shaderStage == ShaderStage::Fragment) {
-    const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-    includeHelperLanes = !fragmentMode.waveOpsExcludeHelperLanes;
-    requireHelperLanes = fragmentMode.waveOpsRequireHelperLanes;
-  }
-
-  Value *result = CreateICmpEQ(createGroupBallot(value, shaderStage), createGroupBallot(getTrue(), shaderStage));
+Value *SubgroupBuilder::createSubgroupAll(const SubgroupHelperLaneState &state, Value *const value,
+                                          const Twine &instName) {
+  Value *result = CreateICmpEQ(createGroupBallot(state, value), createGroupBallot(state, getTrue()));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  if (includeHelperLanes) {
+  if (state.included()) {
     result = CreateZExt(result, getInt32Ty());
-    result = CreateIntrinsic(requireHelperLanes ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm, {getInt32Ty()},
-                             {result});
+    result =
+        CreateIntrinsic(state.required() ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
   }
   return result;
@@ -118,25 +111,16 @@ Value *SubgroupBuilder::createSubgroupAll(Value *const value, ShaderStageEnum sh
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
-  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
-
-  bool includeHelperLanes = false;
-  bool requireHelperLanes = false;
-
-  if (getShaderStage(GetInsertBlock()->getParent()).value() == ShaderStage::Fragment) {
-    const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-    includeHelperLanes = !fragmentMode.waveOpsExcludeHelperLanes;
-    requireHelperLanes = fragmentMode.waveOpsRequireHelperLanes;
-  }
-
-  Value *result = CreateICmpNE(createGroupBallot(value, shaderStage.value()), getInt64(0));
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+  Value *result = CreateICmpNE(createGroupBallot(state, value), getInt64(0));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  if (includeHelperLanes) {
+  if (state.included()) {
     result = CreateZExt(result, getInt32Ty());
-    result = CreateIntrinsic(requireHelperLanes ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm, {getInt32Ty()},
-                             {result});
+    result =
+        CreateIntrinsic(state.required() ? Intrinsic::amdgcn_wqm : Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
   }
   return result;
@@ -148,11 +132,12 @@ Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instN
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
-  auto shaderStage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
 
   Type *const type = value->getType();
 
-  Value *compare = createSubgroupBroadcastFirst(value, shaderStage, instName);
+  Value *compare = createSubgroupBroadcastFirst(state, value, instName);
 
   if (type->isFPOrFPVectorTy())
     compare = CreateFCmpOEQ(compare, value);
@@ -167,9 +152,9 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &
     for (unsigned i = 1, compCount = cast<FixedVectorType>(type)->getNumElements(); i < compCount; i++)
       result = CreateAnd(result, CreateExtractElement(compare, i));
 
-    return createSubgroupAll(result, shaderStage, instName);
+    return createSubgroupAll(state, result, instName);
   }
-  return createSubgroupAll(compare, shaderStage, instName);
+  return createSubgroupAll(state, compare, instName);
 }
 
 // =====================================================================================================================
@@ -181,8 +166,6 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
                                              const Twine &instName) {
-  auto shaderStage = getShaderStage(GetInsertBlock()->getParent()).value();
-
   // LocalId = SubgroupLocalInvocationId
   // RotationGroupSize = hasClusterSIze? ClusterSize : SubgroupSize.
   // Invocation ID = ((LocalId + Delta) & (RotationGroupSize - 1)) + (LocalId & ~(RotationGroupSize - 1))
@@ -193,8 +176,7 @@ Value *SubgroupBuilder::CreateSubgroupRotate(Value *const value, Value *const de
     invocationId =
         CreateOr(CreateAnd(invocationId, rotationGroupSize), CreateAnd(localId, CreateNot(rotationGroupSize)));
   }
-
-  return createSubgroupShuffle(value, invocationId, shaderStage, instName);
+  return CreateSubgroupShuffle(value, invocationId, instName);
 }
 
 // =====================================================================================================================
@@ -231,15 +213,14 @@ Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *
 // =====================================================================================================================
 // Create a subgroup broadcastfirst call.
 //
+// @param state : The subgroup helper lane state
 // @param value : The value to read from the first active lane into all other active lanes.
-// @param shaderStage : shader stage enum.
 // @param instName : Name to give final instruction.
-Value *BuilderImpl::createSubgroupBroadcastFirst(Value *const value, ShaderStageEnum shaderStage,
+Value *BuilderImpl::createSubgroupBroadcastFirst(const SubgroupHelperLaneState &state, Value *const value,
                                                  const Twine &instName) {
-  // For waveOpsExcludeHelperLanes mode, we need filter out the helperlane and use readlane instead.
-  if (shaderStage == ShaderStage::Fragment &&
-      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsExcludeHelperLanes) {
-    Value *ballot = createGroupBallot(getTrue(), shaderStage);
+  // We need filter out the helperlane and use readlane instead if don't care helper lanes.
+  if (state.excluded()) {
+    Value *ballot = createGroupBallot(state, getTrue());
     Value *firstlane = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), {ballot, getTrue()});
     firstlane = CreateTrunc(firstlane, getInt32Ty());
 
@@ -268,7 +249,9 @@ Value *BuilderImpl::CreateSubgroupBallot(Value *const value, const Twine &instNa
   // Check the type is definitely an integer.
   assert(value->getType()->isIntegerTy());
 
-  Value *ballot = createGroupBallot(value);
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+  Value *ballot = createGroupBallot(state, value);
 
   // Ballot expects a <4 x i32> return, so we need to turn the i64 into that.
   ballot = CreateBitCast(ballot, FixedVectorType::get(getInt32Ty(), 2));
@@ -384,12 +367,13 @@ Value *BuilderImpl::CreateSubgroupBallotFindMsb(Value *const value, const Twine 
 // =====================================================================================================================
 // Create a subgroup shuffle call.
 //
+// @param state : The subgroup helper lane state
 // @param value : The value to shuffle.
 // @param index : The index to shuffle from.
 // @param shaderStage : shader stage enum.
 // @param instName : Name to give final instruction.
-Value *BuilderImpl::createSubgroupShuffle(Value *const value, Value *const index, ShaderStageEnum shaderStage,
-                                          const Twine &instName) {
+Value *BuilderImpl::createSubgroupShuffle(const SubgroupHelperLaneState &state, Value *const value, Value *const index,
+                                          ShaderStageEnum shaderStage, const Twine &instName) {
 
   if (supportWaveWideBPermute(shaderStage)) {
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
@@ -435,14 +419,13 @@ Value *BuilderImpl::createSubgroupShuffle(Value *const value, Value *const index
     auto result = CreateSelect(indexInSameHalf, bPermSameHalf, bPermOtherHalf);
 
     // If required, force inputs of the operation to be computed in WQM.
-    if (shaderStage == ShaderStage::Fragment &&
-        m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
-      result = createWqm(result, shaderStage);
+    if (state.required())
+      result = createWqm(result);
 
     return result;
   }
 
-  return createShuffleLoop(value, index, shaderStage);
+  return createShuffleLoop(state, value, index);
 }
 
 // =====================================================================================================================
@@ -591,8 +574,9 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
   Value *result = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+  if (state.excluded()) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateSelect(isLive, result, identity);
   }
@@ -647,8 +631,7 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
   result = createWwm(result);
 
   // If required, force inputs of the operation to be computed in WQM.
-  if (m_shaderStage == ShaderStage::Fragment &&
-      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+  if (state.required())
     result = createWqm(result);
 
   return result;
@@ -720,8 +703,9 @@ Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, 
   result = createWwm(result);
 
   // If required, force inputs of the operation to be computed in WQM.
-  if (m_shaderStage == ShaderStage::Fragment &&
-      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+  if (state.required())
     result = createWqm(result);
 
   return result;
@@ -748,8 +732,9 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
   Value *result = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+  if (state.excluded()) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateSelect(isLive, result, identity);
   }
@@ -825,8 +810,7 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
   result = createWwm(result);
 
   // If required, force inputs of the operation to be computed in WQM.
-  if (m_shaderStage == ShaderStage::Fragment &&
-      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsRequireHelperLanes)
+  if (state.required())
     result = createWqm(result);
 
   return result;
@@ -842,6 +826,8 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArithOp, Value *const value,
                                                           Value *const mask, const Twine &instName) {
   Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
 
   Value *laneIndex = CreateGetLaneNumber();
   Value *clusterMask =
@@ -853,8 +839,7 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
   Value *result = value;
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (state.excluded()) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateSelect(isLive, result, identity);
   }
@@ -866,7 +851,8 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
   Value *preLaneMask = CreateSub(CreateShl(constOne, CreateZExtOrTrunc(laneIndex, clusterMask->getType())), constOne);
   Value *checkMask = CreateAnd(preLaneMask, clusterMask);
 
-  Value *preLaneValue = CreateSubgroupShuffle(result, createFindMsb(checkMask), instName);
+  Value *preLaneValue = createSubgroupShuffle(SubgroupHelperLaneState::get(std::nullopt, state.requireHelperLanes),
+                                              result, createFindMsb(checkMask), m_shaderStage.value(), instName);
 
   result = CreateSelect(CreateICmpNE(checkMask, constZero), preLaneValue, identity);
 
@@ -882,7 +868,10 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
     Value *isPreviousLaneValid = CreateICmpNE(preClusterMask, constZero);
     Value *previousLaneIndex = createFindMsb(preClusterMask);
     Value *previousLaneValue = nullptr;
-    { previousLaneValue = CreateSubgroupShuffle(result, previousLaneIndex, instName); }
+    {
+      previousLaneValue = createSubgroupShuffle(SubgroupHelperLaneState::get(std::nullopt, state.requireHelperLanes),
+                                                result, previousLaneIndex, m_shaderStage.value(), instName);
+    }
 
     // Don't accumulate if there is no valid lane found in previous cluster or current lane is no need for accumulate.
     // TODO: Check amdgcn_inverse_ballot version.
@@ -1040,6 +1029,8 @@ Value *BuilderImpl::CreateSubgroupMbcnt(Value *const mask, const Twine &instName
 Value *BuilderImpl::CreateSubgroupPartition(llvm::Value *const value, const Twine &instName) {
   BasicBlock *currentBlock = GetInsertBlock();
   auto insertPoint = GetInsertPoint();
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
 
   BasicBlock *beforeBlock =
       splitBlockBefore(currentBlock, &*insertPoint, nullptr, nullptr, nullptr, currentBlock->getName());
@@ -1061,9 +1052,9 @@ Value *BuilderImpl::CreateSubgroupPartition(llvm::Value *const value, const Twin
   // remove the default br generated by splitBlockBefore.
   loopBlock->getTerminator()->eraseFromParent();
   SetInsertPoint(loopBlock);
-  Value *laneValue = CreateSubgroupBroadcastFirst(targetValue);
+  Value *laneValue = createSubgroupBroadcastFirst(state, targetValue, instName);
   Value *isEqual = CreateICmpEQ(laneValue, targetValue);
-  Value *mask = createGroupBallot(isEqual);
+  Value *mask = createGroupBallot(state, isEqual);
   CreateCondBr(isEqual, loopEndBlock, loopBlock);
 
   // Handle Loop End
@@ -1332,13 +1323,12 @@ Value *BuilderImpl::createWwm(Value *const value) {
 // Only in fragment shader stage.
 //
 // @param value : The value to pass to the soft WQM call.
-// @param shaderStage : shader stage enum.
-Value *BuilderImpl::createWqm(Value *const value, ShaderStageEnum shaderStage) {
+Value *BuilderImpl::createWqm(Value *const value) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
     return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, mappedArgs[0]);
   };
 
-  if (shaderStage == ShaderStage::Fragment)
+  if (m_shaderStage.value() == ShaderStage::Fragment)
     return CreateMapToSimpleType(mapFunc, value, {});
 
   return value;
@@ -1412,15 +1402,18 @@ Value *BuilderImpl::createInverseBallotSelect(uint64_t selectMask, Value *const 
 }
 
 // =====================================================================================================================
-// Do group ballot with all active threads participated, turning a boolean value (in a VGPR) into a subgroup-wide
-// shared SGPR.
+// Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
 //
+// @param state : The subgroup helper lane state
 // @param value : The value to contribute to the SGPR, must be an boolean type.
-Value *BuilderImpl::createGroupBallotAllActive(Value *const value) {
+Value *BuilderImpl::createGroupBallot(const SubgroupHelperLaneState &state, Value *const value) {
   // Check the type is definitely an boolean.
   assert(value->getType()->isIntegerTy(1));
 
   Value *result = value;
+  if (state.excluded())
+    result = CreateAnd(CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {}), result);
+
   unsigned waveSize = getShaderWaveSize();
   result = CreateIntrinsic(getIntNTy(waveSize), Intrinsic::amdgcn_ballot, result);
 
@@ -1429,34 +1422,6 @@ Value *BuilderImpl::createGroupBallotAllActive(Value *const value) {
     result = CreateZExt(result, getInt64Ty());
 
   return result;
-}
-
-// =====================================================================================================================
-// Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
-//
-// @param value : The value to contribute to the SGPR, must be an boolean type.
-// @param shaderStage : shader stage enum.
-Value *BuilderImpl::createGroupBallot(Value *const value, ShaderStageEnum shaderStage) {
-  // Check the type is definitely an boolean.
-  assert(value->getType()->isIntegerTy(1));
-
-  Value *result = value;
-
-  // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
-  if (shaderStage == ShaderStage::Fragment &&
-      m_pipelineState->getShaderModes()->getFragmentShaderMode().waveOpsExcludeHelperLanes) {
-    auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
-    result = CreateAnd(isLive, result);
-  }
-  return createGroupBallotAllActive(result);
-}
-
-// =====================================================================================================================
-// Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
-//
-// @param value : The value to contribute to the SGPR, must be an boolean type.
-Value *BuilderImpl::createGroupBallot(Value *const value) {
-  return createGroupBallot(value, m_shaderStage.value());
 }
 
 // =====================================================================================================================
@@ -1484,11 +1449,12 @@ Value *BuilderImpl::createGroupBallot(Value *const value) {
 // }
 // while (workList != 0)
 //
+// @param state : The subgroup helper lane state
 // @param value : The value to shuffle.
 // @param index : The index to shuffle from.
 // @param instName : Name to give instruction(s)
-llvm::Value *BuilderImpl::createShuffleLoop(llvm::Value *const value, llvm::Value *const index,
-                                            ShaderStageEnum shaderStage, const llvm::Twine &instName) {
+llvm::Value *BuilderImpl::createShuffleLoop(const SubgroupHelperLaneState &state, llvm::Value *const value,
+                                            llvm::Value *const index, const llvm::Twine &instName) {
   assert(value != nullptr && index != nullptr);
   // Return readlane directly, if the index is a constant value.
   if (isa<Constant>(index))
@@ -1498,12 +1464,7 @@ llvm::Value *BuilderImpl::createShuffleLoop(llvm::Value *const value, llvm::Valu
   // By implementation, the Insert point has been set to the callInst when call processCall
   auto *loopPoint = &*(GetInsertPoint());
   auto *originalBlock = loopPoint->getParent();
-
-  // We are forcing all active threads participate the shuffle because CreateSubgroupClusteredMultiExclusive()
-  // depends on this to be correct.
-  // TODO: Refine the code or algorithm so that createShuffleLoop is no longer affected by external code
-  // implementations.
-  auto *workList = createGroupBallotAllActive(getTrue());
+  auto *workList = createGroupBallot(state, getTrue());
 
   // Init loop block.
   auto *loop = originalBlock->splitBasicBlock(loopPoint, ".shuffleLoop");
@@ -1530,7 +1491,7 @@ llvm::Value *BuilderImpl::createShuffleLoop(llvm::Value *const value, llvm::Valu
     return builder.CreateSelect(passthroughArgs[1], result, value);
   };
   auto result = CreateMapToSimpleType(mapFunc, {resultPhi, value}, {currentSrcLaneIndex, notCurrentLane});
-  auto newWorkList = CreateAnd(createGroupBallotAllActive(notCurrentLane), workListPhi);
+  auto newWorkList = CreateAnd(createGroupBallot(state, notCurrentLane), workListPhi);
   resultPhi->addIncoming(result, loop);
   workListPhi->addIncoming(newWorkList, loop);
   auto *cond = CreateICmpEQ(newWorkList, ConstantInt::get(waveSize, 0));
@@ -1562,7 +1523,10 @@ Value *BuilderImpl::createFindMsb(Value *const mask) {
 // @param requireFullQuads : Identify whether it's in wqm.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateQuadBallot(Value *const value, bool requireFullQuads, const Twine &instName) {
-  Value *ballotValue = createGroupBallot(value);
+  const auto stage = getShaderStage(GetInsertBlock()->getParent()).value();
+  const auto state = SubgroupHelperLaneState::get(stage, m_pipelineState);
+
+  Value *ballotValue = createGroupBallot(state, value);
 
   // Get the 1st thread_id in the quad
   Value *threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");

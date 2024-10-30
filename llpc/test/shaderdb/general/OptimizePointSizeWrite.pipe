@@ -1,0 +1,84 @@
+; This test is to verify the optimization of PointSize write. When the write value of PointSize is 1.0, we can remove
+; it safely in Vulkan. The optimization is controlled by the pipeline option optimizePointSizeWrite.
+
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 12, i32 15, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, i1 true, i1 false)
+
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; SHADERTEST: v_mov_b32_e32 v0, 1.0
+; SHADERTEST-NEXT: exp pos0 v0, v0, v0, v0 done
+
+; SHADERTEST: .spi_shader_pos_format: [ 0x0000000000000004 0x0000000000000000 0x0000000000000000 0x0000000000000000 0x0000000000000000 ]
+
+[Version]
+version = 75
+
+[VsGlsl]
+#version 450 core
+
+void main() {
+  gl_Position = vec4(1.0);
+  gl_PointSize = 1.0;
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450 core
+
+layout(location = 0) out vec4 color;
+
+void main() {
+  color = vec4(1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+userDataNode[1].visibility = 66
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 6
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = DescriptorConstBufferCompact
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 2
+userDataNode[1].next[0].set = 0x0000005D
+userDataNode[1].next[0].binding = 17
+userDataNode[1].next[0].strideInDwords = 0
+userDataNode[1].next[1].type = DescriptorConstBuffer
+userDataNode[1].next[1].offsetInDwords = 2
+userDataNode[1].next[1].sizeInDwords = 8
+userDataNode[1].next[1].set = 0x0000005D
+userDataNode[1].next[1].binding = 0
+userDataNode[1].next[1].strideInDwords = 0
+userDataNode[1].next[2].type = DescriptorBuffer
+userDataNode[1].next[2].offsetInDwords = 10
+userDataNode[1].next[2].sizeInDwords = 8
+userDataNode[1].next[2].set = 0x0000005D
+userDataNode[1].next[2].binding = 1
+userDataNode[1].next[2].strideInDwords = 0
+userDataNode[2].visibility = 4
+userDataNode[2].type = StreamOutTableVaPtr
+userDataNode[2].offsetInDwords = 2
+userDataNode[2].sizeInDwords = 1
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+depthClipEnable = 1
+numSamples = 1
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+nggState.enableNgg = 1
+options.enableImplicitInvariantExports = 1
+options.optimizationLevel = 2
+options.optimizePointSizeWrite = 1

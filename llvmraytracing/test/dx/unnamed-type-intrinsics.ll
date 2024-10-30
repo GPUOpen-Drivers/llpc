@@ -382,11 +382,11 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP20]], ptr [[TMP25]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 poison, [[TMP1]] [[TRAV_DATA2_I]], [16 x i32] poison, [10 x i32] [[TMP21]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount [[META18]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = call { [[TMP0]], [33 x i32], [10 x i32] } @await(ptr [[TMP28]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = call { [[TMP0]], [33 x i32], [10 x i32] } (...) @lgc.cps.await__sl_s_sa33i32a10i32s(i64 4, i32 8, i64 poison, [[TMP1]] [[TRAV_DATA2_I]], [16 x i32] poison, [10 x i32] [[TMP21]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount [[META18]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = extractvalue { [[TMP0]], [33 x i32], [10 x i32] } [[TMP35]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [10 x i32] [[TMP24]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] poison, ptr [[TMP4]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = freeze [[STRUCT_RAYPAYLOAD]] poison
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] [[TMP38]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = load i32, ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr [[TMP23]], align 4
@@ -489,6 +489,6 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr inbounds [[TMP2]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load [[TMP0]], ptr [[TMP46]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[TMP0]] [[TMP47]], [33 x i32] poison, [10 x i32] [[TMP49]]), !continuation.registercount [[META18]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[TMP0]] [[TMP47]], [33 x i32] poison, [10 x i32] [[TMP49]]), !continuation.registercount [[META18]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;

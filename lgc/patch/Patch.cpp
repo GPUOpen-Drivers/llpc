@@ -29,21 +29,24 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/Patch.h"
+#include "GenerateNullFragmentShader.h"
 #include "LowerPopsInterlock.h"
 #include "LowerRayQueryWrapper.h"
-#include "PatchNullFragShader.h"
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
 #include "lgc/patch/AddLoopMetadata.h"
+#include "lgc/patch/ApplyWorkarounds.h"
 #include "lgc/patch/CheckShaderCache.h"
 #include "lgc/patch/CollectImageOperations.h"
+#include "lgc/patch/CollectResourceUsage.h"
 #include "lgc/patch/Continufy.h"
-#include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/FragmentColorExport.h"
 #include "lgc/patch/GenerateCopyShader.h"
 #include "lgc/patch/IncludeLlvmIr.h"
+#include "lgc/patch/LowerBufferOperations.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/LowerDesc.h"
 #include "lgc/patch/LowerGpuRt.h"
@@ -51,18 +54,16 @@
 #include "lgc/patch/LowerInOut.h"
 #include "lgc/patch/LowerInvariantLoads.h"
 #include "lgc/patch/LowerMulDx9Zero.h"
+#include "lgc/patch/LowerReadFirstLane.h"
 #include "lgc/patch/LowerSubgroupOps.h"
 #include "lgc/patch/MutateEntryPoint.h"
-#include "lgc/patch/PatchBufferOp.h"
+#include "lgc/patch/PassthroughHullShader.h"
 #include "lgc/patch/PatchInitializeWorkgroupMemory.h"
-#include "lgc/patch/PatchPeepholeOpt.h"
-#include "lgc/patch/PatchPreparePipelineAbi.h"
-#include "lgc/patch/PatchReadFirstLane.h"
-#include "lgc/patch/PatchResourceCollect.h"
-#include "lgc/patch/PatchSetupTargetFeatures.h"
-#include "lgc/patch/PatchWorkarounds.h"
+#include "lgc/patch/PeepholeOptimization.h"
+#include "lgc/patch/PreparePipelineAbi.h"
 #include "lgc/patch/ScalarizeLoads.h"
-#include "lgc/patch/TcsPassthroughShader.h"
+#include "lgc/patch/SetupTargetFeatures.h"
+#include "lgc/patch/StructurizeBuffers.h"
 #include "lgc/patch/VertexFetch.h"
 
 #if LLPC_BUILD_STRIX1
@@ -214,11 +215,11 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(MutateEntryPoint());
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerPopsInterlock()));
   passMgr.addPass(PatchInitializeWorkgroupMemory());
-  passMgr.addPass(PatchInOutImportExport());
+  passMgr.addPass(LowerInOut());
 
   // Patch invariant load and loop metadata.
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerInvariantLoads()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(PatchLoopMetadata())));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(AddLoopMetadata())));
 
 #if LLPC_BUILD_STRIX1
   passMgr.addPass(WorkaroundDsSubdwordWrite());
@@ -238,7 +239,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   // Collect image operations
   if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11)
-    passMgr.addPass(PatchImageOpCollect());
+    passMgr.addPass(CollectImageOperations());
 
   // Second part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchPreparePipelineAbi());
@@ -261,6 +262,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     FunctionPassManager fpm;
     fpm.addPass(PromotePass());
     fpm.addPass(ADCEPass());
+    fpm.addPass(StructurizeBuffers());
     fpm.addPass(PatchBufferOp());
     fpm.addPass(InstCombinePass());
     fpm.addPass(SimplifyCFGPass());
@@ -272,6 +274,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     }
   } else {
     FunctionPassManager fpm;
+    fpm.addPass(StructurizeBuffers());
     fpm.addPass(PatchBufferOp());
     fpm.addPass(InstCombinePass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
@@ -287,7 +290,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   // Include LLVM IR as a separate section in the ELF binary
   if (pipelineState->getOptions().includeIr)
-    passMgr.addPass(PatchLlvmIrInclusion());
+    passMgr.addPass(IncludeLlvmIr());
 
   // Stop timer for patching passes.
   if (patchTimer)
@@ -443,8 +446,8 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   scalarizerOptions.ScalarizeMinBits = 32;
   fpm.addPass(ScalarizerPass(scalarizerOptions));
 #endif
-  fpm.addPass(PatchMulDx9Zero());
-  fpm.addPass(PatchLoadScalarizer());
+  fpm.addPass(LowerMulDx9Zero());
+  fpm.addPass(ScalarizeLoads());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());
   fpm.addPass(BDCEPass());

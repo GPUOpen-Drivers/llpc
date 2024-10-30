@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  IncludeLlvmIr.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchLlvmIrInclusion.
+ * @brief LLPC source file: contains implementation of class lgc::IncludeLlvmIr.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/IncludeLlvmIr.h"
@@ -33,7 +33,7 @@
 #include "lgc/state/PipelineState.h"
 #include "llvm/IR/Constants.h"
 
-#define DEBUG_TYPE "lgc-patch-llvm-ir-inclusion"
+#define DEBUG_TYPE "lgc-include-llvm-ir"
 
 using namespace llvm;
 using namespace lgc;
@@ -46,7 +46,7 @@ namespace lgc {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchLlvmIrInclusion::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses IncludeLlvmIr::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   if (!pipelineState->getOptions().includeIr)
     return PreservedAnalyses::all();

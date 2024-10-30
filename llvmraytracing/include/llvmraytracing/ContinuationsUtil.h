@@ -116,7 +116,7 @@ enum class AnyHitExitKind {
 };
 
 // The address space used for the continuation stack.
-enum class ContStackAddrspace : uint32_t { Scratch = 21, Global = 22 };
+enum class ContStackAddrspace : uint32_t { GlobalLLPC = 1, ScratchLLPC = 5, Scratch = 21, Global = 22 };
 
 struct ContSetting {
   /// A hash value that is used as name.
@@ -205,9 +205,6 @@ private:
   // The raytracing ip level that is available on the target architecture.
   // This is exposed to gpurt code via the GetRtip intrinsic.
   static constexpr const char *MDRtipName = "continuation.rtip";
-  // Flags set for continuations.
-  // This is exposed to gpurt code via the ContinuationsGetFlags intrinsic.
-  static constexpr const char *MDFlagsName = "continuation.flags";
 
   static std::optional<uint32_t> extractZExtI32Constant(MDNode *Node) {
     if (Node) {
@@ -366,7 +363,6 @@ public:
   MODULE_METADATA_HELPER(MaxUsedPayloadRegisterCount, MDMaxUsedPayloadRegisterCountName)
   MODULE_METADATA_HELPER(MaxPayloadRegisterCount, MDMaxPayloadRegisterCountName)
   MODULE_METADATA_HELPER(Rtip, MDRtipName)
-  MODULE_METADATA_HELPER(Flags, MDFlagsName)
 
 #undef MODULE_METADATA_HELPER
 
@@ -380,7 +376,9 @@ public:
     if (!AddrSpace)
       return {};
     assert((*AddrSpace == static_cast<uint32_t>(ContStackAddrspace::Scratch) ||
-            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::Global)) &&
+            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::Global) ||
+            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::ScratchLLPC) ||
+            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::GlobalLLPC)) &&
            "Unexpected continuation stack address space");
     return static_cast<ContStackAddrspace>(*AddrSpace);
   };
@@ -413,16 +411,10 @@ public:
     return MDNode::get(T->getContext(), {ConstantAsMetadata::get(PoisonValue::get(T))});
   }
 
-  static std::optional<int32_t> tryGetWaitMask(const CallInst &CI) {
-    return extractZExtI32Constant(CI.getMetadata(MDWaitMaskName));
-  }
-
-  static void setWaitMask(CallInst &CI, int32_t WaitMask) {
-    CI.setMetadata(MDWaitMaskName, getI32MDConstant(CI.getContext(), WaitMask));
-  }
+  static void setWaitMask(CallInst &CI) { CI.setMetadata(MDWaitMaskName, MDTuple::get(CI.getContext(), {})); }
 
   // Queries whether an awaited call should wait on a wait mask.
-  static bool isWaitAwaitCall(const CallInst &CI) { return CI.getMetadata(MDWaitMaskName) != nullptr; }
+  static bool isWaitAwaitCall(const CallInst &CI) { return CI.hasMetadata(MDWaitMaskName); }
 
   static void removeWaitMask(CallInst &CI) { CI.setMetadata(MDWaitMaskName, nullptr); }
 
@@ -556,8 +548,6 @@ DRIVER_FUNC_NAME(ShaderStart)
 // Replace all calls to a given function with some value.
 // Removes the original call.
 void replaceCallsToFunction(llvm::Function &F, llvm::Value &Replacement);
-
-bool isLgcRtOp(const llvm::Function *F);
 
 // Move all basic blocks of OldFunc to NewFunc.
 void moveFunctionBody(Function &OldFunc, Function &NewFunc);

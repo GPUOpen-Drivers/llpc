@@ -17,6 +17,8 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare void @lgc.ilcps.waitContinue(...) noreturn
 
+declare !pointeetys !24 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
+
 declare !pointeetys !24 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data)
 
 declare !pointeetys !27 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)

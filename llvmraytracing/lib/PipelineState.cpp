@@ -39,10 +39,11 @@ namespace {
 // Constants used in the msgpack format
 namespace MsgPackFormat {
 
-constexpr unsigned MajorVersion = 1;
+constexpr unsigned MajorVersion = 2;
 
 static constexpr char Version[] = "version";
 static constexpr char MaxUsedPayloadRegisterCount[] = "max_used_payload_register_count";
+static constexpr char SpecializeDriverShadersState[] = "specialize_driver_shaders_state";
 
 } // namespace MsgPackFormat
 } // anonymous namespace
@@ -65,6 +66,12 @@ Expected<PipelineState> PipelineState::decodeMsgpack(llvm::msgpack::DocNode &Roo
   PipelineState State = {};
   GetUInt(Node[MsgPackFormat::MaxUsedPayloadRegisterCount], State.MaxUsedPayloadRegisterCount);
 
+  auto &SDSNode = Node[MsgPackFormat::SpecializeDriverShadersState];
+  auto SDSStateOrErr = SpecializeDriverShadersState::decodeMsgpack(SDSNode);
+  if (auto Err = SDSStateOrErr.takeError())
+    return Err;
+  State.SDSState = *SDSStateOrErr;
+
   return State;
 }
 
@@ -82,6 +89,7 @@ void PipelineState::encodeMsgpack(llvm::msgpack::DocNode &Root) const {
   auto &Node = Root.getMap(true);
   Node[MsgPackFormat::Version] = MsgPackFormat::MajorVersion;
   Node[MsgPackFormat::MaxUsedPayloadRegisterCount] = MaxUsedPayloadRegisterCount;
+  SDSState.encodeMsgpack(Node[MsgPackFormat::SpecializeDriverShadersState]);
 }
 
 std::string PipelineState::encodeMsgpack() const {
@@ -100,6 +108,10 @@ llvm::Expected<PipelineState> PipelineState::fromModuleMetadata(const llvm::Modu
   auto OptMaxUsedPayloadRegCount = ContHelper::tryGetMaxUsedPayloadRegisterCount(M);
   if (OptMaxUsedPayloadRegCount.has_value())
     State.MaxUsedPayloadRegisterCount = *OptMaxUsedPayloadRegCount;
+  auto SDSStateOrErr = SpecializeDriverShadersState::fromModuleMetadata(M);
+  if (auto Err = SDSStateOrErr.takeError())
+    return Err;
+  State.SDSState = *SDSStateOrErr;
   return State;
 }
 
@@ -107,10 +119,12 @@ void PipelineState::exportModuleMetadata(llvm::Module &M) const {
   if (MaxUsedPayloadRegisterCount) {
     ContHelper::setMaxUsedPayloadRegisterCount(M, MaxUsedPayloadRegisterCount);
   }
+  SDSState.exportModuleMetadata(M);
 }
 
 void PipelineState::merge(const PipelineState &Other) {
   MaxUsedPayloadRegisterCount = std::max(MaxUsedPayloadRegisterCount, Other.MaxUsedPayloadRegisterCount);
+  SDSState.merge(Other.SDSState);
 }
 
 } // namespace llvmraytracing

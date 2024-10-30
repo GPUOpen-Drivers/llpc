@@ -38,7 +38,7 @@ void main()
 // SHADERTEST-GFX-NEXT: %[[shufflevector1:[0-9]+]] = shufflevector <8 x i32> %[[insert1]], <8 x i32> %[[load1]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 12, i32 13, i32 14, i32 15>
 // SHADERTEST-GFX-NEXT: %[[gep2:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext1]]
 // SHADERTEST-GFX-NEXT: %[[load2:[0-9]+]] = load <4 x i32>, ptr addrspace(4) %[[gep2]], align 4
-// SHADERTEST-GFX-NEXT: %[[image_call1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector1]], <4 x i32> %[[load2]], i1 false, i32 0, i32 0)
+// SHADERTEST-GFX-NEXT: %[[image_call1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector1]], <4 x i32> %[[load2]], i1 false, i32 0, i32 0)
 // SHADERTEST-GFX-NEXT: %[[end1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin1]], <4 x float> %[[image_call1]])
 //
 // SHADERTEST-GFX: %[[begin2:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul1]])
@@ -54,7 +54,7 @@ void main()
 // SHADERTEST-GFX-NEXT: %[[shufflevector2:[0-9]+]] = shufflevector <8 x i32> %[[insert2]], <8 x i32> %[[load3]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 12, i32 13, i32 14, i32 15>
 // SHADERTEST-GFX-NEXT: %[[gep4:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext2]]
 // SHADERTEST-GFX-NEXT: %[[load4:[0-9]+]] = load <4 x i32>, ptr addrspace(4) %[[gep4]], align 4
-// SHADERTEST-GFX-NEXT: %[[image_call2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector2]], <4 x i32> %[[load4]], i1 false, i32 0, i32 0)
+// SHADERTEST-GFX-NEXT: %[[image_call2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector2]], <4 x i32> %[[load4]], i1 false, i32 0, i32 0)
 // SHADERTEST-GFX-NEXT: %[[end2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin2]], <4 x float> %[[image_call2]])
 // SHADERTEST-GFX: AMDLLPC SUCCESS
 
@@ -67,7 +67,7 @@ void main()
 // SHADERTEST-GFX_10_3_0-NEXT: %[[load1:[0-9]+]] = load <8 x i32>, ptr addrspace(4) %[[gep1]], align 4
 // SHADERTEST-GFX_10_3_0-NEXT: %[[gep2:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext1]]
 // SHADERTEST-GFX_10_3_0-NEXT: %[[load2:[0-9]+]] = load <4 x i32>, ptr addrspace(4) %[[gep2]], align 4
-// SHADERTEST-GFX_10_3_0-NEXT: %[[image_call1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[load1]], <4 x i32> %[[load2]], i1 false, i32 0, i32 0)
+// SHADERTEST-GFX_10_3_0-NEXT: %[[image_call1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[load1]], <4 x i32> %[[load2]], i1 false, i32 0, i32 0)
 // SHADERTEST-GFX_10_3_0-NEXT: %[[end1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin1]], <4 x float> %[[image_call1]])
 //
 // SHADERTEST-GFX_10_3_0: %[[begin2:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul1]])
@@ -77,7 +77,7 @@ void main()
 // SHADERTEST-GFX_10_3_0-NEXT: %[[load3:[0-9]+]] = load <8 x i32>, ptr addrspace(4) %[[gep3]], align 4
 // SHADERTEST-GFX_10_3_0-NEXT: %[[gep4:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext2]]
 // SHADERTEST-GFX_10_3_0-NEXT: %[[load4:[0-9]+]] = load <4 x i32>, ptr addrspace(4) %[[gep4]], align 4
-// SHADERTEST-GFX_10_3_0-NEXT: %[[image_call2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[load3]], <4 x i32> %[[load4]], i1 false, i32 0, i32 0)
+// SHADERTEST-GFX_10_3_0-NEXT: %[[image_call2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[load3]], <4 x i32> %[[load4]], i1 false, i32 0, i32 0)
 // SHADERTEST-GFX_10_3_0-NEXT: %[[end2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin2]], <4 x float> %[[image_call2]])
 // SHADERTEST-GFX_10_3_0: AMDLLPC SUCCESS
 
@@ -94,7 +94,7 @@ void main()
 // SHADERTEST-GFX_10_3_2-NEXT: %[[shufflevector:[0-9]+]] = shufflevector <8 x i32> %[[insert]], <8 x i32> %[[load1]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 15>
 // SHADERTEST-GFX_10_3_2-NEXT: %[[gep2:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext1]]
 // SHADERTEST-GFX_10_3_2-NEXT: %[[load2:[0-9]+]] = load <4 x i32>, ptr addrspace(4) %[[gep2]], align 4
-// SHADERTEST-GFX_10_3_2-NEXT: %[[image_call1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector]], <4 x i32> %[[load2]], i1 false, i32 0, i32 0)
+// SHADERTEST-GFX_10_3_2-NEXT: %[[image_call1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector]], <4 x i32> %[[load2]], i1 false, i32 0, i32 0)
 // SHADERTEST-GFX_10_3_2-NEXT: %[[end1:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin1]], <4 x float> %[[image_call1]])
 //
 // SHADERTEST-GFX_10_3_2: %[[begin2:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul1]])
@@ -108,6 +108,6 @@ void main()
 // SHADERTEST-GFX_10_3_2-NEXT: %[[shufflevector:[0-9]+]] = shufflevector <8 x i32> %[[insert]], <8 x i32> %[[load3]], <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 15>
 // SHADERTEST-GFX_10_3_2-NEXT: %[[gep4:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext2]]
 // SHADERTEST-GFX_10_3_2-NEXT: %[[load4:[0-9]+]] = load <4 x i32>, ptr addrspace(4) %[[gep4]], align 4
-// SHADERTEST-GFX_10_3_2-NEXT: %[[image_call2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector]], <4 x i32> %[[load4]], i1 false, i32 0, i32 0)
+// SHADERTEST-GFX_10_3_2-NEXT: %[[image_call2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float %{{.*}}, float %{{.*}}, <8 x i32> %[[shufflevector]], <4 x i32> %[[load4]], i1 false, i32 0, i32 0)
 // SHADERTEST-GFX_10_3_2-NEXT: %[[end2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin2]], <4 x float> %[[image_call2]])
 // SHADERTEST-GFX_10_3_2: AMDLLPC SUCCESS

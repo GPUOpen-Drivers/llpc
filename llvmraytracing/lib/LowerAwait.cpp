@@ -59,40 +59,14 @@ private:
   Module &Mod;
   MapVector<Function *, SmallVector<CallInst *>> ToProcess;
   void collectContinuationFunctions();
-  void processContinuations(bool IsLgcCpsMode);
+  void processContinuations();
 };
 } // anonymous namespace
-
-Function *llvm::getContinuationAwait(Module &M, Type *TokenTy, StructType *RetTy) {
-  std::string Name = "await";
-  auto &C = M.getContext();
-  auto *AwaitTy = FunctionType::get(RetTy, TokenTy, false);
-  auto *AwaitFun = Function::Create(AwaitTy, GlobalValue::LinkageTypes::ExternalLinkage, Name, &M);
-  AwaitFun->setAttributes(
-      AttributeList::get(C, AttributeList::FunctionIndex, {Attribute::NoUnwind, Attribute::WillReturn}));
-  return AwaitFun;
-}
 
 LowerAwaitPassImpl::LowerAwaitPassImpl(Module &Mod) : Mod{Mod} {
 }
 
-void LowerAwaitPassImpl::collectContinuationFunctions() {
-  for (auto &F : Mod.functions()) {
-    if (!F.getName().starts_with("await")) {
-      // Force processing annotated functions, even if they don't have await
-      // calls
-      if (F.hasMetadata(ContHelper::MDContinuationName))
-        ToProcess.insert({&F, {}});
-      continue;
-    }
-    for (auto *U : F.users()) {
-      if (auto *Inst = dyn_cast<CallInst>(U))
-        ToProcess[Inst->getFunction()].push_back(Inst);
-    }
-  }
-}
-
-void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
+void LowerAwaitPassImpl::processContinuations() {
   // We definitely have a call that requires continuation in this function
   //
   // If this is the first time we've done this for this function
@@ -195,22 +169,19 @@ void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
     for (auto *CI : FuncData.second) {
       B.SetInsertPoint(CI);
       Value *SuspendRetconArg = nullptr;
-      if (IsLgcCpsMode) {
-        SmallVector<Value *> Args;
-        SmallVector<Type *> ArgTys;
-        for (Value *Arg : CI->args()) {
-          Args.push_back(Arg);
-          ArgTys.push_back(Arg->getType());
-        }
-
-        // Insert a dummy call to remember the arguments to lgc.cps.await.
-        auto *ShaderTy = FunctionType::get(TokenTy, ArgTys, false);
-        auto *ShaderFun = B.CreateIntToPtr(CI->getArgOperand(0), ShaderTy->getPointerTo());
-        SuspendRetconArg = B.CreateCall(ShaderTy, ShaderFun, Args);
-        cast<CallInst>(SuspendRetconArg)->copyMetadata(*CI);
-      } else {
-        SuspendRetconArg = CI->getArgOperand(0);
+      SmallVector<Value *> Args;
+      SmallVector<Type *> ArgTys;
+      for (Value *Arg : CI->args()) {
+        Args.push_back(Arg);
+        ArgTys.push_back(Arg->getType());
       }
+
+      // Insert a dummy call to remember the arguments to lgc.cps.await.
+      auto *ShaderTy = FunctionType::get(TokenTy, ArgTys, false);
+      auto *ShaderFun = B.CreateIntToPtr(CI->getArgOperand(0), ShaderTy->getPointerTo());
+      SuspendRetconArg = B.CreateCall(ShaderTy, ShaderFun, Args);
+      cast<CallInst>(SuspendRetconArg)->copyMetadata(*CI);
+
       B.CreateIntrinsic(Intrinsic::coro_suspend_retcon, {B.getInt1Ty()}, SuspendRetconArg);
       auto *RetTy = CI->getType();
       if (!RetTy->isVoidTy()) {
@@ -225,24 +196,26 @@ void LowerAwaitPassImpl::processContinuations(bool IsLgcCpsMode) {
 PreservedAnalyses LowerAwaitPassImpl::run() {
   struct VisitorPayload {
     LowerAwaitPassImpl &Self;
-    bool HasCpsAwaitCalls = false;
   };
 
   static auto Visitor = llvm_dialects::VisitorBuilder<VisitorPayload>()
                             .add<lgc::cps::AwaitOp>([](VisitorPayload &Payload, auto &Op) {
                               Payload.Self.ToProcess[Op.getFunction()].push_back(&Op);
-                              Payload.HasCpsAwaitCalls = true;
                             })
                             .build();
 
   VisitorPayload P{*this};
   Visitor.visit(P, Mod);
 
-  collectContinuationFunctions();
+  for (auto &F : Mod) {
+    // Force processing annotated functions, even if they don't have await
+    // calls
+    if (F.hasMetadata(ContHelper::MDContinuationName))
+      ToProcess.insert({&F, {}});
+  }
 
   if (!ToProcess.empty()) {
-    bool IsLgcCpsMode = P.HasCpsAwaitCalls || ContHelper::isLgcCpsModule(Mod);
-    processContinuations(IsLgcCpsMode);
+    processContinuations();
     fixupDxilMetadata(Mod);
     return PreservedAnalyses::none();
   }

@@ -56,6 +56,12 @@ enum class PipelineLink : unsigned;
 
 } // namespace lgc
 
+namespace SPIRV {
+
+class SPIRVModule;
+
+} // namespace SPIRV
+
 namespace Llpc {
 
 using Vkgc::ElfPackage;
@@ -98,8 +104,8 @@ private:
 // Represents LLPC pipeline compiler.
 class Compiler : public ICompiler {
 public:
-  Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *options, MetroHash::Hash optionHash,
-           Vkgc::ICache *cache);
+  Compiler(GfxIpVersion gfxIp, const char *apiName, unsigned optionCount, const char *const *options,
+           MetroHash::Hash optionHash, Vkgc::ICache *cache);
   ~Compiler();
 
   virtual void VKAPI_CALL Destroy();
@@ -204,6 +210,7 @@ private:
 
   std::vector<std::string> m_options;           // Compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info
+  const char *m_apiName;                        // API name from client, "Vulkan" or "OpenGL"
   Vkgc::ICache *m_cache;                        // Point to ICache implemented in client
   static unsigned m_instanceCount;              // The count of compiler instance
   static unsigned m_outRedirectCount;           // The count of output redirect
@@ -215,7 +222,7 @@ private:
                                                                       // wait for main thread switching context
 
   void buildShaderModuleResourceUsage(
-      const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+      const ShaderModuleBuildInfo *shaderInfo, SPIRV::SPIRVModule *module, Vkgc::ResourcesNodes &resourcesNodes,
       std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
       std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
       std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,

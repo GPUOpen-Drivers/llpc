@@ -1,6 +1,6 @@
 ; Tests that if _cont_ExitRayGen ends with an enqueue, then we still free RayGen continuation state.
 ; This is a regression test, in an earlier version we only freed for returns and missed this case.
-; RUN: grep -v "lgc.cps.module" %s | opt --verify-each -passes="dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,remove-types-metadata" -S --lint-abort-on-error | FileCheck %s
+; RUN: grep -v "lgc.cps.module" %s | opt --verify-each -passes="dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata" -S --lint-abort-on-error | FileCheck %s
 ; RUN: opt --verify-each -passes="dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata" -S %s --lint-abort-on-error | FileCheck %s
 
 ; There is just a single RayGen shader in this module, so any free must come from it.

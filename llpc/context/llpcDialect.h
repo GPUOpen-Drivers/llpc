@@ -35,3 +35,7 @@ namespace LlpcName {
 const static char SpirvCooperativeMatrixProxy[] = "spirv.cooperative.matrix.proxy";
 
 } // namespace LlpcName
+
+#define GET_INCLUDES
+#define GET_DIALECT_DECLS
+#include "LlpcDialect.h.inc"

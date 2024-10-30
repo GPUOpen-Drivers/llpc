@@ -1,0 +1,93 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s -validate-spirv=false | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.load.i32(<4 x i32> [[descriptor:%[0-9]+]], i32 [[index:%[0-9]+]], i32 32, i32 0, i32 0)
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.struct.buffer.load.v4i32(<4 x i32> [[descriptor]], i32 [[index]], i32 [[sink_idx:%.*]], i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.struct.buffer.store.v4i32(<4 x i32> {{%[0-9]+}}, <4 x i32> {{%[0-9]+}}, i32 [[index]], i32 0, i32 0, i32 0)
+
+; SHADERTEST-NOT: mul i32 {{%[0-9]+}}, 48
+; SHADERTEST-NOT: add i32 {{%.*}}, 32
+; SHADERTEST-NOT: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> {{%[0-9]+}}, i32 {{%.*}}, i32 0), !invariant.load !!{{[0-9]+}}
+; SHADERTEST-NOT: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> [[descriptor]], i32 {{%.*}}, i32 0), !invariant.load !!{{[0-9]+}}
+; SHADERTEST-NOT: shl i32 [[index]], 4
+; SHADERTEST-NOT: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> {{%[0-9]+}}, <4 x i32> [[descriptor]], i32 {{%[0-9]+}}, i32 0, i32 0)
+; END_SHADERTEST
+
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID %Output %Input
+               OpExecutionMode %main LocalSize 64 1 1
+               OpSource HLSL 660
+               OpName %type_RWStructuredBuffer_v4float "type.RWStructuredBuffer.v4float"
+               OpName %Output "Output"
+               OpName %type_StructuredBuffer_MyStruct "type.StructuredBuffer.MyStruct"
+               OpName %MyStruct "MyStruct"
+               OpMemberName %MyStruct 0 "Color"
+               OpMemberName %MyStruct 1 "Normal"
+               OpMemberName %MyStruct 2 "showColor"
+               OpName %Input "Input"
+               OpName %main "main"
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %Output DescriptorSet 0
+               OpDecorate %Output Binding 0
+               OpDecorate %Input DescriptorSet 0
+               OpDecorate %Input Binding 0
+               OpDecorate %_runtimearr_v4float ArrayStride 16
+               OpMemberDecorate %type_RWStructuredBuffer_v4float 0 Offset 0
+               OpDecorate %type_RWStructuredBuffer_v4float Block
+               OpMemberDecorate %MyStruct 0 Offset 0
+               OpMemberDecorate %MyStruct 1 Offset 16
+               OpMemberDecorate %MyStruct 2 Offset 32
+               OpDecorate %_runtimearr_MyStruct ArrayStride 48
+               OpMemberDecorate %type_StructuredBuffer_MyStruct 0 Offset 0
+               OpMemberDecorate %type_StructuredBuffer_MyStruct 0 NonWritable
+               OpDecorate %type_StructuredBuffer_MyStruct Block
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %int_2 = OpConstant %int 2
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+      %int_1 = OpConstant %int 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_runtimearr_v4float = OpTypeRuntimeArray %v4float
+%type_RWStructuredBuffer_v4float = OpTypeStruct %_runtimearr_v4float
+%_ptr_StorageBuffer_type_RWStructuredBuffer_v4float = OpTypePointer StorageBuffer %type_RWStructuredBuffer_v4float
+   %MyStruct = OpTypeStruct %v4float %v4float %uint
+%_runtimearr_MyStruct = OpTypeRuntimeArray %MyStruct
+%type_StructuredBuffer_MyStruct = OpTypeStruct %_runtimearr_MyStruct
+%_ptr_StorageBuffer_type_StructuredBuffer_MyStruct = OpTypePointer StorageBuffer %type_StructuredBuffer_MyStruct
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+       %void = OpTypeVoid
+         %23 = OpTypeFunction %void
+%_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+       %bool = OpTypeBool
+%_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
+     %Output = OpVariable %_ptr_StorageBuffer_type_RWStructuredBuffer_v4float StorageBuffer
+      %Input = OpVariable %_ptr_StorageBuffer_type_StructuredBuffer_MyStruct StorageBuffer
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+       %main = OpFunction %void None %23
+         %27 = OpLabel
+         %28 = OpLoad %v3uint %gl_GlobalInvocationID
+         %29 = OpCompositeExtract %uint %28 0
+         %30 = OpAccessChain %_ptr_StorageBuffer_uint %Input %int_0 %29 %int_2
+         %31 = OpLoad %uint %30
+         %32 = OpINotEqual %bool %31 %uint_0
+               OpSelectionMerge %33 None
+               OpBranchConditional %32 %34 %35
+         %34 = OpLabel
+         %36 = OpAccessChain %_ptr_StorageBuffer_v4float %Input %int_0 %29 %int_0
+         %37 = OpLoad %v4float %36
+         %38 = OpAccessChain %_ptr_StorageBuffer_v4float %Output %int_0 %29
+               OpStore %38 %37
+               OpBranch %33
+         %35 = OpLabel
+         %39 = OpAccessChain %_ptr_StorageBuffer_v4float %Input %int_0 %29 %int_1
+         %40 = OpLoad %v4float %39
+         %41 = OpAccessChain %_ptr_StorageBuffer_v4float %Output %int_0 %29
+               OpStore %41 %40
+               OpBranch %33
+         %33 = OpLabel
+               OpReturn
+               OpFunctionEnd

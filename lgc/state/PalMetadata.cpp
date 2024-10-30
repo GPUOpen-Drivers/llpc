@@ -329,6 +329,9 @@ void PalMetadata::fixUpRegisters() {
         case PrimitiveType::TriangleStripAdjacency:
           gsOutputPrimitiveType = 2; // TRISTRIP
           break;
+        case PrimitiveType::Rect:
+          gsOutputPrimitiveType = 4; // RECTLIST
+          break;
         default:
           llvm_unreachable("Should never be called!");
           break;

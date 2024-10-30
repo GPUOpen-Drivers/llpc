@@ -258,12 +258,12 @@ rtState.rtIpOverride = 0
 ; CHECK-NEXT:    [[TMP8:%.*]] = mul i32 [[TMP7]], [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_4_VEC_EXTRACT]]
 ; CHECK-NEXT:    [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT:%.*]] = extractelement <3 x i32> [[TMP5]], i64 0
 ; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[TMP8]], [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]]
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr <{ [4294967295 x <{ [3 x float], float, [3 x float], float }>] }>, ptr addrspace(7) [[TMP3]], i32 0, i32 0, i32 [[TMP9]]
-; CHECK-NEXT:    [[TMP11:%.*]] = load <3 x float>, ptr addrspace(7) [[TMP10]], align 16
+; CHECK-NEXT:    [[TMP10:%.*]] = call ptr addrspace(7) @lgc.buffer.index(ptr addrspace(7) [[TMP3]], i32 32, i32 [[TMP9]])
+; CHECK-NEXT:    [[TMP11:%.*]] = load <3 x float>, ptr addrspace(7) [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr addrspace(7) [[TMP10]], i32 12
 ; CHECK-NEXT:    [[TMP13:%.*]] = load float, ptr addrspace(7) [[TMP12]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(7) [[TMP10]], i32 16
-; CHECK-NEXT:    [[TMP15:%.*]] = load <3 x float>, ptr addrspace(7) [[TMP14]], align 16
+; CHECK-NEXT:    [[TMP15:%.*]] = load <3 x float>, ptr addrspace(7) [[TMP14]], align 4
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(7) [[TMP10]], i32 28
 ; CHECK-NEXT:    [[TMP17:%.*]] = load float, ptr addrspace(7) [[TMP16]], align 4
 ; CHECK-NEXT:    [[TMP18:%.*]] = call ptr addrspace(5) (...) @lgc.rtq.gep.opaque([3 x i127] poison, i1 false, ptr addrspace(5) [[__LLPC_GLOBAL_PROXY_Q]], i32 0, i32 2)
@@ -287,7 +287,7 @@ rtState.rtIpOverride = 0
 ; CHECK-NEXT:    br i1 [[COND]], label [[TMP29:%.*]], label [[COMMON_RET]]
 ; CHECK:       29:
 ; CHECK-NEXT:    [[TMP30:%.*]] = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.rtq.intersection.barycentrics(ptr addrspace(5) [[TMP27]], i1 true)
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr <{ [4294967295 x [2 x float]] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 0, i32 [[TMP9]]
-; CHECK-NEXT:    store <2 x float> [[TMP30]], ptr addrspace(7) [[TMP31]], align 8
+; CHECK-NEXT:    [[TMP31:%.*]] = call ptr addrspace(7) @lgc.buffer.index(ptr addrspace(7) [[TMP0]], i32 8, i32 [[TMP9]])
+; CHECK-NEXT:    store <2 x float> [[TMP30]], ptr addrspace(7) [[TMP31]], align 4
 ; CHECK-NEXT:    br label [[COMMON_RET]]
 ;

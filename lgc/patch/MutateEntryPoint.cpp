@@ -59,7 +59,6 @@
 #include "lgc/LgcContext.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
-#include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/AbiMetadata.h"
@@ -87,9 +86,12 @@ using namespace lgc;
 using namespace cps;
 
 // =====================================================================================================================
-MutateEntryPoint::MutateEntryPoint()
-    : m_hasTs(false), m_hasGs(false),
-      m_setInactiveChainArgId(Function::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg")) {
+MutateEntryPoint::MutateEntryPoint() : m_hasTs(false), m_hasGs(false) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 513481
+  m_setInactiveChainArgId = Function::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg");
+#else
+  m_setInactiveChainArgId = Intrinsic::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg");
+#endif
 }
 
 // =====================================================================================================================
@@ -163,7 +165,9 @@ PreservedAnalyses MutateEntryPoint::run(Module &module, ModuleAnalysisManager &a
 
   m_cpsShaderInputCache.clear();
 
-  processGroupMemcpy(module);
+  if (!m_pipelineState->isGraphics())
+    processCsGroupMemcpy(module);
+
   processDriverTableLoad(module);
 
   return PreservedAnalyses::none();
@@ -304,7 +308,7 @@ void MutateEntryPoint::lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTa
 // Process GroupMemcpyOp.
 //
 // @param module : LLVM module
-void MutateEntryPoint::processGroupMemcpy(Module &module) {
+void MutateEntryPoint::processCsGroupMemcpy(Module &module) {
   SmallVector<CallInst *> callsToRemove;
 
   struct Payload {
@@ -317,7 +321,7 @@ void MutateEntryPoint::processGroupMemcpy(Module &module) {
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add<GroupMemcpyOp>([](auto &payload, auto &op) {
-                              payload.self->lowerGroupMemcpy(op);
+                              payload.self->lowerCsGroupMemcpy(op);
                               payload.callsToRemove.push_back(&op);
                             })
                             .build();
@@ -331,126 +335,79 @@ void MutateEntryPoint::processGroupMemcpy(Module &module) {
 // Lower GroupMemcpyOp - Copy memory using threads in a workgroup (scope=2) or subgroup (scope=3).
 //
 // @param groupMemcpyOp : Call instruction to do group memory copy
-void MutateEntryPoint::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
-  BuilderImpl builder(m_pipelineState);
+void MutateEntryPoint::lowerCsGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
+  BuilderBase builder(groupMemcpyOp.getContext());
   Function *entryPoint = groupMemcpyOp.getFunction();
-  auto stage = getShaderStage(entryPoint);
-  builder.setShaderStage(stage);
   builder.SetInsertPoint(&groupMemcpyOp);
-
-  auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-
-  auto dst = groupMemcpyOp.getDst();
-  auto src = groupMemcpyOp.getSrc();
-  auto len = groupMemcpyOp.getSize();
-  auto scope = groupMemcpyOp.getScope();
 
   unsigned scopeSize = 0;
   Value *threadIndex = nullptr;
 
-  if (scope == 2) {
+  auto scope = groupMemcpyOp.getScope();
+  if (scope == MemcpyScopeWorkGroup) {
     unsigned workgroupSize[3] = {};
     auto shaderModes = m_pipelineState->getShaderModes();
-    if (stage == ShaderStage::Task || stage == ShaderStage::Compute) {
-      Module &module = *groupMemcpyOp.getModule();
-      workgroupSize[0] = shaderModes->getComputeShaderMode(module).workgroupSizeX;
-      workgroupSize[1] = shaderModes->getComputeShaderMode(module).workgroupSizeY;
-      workgroupSize[2] = shaderModes->getComputeShaderMode(module).workgroupSizeZ;
-    } else if (stage == ShaderStage::Mesh) {
-      workgroupSize[0] = shaderModes->getMeshShaderMode().workgroupSizeX;
-      workgroupSize[1] = shaderModes->getMeshShaderMode().workgroupSizeY;
-      workgroupSize[2] = shaderModes->getMeshShaderMode().workgroupSizeZ;
+    assert(getShaderStage(entryPoint) == ShaderStage::Compute);
+
+    Module &module = *groupMemcpyOp.getModule();
+    workgroupSize[0] = shaderModes->getComputeShaderMode(module).workgroupSizeX;
+    workgroupSize[1] = shaderModes->getComputeShaderMode(module).workgroupSizeY;
+    workgroupSize[2] = shaderModes->getComputeShaderMode(module).workgroupSizeZ;
+
+    scopeSize = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Compute)->entryArgIdxs.cs;
+    Value *threadIdInGroup = getFunctionArgument(entryPoint, entryArgIdxs.localInvocationId);
+    Value *threadIdComp[3];
+
+    auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+    if (gfxIp.major < 11) {
+      for (unsigned idx = 0; idx < 3; idx++)
+        threadIdComp[idx] = builder.CreateExtractElement(threadIdInGroup, idx);
     } else {
-      llvm_unreachable("Invalid shade stage!");
+      // The local invocation ID is packed to VGPR0 on GFX11+ with the following layout:
+      //
+      //   +-----------------------+-----------------------+-----------------------+
+      //   | Local Invocation ID Z | Local Invocation ID Y | Local Invocation ID X |
+      //   | [29:20]               | [19:10]               | [9:0]                 |
+      //   +-----------------------+-----------------------+-----------------------+
+      // localInvocationIdZ = localInvocationId[29:20]
+      threadIdComp[2] = builder.CreateAnd(builder.CreateLShr(threadIdInGroup, 20), 0x3FF, "localInvocationIdZ");
+      // localInvocationIdY = localInvocationId[19:10]
+      threadIdComp[1] = builder.CreateAnd(builder.CreateLShr(threadIdInGroup, 10), 0x3FF, "localInvocationIdY");
+      // localInvocationIdX = localInvocationId[9:0]
+      threadIdComp[0] = builder.CreateAnd(threadIdInGroup, 0x3FF, "localInvocationIdX");
     }
 
-    // LocalInvocationId is a function argument now and CreateReadBuiltInInput cannot retrieve it.
-    unsigned argIndex = 0xFFFFFFFF;
-    switch (stage.value()) {
-    case ShaderStage::Task: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Task)->entryArgIdxs.task;
-      argIndex = entryArgIdxs.localInvocationId;
-      break;
-    }
-    case ShaderStage::Mesh: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
-      argIndex = entryArgIdxs.localInvocationId;
-      break;
-    }
-    case ShaderStage::Compute: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Compute)->entryArgIdxs.cs;
-      argIndex = entryArgIdxs.localInvocationId;
-      break;
-    }
-    default:
-      llvm_unreachable("Invalid shade stage!");
-      break;
-    }
-
-    const unsigned waveSize = m_pipelineState->getShaderWaveSize(stage.value());
-
-    // For mesh shader the following two ids are required.
-    Value *waveIdInSubgroupMesh = nullptr;
-    Value *threadIdInWaveMesh = nullptr;
-    if (stage == ShaderStage::Mesh) {
-      builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, builder.getInt64(-1));
-      // waveId = mergedWaveInfo[27:24]
-      Value *mergedWaveInfo =
-          getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(gfxIp, EsGs::MergedWaveInfo));
-      waveIdInSubgroupMesh = builder.CreateAnd(builder.CreateLShr(mergedWaveInfo, 24), 0xF, "waveIdInSubgroupMesh");
-
-      threadIdInWaveMesh =
-          builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
-      if (waveSize == 64) {
-        threadIdInWaveMesh =
-            builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWaveMesh});
-      }
-      threadIdInWaveMesh->setName("threadIdInWaveMesh");
-    }
-
-    unsigned workgroupTotalSize = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-
-    scopeSize = workgroupTotalSize;
-
-    // localInvocationId argument for mesh shader is available from GFX11+. But it can be retrieved in anther way.
-    if (stage == ShaderStage::Mesh) {
-      threadIndex = builder.CreateAdd(builder.CreateMul(waveIdInSubgroupMesh, builder.getInt32(waveSize)),
-                                      threadIdInWaveMesh, "threadIdInSubgroupMesh");
-    } else {
-      Value *threadIdInGroup = getFunctionArgument(entryPoint, argIndex);
-      Value *threadIdComp[3];
-      if (gfxIp.major < 11) {
-        for (unsigned idx = 0; idx < 3; idx++)
-          threadIdComp[idx] = builder.CreateExtractElement(threadIdInGroup, idx);
-      } else {
-        // The local invocation ID is packed to VGPR0 on GFX11+ with the following layout:
-        //
-        //   +-----------------------+-----------------------+-----------------------+
-        //   | Local Invocation ID Z | Local Invocation ID Y | Local Invocation ID X |
-        //   | [29:20]               | [19:10]               | [9:0]                 |
-        //   +-----------------------+-----------------------+-----------------------+
-        // localInvocationIdZ = localInvocationId[29:20]
-        threadIdComp[2] = builder.CreateAnd(builder.CreateLShr(threadIdInGroup, 20), 0x3FF, "localInvocationIdZ");
-        // localInvocationIdY = localInvocationId[19:10]
-        threadIdComp[1] = builder.CreateAnd(builder.CreateLShr(threadIdInGroup, 10), 0x3FF, "localInvocationIdY");
-        // localInvocationIdX = localInvocationId[9:0]
-        threadIdComp[0] = builder.CreateAnd(threadIdInGroup, 0x3FF, "localInvocationIdX");
-      }
-
-      // LocalInvocationIndex is
-      // (LocalInvocationId.Z * WorkgroupSize.Y + LocalInvocationId.Y) * WorkGroupSize.X + LocalInvocationId.X
-      // tidigCompCnt is not always 3 if groupSizeY and/or groupSizeZ are 1. See RegisterMetadataBuilder.cpp.
-      threadIndex = builder.getInt32(0);
-      if (workgroupSize[2] > 1)
-        threadIndex = builder.CreateMul(threadIdComp[2], builder.getInt32(workgroupSize[1]));
-      if (workgroupSize[1] > 1)
-        threadIndex =
-            builder.CreateMul(builder.CreateAdd(threadIndex, threadIdComp[1]), builder.getInt32(workgroupSize[0]));
-      threadIndex = builder.CreateAdd(threadIndex, threadIdComp[0]);
-    }
+    // LocalInvocationIndex is
+    // (LocalInvocationId.Z * WorkgroupSize.Y + LocalInvocationId.Y) * WorkGroupSize.X + LocalInvocationId.X
+    // tidigCompCnt is not always set to 2(xyz) if groupSizeY and/or groupSizeZ are 1. See RegisterMetadataBuilder.cpp.
+    threadIndex = builder.getInt32(0);
+    if (workgroupSize[2] > 1)
+      threadIndex = builder.CreateMul(threadIdComp[2], builder.getInt32(workgroupSize[1]));
+    if (workgroupSize[1] > 1)
+      threadIndex =
+          builder.CreateMul(builder.CreateAdd(threadIndex, threadIdComp[1]), builder.getInt32(workgroupSize[0]));
+    threadIndex = builder.CreateAdd(threadIndex, threadIdComp[0]);
   } else {
     llvm_unreachable("Unsupported scope!");
   }
+
+  processGroupMemcpy(groupMemcpyOp, builder, threadIndex, scopeSize);
+}
+
+// =====================================================================================================================
+// Common code to do the memory copy part of GroupMemcpyOp, used by MeshTaskShader and PatchEntryPointMutate.
+//
+// @param groupMemcpyOp : Call instruction to do group memory copy
+// @param builder : The IR builder for inserting instructions
+// @param threadIndex : Current thread index
+// @param scopeSize : The copy size in bytes for specified scope (currently workgroup only, maybe subgroup).
+void MutateEntryPoint::processGroupMemcpy(GroupMemcpyOp &groupMemcpyOp, BuilderBase &builder, Value *threadIndex,
+                                          unsigned scopeSize) {
+  auto dst = groupMemcpyOp.getDst();
+  auto src = groupMemcpyOp.getSrc();
+  auto len = groupMemcpyOp.getSize();
 
   // Copy in 16-bytes if possible
   unsigned wideDwords = 4;
@@ -914,7 +871,7 @@ unsigned MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, B
                                         SmallVectorImpl<CpsExitInfo> &exitInfos) {
   IRBuilder<> builder(parent->getContext());
   const DataLayout &layout = parent->getParent()->getDataLayout();
-  // Translate @lgc.cps.jump(CR %target, i32 %levels, T %state, ...) into:
+  // Translate @lgc.cps.jump(CR %target, i32 %levels, T %state, i32 %csp, ...) into:
   // @llvm.amdgcn.cs.chain(ptr %fn, i{32,64} %exec, T %sgprs, U %vgprs, i32 immarg %flags, ...)
   Value *vcr = jumpOp->getTarget();
   builder.SetInsertPoint(jumpOp);
@@ -934,7 +891,7 @@ unsigned MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, B
 
   // Add extra args specific to the target function.
   SmallVector<Value *> remainingArgs;
-  for (Value *arg : drop_begin(jumpOp->args(), 3))
+  for (Value *arg : drop_begin(jumpOp->args(), 4))
     remainingArgs.push_back(arg);
 
   // Packing VGPR arguments {vcr, vsp, args...}

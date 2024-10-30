@@ -90,6 +90,9 @@ llvm::Argument *getFunctionArgument(llvm::Function *func, unsigned idx, const ll
 // Checks if one type can be bitcasted to the other (type1 -> type2).
 bool canBitCast(const llvm::Type *ty1, const llvm::Type *ty2);
 
+// Checks if the type is supported on amdgcn_readfirstlane in the backend.
+bool isReadFirstLaneTypeSupported(const llvm::Type *ty);
+
 // Checks if the specified value actually represents a don't-care value (0xFFFFFFFF).
 bool isDontCareValue(llvm::Value *value);
 
@@ -99,6 +102,10 @@ llvm::Type *getVgprTy(llvm::Type *ty);
 
 // Helper function to create LLVM Function and update NewDbgInfoFormat flag
 llvm::Function *createFunctionHelper(llvm::FunctionType *ty, llvm::GlobalValue::LinkageTypes linkage,
-                                     llvm::Module *module, const llvm::Twine &name = "");
+                                     llvm::Module *module, bool createDbgInfo = false, const llvm::Twine &name = "");
+
+// Helper function to call LLVM Function and set debug location
+llvm::CallInst *callFunctionHelper(llvm::Function *func, llvm::ArrayRef<llvm::Value *> args,
+                                   llvm::BasicBlock *insertAtEnd);
 
 } // namespace lgc

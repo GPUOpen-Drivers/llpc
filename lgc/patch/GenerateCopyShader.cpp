@@ -112,30 +112,18 @@ PreservedAnalyses GenerateCopyShader::run(Module &module, ModuleAnalysisManager 
     // the argument definitions are decided by compiler not by HW. We could have such variable layout (not fixed with
     // GPU generation evolvement):
     //
-    // GFX10:
     //   void copyShader(
     //     i32 vertexIndex)
-    //
-    // GFX11+:
-    //   void copyShader(
-    //     i32 inreg globalTable,
-    //     i32 vertexIndex)
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
-      argTys = {int32Ty};
-      argInReg = {false};
-      argNames = {"vertexIndex"};
-    } else {
-      argTys = {int32Ty, int32Ty};
-      argInReg = {true, false};
-      argNames = {"globalTable", "vertexIndex"};
-    }
+    argTys = {int32Ty};
+    argInReg = {false};
+    argNames = {"vertexIndex"};
   }
 
   auto entryPointTy = FunctionType::get(builder.getVoidTy(), argTys, false);
 
   // Create function for the copy shader entrypoint, and insert it before the FS (if there is one).
   auto entryPoint =
-      createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, &module, lgcName::CopyShaderEntryPoint);
+      createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, &module, false, lgcName::CopyShaderEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
 

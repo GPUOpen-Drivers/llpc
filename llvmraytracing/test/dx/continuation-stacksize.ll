@@ -1,6 +1,6 @@
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' \
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' \
 ; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=POSTPROCESS-STACKSIZE %s
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,remove-types-metadata' \
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata' \
 ; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=CLEANUP-STATESIZE %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
@@ -38,6 +38,8 @@ declare !pointeetys !17 %struct.BuiltInTriangleIntersectionAttributes @_cont_Get
 
 ; Function Attrs: nounwind memory(none)
 declare !pointeetys !19 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
+
+declare !pointeetys !21 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
 define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !{%struct.DispatchSystemData poison} {
   ret void

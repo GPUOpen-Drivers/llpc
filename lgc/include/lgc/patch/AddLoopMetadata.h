@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  AddLoopMetadata.h
- * @brief LLPC header file: contains declaration of class lgc::PatchLoopMetadata.
+ * @brief LLPC header file: contains declaration of class lgc::AddLoopMetadata.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -39,9 +39,9 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the LLVM pass for patching loop metadata.
-class PatchLoopMetadata : public llvm::PassInfoMixin<PatchLoopMetadata> {
+class AddLoopMetadata : public llvm::PassInfoMixin<AddLoopMetadata> {
 public:
-  PatchLoopMetadata();
+  AddLoopMetadata();
   llvm::PreservedAnalyses run(llvm::Loop &loop, llvm::LoopAnalysisManager &analysisManager,
                               llvm::LoopStandardAnalysisResults &loopAnalysisResults, llvm::LPMUpdater &);
 

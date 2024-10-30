@@ -29,6 +29,8 @@ declare !pointeetys !14 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitT
 
 declare !pointeetys !16 %struct.HitData @_cont_GetCommittedState(%struct.SystemData*) #0
 
+declare !pointeetys !17 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
+
 define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) #0 !pointeetys !17 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define i32 @_cont_GetLocalRootIndex(
 ; LOWERRAYTRACINGPIPELINE-SAME: ptr [[DATA:%.*]]) #[[ATTR0:[0-9]+]] {
@@ -140,7 +142,7 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP26]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP27]], [19 x i32] poison, [8 x i32] [[TMP24]]), !continuation.registercount [[META10]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP27]], [19 x i32] poison, [8 x i32] [[TMP24]]), !continuation.registercount [[META10]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %ptr = getelementptr inbounds %struct.RayPayload, %struct.RayPayload* %payload, i32 0, i32 0

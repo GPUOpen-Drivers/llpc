@@ -44,6 +44,7 @@
 #define DEBUG_TYPE "compilerutils"
 
 using namespace llvm;
+using namespace CompilerUtils;
 
 // Whether this is a load instruction that should translate to a last_use
 // load.
@@ -164,74 +165,104 @@ void CompilerUtils::setIsLastUseLoad(llvm::LoadInst &Load) {
 
 namespace {
 
-class CrossModuleValueMaterializer : public ValueMaterializer {
-public:
-  CrossModuleValueMaterializer(Module *targetMod, CompilerUtils::CrossModuleInliner &inliner,
-                               SmallDenseMap<GlobalValue *, GlobalValue *> &mapped)
-      : targetMod(targetMod), inliner(&inliner), mapped(&mapped) {}
-  virtual ~CrossModuleValueMaterializer() = default;
+// Map Types from source to target module.
+struct CrossModuleTypeRemapper : public ValueMapTypeRemapper {
+  CrossModuleTypeRemapper() = default;
 
-  void setMapper(ValueMapper *mapper) { this->mapper = mapper; }
-
-  virtual Value *materialize(Value *v) override {
-    if (auto *gv = dyn_cast<GlobalValue>(v)) {
-      if (gv->getParent() == targetMod)
-        return nullptr;
-
-      auto *newGv = moveGlobalValueToNewModule(gv);
-      return newGv;
+  Type *remapType(Type *SrcTy) override {
+    if (auto found = mappedTypes.find(SrcTy); found != mappedTypes.end()) {
+      return found->second;
     }
-    return nullptr;
+    return SrcTy;
   }
 
-private:
-  GlobalValue *moveGlobalValueToNewModule(GlobalValue *gv) {
-    if (auto *existing = inliner->findCopiedGlobal(*gv, *targetMod))
-      return existing;
-
-    auto newName = CompilerUtils::CrossModuleInliner::getCrossModuleName(*gv);
-    if (auto *callee = dyn_cast<Function>(gv)) {
-      if (!callee->isDeclaration()) {
-        report_fatal_error(
-            Twine("Cross module inlining does not support functions with calls to functions with a body. "
-                  "Run the inliner before trying to inline across modules (trying to call '") +
-            callee->getName() + "')");
-      }
-
-      // Create a function declaration
-      auto *newGv =
-          CompilerUtils::cloneFunctionHeader(*callee, callee->getFunctionType(), callee->getAttributes(), targetMod);
-      newGv->setName(newName);
-
-      (*mapped)[gv] = newGv;
-      return newGv;
-    }
-
-    if (auto *gVar = dyn_cast<GlobalVariable>(gv)) {
-      // Create a global with the correct type
-      auto *newGv = new GlobalVariable(*targetMod, gVar->getValueType(), gVar->isConstant(), gVar->getLinkage(),
-                                       nullptr, newName, nullptr, gVar->getThreadLocalMode(), gVar->getAddressSpace());
-      newGv->copyAttributesFrom(gVar);
-      if (gVar->hasInitializer()) {
-        // Recursively map initializer
-        auto *newInit = mapper->mapConstant(*gVar->getInitializer());
-        newGv->setInitializer(newInit);
-      }
-
-      (*mapped)[gv] = newGv;
-      return newGv;
-    }
-
-    report_fatal_error("Encountered unknown global object while inlining");
-  }
-
-  Module *targetMod;
-  CompilerUtils::CrossModuleInliner *inliner;
-  SmallDenseMap<GlobalValue *, GlobalValue *> *mapped;
-  ValueMapper *mapper;
+  DenseMap<Type *, Type *> mappedTypes;
 };
 
 } // anonymous namespace
+
+class CrossModuleInliner::CrossModuleValueMaterializer : public ValueMaterializer {
+public:
+  CrossModuleValueMaterializer(CrossModuleInliner &inliner) : inliner(&inliner) {}
+  virtual ~CrossModuleValueMaterializer() = default;
+
+  virtual Value *materialize(Value *v) override;
+
+  CrossModuleInliner *inliner;
+};
+
+struct CrossModuleInliner::Impl {
+  Impl(CrossModuleInliner &inliner, GetGlobalInModuleTy getGlobalInModuleFunc)
+      : materializer(inliner), mapper(map, RF_IgnoreMissingLocals, &typeRemapper, &materializer),
+        getGlobalInModuleFunc(std::move(getGlobalInModuleFunc)) {}
+
+  CrossModuleTypeRemapper typeRemapper;
+  CrossModuleValueMaterializer materializer;
+  llvm::ValueToValueMapTy map;
+  llvm::ValueMapper mapper;
+  GetGlobalInModuleTy getGlobalInModuleFunc;
+  llvm::Module *targetMod = nullptr;
+};
+
+Value *CrossModuleInliner::CrossModuleValueMaterializer::materialize(Value *v) {
+  if (auto *gv = dyn_cast<GlobalValue>(v)) {
+    if (gv->getParent() == inliner->impl->targetMod)
+      return nullptr;
+
+    GlobalValue *newGv = inliner->findCopiedGlobal(*gv, *inliner->impl->targetMod);
+    if (!newGv)
+      newGv = &inliner->impl->getGlobalInModuleFunc(*inliner, *gv, *inliner->impl->targetMod);
+
+    // Insert into mappedTypes if there is no entry yet.
+    // Ensure recorded type mappings are consistent.
+    auto &mappedTypes = inliner->impl->typeRemapper.mappedTypes;
+    auto InsertToMappedTypes = [&mappedTypes](Type *sourceType, Type *copiedType) {
+      assert((sourceType != nullptr) && (copiedType != nullptr));
+      if (sourceType != copiedType) {
+        auto found = mappedTypes.insert(std::make_pair(sourceType, copiedType));
+        assert((found.second || copiedType == found.first->second) && "Inconsistent type mapping");
+      }
+    };
+    if (isa<GlobalVariable>(newGv)) {
+      Type *sourceType = gv->getValueType();
+      Type *copiedType = newGv->getValueType();
+      InsertToMappedTypes(sourceType, copiedType);
+    } else if (auto *func = dyn_cast<Function>(gv)) {
+      // Map type for function arguments and return.
+      FunctionType *sourceFuncTy = dyn_cast<FunctionType>(func->getFunctionType());
+      FunctionType *copiedFuncTy = dyn_cast<FunctionType>(cast<Function>(newGv)->getFunctionType());
+      for (unsigned index = 0; index < sourceFuncTy->getNumParams(); ++index) {
+        Type *sourceArgTy = sourceFuncTy->getParamType(index);
+        Type *copiedArgTy = copiedFuncTy->getParamType(index);
+        InsertToMappedTypes(sourceArgTy, copiedArgTy);
+      }
+      Type *sourceRetType = func->getReturnType();
+      Type *copiedRetType = copiedFuncTy->getReturnType();
+      InsertToMappedTypes(sourceRetType, copiedRetType);
+    }
+
+    return newGv;
+  }
+  return nullptr;
+}
+
+CrossModuleInliner::CrossModuleInliner(GetGlobalInModuleTy getGlobalInModuleCallback)
+    : impl(std::make_unique<Impl>(*this, std::move(getGlobalInModuleCallback))) {
+}
+
+CrossModuleInliner::CrossModuleInliner(CrossModuleInliner &&inliner) : impl(std::move(inliner.impl)) {
+  if (impl)
+    impl->materializer.inliner = this;
+}
+
+CrossModuleInliner &CrossModuleInliner::operator=(CrossModuleInliner &&inliner) {
+  impl = std::move(inliner.impl);
+  if (impl)
+    impl->materializer.inliner = this;
+  return *this;
+}
+
+CrossModuleInliner::~CrossModuleInliner() = default;
 
 iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall(CallBase &cb) {
   auto *calleeFunc = cb.getCalledFunction();
@@ -242,10 +273,11 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
   Function *targetFunc = cb.getFunction();
   auto *targetMod = targetFunc->getParent();
   auto callBb = cb.getParent()->getIterator();
+
   auto callBbSuccessor = callBb;
   ++callBbSuccessor;
   const bool callBbHasSuccessor = callBbSuccessor != targetFunc->end();
-  const size_t bbCount = targetFunc->size();
+  [[maybe_unused]] const size_t bbCount = targetFunc->size();
   // Save uses of the return value
   SmallVector<Value *> users(cb.users());
 
@@ -291,10 +323,6 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
     assert(!calleeFunc->getParent()->getName().empty() && "Can only inline from modules that have a name");
 
     // Look for references to global values and replace them with global values in the new module
-    CrossModuleValueMaterializer materializer{targetMod, *this, mappedGlobals};
-    ValueToValueMapTy map;
-    ValueMapper mapper{map, RF_IgnoreMissingLocals, nullptr, &materializer};
-    materializer.setMapper(&mapper);
     for (auto bb = firstNewBb; bb != lastNewBb; bb++) {
       bool skipBeforeInsts = hasInstBefore && bb == firstNewBb;
       for (auto &i : *bb) {
@@ -307,7 +335,7 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
         if (hasInstAfter && &i == &*instAfter)
           break;
 
-        mapper.remapInstruction(i);
+        impl->mapper.remapInstruction(i);
       }
       assert((bb != firstNewBb || !hasInstBefore || !skipBeforeInsts) && "Did not find first instruction");
     }
@@ -315,7 +343,7 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
     // If the inlined function returned a constant, that gets inlined into the users of the original value. Iterate over
     // these to catch all global values
     for (auto *u : users)
-      mapper.remapInstruction(*cast<Instruction>(u));
+      impl->mapper.remapInstruction(*cast<Instruction>(u));
   }
 
   return make_range(firstNewBb, lastNewBb);
@@ -361,28 +389,86 @@ CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *ca
 }
 
 GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &sourceGv, Module &targetModule) {
-  assert(sourceGv.getParent() != &targetModule && "This function only finds copies across modules");
-  assert(sourceGv.hasName() && "Cannot find a global value that does not have a name");
   checkTargetModule(targetModule);
 
-  if (auto found = mappedGlobals.find(&sourceGv); found != mappedGlobals.end()) {
-    assert(found->second->getParent() == &targetModule &&
+  if (auto found = impl->map.find(&sourceGv); found != impl->map.end()) {
+    auto *global = cast<GlobalValue>(found->second);
+    assert(global->getParent() == &targetModule &&
            "The CrossModuleInliner can only be used with a single target module");
-    return found->second;
+    return global;
   }
 
-  GlobalValue *gv = targetModule.getNamedValue(getCrossModuleName(sourceGv));
-  if (gv)
-    assert(gv->getValueType() == sourceGv.getValueType());
-  return gv;
+  return nullptr;
+}
+
+llvm::GlobalValue &CrossModuleInliner::defaultGetGlobalInModuleFunc(CrossModuleInliner &inliner,
+                                                                    llvm::GlobalValue &sourceGv,
+                                                                    llvm::Module &targetModule) {
+  inliner.checkTargetModule(targetModule);
+  assert(inliner.impl && "Called GetGlobalInModule, but the inliner is currently not inlining anything");
+
+  // Try to find by name
+  if (auto *existing = targetModule.getNamedValue(CompilerUtils::CrossModuleInliner::getCrossModuleName(sourceGv)))
+    return *existing;
+
+  auto &mappedTypes = inliner.impl->typeRemapper.mappedTypes;
+  auto newName = getCrossModuleName(sourceGv);
+  if (auto *callee = dyn_cast<Function>(&sourceGv)) {
+    if (!callee->isDeclaration()) {
+      report_fatal_error(Twine("Cross module inlining does not support functions with calls to functions with a body. "
+                               "Run the inliner before trying to inline across modules (trying to call '") +
+                         callee->getName() + "')");
+    }
+
+    // FunctionType needs to be mapped outside of the ValueMaterializer to avoid failing when
+    // setting the function as an operand in the CallInst in remapInstruction.
+    FunctionType *sourceFuncTy = dyn_cast<FunctionType>(callee->getFunctionType());
+    SmallVector<Type *> params;
+    for (unsigned index = 0; index < sourceFuncTy->getNumParams(); ++index) {
+      Type *argTy = sourceFuncTy->getParamType(index);
+      Type *mappedTy = argTy;
+      if (auto found = mappedTypes.find(mappedTy); found != mappedTypes.end())
+        mappedTy = found->second;
+      params.push_back(mappedTy);
+    }
+
+    Type *returnTy = sourceFuncTy->getReturnType();
+    Type *mappedTy = returnTy;
+    if (auto found = mappedTypes.find(mappedTy); found != mappedTypes.end())
+      mappedTy = found->second;
+
+    // Create a function declaration
+    FunctionType *targetFuncTy = FunctionType::get(mappedTy, params, sourceFuncTy->isVarArg());
+    auto *newGv = CompilerUtils::cloneFunctionHeader(*callee, targetFuncTy, callee->getAttributes(), &targetModule);
+    newGv->setName(newName);
+    return *newGv;
+  }
+
+  if (auto *gVar = dyn_cast<GlobalVariable>(&sourceGv)) {
+    // Create a global with the correct type
+    Type *mappedTy = gVar->getValueType();
+    if (auto found = mappedTypes.find(mappedTy); found != mappedTypes.end())
+      mappedTy = found->second;
+    auto *newGv = new GlobalVariable(targetModule, mappedTy, gVar->isConstant(), gVar->getLinkage(), nullptr, newName,
+                                     nullptr, gVar->getThreadLocalMode(), gVar->getAddressSpace());
+    newGv->copyAttributesFrom(gVar);
+    if (gVar->hasInitializer()) {
+      // Recursively map initializer
+      auto *newInit = inliner.impl->mapper.mapConstant(*gVar->getInitializer());
+      newGv->setInitializer(newInit);
+    }
+    return *newGv;
+  }
+
+  report_fatal_error("Encountered unknown global object while inlining");
 }
 
 // Get the name of a global that is copied to a different module for inlining.
-std::string CompilerUtils::CrossModuleInliner::getCrossModuleName(GlobalValue &gv) {
+std::string CrossModuleInliner::getCrossModuleName(GlobalValue &gv) {
   if (auto *fn = dyn_cast<Function>(&gv)) {
     // Intrinsics should not be renamed since the IR verifier insists on a "correct" name mangling based on any
     // overloaded types. Lgc dialects also require exact name for similar reason.
-    if (fn->isIntrinsic() || fn->getName().starts_with("lgc."))
+    if (fn->isIntrinsic() || fn->getName().starts_with("lgc.") || fn->getName().starts_with("llpcfe."))
       return fn->getName().str();
   }
   return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
@@ -396,6 +482,13 @@ PointerType *llvm::getWithSamePointeeType(PointerType *ptrTy, unsigned addressSp
   // latest)
   return PointerType::get(ptrTy->getContext(), addressSpace);
 #endif
+}
+
+void CrossModuleInliner::checkTargetModule(llvm::Module &targetModule) {
+  if (impl->targetMod == nullptr)
+    impl->targetMod = &targetModule;
+  else
+    assert(impl->targetMod == &targetModule);
 }
 
 void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointerValue, Value *newPointerValue,
@@ -456,6 +549,8 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
     }
     case Instruction::Load:
     case Instruction::Store:
+    case Instruction::AtomicRMW:
+    case Instruction::AtomicCmpXchg:
       // No further processing needed for the users.
       continue;
     case Instruction::InsertValue:
@@ -547,6 +642,19 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
   }
   assert(PhiElems.empty() && "All phi inputs need to be handled, otherwise we end in an inconsistent state");
 #endif
+}
+
+Value *CompilerUtils::simplifyingCreateConstGEP1_32(IRBuilder<> &builder, Type *ty, Value *ptr, uint32_t idx) {
+  // A GEP with a single zero index is redundant with opaque pointers
+  if (idx == 0)
+    return ptr;
+  return builder.CreateConstGEP1_32(ty, ptr, idx);
+}
+
+Value *CompilerUtils::simplifyingCreateConstInBoundsGEP1_32(IRBuilder<> &builder, Type *ty, Value *ptr, uint32_t idx) {
+  if (idx == 0)
+    return ptr;
+  return builder.CreateConstInBoundsGEP1_32(ty, ptr, idx);
 }
 
 void CompilerUtils::RegisterPasses(llvm::PassBuilder &PB) {

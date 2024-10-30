@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  CollectImageOperations.h
- * @brief LLPC header file: contains declaration of class lgc::PatchImageOpCollect.
+ * @brief LLPC header file: contains declaration of class lgc::CollectImageOperations.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -38,7 +38,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for image operations
-class PatchImageOpCollect : public llvm::PassInfoMixin<PatchImageOpCollect> {
+class CollectImageOperations : public llvm::PassInfoMixin<CollectImageOperations> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

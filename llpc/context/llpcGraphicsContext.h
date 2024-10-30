@@ -40,8 +40,8 @@ namespace Llpc {
 // Represents LLPC context for graphics pipeline compilation. Derived from the base class Llpc::Context.
 class GraphicsContext : public PipelineContext {
 public:
-  GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo, MetroHash::Hash *pipelineHash,
-                  MetroHash::Hash *cacheHash);
+  GraphicsContext(GfxIpVersion gfxIp, const char *apiName, const GraphicsPipelineBuildInfo *pipelineInfo,
+                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~GraphicsContext() = default;
 
   virtual PipelineType getPipelineType() const override { return PipelineType::Graphics; }

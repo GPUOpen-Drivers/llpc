@@ -1,0 +1,285 @@
+; Check that driver shader specialization (SDS) works on LLPC raytracing pipelines.
+;
+; This test consists of two files:
+;  * ./PipelineRays_Continuations_SpecializeDriverShaders.pipe
+;    This file defines the actual pipeline, and uses debug output to check analysis details.
+;    Thus, it only runs with assertions enabled.
+;  * ./PipelineRays_Continuations_SpecializeDriverShaders_Isa.pipe
+;    This file uses the above pipeline, and checks Traversal ISA.
+;    It does not rely on debug builds.
+;
+; Assertions are required because we check debug output:
+; REQUIRES: assertions
+;
+; RUN: amdllpc -gfxip 11.0 -emit-llvm -o - %s --debug-only='specialize-driver-shaders' 2>&1 | FileCheck %s
+
+[Version]
+version = 69
+
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  // The different fields test different cases of where values are set in which way.
+  // The yes/no comment indicates whether it should be constant-propagated into Traversal.
+  // For common constants of value$i, we use 0xbeef$i.
+  uint value1; // yes: same constant among all TraceRay sites and AHS (0xbeef1)
+  uint value2; // no:  different between TraceRay sites, ignored by AHS
+  uint value3; // yes: unset in TraceRay call sites, set by AHS
+  uint value4; // yes: unset in TraceRay call sites, conditionally set by AHS
+  uint value5; // no:  same constant in TraceRay call sites, modified by AHS
+  uint value6; // no:  constant in RayGen, dynamic in CHit, ignored by AHS
+  uint value7; // no:  dynamic RayGen, constant in CHit, ignored by AHS
+};
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(binding = 1, set = 0, rgba32f) uniform image2D g_dst;
+
+layout(location = 14) rayPayloadEXT RayPayload g_ray;
+
+// CHECK-LABEL: [SDS] Finished analysis of function _rgen_1
+// CHECK-NEXT: [SDS]
+// Capture the column headers of the arg slot table in the next line.
+// When analyzing the traversal shader, check that the number of arg slots matches.
+// This should be the case because the payload should use the top arg slots in both cases.
+// Verifying this means it is likely that we succeeded in aligning arguments.
+// Don't require a specific number because it depends on GpuRt system data.
+// Example line with 42 arg slots:
+//     [SDS] 012345678901234567890123456789012345678901
+// CHECK-NEXT: [SDS] [[ARG_SLOTS:[0-9]+]]{{$}}
+// Check that the payload is detected as expected:
+// CHECK-NEXT: [SDS] {{[CUDP]+}}CCUUCCD{{$}}
+
+void main() {
+  vec3 origin;
+  origin.x = gl_LaunchIDEXT.x;
+  origin.y = gl_LaunchIDEXT.y;
+  origin.z = 0;
+  g_ray.value1 = 0xbeef1;
+  g_ray.value2 = 0x1beef2;
+  // g_ray.value3 = unset;
+  // g_ray.value4 = unset
+  g_ray.value5 = 0xbeef5;
+  g_ray.value6 = 0xbeef6;
+  g_ray.value7 = gl_LaunchIDEXT.x;
+
+  float tMin = intBitsToFloat(0xdeadbeef);
+
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff,
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              origin.xyz, tMin, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 14);
+
+  imageStore(g_dst, ivec2(gl_LaunchIDEXT.xy), vec4(0, 0, 0, 0));
+}
+
+[rgenInfo]
+entryPoint = main
+
+[chitGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  // The different fields test different cases of where values are set in which way.
+  // The yes/no comment indicates whether it should be constant-propagated into Traversal.
+  // For common constants of value$i, we use 0xbeef$i.
+  uint value1; // yes: same constant among all TraceRay sites and AHS (0xbeef1)
+  uint value2; // no:  different between TraceRay sites, ignored by AHS
+  uint value3; // yes: unset in TraceRay call sites, set by AHS
+  uint value4; // yes: unset in TraceRay call sites, conditionally set by AHS
+  uint value5; // no:  same constant in TraceRay call sites, modified by AHS
+  uint value6; // no:  constant in RayGen, dynamic in CHit, ignored by AHS
+  uint value7; // no:  dynamic RayGen, constant in CHit, ignored by AHS
+};
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(shaderRecordEXT, std430) buffer sbt {
+  float z;
+};
+layout(location = 14) rayPayloadEXT RayPayload g_ray;
+rayPayloadInEXT RayPayload g_ray_incoming;
+
+hitAttributeEXT vec2 g_hit;
+
+// CHECK-LABEL: [SDS] Finished analysis of function _chit_2
+// CHECK-NEXT: [SDS]
+// CHECK-NEXT: [SDS] [[ARG_SLOTS]]{{$}}
+// Check that the payload is detected as expected:
+// CHECK-NEXT: [SDS] {{[CUDP]+}}CCUUCDC{{$}}
+
+void main() {
+  g_ray.value1 = 0xbeef1;
+  g_ray.value2 = 0x2beef2; // rgs sets 0x1beef2
+  // g_ray.value3 = unset;
+  // g_ray.value4 = unset
+  g_ray.value5 = 0xbeef5;
+  g_ray.value6 = g_ray_incoming.value1; // counts as dynamic
+  g_ray.value7 = 0xbeef7;
+
+  vec3 origin;
+  origin.x = gl_LaunchIDEXT.x;
+  origin.y = gl_LaunchIDEXT.y;
+  origin.z = 0;
+
+  float tMin = intBitsToFloat(0xdeadbeef);
+
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff,
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              origin.xyz, tMin, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 14);
+}
+
+[chitInfo]
+entryPoint = main
+
+[ahitGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  // The different fields test different cases of where values are set in which way.
+  // The yes/no comment indicates whether it should be constant-propagated into Traversal.
+  // For common constants of value$i, we use 0xbeef$i.
+  uint value1; // yes: same constant among all TraceRay sites and AHS (0xbeef1)
+  uint value2; // no:  different between TraceRay sites, ignored by AHS
+  uint value3; // yes: unset in TraceRay call sites, set by AHS
+  uint value4; // yes: unset in TraceRay call sites, conditionally set by AHS
+  uint value5; // no:  same constant in TraceRay call sites, modified by AHS
+  uint value6; // no:  constant in RayGen, dynamic in CHit, ignored by AHS
+  uint value7; // no:  dynamic RayGen, constant in CHit, ignored by AHS
+};
+
+layout(shaderRecordEXT, std430) buffer sbt {
+  float z;
+};
+//layout(location = 14) rayPayloadEXT RayPayload g_ray;
+rayPayloadInEXT RayPayload g_ray;
+
+hitAttributeEXT vec2 g_hit;
+
+// CHECK-LABEL: [SDS] Finished analysis of function _ahit_3
+// CHECK-NEXT: [SDS]
+// CHECK-NEXT: [SDS] [[ARG_SLOTS]]{{$}}
+// Check that the payload is detected as expected:
+// CHECK-NEXT: [SDS] {{[CUDP]+}}CPCCDPP{{$}}
+
+void main() {
+  g_ray.value1 = 0xbeef1;
+  //g_ray.value2 = unset;
+  g_ray.value3 = 0xbeef3;
+  if (g_ray.value4 == 17) {
+    g_ray.value4 = 0xbeef4;
+  }
+  g_ray.value5 += 1;
+  // g_ray.value6 = unset;
+  // g_ray.value7 = unset;
+
+  // Ensure we are indeed an AHS:
+  ignoreIntersectionEXT;
+}
+
+[ahitInfo]
+entryPoint = main
+
+[sectGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+// CHECK-LABEL: [SDS] Finished analysis of function _sect_4
+// CHECK-NEXT: [SDS]
+// For intersection, do not force the line to end with ARG_SLOTS, as intersection pessimistically preserves
+// payload VGPRs, and thus may see a larger number of args:
+// CHECK-NEXT: [SDS] [[ARG_SLOTS]]
+// Check that intersection pessimistically preserves 32 payload VGPRs:
+// CHECK-NEXT: [SDS] {{[CUDP]+}}PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
+void main()
+{
+    reportIntersectionEXT(0.5, 0u);
+}
+
+[sectInfo]
+entryPoint = main
+
+; Check Traversal analysis
+; CHECK-LABEL: [SDS] Finished analysis of function _cs_
+; CHECK-NEXT: [SDS]
+; CHECK-NEXT: [SDS] [[ARG_SLOTS]]{{$}}
+; Check that at least 7 dwords at the end are preserved for the payload:
+; CHECK-NEXT: [SDS] {{[CUDP]+}}PPPPPPP{{$}}
+
+[ResourceMapping]
+userDataNode[0].visibility = 0xffffffff
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = DescriptorImage
+userDataNode[0].next[1].offsetInDwords = 4
+userDataNode[0].next[1].sizeInDwords = 8
+userDataNode[0].next[1].set = 0x00000000
+userDataNode[0].next[1].binding = 1
+userDataNode[1].visibility = 0xffffffff
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = DescriptorConstBufferCompact
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 2
+userDataNode[1].next[0].set = 0x0000005D
+userDataNode[1].next[0].binding = 17
+userDataNode[1].next[1].type = DescriptorConstBuffer
+userDataNode[1].next[1].offsetInDwords = 2
+userDataNode[1].next[1].sizeInDwords = 4
+userDataNode[1].next[1].set = 0x0000005D
+userDataNode[1].next[1].binding = 0
+userDataNode[1].next[2].type = DescriptorBuffer
+userDataNode[1].next[2].offsetInDwords = 6
+userDataNode[1].next[2].sizeInDwords = 4
+userDataNode[1].next[2].set = 0x0000005D
+userDataNode[1].next[2].binding = 1
+
+[RayTracingPipelineState]
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+groups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR
+groups[1].closestHitShader = 1
+groups[1].anyHitShader = 2
+groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR
+groups[2].generalShader = -1
+groups[2].closestHitShader = -1
+groups[2].anyHitShader = -1
+groups[2].intersectionShader = 3
+maxRecursionDepth = 2
+indirectStageMask = 0xffffffff
+mode = 3
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2164261887
+rtState.nodeStrideShift = 7
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.outerTileSize = 4
+rtState.dispatchDimSwizzleMode = 0
+rtState.enableDispatchRaysInnerSwizzle = 1
+rtState.enableDispatchRaysOuterSwizzle = 1
+rtState.enableOptimalLdsStackSizeForIndirect = 1
+rtState.enableOptimalLdsStackSizeForUnified = 1
+payloadSizeMaxInLib = 28
+attributeSizeMaxInLib = 8
+hasPipelineLibrary = 1

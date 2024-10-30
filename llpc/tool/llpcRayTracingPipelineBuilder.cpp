@@ -103,9 +103,10 @@ Expected<SmallVector<BinaryData>> RayTracingPipelineBuilder::buildRayTracingPipe
                          compileInfo.autoLayoutDesc);
 
   pipelineInfo->pInstance = nullptr; // Dummy, unused
-  pipelineInfo->pUserData = &compileInfo.pipelineBuf;
+  pipelineInfo->pUserData = &compileInfo;
   pipelineInfo->pfnOutputAlloc = allocateBuffer;
-  pipelineInfo->options.robustBufferAccess = compileInfo.robustBufferAccess;
+  if (compileInfo.robustBufferAccess.has_value())
+    pipelineInfo->options.robustBufferAccess = *compileInfo.robustBufferAccess;
   pipelineInfo->rtState.nodeStrideShift = Log2_32(compileInfo.bvhNodeStride);
   pipelineInfo->shaderCount = compileInfo.shaderModuleDatas.size();
 

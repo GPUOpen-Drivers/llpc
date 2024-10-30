@@ -35,6 +35,7 @@ function(add_lgc_unittest test_dirname)
 endfunction()
 
 add_subdirectory(interface)
+add_subdirectory(internal)
 
 # Add a LIT target to execute all unit tests.
 # Required by lit.site.cfg.py.in.
@@ -54,4 +55,5 @@ add_lit_testsuite(check-lgc-units "Running the LGC unit tests"
   ${exclude_from_check_all}
   DEPENDS
     LgcUnitTests
+    LgcInternalTests
 )

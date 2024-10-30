@@ -31,13 +31,14 @@
 #include "ShaderMerger.h"
 #include "NggPrimShader.h"
 #include "lgc/patch/Patch.h"
-#include "lgc/patch/PatchPreparePipelineAbi.h"
+#include "lgc/patch/PreparePipelineAbi.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
@@ -285,14 +286,17 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
 // @param lsEntryPoint : Entry-point of hardware local shader (LS) (could be null)
 // @param hsEntryPoint : Entry-point of hardware hull shader (HS)
 Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function *hsEntryPoint) {
+  bool createDbgInfo = false;
   if (lsEntryPoint) {
     lsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     lsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+    createDbgInfo |= lsEntryPoint->getSubprogram() != nullptr;
   }
 
   assert(hsEntryPoint);
   hsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
   hsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+  createDbgInfo |= hsEntryPoint->getSubprogram() != nullptr;
 
   processRayQueryLdsStack(lsEntryPoint, hsEntryPoint);
 
@@ -303,7 +307,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // because the vertex fetch shader will be prepended to this module and expect the fall through into the merged
   // shader.
   Function *entryPoint = createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, hsEntryPoint->getParent(),
-                                              lgcName::LsHsEntryPoint);
+                                              createDbgInfo, lgcName::LsHsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(entryPoint, ShaderStage::TessControl);
 
@@ -443,7 +447,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     appendArguments(lsArgs, vertexFetches);
 
-    CallInst *call = builder.CreateCall(lsEntryPoint, lsArgs);
+    CallInst *call = callFunctionHelper(lsEntryPoint, lsArgs, builder.GetInsertBlock());
     call->setCallingConv(CallingConv::AMDGPU_LS);
   }
 
@@ -510,7 +514,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     hsArgs.push_back(patchId);
     hsArgs.push_back(relPatchId);
 
-    CallInst *call = builder.CreateCall(hsEntryPoint, hsArgs);
+    CallInst *call = callFunctionHelper(hsEntryPoint, hsArgs, builder.GetInsertBlock());
     call->setCallingConv(CallingConv::AMDGPU_HS);
   }
   builder.CreateBr(endHsBlock);
@@ -613,14 +617,17 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
 // @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
 // @param gsEntryPoint : Entry-point of hardware geometry shader (GS)
 Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function *gsEntryPoint) {
+  bool createDbgInfo = false;
   if (esEntryPoint) {
     esEntryPoint->setLinkage(GlobalValue::InternalLinkage);
     esEntryPoint->addFnAttr(Attribute::AlwaysInline);
+    createDbgInfo = esEntryPoint->getSubprogram() != nullptr;
   }
 
   assert(gsEntryPoint);
   gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
   gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
+  createDbgInfo |= gsEntryPoint->getSubprogram() != nullptr;
 
   processRayQueryLdsStack(esEntryPoint, gsEntryPoint);
 
@@ -634,7 +641,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   // because the vertex fetch shader will be prepended to this module and expect the fall through into the merged
   // shader.
   Function *entryPoint =
-      createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, module, lgcName::EsGsEntryPoint);
+      createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, module, createDbgInfo, lgcName::EsGsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   module->getFunctionList().push_front(entryPoint);
 
@@ -802,7 +809,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
       appendArguments(esArgs, vertexFetches);
     }
 
-    CallInst *call = builder.CreateCall(esEntryPoint, esArgs);
+    CallInst *call = callFunctionHelper(esEntryPoint, esArgs, builder.GetInsertBlock());
     call->setCallingConv(CallingConv::AMDGPU_ES);
   }
   builder.CreateBr(endEsBlock);
@@ -857,7 +864,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
     gsArgs.push_back(esGsOffset5);
     gsArgs.push_back(invocationId);
 
-    CallInst *call = builder.CreateCall(gsEntryPoint, gsArgs);
+    CallInst *call = callFunctionHelper(gsEntryPoint, gsArgs, builder.GetInsertBlock());
     call->setCallingConv(CallingConv::AMDGPU_GS);
   }
   builder.CreateBr(endGsBlock);

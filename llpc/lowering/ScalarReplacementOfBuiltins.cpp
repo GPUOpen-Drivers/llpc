@@ -31,9 +31,11 @@
 #include "ScalarReplacementOfBuiltins.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcDialect.h"
 #include "vkgcDefs.h"
 #include "spirv/spirv.hpp"
 #include "lgc/Builder.h"
+#include "llvm/ADT/ADL.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/Analysis.h"
@@ -77,7 +79,6 @@ PreservedAnalyses ScalarReplacementOfBuiltins::run(Module &module, ModuleAnalysi
     if (!needsSplit(global))
       continue;
 
-    // TODO: Handle the case where globalBuiltinVar is gl_in or gl_MeshVerticesEXT.
     if (global->getValueType()->isStructTy()) {
       splitBuiltinStructure(global);
       changed = true;
@@ -114,7 +115,7 @@ ShaderInOutMetadata ScalarReplacementOfBuiltins::getShaderInOutMetadata(Type *el
 // @param globalBuiltinVar : Global variable containing built-in type
 bool ScalarReplacementOfBuiltins::needsSplit(GlobalVariable *globalBuiltinVar) {
   auto addressSpace = globalBuiltinVar->getType()->getAddressSpace();
-  if (addressSpace != SPIRV::SPIRAS_Output)
+  if (addressSpace != SPIRV::SPIRAS_Output && addressSpace != SPIRV::SPIRAS_Input)
     return false;
 
   Type *valueType = globalBuiltinVar->getValueType();
@@ -275,55 +276,34 @@ void ScalarReplacementOfBuiltins::replaceGlobalBuiltinVar(GlobalVariable *global
     } else if (LoadInst *loadInst = dyn_cast<LoadInst>(user)) {
       GlobalVariable *LoadValue = cast<GlobalVariable>(elements[0]);
       loadInst->replaceUsesOfWith(globalBuiltinVar, LoadValue);
-    } else if (auto *gepInst = dyn_cast<GetElementPtrInst>(user)) {
+    } else if (auto *gepInst = dyn_cast<StructuralGepOp>(user)) {
       SmallVector<Value *, 8> indices;
-      GlobalVariable *globalValueReplace = nullptr;
-      Type *globalValueReplaceTy = nullptr;
-      unsigned index = UINT_MAX;
-
-      if (globalBuiltinVar->getValueType()->isStructTy()) {
-        // Note: The newly generated global variables are created based on the elements of the original global structure
-        // variable. Therefore, when encountering a GetElementPtr (GEP) instruction, we utilize the second operand to
-        // determine which of the newly generated global variables corresponds to a specific element in the original
-        // structure.
-        // Example:
-        // GEP Instruction: getelementptr ({ <4 x float>, float... }, ptr addrspace(65) @0, i32 0, i32 4)
-        // Here, `gepInst->idx_begin() + 1` retrieves the index to access the fourth element of the
-        // original structure (0-indexed), which corresponds to the fourth newly created global variable.
-        // This allows matching the GEP indices with the corresponding split global variables.
-        index = cast<ConstantInt>(gepInst->idx_begin() + 1)->getZExtValue();
-        indices.push_back(*(gepInst->idx_begin()));
-        unsigned int numIndices = gepInst->getNumIndices();
-        if (numIndices >= 3)
-          indices.append(gepInst->idx_begin() + 2, gepInst->idx_end());
-        assert(cast<ConstantInt>(indices[0])->isZero() && "Non-zero GEP first index\n");
-      } else if (globalBuiltinVar->getValueType()->isArrayTy()) {
-        // Note: The newly generated global variables are derived from the elements of the original array.
-        // When processing a GetElementPtr (GEP) instruction that navigates through such an array, the third operand
-        // (after the base pointer and the initial index which is typically zero) indicates the specific element
-        // in the array that is being accessed.
-        // Example:
-        // GEP Instruction: getelementptr [3 x { <4 x float>, ... }], ptr addrspace(65) @gl_out, i32 0, i32 %5, i32 4
-        // In this example, `gepInst->idx_begin() + 2` corresponds to `i32 4`, which is used to access the fourth
-        // element of the array (0-indexed). This element index is used to determine the appropriate newly created
-        // global variable that corresponds to this element in the original array structure. This indexing helps in
-        // directly mapping the GEP instruction indices to the split global variables.
-        index = cast<ConstantInt>(gepInst->idx_begin() + 2)->getZExtValue();
-        for (auto it = gepInst->idx_begin(); it != gepInst->idx_end(); ++it) {
-          if (it - gepInst->idx_begin() == 2)
-            continue;
-          indices.push_back(*it);
-        }
-      } else {
-        llvm_unreachable("Not implemented");
-      }
-
-      globalValueReplace = cast<GlobalVariable>(elements[index]);
-      globalValueReplaceTy = globalValueReplace->getValueType();
+      // NOTE: The newly generated global variables are created based on the elements of the original global structure
+      // variable or global array variable. Therefore, when encountering a GetElementPtr (GEP) instruction, we utilize
+      // the second operand to determine which of the newly generated global variables corresponds to a specific element
+      // in the original type.
+      // For example:
+      //   structure built-in: getelementptr { <4 x float>, float, ... }, ptr addrspace(65) @0, i32 0, i32 1
+      //   array built-in: getelementptr [3 x { <4 x float>, ... }], ptr addrspace(65) @1, i32 0, i32 %5, i32 0, i32 2
+      //  ===>
+      //   scalarized structure built-in: getelementptr float, ptr addrspace(65) @gl_out_0, i32 0
+      //   scalarized array built-in: getelementptr [3 x <4 x float>], ptr addrspace(65) @gl_out_1, i32 0, i32 %5, i32 2
+      //
+      // The first one index is always 0 dereference the pointer value. The element idx (1 if original global variable
+      // is a structure, or 2 if the original global variable is an array) indicates which built-in variable is used.
+      assert(globalBuiltinVar->getValueType()->isStructTy() || globalBuiltinVar->getValueType()->isArrayTy());
+      const auto indexRange = gepInst->getIndices();
+      const auto elementIdxIt =
+          std::next(llvm::adl_begin(indexRange), globalBuiltinVar->getValueType()->isStructTy() ? 1 : 2);
+      indices.append(llvm::adl_begin(indexRange), elementIdxIt);
+      // Remove the element index from the indices.
+      const unsigned index = cast<ConstantInt>(*elementIdxIt)->getZExtValue();
+      const auto indicesAfterElementIdx = llvm::make_range(std::next(elementIdxIt), llvm::adl_end(indexRange));
+      indices.append(llvm::adl_begin(indicesAfterElementIdx), llvm::adl_end(indicesAfterElementIdx));
+      assert(cast<ConstantInt>(indices[0])->isZero() && "Non-zero GEP first index\n");
+      Type *globalValueReplaceTy = cast<GlobalVariable>(elements[index])->getValueType();
       m_builder->SetInsertPoint(gepInst);
-      Value *gepElement =
-          m_builder->CreateGEP(globalValueReplaceTy, elements[index], indices, "",
-                               gepInst->isInBounds() ? GEPNoWrapFlags::inBounds() : GEPNoWrapFlags::none());
+      Value *gepElement = m_builder->create<StructuralGepOp>(elements[index], globalValueReplaceTy, false, indices);
       gepInst->replaceAllUsesWith(gepElement);
       gepInst->eraseFromParent();
     } else {
@@ -358,7 +338,7 @@ void ScalarReplacementOfBuiltins::splitBuiltinStructure(GlobalVariable *globalBu
     StringRef builtinElementName = getBuiltinElementName(inOutMeta);
     GlobalVariable *replacementBuiltinVar = new GlobalVariable(
         *m_module, elementType, false, GlobalValue::ExternalLinkage, nullptr, prefixName + builtinElementName, nullptr,
-        GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Output);
+        GlobalVariable::NotThreadLocal, globalBuiltinVar->getType()->getAddressSpace());
 
     replacementBuiltinVar->addMetadata(gSPIRVMD::InOut,
                                        *MDNode::get(*m_context, {ConstantAsMetadata::get(elementMetadata)}));

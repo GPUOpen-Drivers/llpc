@@ -19,7 +19,7 @@ void main()
 
 // BEGIN_WITHOUT_IIE
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=WITHOUT_IIE %s
+; RUN: amdllpc -v --enable-implicit-invariant-exports=1 %gfxip %s | FileCheck -check-prefix=WITHOUT_IIE %s
 ; WITHOUT_IIE-LABEL: {{^// LLPC}} pipeline before-patching results
 ; WITHOUT_IIE: %[[val:.*]] = extractvalue [4 x <4 x float>] %{{.*}}, 3
 ; WITHOUT_IIE: %[[mul:.*]] = fmul nnan nsz <4 x float> %[[val]], %{{.*}}

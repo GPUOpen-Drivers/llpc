@@ -122,6 +122,9 @@ public:
 
   // Whether the type of a cooperative matrix is specified bit width.
   static bool isTypeNCooperativeMatrix(CooperativeMatrixElementType elemType, unsigned bitWidth);
+
+  // Get the bit width of the cooperative matrix element.
+  static unsigned getBitWidthOfCooperativeMatrixElement(CooperativeMatrixElementType elemType);
 };
 
 } // namespace lgc
