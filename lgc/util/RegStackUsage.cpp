@@ -99,6 +99,21 @@ struct Usage {
   bool memOrdered;
 };
 
+struct UsageTemp {
+  unsigned maxRecursionDepth;
+  unsigned callableShaderCount;
+  unsigned backendStackSize;
+  unsigned frontendStackSize;
+  unsigned stackFrameSizeInBytes;
+  unsigned scratchMemorySize;
+  unsigned ldsSize;
+  unsigned sgprCount;
+  unsigned vgprCount;
+  bool cpsGlobal;
+  bool scratchEn;
+  bool memOrdered;
+};
+
 // =====================================================================================================================
 // Output Usage textually, for debug.
 [[maybe_unused]] static raw_ostream &operator<<(raw_ostream &stream, const Usage &usage) {
@@ -296,7 +311,20 @@ RegStackUsageImpl::RegStackUsageImpl(const llvm::Module &module) : m_msgPackScan
   if (namedNode && namedNode->getNumOperands() >= 1) {
     StringRef str = dyn_cast<MDString>(namedNode->getOperand(0)->getOperand(0))->getString();
     assert(str.size() == sizeof(m_usage));
-    memcpy(&m_usage, str.data(), sizeof(m_usage));
+    UsageTemp usage;
+    memcpy(&usage, str.data(), sizeof(m_usage));
+    m_usage.maxRecursionDepth = usage.maxRecursionDepth;
+    m_usage.callableShaderCount = usage.callableShaderCount;
+    m_usage.backendStackSize = usage.backendStackSize;
+    m_usage.frontendStackSize = usage.frontendStackSize;
+    m_usage.stackFrameSizeInBytes = usage.stackFrameSizeInBytes;
+    m_usage.scratchMemorySize = usage.scratchMemorySize;
+    m_usage.ldsSize = usage.ldsSize;
+    m_usage.sgprCount = usage.sgprCount;
+    m_usage.vgprCount = usage.vgprCount;
+    m_usage.cpsGlobal = usage.cpsGlobal;
+    m_usage.scratchEn = usage.scratchEn;
+    m_usage.memOrdered = usage.memOrdered;
   }
 }
 
