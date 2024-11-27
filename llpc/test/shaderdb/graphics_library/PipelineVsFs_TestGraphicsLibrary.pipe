@@ -14,18 +14,18 @@ colorExport=PipelineLibCes_TestColorExport.pipe
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
-; SHADERTEST-NEXT:    [[TMP2:%.*]] = call <4 x float> @lgc.input.import.generic__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison)
-; SHADERTEST-NEXT:    [[TMP3:%.*]] = call i32 @lgc.special.user.data.BaseVertex(i32 268435459) #[[ATTR3:[0-9]+]]
-; SHADERTEST-NEXT:    [[TMP4:%.*]] = call i32 @lgc.shader.input.VertexId(i32 18) #[[ATTR3]]
-; SHADERTEST-NEXT:    [[VERTEXINDEX:%.*]] = add i32 [[TMP3]], [[TMP4]]
+; SHADERTEST-NEXT:    [[TMP2:%.*]] = call i32 @lgc.special.user.data.BaseVertex(i32 268435459) #[[ATTR4:[0-9]+]]
+; SHADERTEST-NEXT:    [[TMP3:%.*]] = call i32 @lgc.shader.input.VertexId(i32 18) #[[ATTR4]]
+; SHADERTEST-NEXT:    [[VERTEXINDEX:%.*]] = add i32 [[TMP2]], [[TMP3]]
 ; SHADERTEST-NEXT:    [[DOTFR:%.*]] = freeze i32 [[VERTEXINDEX]]
-; SHADERTEST-NEXT:    [[TMP5:%.*]] = icmp slt i32 [[DOTFR]], 3
-; SHADERTEST-NEXT:    [[TMP6:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(7) [[TMP0]], i32 4
-; SHADERTEST-NEXT:    [[DOT0_IN:%.*]] = select i1 [[TMP5]], ptr addrspace(7) [[TMP0]], ptr addrspace(7) [[TMP6]]
+; SHADERTEST-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[DOTFR]], 3
+; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(7) [[TMP0]], i32 4
+; SHADERTEST-NEXT:    [[DOT0_IN:%.*]] = select i1 [[TMP4]], ptr addrspace(7) [[TMP0]], ptr addrspace(7) [[TMP5]]
 ; SHADERTEST-NEXT:    [[DOT0:%.*]] = load float, ptr addrspace(7) [[DOT0_IN]], align 4
-; SHADERTEST-NEXT:    [[TMP7:%.*]] = insertelement <4 x float> [[TMP2]], float 1.000000e+00, i64 3
+; SHADERTEST-NEXT:    [[TMP6:%.*]] = call <4 x float> @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+; SHADERTEST-NEXT:    [[TMP7:%.*]] = insertelement <4 x float> [[TMP6]], float 1.000000e+00, i64 3
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = insertelement <4 x float> [[TMP7]], float [[DOT0]], i64 2
-; SHADERTEST-NEXT:    call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> [[TMP8]])
+; SHADERTEST-NEXT:    call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> [[TMP8]]) #[[ATTR5:[0-9]+]]
 ; SHADERTEST-NEXT:    ret void
 ;
 ;
@@ -34,16 +34,16 @@ colorExport=PipelineLibCes_TestColorExport.pipe
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 1, i32 1, i32 0, i32 0)
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
-; SHADERTEST-NEXT:    [[FRAGCOORD:%.*]] = call <4 x float> @lgc.input.import.builtin.FragCoord.v4f32.i32(i32 15)
+; SHADERTEST-NEXT:    [[FRAGCOORD:%.*]] = call <4 x float> @lgc.input.import.builtin.FragCoord.v4f32.i32(i32 15) #[[ATTR4]]
 ; SHADERTEST-NEXT:    [[__LLPC_INPUT_PROXY_GL_FRAGCOORD_4_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[FRAGCOORD]], i64 1
 ; SHADERTEST-NEXT:    [[TMP2:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[__LLPC_INPUT_PROXY_GL_FRAGCOORD_4_VEC_EXTRACT]], -5.000000e-01
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = fptosi float [[TMP2]] to i32
 ; SHADERTEST-NEXT:    [[DOTFR:%.*]] = freeze i32 [[TMP3]]
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = icmp slt i32 [[DOTFR]], 8
-; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr {{(inbounds )?}}i8, ptr addrspace(7) [[TMP0]], i32 16
+; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(7) [[TMP0]], i32 16
 ; SHADERTEST-NEXT:    [[DOT0_IN:%.*]] = select i1 [[TMP4]], ptr addrspace(7) [[TMP0]], ptr addrspace(7) [[TMP5]]
 ; SHADERTEST-NEXT:    [[DOT0:%.*]] = load <4 x float>, ptr addrspace(7) [[DOT0_IN]], align 16
-; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[DOT0]]) #[[ATTR3]]
+; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[DOT0]]) #[[ATTR3:[0-9]+]]
 ; SHADERTEST-NEXT:    ret void
 ;
 ;

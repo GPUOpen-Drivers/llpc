@@ -19,7 +19,7 @@
                OpEntryPoint TessellationEvaluation %main "main" %DomainPoint %gl_PrimitiveID %o0xyzw %ipatch0y %gl_PointSize
                OpExecutionMode %main Quads
                OpExecutionMode %main SignedZeroInfNanPreserve 32
-          %2 = OpString "VMware VMGI Translator (shader 21)"
+          %2 = OpString "VMGI Translator (shader 21)"
           %3 = OpString "DOMA"
          %71 = OpString "PROPERTY REFACTORING_ALLOWED"
          %72 = OpString "DCL INPUT_PATCH_CONSTANT[0].y"

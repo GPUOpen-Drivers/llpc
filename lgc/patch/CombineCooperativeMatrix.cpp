@@ -117,13 +117,11 @@ bool CooperativeMatrixCombiner::run() {
                                   .addSet<CooperativeMatrixConvertOp, CooperativeMatrixTransposeOp>(
                                       [](auto &self, auto &op) { self.m_ops.push_back(&op); })
                                   .add<CooperativeMatrixMulAddOp>([](auto &self, auto &op) {
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
                                     auto accumElemType = op.getMatrixCElemType();
                                     bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
                                     if ((self.m_gfxIpVersion.major == 11) && isPackable) {
                                       self.m_muladds[op.getParent()].push_back(&op);
                                     }
-#endif
                                   })
                                   .build();
   visitor.visit(*this, m_function);
@@ -144,7 +142,6 @@ bool CooperativeMatrixCombiner::run() {
       m_eraseList.clear();
     }
   }
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
   // wmma packing on gfx11 only possible with new wmma_f16_tied intrinsic
   for (auto muladdsPerBB : m_muladds) {
     changed |= tryFoldMuladd(std::move(muladdsPerBB.second));
@@ -157,7 +154,6 @@ bool CooperativeMatrixCombiner::run() {
   }
 
   m_muladds.clear();
-#endif
 
   m_ops.clear();
 
@@ -677,11 +673,7 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CooperativeMatrixMulAd
       next->setIsSatOrOpsel(false);
       muladdChain.push_back(next);
       muladdLo = next;
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
-      llvm::erase_value(muladds, muladdLo);
-#else
       llvm::erase(muladds, muladdLo);
-#endif
     }
 
     Instruction *firstLoUser = findFirstUser(muladdLo);
@@ -708,11 +700,7 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CooperativeMatrixMulAd
 
     muladdChain.push_back(muladdHi);
     muladdHi->setIsSatOrOpsel(true);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
-    llvm::erase_value(muladds, muladdLo);
-#else
     llvm::erase(muladds, muladdHi);
-#endif
     while (muladdHi->hasOneUse()) {
       auto *next = dyn_cast<CooperativeMatrixMulAddOp>(*muladdHi->users().begin());
       if (!is_contained(muladds, next)) {
@@ -725,11 +713,7 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CooperativeMatrixMulAd
       next->setIsSatOrOpsel(true);
       muladdChain.push_back(next);
       muladdHi = next;
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
-      llvm::erase_value(muladds, muladdLo);
-#else
       llvm::erase(muladds, next);
-#endif
     }
 
     auto cmp = [&](CallInst *a, CallInst *b) { return a->comesBefore(b); };

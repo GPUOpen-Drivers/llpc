@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.sin.v4f32(
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.cos.v4f32(
-; SHADERTEST: = fdiv reassoc nnan nsz arcp contract afn <4 x float> <float 1.000000e+00,
+; SHADERTEST: = fdiv reassoc nnan nsz arcp contract afn <4 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00,)}}
 ; SHADERTEST: = fmul reassoc nnan nsz arcp contract afn <4 x float>
 ; SHADERTEST: AMDLLPC SUCCESS
 */

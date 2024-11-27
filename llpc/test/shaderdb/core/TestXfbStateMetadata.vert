@@ -20,8 +20,8 @@ void main()
 // CHECK-LABEL: define {{[^@]+}}@lgc.shader.VS.main
 // CHECK-SAME: () local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !10 !lgc.shaderstage !1 !lgc.xfb.state !11 {
 // CHECK-NEXT:  .entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.create.read.generic.input.f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 poison)
-// CHECK-NEXT:    [[TMP1:%.*]] = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
+// CHECK-NEXT:    [[TMP0:%.*]] = call float @lgc.load.vertex.input__f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+// CHECK-NEXT:    [[TMP1:%.*]] = call <4 x float> @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
 // CHECK-NEXT:    call void (...) @lgc.create.write.builtin.output(<4 x float> [[TMP1]], i32 0, i32 0, i32 poison, i32 poison)
 // CHECK-NEXT:    call void (...) @lgc.create.write.xfb.output(float [[TMP0]], i1 true, i32 1, i32 0, i32 4, i32 0, i32 0)
 // CHECK-NEXT:    call void (...) @lgc.create.write.builtin.output(float [[TMP0]], i32 1, i32 0, i32 poison, i32 poison)
@@ -29,8 +29,6 @@ void main()
 //
 //.
 // CHECK: attributes #[[ATTR0]] = { alwaysinline nounwind "denormal-fp-math-f32"="preserve-sign" }
-// CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind willreturn memory(read) }
-// CHECK: attributes #[[ATTR2:[0-9]+]] = {{{.*}} nounwind }
+// CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind willreturn memory(none) }
+// CHECK: attributes #[[ATTR2:[0-9]+]] = { nodivergencesource nounwind }
 //.
-// CHECK: [[META0:![0-9]+]] = !{!"Vulkan"}
-// CHECK: [[META1:![0-9]+]] = !{i32 1}

@@ -42,12 +42,14 @@ using namespace llvm;
 using namespace CompilerUtils;
 
 #define DEBUG_TYPE "specialize-driver-shaders"
+#ifndef NDEBUG
 // Normal debug output that is also used in testing is wrapped in LLVM_DEBUG
 // which can be enabled with --debug arguments.
 //
 // Even more detailed debug output is wrapped in DETAIL_DEBUG which can be enabled by changing EnableDetailDebugOutput.
 // This can be useful when debugging, for instance why a particular argument slot was not detected as preserved.
 static constexpr bool EnableDetailDebugOutput = false;
+#endif
 #define DETAIL_DEBUG(BODY)                                                                                             \
   LLVM_DEBUG({                                                                                                         \
     if (EnableDetailDebugOutput) {                                                                                     \
@@ -466,14 +468,9 @@ struct JumpInfo {
 };
 
 struct AwaitInfo : public JumpInfo {
-  // For awaits, we handle both lgc.cps.await and legacy awaits.
+  // Handle lgc.cps.await.
   // lgc.cps uses a single await call, like:
   //   %result = call @lgc.cps.await(i32 %target, i32 %levels, args...)
-  // legacy mode uses *two* calls, first invoking target, and then awaiting the result:
-  //   %handle = call ptr inttoptr (i32 %target to ptr)(args...)
-  //   %result = call @await(ptr %handle)
-  // For legacy awaits, this is the second call that obtains the result value.
-  // For lgc.cps.await, it is the unique await call.
   CallInst *AwaitedResult = nullptr;
 };
 
@@ -513,15 +510,15 @@ public:
                                                                                            M.getContext())} {
     HadNonTrivialIncomingTraversalArgsInfo = !TraversalArgsInfo.ArgSlots.empty();
     if (ContHelper::isLgcCpsModule(M)) {
-      // Ignore cont state, return addr, shaderRecIdx
-      FirstRelevantIncomingArgIdx = 3;
-      // Ignore: shaderAddr, levels, state, csp, returnAddr, shaderRecIdx
-      FirstRelevantOutgoingJumpArgIdx = 6;
+      // Ignore return addr, shaderRecIdx
+      FirstRelevantIncomingArgIdx = 2;
+      // Ignore: shaderAddr, levels, csp, returnAddr, shaderRecIdx
+      FirstRelevantOutgoingJumpArgIdx = 5;
     } else {
       // Ignore returnAddr
       FirstRelevantIncomingArgIdx = 1;
-      // Ignore: shaderAddr, levels, state, csp, returnAddr
-      FirstRelevantOutgoingJumpArgIdx = 5;
+      // Ignore: shaderAddr, levels, csp, returnAddr
+      FirstRelevantOutgoingJumpArgIdx = 4;
     }
   }
 
@@ -627,32 +624,6 @@ public:
 
     State S{*this};
     Visitor.visit(S, M);
-
-    // Also collect legacy awaits.
-    // Because there can be multiple overloads, we need to collect all functions starting with "await".
-    for (auto &F : M.functions()) {
-      if (F.getName().starts_with("await")) {
-        forEachCall(F, [&](CallInst &AwaitResult) {
-          Function *ContainingFunc = AwaitResult.getFunction();
-          auto *It = ToProcess.find(ContainingFunc);
-          if (It == ToProcess.end())
-            return; // ignore this call
-
-          // Legacy awaits look like this:
-          //   %awaitHandle = call ptr inttoptr (i32 %target to ptr)(args...)
-          //   %awaitResult = call @await(ptr %awaitedResult)
-          assert(AwaitResult.arg_size() == 1);
-          auto *AwaitHandle = cast<CallInst>(AwaitResult.getArgOperand(0));
-          assert(AwaitHandle->getType()->isPointerTy());
-          FunctionData &Data = It->second;
-          // Legacy awaited calls have only normal args.
-          // The awaited function is indirectly called, and thus not an arg,
-          // and the optional wait mask is on metadata.
-          unsigned FirstRelevantArgIdx = 1; // ignore return address
-          Data.Awaits.push_back({{AwaitHandle, FirstRelevantArgIdx}, &AwaitResult});
-        });
-      }
-    }
   }
 
   const ArgumentLayoutInfo &getOrComputeArgumentLayoutInfo(Type *Ty) {
@@ -1092,8 +1063,8 @@ public:
       dbgs() << "[SDS] Specializing function, final args info:\n";
       TraversalArgsInfo.printTable(dbgs(), "[SDS] ");
     });
-    unsigned TotalNumToBeReplacedDwords = 0;
-    unsigned TotalNumReplacedDwords = 0;
+    [[maybe_unused]] unsigned TotalNumToBeReplacedDwords = 0;
+    [[maybe_unused]] unsigned TotalNumReplacedDwords = 0;
     unsigned AccumArgSlotIdx = 0;
     ValueSpecializer VS{*Func->getParent()};
 

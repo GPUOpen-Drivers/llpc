@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  CollectResourceUsage.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchResourceCollect.
+ * @brief LLPC source file: contains implementation of class lgc::CollectResourceUsage.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/CollectResourceUsage.h"
@@ -49,7 +49,7 @@
 #include <algorithm>
 #include <set>
 
-#define DEBUG_TYPE "lgc-patch-resource-collect"
+#define DEBUG_TYPE "lgc-collect-resource-usage"
 
 using namespace llvm;
 using namespace lgc;
@@ -69,7 +69,7 @@ constexpr unsigned OnChipGsMaxEsVertsPerSubgroup = 255;
 constexpr unsigned DefaultLdsSizePerSubgroup = 8192;
 
 // =====================================================================================================================
-PatchResourceCollect::PatchResourceCollect() : m_resUsage(nullptr) {
+CollectResourceUsage::CollectResourceUsage() : m_resUsage(nullptr) {
 }
 
 // =====================================================================================================================
@@ -78,7 +78,7 @@ PatchResourceCollect::PatchResourceCollect() : m_resUsage(nullptr) {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses CollectResourceUsage::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
 
@@ -93,6 +93,9 @@ PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManage
   m_processMissingFs = pipelineState->isPartPipeline();
 
   m_tcsInputHasDynamicIndexing = false;
+
+  // Initialize the flag to match pipeline option settings
+  m_optimizePointSizeWrite = m_pipelineState->getOptions().optimizePointSizeWrite;
 
   bool needPack = false;
   for (auto stage : ShaderStagesGraphics) {
@@ -156,7 +159,7 @@ PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManage
 // Sets NGG control settings
 //
 // @param [in/out] module : Module
-void PatchResourceCollect::setNggControl(Module *module) {
+void CollectResourceUsage::setNggControl(Module *module) {
   assert(m_pipelineState->isGraphics());
   // If mesh pipeline, skip NGG control settings
   const bool meshPipeline =
@@ -264,7 +267,7 @@ void PatchResourceCollect::setNggControl(Module *module) {
 // Checks whether NGG could be enabled.
 //
 // @param [in/out] module : Module
-bool PatchResourceCollect::canUseNgg(Module *module) {
+bool CollectResourceUsage::canUseNgg(Module *module) {
   assert(m_pipelineState->isGraphics());
 
   // Always enable NGG for GFX11+
@@ -316,7 +319,7 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
 // Checks whether NGG culling could be enabled.
 //
 // @param [in/out] module : Module
-bool PatchResourceCollect::canUseNggCulling(Module *module) {
+bool CollectResourceUsage::canUseNggCulling(Module *module) {
   assert(m_pipelineState->isGraphics());
 
   const bool hasTs = m_pipelineState->hasShaderStage(ShaderStage::TessControl) ||
@@ -398,8 +401,8 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
     return false;
 
   // Heuristic detecting very simple calculated position for geometry that will
-  // never be culled, disable NGG culling if there is no position fetch.
-  auto hasPositionFetch = [posCall] {
+  // never be culled, disable NGG culling if position value is from input.
+  auto posValueFromInput = [posCall] {
     std::list<Instruction *> workList;
     workList.push_back(posCall);
     std::unordered_set<Instruction *> visited;
@@ -408,8 +411,9 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
       workList.pop_front();
       visited.insert(inst);
       for (Value *op : inst->operands()) {
-        LoadInst *opLoad = dyn_cast<LoadInst>(op);
-        if (opLoad && opLoad->getPointerAddressSpace() != ADDR_SPACE_CONST)
+        CallInst *call = dyn_cast<CallInst>(op);
+        if (call && (isa<InputImportGenericOp>(call) || isa<LoadVertexInputOp>(call) ||
+                     call->getName().starts_with(lgcName::InputImportBuiltIn)))
           return true;
         Instruction *opInst = dyn_cast<Instruction>(op);
         if (opInst && visited.find(opInst) == visited.end())
@@ -418,7 +422,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
     }
     return false;
   };
-  if (!hasGs && !hasPositionFetch())
+  if (!hasGs && !posValueFromInput())
     return false;
 
   // We can safely enable NGG culling here
@@ -427,7 +431,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
 
 // =====================================================================================================================
 // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
-bool PatchResourceCollect::checkGsOnChipValidity() {
+bool CollectResourceUsage::checkGsOnChipValidity() {
   bool gsOnChip = true;
 
   const bool hasTs = m_pipelineState->hasShaderStage(ShaderStage::TessControl) ||
@@ -1084,7 +1088,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
 // =====================================================================================================================
 // Process a single shader.
-void PatchResourceCollect::processShader() {
+void CollectResourceUsage::processShader() {
   m_resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value());
 
   // Invoke handling of "call" instruction
@@ -1148,7 +1152,7 @@ void PatchResourceCollect::processShader() {
 // =====================================================================================================================
 // Process missing fragment shader. This happens in a part-pipeline compile; we deserialize the FS's input mappings
 // from PAL metadata that came from the separate FS compilation.
-void PatchResourceCollect::processMissingFs() {
+void CollectResourceUsage::processMissingFs() {
   assert(m_shaderStage == ShaderStage::Fragment);
   if (!m_processMissingFs)
     return;
@@ -1185,7 +1189,7 @@ void PatchResourceCollect::processMissingFs() {
 
 // =====================================================================================================================
 // Check whether vertex reuse should be disabled.
-bool PatchResourceCollect::isVertexReuseDisabled() {
+bool CollectResourceUsage::isVertexReuseDisabled() {
   const bool hasGs = m_pipelineState->hasShaderStage(ShaderStage::Geometry);
   const bool hasTs = (m_pipelineState->hasShaderStage(ShaderStage::TessControl) ||
                       m_pipelineState->hasShaderStage(ShaderStage::TessEval));
@@ -1213,7 +1217,7 @@ bool PatchResourceCollect::isVertexReuseDisabled() {
 // Check if ray query LDS stack usage.
 //
 // @param module : LLVM module
-void PatchResourceCollect::checkRayQueryLdsStackUsage(Module *module) {
+void CollectResourceUsage::checkRayQueryLdsStackUsage(Module *module) {
   auto ldsStack = module->getNamedGlobal(RayQueryLdsStackName);
   if (ldsStack) {
     SmallVector<Constant *> worklist;
@@ -1240,7 +1244,7 @@ void PatchResourceCollect::checkRayQueryLdsStackUsage(Module *module) {
 // Visits "call" instruction.
 //
 // @param callInst : "Call" instruction
-void PatchResourceCollect::visitCallInst(CallInst &callInst) {
+void CollectResourceUsage::visitCallInst(CallInst &callInst) {
   auto callee = callInst.getCalledFunction();
   if (!callee)
     return;
@@ -1249,7 +1253,8 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
 
   auto mangledName = callee->getName();
 
-  if (isa<InputImportGenericOp>(callInst) || isa<InputImportInterpolatedOp>(callInst)) {
+  if (isa<LoadVertexInputOp>(callInst) || isa<InputImportGenericOp>(callInst) ||
+      isa<InputImportInterpolatedOp>(callInst)) {
     if (isDeadCall)
       m_deadCalls.push_back(&callInst);
     else
@@ -1277,26 +1282,27 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   } else if (mangledName.starts_with(lgcName::OutputExportGeneric)) {
     m_outputCalls.push_back(&callInst);
   } else if (mangledName.starts_with(lgcName::OutputExportBuiltIn)) {
-    // NOTE: If an output value is unspecified, we can safely drop it and remove the output export call for the last
-    // vertex processing stage (Mesh shader has different processing).
     if (m_pipelineState->getLastVertexProcessingStage() == m_shaderStage && m_shaderStage != ShaderStage::Mesh) {
+      // NOTE: If an output value is unspecified, we can safely drop it and remove the output export call for the last
+      // vertex processing stage (Mesh shader has different processing).
       unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
       auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
-      bool builtInActive = true;
 
       if (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue))
-        builtInActive = false;
-
-      if (m_pipelineState->getOptions().optimizePointSizeWrite && builtInId == BuiltInPointSize) {
-        // Remove the write of PointSize if its write value is 1.0.
-        if (isa<ConstantFP>(outputValue) && cast<ConstantFP>(outputValue)->getValueAPF().convertToFloat() == 1.0)
-          builtInActive = false;
-      }
-
-      if (builtInActive)
-        m_activeOutputBuiltIns.insert(builtInId);
+        m_deadCalls.push_back(&callInst); // Output value is undefined, could be safely remove the write call
       else
-        m_deadCalls.push_back(&callInst);
+        m_activeOutputBuiltIns.insert(builtInId);
+
+      // Could remove PointSize writes if all write values are uniformly 1.0. Let's decide when we finish
+      // visiting all of such writes.
+      if (m_optimizePointSizeWrite && builtInId == BuiltInPointSize) {
+        if (isa<ConstantFP>(outputValue) && cast<ConstantFP>(outputValue)->getValueAPF().convertToFloat() == 1.0) {
+          m_pointSizeWritesToOptimize.push_back(&callInst); // Could be optimized
+        } else {
+          m_optimizePointSizeWrite = false; // Encounter non-1.0 value, disable the optimization
+          m_pointSizeWritesToOptimize.clear();
+        }
+      }
     }
   } else if (mangledName.starts_with(lgcName::OutputExportXfb)) {
     auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
@@ -1329,7 +1335,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
 
 // =====================================================================================================================
 // Clears inactive (those actually unused) inputs.
-void PatchResourceCollect::clearInactiveBuiltInInput() {
+void CollectResourceUsage::clearInactiveBuiltInInput() {
   // Clear those inactive built-in inputs (some are not checked, whose usage flags do not rely on their
   // actual uses)
   auto &builtInUsage = m_resUsage->builtInUsage;
@@ -1547,9 +1553,22 @@ void PatchResourceCollect::clearInactiveBuiltInInput() {
 
 // =====================================================================================================================
 // Clears inactive (those actually unused) outputs.
-void PatchResourceCollect::clearInactiveBuiltInOutput() {
+void CollectResourceUsage::clearInactiveBuiltInOutput() {
   // Clear inactive output built-ins for the last vertex processing stage (Mesh shader has different processing).
   if (m_pipelineState->getLastVertexProcessingStage() == m_shaderStage && m_shaderStage != ShaderStage::Mesh) {
+    if (m_optimizePointSizeWrite) {
+      // Mark all such writes as dead in order to remove them later on
+      for (auto pointSizeWrite : m_pointSizeWritesToOptimize)
+        m_deadCalls.push_back(pointSizeWrite);
+      m_pointSizeWritesToOptimize.clear();
+
+      // Mark PointSize as inactive
+      if (m_activeOutputBuiltIns.count(BuiltInPointSize) > 0)
+        m_activeOutputBuiltIns.erase(BuiltInPointSize);
+    } else {
+      assert(m_pointSizeWritesToOptimize.empty()); // Must be empty collection
+    }
+
     auto &builtInOutLocMap = m_resUsage->inOutUsage.builtInOutputLocMap;
 
     if (m_shaderStage == ShaderStage::Geometry) {
@@ -1656,7 +1675,7 @@ void PatchResourceCollect::clearInactiveBuiltInOutput() {
 // Does generic input/output matching and does location mapping afterwards.
 //
 // NOTE: This function should be called after the cleanup work of inactive inputs is done.
-void PatchResourceCollect::matchGenericInOut() {
+void CollectResourceUsage::matchGenericInOut() {
   assert(m_pipelineState->isGraphics());
 
   // Do input matching and location remapping
@@ -1815,7 +1834,7 @@ void PatchResourceCollect::matchGenericInOut() {
 // Maps special built-in input/output to generic ones.
 //
 // NOTE: This function should be called after generic input/output matching is done.
-void PatchResourceCollect::mapBuiltInToGenericInOut() {
+void CollectResourceUsage::mapBuiltInToGenericInOut() {
   assert(m_pipelineState->isGraphics());
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value());
@@ -2714,7 +2733,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
 //
 // @param builtInId : Built-in ID
 // @param elemCount : Element count of this built-in
-void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount) {
+void CollectResourceUsage::mapGsBuiltInOutput(unsigned builtInId, unsigned elemCount) {
   assert(m_shaderStage == ShaderStage::Geometry);
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
   auto &inOutUsage = resUsage->inOutUsage.gs;
@@ -2733,7 +2752,7 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 
 // =====================================================================================================================
 // Update the inputLocInfoutputoMap, perPatchInputLocMap and perPrimitiveInputLocMap
-void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
+void CollectResourceUsage::updateInputLocInfoMapWithUnpack() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
   // Remove unused locationInfo
@@ -2889,7 +2908,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
 
 // =====================================================================================================================
 // Clear unused output from outputLocInfoMap, perPatchOutputLocMap, and perPrimitiveOutputLocMap
-void PatchResourceCollect::clearUnusedOutput() {
+void CollectResourceUsage::clearUnusedOutput() {
   auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
@@ -3031,7 +3050,7 @@ void PatchResourceCollect::clearUnusedOutput() {
 
 // =====================================================================================================================
 // Update the outputLocInfoMap, perPatchOutputLocMap, and perPrimitiveOutputLocMap
-void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
+void CollectResourceUsage::updateOutputLocInfoMapWithUnpack() {
   clearUnusedOutput();
 
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
@@ -3275,7 +3294,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 
 // =====================================================================================================================
 // Returns true if the locations for the GS output can be compressed.
-bool PatchResourceCollect::canChangeOutputLocationsForGs() {
+bool CollectResourceUsage::canChangeOutputLocationsForGs() {
   // The GS outputs can only be changed if LGC has access to the fragment shader's inputs.
   if (!m_pipelineState->isUnlinked())
     return true;
@@ -3288,7 +3307,7 @@ bool PatchResourceCollect::canChangeOutputLocationsForGs() {
 
 // =====================================================================================================================
 // Update inputLocInfoMap based on {TCS, GS, FS} input import calls
-void PatchResourceCollect::updateInputLocInfoMapWithPack() {
+void CollectResourceUsage::updateInputLocInfoMapWithPack() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
   inputLocInfoMap.clear();
@@ -3331,7 +3350,7 @@ void PatchResourceCollect::updateInputLocInfoMapWithPack() {
 
 // =====================================================================================================================
 // Update outputLocInfoMap based on inputLocInfoMap of next stage or GS output export calls for copy shader
-void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
+void CollectResourceUsage::updateOutputLocInfoMapWithPack() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   outputLocInfoMap.clear(); // Clear it, will reconstruct
@@ -3461,7 +3480,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
 
 // =====================================================================================================================
 // Re-assemble output export functions based on the locationInfoMap
-void PatchResourceCollect::reassembleOutputExportCalls() {
+void CollectResourceUsage::reassembleOutputExportCalls() {
   if (m_outputCalls.empty())
     return;
   assert(m_pipelineState->canPackOutput(m_shaderStage.value()));
@@ -3524,10 +3543,8 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
       if (elementTy->isHalfTy())
         element = builder.CreateBitCast(element, builder.getInt16Ty());
       element = builder.CreateZExt(element, builder.getInt32Ty());
-    } else if (elementTy->isFloatTy()) {
-      // float -> i32
-      element = builder.CreateBitCast(element, builder.getInt32Ty());
     }
+
     elementsInfo.elements[elemIdx] = element;
     if (bitWidth < 32)
       ++elementsInfo.elemCountOf16bit;
@@ -3560,8 +3577,11 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
         assert(highElem);
         highElem = builder.CreateShl(highElem, 16);
         outValue = builder.CreateOr(outValue, highElem);
+        outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
+      } else if (outValue->getType()->isIntegerTy(32)) {
+        // Convert integer to float
+        outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
       }
-      outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
     } else {
       // Output a vector
       outValue = PoisonValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
@@ -3574,8 +3594,12 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
             // Two 16 - bit elements packed as a 32 - bit scalar
             highElem = builder.CreateShl(highElem, 16);
             component = builder.CreateOr(component, highElem);
+            component = builder.CreateBitCast(component, builder.getFloatTy());
+          } else if (component->getType()->isIntegerTy(32)) {
+            // Convert integer to float
+            component = builder.CreateBitCast(component, builder.getFloatTy());
           }
-          component = builder.CreateBitCast(component, builder.getFloatTy());
+          // If component is already a float, no bitcast needed
           outValue = builder.CreateInsertElement(outValue, component, vectorComp);
         }
       }
@@ -3597,13 +3621,13 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
 // Scalarize last vertex processing stage outputs and {TCS,FS} inputs ready for packing.
 //
 // @param [in/out] module : Module
-void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
+void CollectResourceUsage::scalarizeForInOutPacking(Module *module) {
   // First gather the input/output calls that need scalarizing.
   SmallVector<CallInst *, 4> outputCalls;
   SmallVector<GenericLocationOp *, 4> inputCalls;
 
   struct Payload {
-    PatchResourceCollect *self;
+    CollectResourceUsage *self;
     SmallVectorImpl<GenericLocationOp *> &inputCalls;
   };
   Payload payload = {this, inputCalls};
@@ -3673,7 +3697,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
 // This is known to be an FS generic or interpolant input or TCS input that is either a vector or 64 bit.
 //
 // @param input : The input import op
-void PatchResourceCollect::scalarizeGenericInput(GenericLocationOp *input) {
+void CollectResourceUsage::scalarizeGenericInput(GenericLocationOp *input) {
   BuilderBase builder(input);
   auto *interpolatedInput = dyn_cast<InputImportInterpolatedOp>(input);
   assert(interpolatedInput || isa<InputImportGenericOp>(input));
@@ -3794,7 +3818,7 @@ void PatchResourceCollect::scalarizeGenericInput(GenericLocationOp *input) {
 // This is known to be a last vertex processing stage (VS/TES/GS) generic output that is either a vector or 64 bit.
 //
 // @param call : Call that represents exporting the generic output
-void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
+void CollectResourceUsage::scalarizeGenericOutput(CallInst *call) {
   BuilderBase builder(call->getContext());
   builder.SetInsertPoint(call);
 
@@ -3849,7 +3873,7 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
 
 // =====================================================================================================================
 // Clear non-specified output value in non-fragment shader stages
-void PatchResourceCollect::clearUndefinedOutput() {
+void CollectResourceUsage::clearUndefinedOutput() {
   if (m_shaderStage == ShaderStage::Fragment)
     return;
   // NOTE: If a vector or all used channels in a location are not specified, we can safely drop it and remove the output

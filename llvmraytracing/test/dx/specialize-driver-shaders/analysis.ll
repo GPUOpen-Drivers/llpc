@@ -1,3 +1,4 @@
+; NOTE: Do not autogenerate
 ; RUN: opt --verify-each -passes='specialize-driver-shaders' -S %s -debug-only='specialize-driver-shaders' 2>&1 | FileCheck %s
 ;
 ; REQUIRES: assertions
@@ -29,12 +30,12 @@ declare %args.type @opaque(...)
 
 ; Simple AHS that just forwards args
 ; CHECK-LABEL: [SDS] Analyzing function AnyHit1
-define void @AnyHit1({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
+define void @AnyHit1(i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
 ; CHECK-NEXT: [SDS] Analyzed outgoing call {{.*}} @lgc.cps.jump({{.*}} %args)
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
 ; CHECK-NEXT: [SDS] 0123456789012345678901234567890{{$}}
 ; CHECK-NEXT: [SDS] PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %args)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %args)
   unreachable
 ; CHECK-NEXT: [SDS] Finished analysis of function AnyHit1
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
@@ -53,7 +54,7 @@ define void @AnyHit1({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
 ;  * writes same constants to dword 25 (constant)
 ;  * writes different constants to dword 26 (dynamic)
 ; CHECK-LABEL: [SDS] Analyzing function AnyHit2
-define void @AnyHit2({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
+define void @AnyHit2(i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
 entry:
   %dw0 = extractvalue %args.type %args, 0, 0
   %dw1 = extractvalue %args.type %args, 0, 1
@@ -82,7 +83,7 @@ exit:
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
 ; CHECK-NEXT: [SDS] 0123456789012345678901234567890{{$}}
 ; CHECK-NEXT: [SDS] DDPPPPPPPPCUPPPPPPPPCUCDPCDPPPP{{$}}
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %args.final)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %args.final)
   unreachable
 }
 
@@ -93,7 +94,7 @@ exit:
 ;  * write matching constants to dword 2
 ; CHECK-LABEL: [SDS] Analyzing function AnyHit3
 ;  * write non-matching constants to dword 3
-define void @AnyHit3({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
+define void @AnyHit3(i32, i32, %args.type %args) !lgc.rt.shaderstage !2 {
 entry:
   %dw0 = extractvalue %args.type %args, 0, 0
   %cond = trunc i32 %dw0 to i1
@@ -102,13 +103,13 @@ exit0:
   %tmp0 = insertvalue %args.type %args, i32 -1, 0, 0
   %tmp1 = insertvalue %args.type %tmp0, i32 -1, 0, 2
   %tmp2 = insertvalue %args.type %tmp1, i32 -1, 0, 3
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %tmp2)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %tmp2)
   unreachable
 exit1:
   %tmp3 = insertvalue %args.type %args, i32 -1, 0, 1
   %tmp4 = insertvalue %args.type %tmp3, i32 -1, 0, 2
   %tmp5 = insertvalue %args.type %tmp4, i32 -2, 0, 3
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %tmp5)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %tmp5)
   unreachable
 ; CHECK:      [SDS] Finished analysis of function AnyHit3
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
@@ -124,7 +125,7 @@ exit1:
 ; would be loaded from continuation state and their origin unknown.
 ; This uses lgc.cps.await.
 ; CHECK-LABEL: [SDS] Analyzing function Intersection1
-define void @Intersection1({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
+define void @Intersection1(i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
 entry:
   %dw0 = extractvalue %args.type %args, 0, 0
   %cond = trunc i32 %dw0 to i1
@@ -159,30 +160,15 @@ exit:
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
 ; CHECK-NEXT: [SDS] 0123456789012345678901234567890{{$}}
 ; CHECK-NEXT: [SDS] PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %args.final)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %args.final)
   unreachable
-}
-
-; Basic test that legacy await is also handled.
-; Note: This test is a bit odd, because this is an lgc.cps module, and we only expect legacy awaits in non-lgc.cps modules.
-; Thus, we use the lgc.cps mode version of lgc.cps.jump including a to-be-ignored shader record index.
-; CHECK-LABEL: [SDS] Analyzing function Intersection2
-define void @Intersection2({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
-  %handle = call ptr inttoptr (i32 poison to ptr)(%args.type %args)
-  %awaited = call %args.type @await(ptr %handle)
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %awaited)
-  ret void
-; CHECK:      [SDS] Finished analysis of function Intersection2
-; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
-; CHECK-NEXT: [SDS] 0123456789012345678901234567890{{$}}
-; CHECK-NEXT: [SDS] PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
 }
 
 ; Check that other function calls to non-await functions are not accidentally considered as preserved.
 ; CHECK-LABEL: [SDS] Analyzing function Intersection3
-define void @Intersection3({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
+define void @Intersection3(i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
   %not.awaited = call %args.type @opaque(%args.type %args)
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %not.awaited)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %not.awaited)
   ret void
 ; CHECK:      [SDS] Finished analysis of function Intersection3
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
@@ -201,7 +187,7 @@ define void @Intersection3({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !
 ; dynamic values coming into the phi node. With just a single one, value origin tracking
 ; can see through the phi node and our phi node handling is not triggered.
 ; CHECK-LABEL: [SDS] Analyzing function Intersection4
-define void @Intersection4({}, i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
+define void @Intersection4(i32, i32, %args.type %args) !lgc.rt.shaderstage !1 {
 entry:
   %dw1 = extractvalue %args.type %args, 0, 1
   %args.modified.0 = insertvalue %args.type %args, i32 %dw1, 0, 0
@@ -234,7 +220,7 @@ exit:
 ; CHECK-NEXT: [SDS] 0         1         2         3{{$}}
 ; CHECK-NEXT: [SDS] 0123456789012345678901234567890{{$}}
 ; CHECK-NEXT: [SDS] DCPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %args.final)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %args.final)
   unreachable
 }
 
@@ -242,18 +228,18 @@ declare [4 x i32] @opaqueCandidate()
 
 ; Traversal shader that contains jumps to an AHS setting a dynamic candidate, and a return back to raygen that preserves only parts of the args.
 ; CHECK-LABEL: [SDS] Analyzing function Traversal1 (shader stage compute)
-define void @Traversal1({}, i32 %ret.addr, i32, { [2 x i32], [8 x i32] } %system.data, [4 x i32] %padding, [8 x i32] %payload) !lgc.rt.shaderstage !6 {
+define void @Traversal1(i32 %ret.addr, i32, { [2 x i32], [8 x i32] } %system.data, [4 x i32] %padding, [8 x i32] %payload) !lgc.rt.shaderstage !6 {
   %cond = trunc i32 %ret.addr to i1
   br i1 %cond, label %rgs.resume, label %ahs
 ahs:
   %ahs.system.data.0 = insertvalue { { [2 x i32], [8 x i32] }, [4 x i32] } poison, { [2 x i32], [8 x i32] } %system.data, 0
   %candidate = call [4 x i32] @opaqueCandidate()
   %ahs.system.data = insertvalue { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data.0, [4 x i32] %candidate, 1
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data, [8 x i32] %payload)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data, [8 x i32] %payload)
   unreachable
 rgs.resume:
   %dispatch.system.data = extractvalue { [2 x i32], [8 x i32] } %system.data, 0
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, [2 x i32] %dispatch.system.data, [12 x i32] poison, [8 x i32] %payload)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, [2 x i32] %dispatch.system.data, [12 x i32] poison, [8 x i32] %payload)
   unreachable
 ; CHECK-LABEL: [SDS] Finished analysis of function Traversal1
 ; CHECK-NEXT:  [SDS] 0         1         2
@@ -265,26 +251,26 @@ rgs.resume:
 ; Hypothetical traversal calling an AHS with a larger arg size, and a RGS with smaller arg size.
 ; This tests mismatching incoming vs outgoing arg sizes.
 ; CHECK-LABEL: [SDS] Analyzing function Traversal2 (shader stage compute)
-define void @Traversal2({}, i32 %ret.addr, i32, { [2 x i32], [8 x i32] } %system.data, [8 x i32] %payload) !lgc.rt.shaderstage !6 {
+define void @Traversal2(i32 %ret.addr, i32, { [2 x i32], [8 x i32] } %system.data, [8 x i32] %payload) !lgc.rt.shaderstage !6 {
   %cond = trunc i32 %ret.addr to i1
   br i1 %cond, label %rgs.resume, label %ahs
 ahs:
   %ahs.system.data.0 = insertvalue { { [2 x i32], [8 x i32] }, [4 x i32] } poison, { [2 x i32], [8 x i32] } %system.data, 0
   %candidate = call [4 x i32] @opaqueCandidate()
   %ahs.system.data = insertvalue { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data.0, [4 x i32] %candidate, 1
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data, [8 x i32] %payload)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data, [8 x i32] %payload)
 ; CHECK-NEXT: [SDS] 0         1         2
 ; CHECK-NEXT: [SDS] 0123456789012345678901
 ; CHECK-NEXT: [SDS] PPPPPPPPPPDDDDDDDDDDDD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data, [8 x i32] %payload)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, { { [2 x i32], [8 x i32] }, [4 x i32] } %ahs.system.data, [8 x i32] %payload)
   unreachable
 rgs.resume:
   %dispatch.system.data = extractvalue { [2 x i32], [8 x i32] } %system.data, 0
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, [2 x i32] %dispatch.system.data, [8 x i32] %payload)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, [2 x i32] %dispatch.system.data, [8 x i32] %payload)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 0123456789
 ; CHECK-NEXT: [SDS] PPDDDDDDDD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, [2 x i32] %dispatch.system.data, [8 x i32] %payload)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, [2 x i32] %dispatch.system.data, [8 x i32] %payload)
   unreachable
 ; CHECK-NEXT: [SDS] Finished analysis of function Traversal2
 ; CHECK-NEXT: [SDS] 0         1         2
@@ -297,12 +283,12 @@ rgs.resume:
 ; by extracting the individual dword values, and passing them as scalars to an outgoing jump.
 ; This should be detected as preserve.
 ; CHECK-LABEL: [SDS] Analyzing function JumpWithPaddingInType
-define void @JumpWithPaddingInType({}, i32 %ret.addr, i32, %args.with.padding %args) !lgc.rt.shaderstage !2 {
+define void @JumpWithPaddingInType(i32 %ret.addr, i32, %args.with.padding %args) !lgc.rt.shaderstage !2 {
   %scalar.0 = extractvalue %args.with.padding %args, 0
   %scalar.1 = extractvalue %args.with.padding %args, 1
   %scalar.2 = extractvalue %args.with.padding %args, 2, 0
   %scalar.3 = extractvalue %args.with.padding %args, 2, 1
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i32 %scalar.0, i64 %scalar.1, i32 %scalar.2, i64 %scalar.3)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 %scalar.0, i64 %scalar.1, i32 %scalar.2, i64 %scalar.3)
   unreachable
 ; CHECK-LABEL: [SDS] Finished analysis of function JumpWithPaddingInType
 ; CHECK-NEXT:  [SDS] 0
@@ -312,7 +298,7 @@ define void @JumpWithPaddingInType({}, i32 %ret.addr, i32, %args.with.padding %a
 
 ; Same as above, but for awaits results.
 ; CHECK-LABEL: [SDS] Analyzing function AwaitWithPaddingInType
-define void @AwaitWithPaddingInType({}, i32 %ret.addr, i32, %args.with.padding %args) !lgc.rt.shaderstage !1 {
+define void @AwaitWithPaddingInType(i32 %ret.addr, i32, %args.with.padding %args) !lgc.rt.shaderstage !1 {
   ; Intentionally do not wrap %args in a struct -- instead pretend the await function returns
   ; the elements of %args as separate args, so we can test the mapping of arg slots into the returned struct
   ; with multiple struct elements.
@@ -321,7 +307,7 @@ define void @AwaitWithPaddingInType({}, i32 %ret.addr, i32, %args.with.padding %
   %scalar.1 = extractvalue %args.with.padding %awaited, 1
   %scalar.2 = extractvalue %args.with.padding %awaited, 2, 0
   %scalar.3 = extractvalue %args.with.padding %awaited, 2, 1
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i32 %scalar.0, i64 %scalar.1, i32 %scalar.2, i64 %scalar.3)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 %scalar.0, i64 %scalar.1, i32 %scalar.2, i64 %scalar.3)
   unreachable
 ; CHECK-LABEL: [SDS] Finished analysis of function AwaitWithPaddingInType
 ; CHECK-NEXT:  [SDS] 0
@@ -336,40 +322,40 @@ define void @AwaitWithPaddingInType({}, i32 %ret.addr, i32, %args.with.padding %
 ; For instance, consider the example that forwards an incoming <2 x i16> argument to a bitcast outgoing i32 argument
 ; in the JumpWithOverlappingi16s test case.
 ; CHECK-LABEL: [SDS] Analyzing function JumpWithSinglei16
-define void @JumpWithSinglei16({}, i32 %ret.addr, i32, i16 %arg) !lgc.rt.shaderstage !2 {
+define void @JumpWithSinglei16(i32 %ret.addr, i32, i16 %arg) !lgc.rt.shaderstage !2 {
 ; Forward arg as-is.
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %arg)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %arg)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] D
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %arg)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %arg)
   unreachable
 }
 
 ; Check that we don't treat a misaligned passed-through dword as preserve. Use a packed struct to force misalignment.
 ; CHECK-LABEL: [SDS] Analyzing function JumpWithMisalignedDword
-define void @JumpWithMisalignedDword({}, i32 %ret.addr, i32, <{ i16, i32 }> %args) !lgc.rt.shaderstage !2 {
+define void @JumpWithMisalignedDword(i32 %ret.addr, i32, <{ i16, i32 }> %args) !lgc.rt.shaderstage !2 {
   switch i32 %ret.addr, label %conditional.0 [
     i32 0, label %conditional.0
     i32 1, label %conditional.1
   ]
 conditional.0:
 ; Forward args as-is.
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, <{ i16, i32 }> %args)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, <{ i16, i32 }> %args)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 01
 ; CHECK-NEXT: [SDS] DD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, <{ i16, i32 }> %args)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, <{ i16, i32 }> %args)
   unreachable
 conditional.1:
 ; Forward extracted scalars.
   %scalar.0 = extractvalue <{ i16, i32 }> %args, 0
   %scalar.1 = extractvalue <{ i16, i32 }> %args, 1
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i32 %scalar.1)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i32 %scalar.1)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 01
 ; CHECK-NEXT: [SDS] DD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i32 %scalar.1)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i32 %scalar.1)
   unreachable
   unreachable
 }
@@ -377,28 +363,28 @@ conditional.1:
 ; All cases involving i16 scalars should not be treated as preserve, as the i16 cannot guarantee to preserve high bits.
 ; Additionally, there can be issues with alignment.
 ; CHECK-LABEL: [SDS] Analyzing function JumpWithOverlappingi16s
-define void @JumpWithOverlappingi16s({}, i32 %ret.addr, i32, <2 x i16> %args) !lgc.rt.shaderstage !2 {
+define void @JumpWithOverlappingi16s(i32 %ret.addr, i32, <2 x i16> %args) !lgc.rt.shaderstage !2 {
   switch i32 %ret.addr, label %conditional.2 [
     i32 0, label %conditional.0
     i32 1, label %conditional.1
     i32 2, label %conditional.2
   ]
 conditional.0:
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, <2 x i16> %args)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, <2 x i16> %args)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 01
 ; CHECK-NEXT: [SDS] DD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, <2 x i16> %args)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, <2 x i16> %args)
   unreachable
 conditional.1:
 ; Forward extracted scalars. This preserves arg slots, but we can't detect it.
   %scalar.0 = extractelement <2 x i16> %args, i32 0
   %scalar.1 = extractelement <2 x i16> %args, i32 1
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i16 %scalar.1)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i16 %scalar.1)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 01
 ; CHECK-NEXT: [SDS] DD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i16 %scalar.1)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %scalar.0, i16 %scalar.1)
   unreachable
 conditional.2:
 ; Forward just the bitcast. This does *not* preserve arg slots, as we merge both i16s into a single i32 arg slot.
@@ -407,18 +393,18 @@ conditional.2:
 ; outgoing %bitcast argument with the corresponding incoming argument slot (value %args, offset 0) might come to the conclusion that it is
 ; preserved. But when allowing i16s, we need to additionally account for the incoming high poison bits that are implicit
 ; in the in-memory representation of %args.
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] D
   %bitcast = bitcast <2 x i16> %args to i32
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
   unreachable
 }
 
 ; Same as above, but with awaits.
 ; CHECK-LABEL: [SDS] Analyzing function AwaitWithOverlappingi16s
-define void @AwaitWithOverlappingi16s({}, i32 %ret.addr, i32, <2 x i16> %args) !lgc.rt.shaderstage !2 {
+define void @AwaitWithOverlappingi16s(i32 %ret.addr, i32, <2 x i16> %args) !lgc.rt.shaderstage !2 {
   switch i32 %ret.addr, label %conditional.2 [
     i32 0, label %conditional.0
     i32 1, label %conditional.1
@@ -428,11 +414,11 @@ conditional.0:
 ; Forward args as-is through an await.
   %awaited.0.struct = call { <2 x i16> } (...) @lgc.cps.await__2xi16(i32 poison, i32 poison, i32 poison, <2 x i16> %args)
   %awaited.0 = extractvalue { <2 x i16> } %awaited.0.struct, 0
-; CHECK-LABEL: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, <2 x i16> %awaited.0)
+; CHECK-LABEL: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, <2 x i16> %awaited.0)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 01
 ; CHECK-NEXT: [SDS] DD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, <2 x i16> %awaited.0)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, <2 x i16> %awaited.0)
   unreachable
 conditional.1:
 ; Forward extracted scalars through an await.
@@ -441,33 +427,33 @@ conditional.1:
   %awaited.1.struct = call { i16, i16 } (...) @lgc.cps.await__i16i16(i32 poison, i32 poison, i32 poison, i16 %scalar.0, i16 %scalar.1)
   %awaited.1.0 = extractvalue { i16, i16 } %awaited.1.struct, 0
   %awaited.1.1 = extractvalue { i16, i16 } %awaited.1.struct, 1
-; CHECK:      [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %awaited.1.0, i16 %awaited.1.1)
+; CHECK:      [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %awaited.1.0, i16 %awaited.1.1)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 01
 ; CHECK-NEXT: [SDS] DD
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i16 %awaited.1.0, i16 %awaited.1.1)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i16 %awaited.1.0, i16 %awaited.1.1)
   unreachable
 conditional.2:
 ; Forward just the bitcast. This does *not* preserve arg slots, as we merge both i16s into a single arg slot.
-; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
+; CHECK-NEXT: [SDS] Analyzed outgoing call   call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] 0
 ; CHECK-NEXT: [SDS] D
   %bitcast = bitcast <2 x i16> %args to i32
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 %bitcast)
   unreachable
 }
 
 ; Check that we ignore callable shaders
-define void @Callable({}, i32 %ret.addr, i32, %args.type %args) !lgc.rt.shaderstage !5 {
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %args)
+define void @Callable(i32 %ret.addr, i32, %args.type %args) !lgc.rt.shaderstage !5 {
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %args)
   unreachable
 ; CHECK-NOT: [SDS] Finished analysis of function Callable
 }
 
 ; Check that we ignore launch kernel shaders
-define void @LaunchKernel({}, i32 %ret.addr, i32, %args.type %args) !lgc.rt.shaderstage !7 {
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 poison, %args.type %args)
+define void @LaunchKernel(i32 %ret.addr, i32, %args.type %args) !lgc.rt.shaderstage !7 {
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, %args.type %args)
   unreachable
 ; CHECK-NOT: [SDS] Finished analysis of function LaunchKernel
 }

@@ -31,7 +31,7 @@
 #pragma once
 #include "SystemValues.h"
 #include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -68,7 +68,7 @@ class LowerCooperativeMatrix : public Patch, public llvm::PassInfoMixin<LowerCoo
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch cooperative matrix calls"; }
+  static llvm::StringRef name() { return "Lower cooperative matrix operations"; }
 
   void visitCallInst(llvm::CallInst &callInst);
 
@@ -100,6 +100,9 @@ private:
     // It will only be set on 16bit@Accumulator@gfx10 like:{C0_0,C1_0;C4_0,C5_0}
     llvm::Value *microStep;
 
+    // It will only be set for processing packed 8-bit value
+    llvm::Value *packOffset;
+
     // It will only be set on 16bit @Accumulator @gfx10 like : {C0_0, C1_0; C4_0, C5_0}, which value will
     // be 2.
     unsigned microCount;
@@ -108,7 +111,7 @@ private:
   TypeProperties getTypeProperties(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout) const;
 
   ComputeAddressInfo computeAddressing(CooperativeMatrixLayout layout, CooperativeMatrixElementType elemType,
-                                       int waveSize, llvm::Value *stride, bool isColMajor,
+                                       int waveSize, llvm::Value *stride, bool isColMajor, bool isFromPackedVal,
                                        llvm::Instruction *insertPos);
 
   void visitCooperativeMatrixLengthOp(CooperativeMatrixLengthOp &matrixlength);
@@ -256,6 +259,7 @@ private:
   PipelineState *m_pipelineState = nullptr;
   PipelineShadersResult *m_pipelineShaders = nullptr;
   GfxIpVersion m_gfxIp;
+  llvm::DenseSet<llvm::Value *> m_valPackedInMatrixes;
 };
 
 } // namespace lgc

@@ -29,8 +29,8 @@ define float @_cont_RayTCurrent() {
 
 ; Note: DXILShaderKind::Miss has value 11
 define void @MyMiss(%struct.Payload* %payload) !pointeetys !1 !lgc.rt.shaderstage !16 {
-; CHECK-LABEL: define %struct.DispatchSystemData @MyMiss
-; CHECK-SAME: (i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.registercount [[META5:![0-9]+]] !continuation [[META10:![0-9]+]] {
+; CHECK-LABEL: define void @MyMiss
+; CHECK-SAME: (i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [8 x i32] [[PADDING:%.*]], [1 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.registercount [[META5:![0-9]+]] !continuation [[META10:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [7 x i32], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
@@ -48,7 +48,7 @@ define void @MyMiss(%struct.Payload* %payload) !pointeetys !1 !lgc.rt.shaderstag
 ; CHECK-NEXT:    store i32 [[TMP8]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[TMP10:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], [8 x i32] poison, [1 x i32] [[TMP10]]), !continuation.registercount [[META5]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP9]], [8 x i32] poison, [1 x i32] [[TMP10]]), !continuation.registercount [[META5]]
 ; CHECK-NEXT:    unreachable
 ;
   %1 = call i32 @_AmdGetShaderKind()

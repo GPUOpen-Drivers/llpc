@@ -31,17 +31,12 @@
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Timer.h"

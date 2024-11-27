@@ -38,7 +38,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(i32 268435459)
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(i32 268435459)
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 245, i32 15, i32 15, i1 true)
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 160, i32 15, i32 15, i1 true)
 ; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32
@@ -57,7 +57,7 @@ void main()
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 238, i32 15, i32 15, i1 true)
 ; SHADERTEST: = call i32 @llvm.amdgcn.mov.dpp.i32(i32 %{{.*}}, i32 68, i32 15, i32 15, i1 true)
 ; SHADERTEST: call {{.*}}float @llvm.amdgcn.wqm.f32
-; SHADERTEST: = call <4 x float> (...) @lgc.input.import.interpolated__v4f32(i1 false, i32 4, i32 0, i32 0, i32 poison, i32 0, <2 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.input.import.interpolated__v4f32(i1 false, i32 4, i32 0, i32 0, i32 poison, i32 0, <2 x float>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32
@@ -85,18 +85,6 @@ void main()
 ; SHADERTEST: call float @llvm.amdgcn.interp.p2
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1
 ; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST: call float @llvm.amdgcn.interp.p2
-; SHADERTEST: call float @llvm.amdgcn.interp.p1
-; SHADERTEST-COUNT-3: call float @llvm.amdgcn.interp.p2
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
 ; SHADERTEST: AMDLLPC SUCCESS
 */

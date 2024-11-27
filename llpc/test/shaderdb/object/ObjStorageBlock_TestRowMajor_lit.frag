@@ -51,10 +51,10 @@ void main()
 // SHADERTEST-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(4)
 // SHADERTEST-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP4]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP4]], i32 -1) ]
 // SHADERTEST-NEXT:    [[TMP5:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP4]], align 16
-// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 1065353216, <4 x i32> [[TMP5]], i32 0, i32 0, i32 0)
-// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 1065353216, <4 x i32> [[TMP5]], i32 16, i32 0, i32 0)
-// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 1065353216, <4 x i32> [[TMP5]], i32 32, i32 0, i32 0)
-// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 1065353216, <4 x i32> [[TMP5]], i32 48, i32 0, i32 0)
+// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1065353216, <4 x i32> [[TMP5]], i32 0, i32 0, i32 0)
+// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1065353216, <4 x i32> [[TMP5]], i32 16, i32 0, i32 0)
+// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1065353216, <4 x i32> [[TMP5]], i32 32, i32 0, i32 0)
+// SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1065353216, <4 x i32> [[TMP5]], i32 48, i32 0, i32 0)
 // SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.f32(i32 0, i32 15, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, i1 true, i1 true)
 // SHADERTEST-NEXT:    ret void
 //

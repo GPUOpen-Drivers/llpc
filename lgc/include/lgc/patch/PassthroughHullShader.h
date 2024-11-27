@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "llvm/IR/PassManager.h"
 
@@ -42,7 +42,7 @@ class TcsPassthroughShader : public llvm::PassInfoMixin<TcsPassthroughShader> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for tessellation control pass-through shader generation"; }
+  static llvm::StringRef name() { return "Pass-through hull shader generation"; }
   void updatePipelineState(llvm::Module &module, PipelineState *pipelineState) const;
   llvm::Function *generateTcsPassthroughShader(llvm::Module &module, PipelineShadersResult &pipelineShaders,
                                                PipelineState *pipelineState);

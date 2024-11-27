@@ -34,6 +34,7 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcIlCpsDialect.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Analysis/SimplifyQuery.h"
 #include "llvm/IR/IRBuilder.h"
 
 namespace llvm {
@@ -56,12 +57,12 @@ constexpr unsigned ContinuationStackAlignment = 4;
 class CpsStackLowering {
 public:
   CpsStackLowering(llvm::LLVMContext &Context, unsigned LoweredCpsStackAddrSpace)
-      : TypeLower(Context), LoweredCpsStackAddrSpace{LoweredCpsStackAddrSpace} {
+      : TypeLower(Context), LoweredCpsStackAddrSpace{LoweredCpsStackAddrSpace}, Builder(Context) {
     BasePointer = llvm::ConstantPointerNull::get(
         llvm::PointerType::get(llvm::Type::getInt8Ty(Context), LoweredCpsStackAddrSpace));
   }
-  llvm::Function *lowerCpsStackOps(llvm::Function *Func, llvm::Function *GetGlobalMemBase, bool RequiresIncomingCsp,
-                                   llvm::Value *CspStorage = nullptr);
+
+  llvm::Function *lowerCpsStackOps(llvm::Function *Func, llvm::Function *GetGlobalMemBase, bool RequiresIncomingCsp);
 
   // Get continuation stack size (in bytes).
   unsigned getStackSizeInBytes() { return StackSizeInBytes; }
@@ -83,6 +84,7 @@ private:
   void visitCpsPeek(lgc::cps::PeekOp &);
   void visitSetVsp(lgc::cps::SetVspOp &);
   void visitGetVsp(lgc::cps::GetVspOp &);
+  void visitJump(lgc::cps::JumpOp &);
   void visitGetElementPtr(llvm::GetElementPtrInst &);
   void visitPtrToIntInst(llvm::PtrToIntInst &);
   void visitIntToPtrInst(llvm::IntToPtrInst &);
@@ -111,4 +113,6 @@ private:
   unsigned LoweredCpsStackAddrSpace;
   unsigned StackSizeInBytes = 0;
   llvm::Value *BasePointer = nullptr;
+  llvm_dialects::Builder Builder;
+  std::optional<llvm::SimplifyQuery> SQ;
 };

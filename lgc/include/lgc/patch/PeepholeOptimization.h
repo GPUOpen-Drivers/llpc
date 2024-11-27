@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  PeepholeOptimization.h
- * @brief LLPC header file: contains declaration of class lgc::PatchPeepholeOpt.
+ * @brief LLPC header file: contains declaration of class lgc::PeepholeOptimization.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -45,12 +45,12 @@ namespace lgc {
 //
 // - Change log2 ( const +/- x ) -> log2 ( max ( 0.0, const +/- x ) ) to avoid application underflow.
 //
-class PatchPeepholeOpt final : public llvm::InstVisitor<PatchPeepholeOpt>,
-                               public llvm::PassInfoMixin<PatchPeepholeOpt> {
+class PeepholeOptimization final : public llvm::InstVisitor<PeepholeOptimization>,
+                                   public llvm::PassInfoMixin<PeepholeOptimization> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for peephole optimizations"; }
+  static llvm::StringRef name() { return "Peephole optimizations"; }
 
   void visitIntToPtr(llvm::IntToPtrInst &intToPtr);
   void visitCallInst(llvm::CallInst &callInst);

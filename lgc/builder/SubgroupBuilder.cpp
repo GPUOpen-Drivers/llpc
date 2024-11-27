@@ -425,7 +425,14 @@ Value *BuilderImpl::createSubgroupShuffle(const SubgroupHelperLaneState &state, 
     return result;
   }
 
-  return createShuffleLoop(state, value, index);
+  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
+    Value *const readlane =
+        builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
+    return createWaterfallLoop(cast<Instruction>(readlane), 1);
+  };
+
+  return CreateMapToSimpleType(mapFunc, value, index);
 }
 
 // =====================================================================================================================

@@ -42,7 +42,7 @@ class CollectImageOperations : public llvm::PassInfoMixin<CollectImageOperations
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for image operation collecting"; }
+  static llvm::StringRef name() { return "Collect image operations"; }
 };
 
 } // namespace lgc

@@ -30,8 +30,8 @@ declare !pointeetys !48 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, 
 
 ; Function Attrs: nounwind
 define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !pointeetys !23 {
-; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @Miss(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [4 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META26:![0-9]+]] !continuation.registercount [[META24:![0-9]+]] !continuation [[META27:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-LABEL: define void @Miss(
+; LOWERRAYTRACINGPIPELINE-SAME: i32 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [4 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META26:![0-9]+]] !continuation.registercount [[META24:![0-9]+]] !continuation [[META27:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [30 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_OUTERPAYLOAD:%.*]], align 8
@@ -147,7 +147,7 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !poi
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP119:%.*]] = load i32, ptr [[TMP57]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP119]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP79:%.*]] = load [1 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP125:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [4 x i32], [1 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa4i32a1i32s(i64 4, i32 8, i64 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], [4 x i32] poison, [1 x i32] [[TMP79]]), !continuation.registercount [[META32:![0-9]+]], !continuation.returnedRegistercount [[META32]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP125:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [4 x i32], [1 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa4i32a1i32s(i32 4, i32 8, i32 poison, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]], [4 x i32] poison, [1 x i32] [[TMP79]]), !continuation.registercount [[META32:![0-9]+]], !continuation.returnedRegistercount [[META32]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP61:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [4 x i32], [1 x i32] } [[TMP125]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP61]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP117:%.*]] = freeze [[STRUCT_INNERPAYLOAD]] poison
@@ -255,7 +255,7 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !poi
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP94:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP95:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP94]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP143:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP95]], [4 x i32] poison, [30 x i32] [[TMP143]]), !continuation.registercount [[META24]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP95]], [4 x i32] poison, [30 x i32] [[TMP143]]), !continuation.registercount [[META24]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A", align 4
@@ -277,8 +277,8 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !poi
 
 ; Function Attrs: nounwind
 define void @Callable(%struct.OuterPayload* noalias %outerPayload) #0 !pointeetys !23 {
-; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @Callable(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [4 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage [[META33:![0-9]+]] !continuation.registercount [[META24]] !continuation [[META34:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-LABEL: define void @Callable(
+; LOWERRAYTRACINGPIPELINE-SAME: i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]], [4 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage [[META33:![0-9]+]] !continuation.registercount [[META24]] !continuation [[META34:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_OUTERPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [30 x i32], align 4
@@ -646,7 +646,7 @@ define void @Callable(%struct.OuterPayload* noalias %outerPayload) #0 !pointeety
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP488:%.*]] = load i32, ptr [[TMP270]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP488]], ptr [[TMP269]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP272:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP274:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [4 x i32], [30 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa4i32a30i32s(i64 2, i32 4, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], [4 x i32] poison, [30 x i32] [[TMP272]]), !continuation.registercount [[META24]], !continuation.returnedRegistercount [[META24]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP274:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [4 x i32], [30 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa4i32a30i32s(i32 2, i32 4, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]], [4 x i32] poison, [30 x i32] [[TMP272]]), !continuation.registercount [[META24]], !continuation.returnedRegistercount [[META24]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP490:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [4 x i32], [30 x i32] } [[TMP274]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [30 x i32] [[TMP490]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP358:%.*]] = freeze [[STRUCT_OUTERPAYLOAD]] poison
@@ -956,7 +956,7 @@ define void @Callable(%struct.OuterPayload* noalias %outerPayload) #0 !pointeety
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP484]], ptr [[TMP482]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP382:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP486:%.*]] = load [30 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP382]], [4 x i32] poison, [30 x i32] [[TMP486]]), !continuation.registercount [[META24]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP382]], [4 x i32] poison, [30 x i32] [[TMP486]]), !continuation.registercount [[META24]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
   %1 = alloca %struct.OuterPayload, align 8
@@ -1157,10 +1157,10 @@ declare %dx.types.Handle @dx.op.annotateHandle(i32, %dx.types.Handle, %dx.types.
 declare %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32, %dx.types.Handle) #2
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #3
+declare %struct.DispatchSystemData @_AmdAwaitTraversal(i32, %struct.TraversalData) #3
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData) #3
+declare %struct.DispatchSystemData @_AmdAwaitShader(i32, i32, %struct.DispatchSystemData) #3
 
 ; Function Attrs: alwaysinline
 declare !pointeetys !32 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #3
@@ -1196,7 +1196,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i32 4, %struct.TraversalData %trav_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -1205,7 +1205,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 ; Function Attrs: alwaysinline
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #3 !pointeetys !45 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i32 2, i32 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void

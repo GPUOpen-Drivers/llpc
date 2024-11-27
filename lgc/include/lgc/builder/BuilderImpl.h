@@ -443,10 +443,17 @@ private:
   llvm::Value *modifySamplerDescForGather(llvm::Value *samplerDesc);
 
   // Transform 32-bit image descriptor pointer to a i32 type or a descriptor load instruction.
-  llvm::Value *transformImageDesc(llvm::Value *imageDesc, bool mustLoad, bool isTexelBuffer, llvm::Type *texelType);
+  llvm::Value *transformImageDesc(llvm::Value *imageDesc, bool mustLoad, bool isTexelBuffer);
 
   // Transform 32-bit sampler descriptor pointer to a i32 type or a descriptor load instruction.
-  llvm::Value *transformSamplerDesc(llvm::Value *samplerDesc);
+  llvm::Value *transformSamplerDesc(llvm::Value *samplerDesc, bool mustLoad);
+
+  // Check if we need a full descriptor
+  bool isFullDescriptorNeeded(llvm::Value *descPtr, bool isImage, llvm::Type *origTexelTy = nullptr,
+                              llvm::Type *texelTy = nullptr);
+
+  // Check if the descriptor is uniform
+  bool isUniformDescriptor(llvm::Value *descPtr, unsigned flags, bool isImage);
 
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
@@ -470,6 +477,8 @@ private:
   };
 
   static const unsigned AtomicOpCompareSwap = 1;
+
+  bool m_isFmaskLoad = false; // If set true, we need load a full descriptor
 
   // -------------------------------------------------------------------------------------------------------------------
   // Input/output operations

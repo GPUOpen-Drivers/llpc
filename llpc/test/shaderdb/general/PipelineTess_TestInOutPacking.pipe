@@ -2,31 +2,35 @@
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
 ; SHADERTEST_PP0-LABEL: {{^// LLPC}} pipeline patching results
 
-; SHADERTEST_PP0: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %{{[0-9]*}}, 48
+; SHADERTEST_PP0: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %{{[0-9]*}}, 192
 ; SHADERTEST_PP0: [[P0:%[0-9a-zA-Z.]+]] = getelementptr {{i8|i32}}, ptr addrspace(3) {{.*}}, i32 [[VERTEX_BASE]]
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(44|176)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(45|180)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(46|184)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(47|188)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 1
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 4
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 5
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 8
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 9
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 10
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 12
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(28|112)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(29|116)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(30|120)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(31|124)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(32|128)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(33|132)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(36|144)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(37|148)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(38|152)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(39|156)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(40|160)}}
-; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(41|164)}}
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1536
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1540
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1552
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1556
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1568
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1572
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1576
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1584
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1600
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1616
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1632
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1648
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1652
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1656
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1660
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1664
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1668
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1680
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1684
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1688
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1692
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1696
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1700
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1712
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1716
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1720
+; SHADERTEST_PP0: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1724
 ; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[^,]*}}, float %{{[^,]*}}, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP0: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 1, i32 1, i32 %PrimMask)
@@ -50,31 +54,35 @@
 ; SHADERTEST_PP1: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 1, i32 0, i32 %PrimMask)
 ; Pre-rasterization part-pipeline:
 ; SHADERTEST_PP1-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST_PP1: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %{{[0-9]*}}, 48
-; SHADERTEST_PP1: [[P0:%[0-9a-zA-Z.]+]] = getelementptr i32, ptr addrspace(3) {{.*}}, i32 [[VERTEX_BASE]]
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(44|176)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(45|180)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(46|184)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(47|188)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 1
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 4
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 5
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 8
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 9
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 10
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 12
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(28|112)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(29|116)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(30|120)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(31|124)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(32|128)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(33|132)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(36|144)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(37|148)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(38|152)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(39|156)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(40|160)}}
-; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8|i32}}, ptr addrspace(3) [[P0]], i32 {{(41|164)}}
+; SHADERTEST_PP1: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %{{[0-9]*}}, 192
+; SHADERTEST_PP1: [[P0:%[0-9a-zA-Z.]+]] = getelementptr i8, ptr addrspace(3) {{.*}}, i32 [[VERTEX_BASE]]
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1536
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1540
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1552
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1556
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1568
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1572
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1576
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1584
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1600
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1616
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1632
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1648
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1652
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1656
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1660
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1664
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1668
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1680
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1684
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1688
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1692
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1696
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1700
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1712
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1716
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1720
+; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 1724
 ; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[^,]*}}, float %{{[^,]*}}, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP1: AMDLLPC SUCCESS

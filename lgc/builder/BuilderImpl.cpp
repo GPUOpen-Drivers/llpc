@@ -311,13 +311,7 @@ BranchInst *BuilderCommon::CreateIf(Value *condition, bool wantElse, const Twine
   BasicBlock *ifBlock = BasicBlock::Create(getContext(), "", endIfBlock->getParent(), endIfBlock);
   ifBlock->takeName(endIfBlock);
   endIfBlock->setName(instName + ".endif");
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445640
-  // Old version of the code
-  ifBlock->getInstList().splice(ifBlock->end(), endIfBlock->getInstList(), endIfBlock->begin(), GetInsertPoint());
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   ifBlock->splice(ifBlock->end(), endIfBlock, endIfBlock->begin(), GetInsertPoint());
-#endif
 
   // Replace non-phi uses of the original block with the new "if" block.
   SmallVector<Use *, 4> nonPhiUses;
@@ -944,27 +938,17 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
                              operandIdx, instName, traceNonUniformIndex);
     } else {
       Value *newIntrinsic = nonUniformInstOperand;
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
-      // Old version of the code
-#else
       // When the non-uniform use is in a VGPR, we can save a v_mov by not inserting the amdgcn_waterfall_readfirstlane
       if (!useVgprForOperands)
-#endif
-      newIntrinsic =
-          CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {nonUniformInstOperandTy, nonUniformInstOperandTy},
-                          {waterfallBegin, newIntrinsic}, nullptr, instName);
+        newIntrinsic = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane,
+                                       {nonUniformInstOperandTy, nonUniformInstOperandTy},
+                                       {waterfallBegin, newIntrinsic}, nullptr, instName);
       if (nonUniformInst->getType()->isVoidTy()) {
         // The buffer/image operation we are waterfalling is a store with no return value. Use
         // llvm.amdgcn.waterfall.last.use on the descriptor.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
-        // Old version of the code
-        newIntrinsic = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use, nonUniformInstOperandTy,
-                                       {waterfallBegin, newIntrinsic}, nullptr, instName);
-#else
         newIntrinsic = CreateIntrinsic(useVgprForOperands ? Intrinsic::amdgcn_waterfall_last_use_vgpr
                                                           : Intrinsic::amdgcn_waterfall_last_use,
                                        nonUniformInstOperandTy, {waterfallBegin, newIntrinsic}, nullptr, instName);
-#endif
       }
       // Replace the descriptor operand in the buffer/image operation.
       nonUniformInst->setOperand(operandIdx, newIntrinsic);

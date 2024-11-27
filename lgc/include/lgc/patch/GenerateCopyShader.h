@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -44,7 +44,7 @@ class GenerateCopyShader : public Patch, public llvm::PassInfoMixin<GenerateCopy
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for copy shader generation"; }
+  static llvm::StringRef name() { return "Generate copy shader"; }
 
 private:
   void exportOutput(unsigned streamId, BuilderBase &builder);

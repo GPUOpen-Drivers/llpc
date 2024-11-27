@@ -82,6 +82,9 @@ void createUnreachable(llvm::IRBuilder<> &b);
 // Specifies a memory that is loaded is the last use.
 void setIsLastUseLoad(llvm::LoadInst &Load);
 
+// Handle early returns, ensure the function has only one return instruction
+llvm::ReturnInst *unifyReturns(llvm::Function &function, llvm::IRBuilder<> &builder, const llvm::Twine &blockName = "");
+
 struct CrossModuleInlinerResult {
   llvm::Value *returnValue;
   llvm::iterator_range<llvm::Function::iterator> newBBs;

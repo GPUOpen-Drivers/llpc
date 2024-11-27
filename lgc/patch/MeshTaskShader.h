@@ -85,7 +85,7 @@ struct MeshOutputsLayout {
 // Represents the handler of mesh/task shader.
 class MeshTaskShader {
 public:
-  MeshTaskShader(PipelineState *pipelineState, PatchPreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers);
+  MeshTaskShader(PipelineState *pipelineState, PreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers);
 
   static unsigned layoutMeshShaderLds(PipelineState *pipelineState, llvm::Function *entryPoint,
                                       MeshLdsLayout *ldsLayout = nullptr, MeshOutputsLayout *outputsLayout = nullptr);
@@ -203,7 +203,7 @@ private:
 
   PipelineState *m_pipelineState = nullptr; // Pipeline state
 
-  PatchPreparePipelineAbi::FunctionAnalysisHandlers
+  PreparePipelineAbi::FunctionAnalysisHandlers
       *m_analysisHandlers; // A collection of handler functions to get the analysis info of the given function
 
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage

@@ -169,6 +169,7 @@ public:
   void writeMetadata(Module &module) const;
   void merge(const RegStackUsageImpl &shaderUsage);
   void finalizeAndUpdate(SmallVectorImpl<char> &elfBuffer, size_t startOffset, unsigned frontendGlobalAlignment);
+  const Usage &getUsage() const { return m_usage; }
 
 private:
   // Construct from PAL metadata blob. This is only used internally for the "Re-scan the new blob to check it" code.

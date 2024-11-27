@@ -251,9 +251,7 @@ llvm::Function *createFunctionHelper(llvm::FunctionType *ty, llvm::GlobalValue::
 
   llvm::Function *func = Function::Create(ty, linkage, name);
 
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
   func->setIsNewDbgInfoFormat(module->IsNewDbgInfoFormat);
-#endif
 
   if (createDbgInfo) {
     DIBuilder debugBuilder(*module);

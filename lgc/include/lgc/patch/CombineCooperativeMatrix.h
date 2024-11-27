@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #pragma once
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "llvm/IR/PassManager.h"
 
 namespace lgc {
@@ -42,7 +42,7 @@ class CombineCooperativeMatrix : public Patch, public llvm::PassInfoMixin<Combin
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "lgc-combine-cooperative-matrix"; }
+  static llvm::StringRef name() { return "Combine cooperative matrix operations"; }
 };
 
 } // namespace lgc

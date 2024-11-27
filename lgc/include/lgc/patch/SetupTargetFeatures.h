@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
@@ -43,7 +43,7 @@ class PatchSetupTargetFeatures : public Patch, public llvm::PassInfoMixin<PatchS
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM to set up target features"; }
+  static llvm::StringRef name() { return "Set up target features"; }
 
 private:
   void setupTargetFeatures(llvm::Module *module);

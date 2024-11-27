@@ -31,7 +31,7 @@ void main()
 ; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: fmul reassoc nnan nsz arcp contract afn <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: fsub reassoc nnan nsz arcp contract afn <4 x half> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: fdiv reassoc nnan nsz arcp contract afn <4 x half> <half 0xH3C00, half 0xH3C00, half 0xH3C00, half 0xH3C00>,
+; SHADERTEST: fdiv reassoc nnan nsz arcp contract afn <4 x half> {{(splat \(half 0xH3C00\))|(<half 0xH3C00, half 0xH3C00, half 0xH3C00, half 0xH3C00>)}},
 ; SHADERTEST: fmul reassoc nnan nsz arcp contract afn <4 x half>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: AMDLLPC SUCCESS

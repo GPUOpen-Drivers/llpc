@@ -1,6 +1,7 @@
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' \
+; NOTE: Do not autogenerate
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' \
 ; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=POSTPROCESS-STACKSIZE %s
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata' \
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,remove-types-metadata' \
 ; RUN:     -S %s --lint-abort-on-error | FileCheck -check-prefix=CLEANUP-STATESIZE %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
@@ -28,10 +29,10 @@ declare i32 @_cont_GetContinuationStackAddr() #0
 declare !pointeetys !33 i1 @_cont_ReportHit(%struct.TraversalData* %data, float %t, i32 %hitKind)
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
+declare %struct.DispatchSystemData @_AmdAwaitTraversal(i32, %struct.TraversalData) #0
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i32, i32, %struct.DispatchSystemData) #0
 
 ; Function Attrs: alwaysinline
 declare !pointeetys !17 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
@@ -55,7 +56,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i32 4, %struct.TraversalData %trav_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   ret void
 }
@@ -63,7 +64,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 ; Function Attrs: alwaysinline
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !pointeetys !23 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i32 2, i32 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -109,9 +110,9 @@ define void @mainTrace() {
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 144}
 
 ; CLEANUP-STACKSIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]
-; CLEANUP-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 348}
+; CLEANUP-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 344}
 ; CLEANUP-STATESIZE-DAG: define void @called{{.*}}%struct.DispatchSystemData{{.*}} !continuation.state ![[called_state:[0-9]+]]
-; CLEANUP-STATESIZE-DAG: ![[called_state]] = !{i32 204}
+; CLEANUP-STATESIZE-DAG: ![[called_state]] = !{i32 200}
 
 ; SAVESTATE-STACKSIZE-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[called_stacksize:[0-9]+]]
 ; SAVESTATE-STACKSIZE-DAG: ![[called_stacksize]] = !{i32 348}

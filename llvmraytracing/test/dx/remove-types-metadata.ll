@@ -5,7 +5,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 %dx.types.Handle = type { i8* }
 %struct.DispatchSystemData = type { <3 x i32> }
-%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float, i64 }
+%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float, i32 }
 %struct.SystemData = type { %struct.DispatchSystemData }
 %struct.HitData = type { <3 x float>, <3 x float>, float, i32 }
 %struct.AnyHitTraversalData = type { %struct.TraversalData, %struct.HitData }
@@ -20,11 +20,11 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare i32 @_cont_GetContinuationStackAddr() #0
 
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
+declare %struct.DispatchSystemData @_AmdAwaitTraversal(i32, %struct.TraversalData) #0
 
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i32, %struct.DispatchSystemData) #0
 
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #0
+declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32, %struct.AnyHitTraversalData, float, i32) #0
 
 declare !pointeetys !31 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData*) #0
 
@@ -41,7 +41,7 @@ declare !pointeetys !39 i1 @_cont_IsEndSearch(%struct.TraversalData*) #0
 declare !pointeetys !41 i32 @_cont_HitKind(%struct.SystemData*) #0
 
 ; Function Attrs: nounwind
-declare i64 @_AmdGetResumePointAddr() #1
+declare i32 @_AmdGetResumePointAddr() #1
 
 ; Function Attrs: nounwind
 declare !pointeetys !42 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
@@ -67,9 +67,9 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 ; METADATA-NEXT:    [[DIS_DATA:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], align 4
 ; METADATA-NEXT:    [[SYS_DATA:%.*]] = insertvalue [[STRUCT_SYSTEMDATA:%.*]] undef, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA]], 0
 ; METADATA-NEXT:    [[TRAV_DATA:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA]], 0
-; METADATA-NEXT:    [[ADDR:%.*]] = call i64 @_AmdGetResumePointAddr() #[[ATTR3:[0-9]+]]
-; METADATA-NEXT:    [[TRAV_DATA2:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA]], i64 [[ADDR]], 5
-; METADATA-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[_AMDAWAITTRAVERSAL:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i64 4, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2]])
+; METADATA-NEXT:    [[ADDR:%.*]] = call i32 @_AmdGetResumePointAddr() #[[ATTR3:[0-9]+]]
+; METADATA-NEXT:    [[TRAV_DATA2:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA]], i32 [[ADDR]], 5
+; METADATA-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @[[_AMDAWAITTRAVERSAL:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 4, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2]])
 ; METADATA-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[NEWDATA]], ptr [[DATA]], align 4
 ; METADATA-NEXT:    call void @_AmdRestoreSystemData(ptr [[DATA]])
 ; METADATA-NEXT:    ret void
@@ -77,9 +77,9 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
-  %addr = call i64 @_AmdGetResumePointAddr() #3
-  %trav_data2 = insertvalue %struct.TraversalData %trav_data, i64 %addr, 5
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data2)
+  %addr = call i32 @_AmdGetResumePointAddr() #3
+  %trav_data2 = insertvalue %struct.TraversalData %trav_data, i32 %addr, 5
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i32 4, %struct.TraversalData %trav_data2)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -89,13 +89,13 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !poi
 ; METADATA-LABEL: define void @_cont_CallShader(
 ; METADATA-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]]) #[[ATTR0]] {
 ; METADATA-NEXT:    [[DIS_DATA:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], align 4
-; METADATA-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] [[_AMDAWAITSHADER:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i64 2, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA]])
+; METADATA-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @[[_AMDAWAITSHADER:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 2, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA]])
 ; METADATA-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[NEWDATA]], ptr [[DATA]], align 4
 ; METADATA-NEXT:    call void @_AmdRestoreSystemData(ptr [[DATA]])
 ; METADATA-NEXT:    ret void
 ;
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i32 2, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -110,7 +110,7 @@ define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hi
 ; METADATA-NEXT:    br i1 [[ISNOHIT]], label [[ISEND:%.*]], label [[CALLAHIT:%.*]]
 ; METADATA:       callAHit:
 ; METADATA-NEXT:    [[TRAV_DATA:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[DATA]], align 4
-; METADATA-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] [[_AMDAWAITANYHIT:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i64 3, [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA]], float [[T]], i32 [[HITKIND]])
+; METADATA-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @[[_AMDAWAITANYHIT:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 3, [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA]], float [[T]], i32 [[HITKIND]])
 ; METADATA-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[NEWDATA]], ptr [[DATA]], align 4
 ; METADATA-NEXT:    call void @_AmdRestoreSystemDataAnyHit(ptr [[DATA]])
 ; METADATA-NEXT:    ret i1 true
@@ -125,7 +125,7 @@ define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hi
 
 callAHit:                                         ; preds = %0
   %trav_data = load %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, align 4
-  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
+  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32 3, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
   store %struct.AnyHitTraversalData %newdata, %struct.AnyHitTraversalData* %data, align 4
   call void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData* %data)
   ret i1 true
@@ -195,14 +195,14 @@ define void @MyRayGen() #2 {
 ; METADATA-NEXT:    call void @llvm.lifetime.start.p0(i64 16, ptr [[TMP4]]) #[[ATTR1:[0-9]+]]
 ; METADATA-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
 ; METADATA-NEXT:    store <4 x float> zeroinitializer, ptr [[TMP5]], align 4, !tbaa [[TBAA31:![0-9]+]]
-; METADATA-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
-; METADATA-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE:@[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP6]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
+; METADATA-NEXT:    [[TMP6:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 160, [[DX_TYPES_HANDLE]] [[TMP1]])
+; METADATA-NEXT:    [[TMP7:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE:[a-zA-Z0-9_$\"\\.-]*[a-zA-Z_$\"\\.-][a-zA-Z0-9_$\"\\.-]*]](i32 216, [[DX_TYPES_HANDLE]] [[TMP6]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; METADATA-NEXT:    call void @dx.op.traceRay.struct.RayPayload(i32 157, [[DX_TYPES_HANDLE]] [[TMP7]], i32 16, i32 -1, i32 0, i32 1, i32 0, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0x3F50624DE0000000, float 1.000000e+00, float 0.000000e+00, float 0.000000e+00, float 1.000000e+04, ptr nonnull [[TMP3]])
 ; METADATA-NEXT:    [[TMP8:%.*]] = load <4 x float>, ptr [[TMP5]], align 4, !tbaa [[TBAA31]]
 ; METADATA-NEXT:    [[TMP9:%.*]] = call i32 @dx.op.dispatchRaysIndex.i32(i32 145, i8 0)
 ; METADATA-NEXT:    [[TMP10:%.*]] = call i32 @dx.op.dispatchRaysIndex.i32(i32 145, i8 1)
-; METADATA-NEXT:    [[TMP11:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
-; METADATA-NEXT:    [[TMP12:%.*]] = call [[DX_TYPES_HANDLE]] [[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP11]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
+; METADATA-NEXT:    [[TMP11:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_CREATEHANDLEFORLIB_DX_TYPES_HANDLE]](i32 160, [[DX_TYPES_HANDLE]] [[TMP2]])
+; METADATA-NEXT:    [[TMP12:%.*]] = call [[DX_TYPES_HANDLE]] @[[DX_OP_ANNOTATEHANDLE]](i32 216, [[DX_TYPES_HANDLE]] [[TMP11]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
 ; METADATA-NEXT:    [[TMP13:%.*]] = extractelement <4 x float> [[TMP8]], i64 0
 ; METADATA-NEXT:    [[TMP14:%.*]] = extractelement <4 x float> [[TMP8]], i64 1
 ; METADATA-NEXT:    [[TMP15:%.*]] = extractelement <4 x float> [[TMP8]], i64 2

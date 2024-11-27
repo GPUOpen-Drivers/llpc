@@ -164,13 +164,14 @@ static void disableFastMath(Value *value, bool clearAll) {
   auto it = workSet.begin();
   while (!workSet.empty()) {
     if (isa<FPMathOperator>(*it)) {
-      // Reset fast math flags to default, but maintain nsz and nnan as required.
+      // Reset fast math flags to default, but maintain nsz, nnan and afn as required.
       auto inst = cast<Instruction>(*it);
       FastMathFlags newFmf;
       if (!clearAll) {
         FastMathFlags instFmf = inst->getFastMathFlags();
         newFmf.setNoSignedZeros(instFmf.noSignedZeros());
         newFmf.setNoNaNs(instFmf.noNaNs());
+        newFmf.setApproxFunc(instFmf.approxFunc());
       }
       inst->copyFastMathFlags(newFmf);
     }

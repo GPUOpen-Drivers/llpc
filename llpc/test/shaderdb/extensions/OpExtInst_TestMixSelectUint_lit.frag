@@ -46,7 +46,7 @@ void main()
 // CHECK-NEXT:    [[TMP16:%.*]] = extractelement <3 x i32> [[TMP9]], i64 1
 // CHECK-NEXT:    [[TMP17:%.*]] = select i1 [[DOTNOT2]], i32 [[TMP16]], i32 [[TMP15]]
 // CHECK-NEXT:    [[TMP18:%.*]] = icmp eq i32 [[TMP17]], [[TMP7]]
-// CHECK-NEXT:    [[TMP19:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP18]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+// CHECK-NEXT:    [[TMP19:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP18]], <4 x float> zeroinitializer, <4 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00>)}}
 // CHECK-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP19]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // CHECK-NEXT:    ret void
 //

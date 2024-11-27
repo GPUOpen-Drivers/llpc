@@ -26,7 +26,7 @@
 // The ModuleBunch class, representing a bunch of modules, and a pass manager
 // and analysis manager for it allowing you to run passes on it.
 
-#include "lgc/ModuleBunch.h"
+#include "compilerutils/ModuleBunch.h"
 #include "llvm/IR/PassManagerImpl.h"
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/Support/FormatVariadic.h"

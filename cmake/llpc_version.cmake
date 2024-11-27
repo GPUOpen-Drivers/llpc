@@ -25,6 +25,8 @@
 
 set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 
+include("${LLPC_SOURCE_DIR}/cmake/findllvm.cmake")
+
 macro(add_llpc_version_projects)
     if (NOT TARGET llpc_version)
         # Force the binary directory to account for the possibility that LLPC is

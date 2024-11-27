@@ -133,6 +133,7 @@ enum MemberType : unsigned {
   MemberTypeIndirectCalleeSavedRegs,      // VFX member type: SectionIndirectCalleeSavedRegs
   MemberTypeGpurtFuncTable,               // VFX member type: SectionGpurtFuncTable
   MemberTypeGpurtOption,                  // VFX member type: SectionGpurtOption
+  MemberTypeOutputLocationMap,            // VFX member type: SectionOutputLocationMap
   MemberTypeExtendedRobustness,           // VFX member type: SectionExtendedRobustness
   MemberTypeAdvancedBlendInfo,            // VFX member type: SectionAdvancedBlendInfo
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 73

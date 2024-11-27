@@ -18,7 +18,7 @@ add_llvm_library(LLVMRaytracing
   lib/Continuations.cpp
   lib/ContinuationsLint.cpp
   lib/CpsStackLowering.cpp
-  lib/DXILContIntrinsicPrepare.cpp
+  lib/DXILContPrepareGpurtLibrary.cpp
   lib/DXILContLgcRtOpConverter.cpp
   lib/DXILContPostProcess.cpp
   lib/DXILSupport.cpp
@@ -102,6 +102,12 @@ if(CONTINUATIONS_BUILD_TESTS)
   set(LLVMRAYTRACING_BUILD_TESTS ON)
 endif()
 if(LLVMRAYTRACING_BUILD_TESTS)
+  if (TARGET llpc_version)
+    get_target_property(LLVMRAYTRACING_LIT_DEFINITIONS LLVMRaytracing COMPILE_DEFINITIONS)
+    get_target_property(LIT_DEFINITIONS llpc_version INTERFACE_COMPILE_DEFINITIONS)
+    list(APPEND LIT_DEFINITIONS ${LLVMRAYTRACING_LIT_DEFINITIONS})
+  endif()
+
   add_subdirectory(test)
   add_subdirectory(unittests)
 

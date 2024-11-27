@@ -188,7 +188,6 @@ private:
 
   Result validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo) const;
 
-  bool runPasses(lgc::PassManager *passMgr, llvm::Module *module) const;
   bool linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipelineElf, Context *context);
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);

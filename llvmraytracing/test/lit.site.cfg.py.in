@@ -20,6 +20,12 @@ except KeyError:
 # Propagate CMake options used in lit feature tests.
 config.llvm_assertions = "@LLVM_ENABLE_ASSERTIONS@"
 
+for d in "@LIT_DEFINITIONS@".split(";"):
+    def_split = d.split("=")
+    name = def_split[0].lower()
+    val = def_split[1] if len(def_split) > 1 else "ON"
+    config.available_features.add(name)
+
 import lit.llvm
 lit.llvm.initialize(lit_config, config)
 

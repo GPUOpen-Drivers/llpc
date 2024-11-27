@@ -233,13 +233,6 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
   // Generate the call for reading the input/output.
   Value *result = nullptr;
   switch (m_shaderStage.value()) {
-  case ShaderStage::Vertex: {
-    assert(locationOffset == getInt32(0));
-    result =
-        create<InputImportGenericOp>(resultTy, false, location, getInt32(0), elemIdx, PoisonValue::get(getInt32Ty()));
-    break;
-  }
-
   case ShaderStage::TessControl:
   case ShaderStage::TessEval: {
     assert(!isOutput || m_shaderStage == ShaderStage::TessControl);
@@ -973,9 +966,13 @@ Value *BuilderImpl::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputI
                                            const Twine &instName) {
   assert(isBuiltInInput(builtIn));
   Value *builtInVal = readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
-  if (builtIn == BuiltInViewIndex)
+  if (builtIn == BuiltInViewIndex) {
+    if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+      return getInt32(m_pipelineState->getDeviceIndex());
+    }
     // View index can only use bit[3:0] of view ID register.
     builtInVal = CreateAnd(builtInVal, getInt32(0xF));
+  }
   return builtInVal;
 }
 
@@ -1105,16 +1102,6 @@ void BuilderImpl::getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTw
   auto provokingVtxInfo =
       ShaderInputs::getInput(ShaderInput::ProvokingVtxInfo, BuilderBase::get(*this), *getLgcContext());
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 479645
-  auto laneID = CreateGetLaneNumber();
-  auto quadId = CreateSDiv(laneID, getInt32(4));
-  auto provokingVertex = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(),
-                                         {provokingVtxInfo, CreateMul(quadId, getInt32(2)), getInt32(2)});
-
-  *isOne = CreateICmpEQ(provokingVertex, getInt32(1));
-  *isTwo = CreateICmpEQ(provokingVertex, getInt32(2));
-
-#else
   // Extract 2-bit vertex index from provokingVtxInfo
   auto isTwoMask = CreateAnd(provokingVtxInfo, getInt32(0xAAAAAAAA));
   auto isOneMask =
@@ -1125,7 +1112,6 @@ void BuilderImpl::getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTw
   isOneMask = CreateIntrinsic(getInt64Ty(), Intrinsic::amdgcn_s_wqm, isOneMask);
   *isTwo = CreateIntrinsic(getInt1Ty(), Intrinsic::amdgcn_inverse_ballot, isTwoMask);
   *isOne = CreateIntrinsic(getInt1Ty(), Intrinsic::amdgcn_inverse_ballot, isOneMask);
-#endif
 }
 
 // =====================================================================================================================
@@ -1505,8 +1491,12 @@ Value *BuilderImpl::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInInstanceIndex:
     return ShaderInputs::getInstanceIndex(builder, *getLgcContext());
   case BuiltInViewIndex:
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
+      if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+        return getInt32(m_pipelineState->getDeviceIndex());
+      }
       return ShaderInputs::getSpecialUserData(UserDataMapping::ViewId, builder);
+    }
     return builder.getInt32(0);
   case BuiltInVertexId:
     return ShaderInputs::getInput(ShaderInput::VertexId, builder, *getLgcContext());

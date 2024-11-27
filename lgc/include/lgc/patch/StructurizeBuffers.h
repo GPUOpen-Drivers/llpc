@@ -41,7 +41,7 @@ class StructurizeBuffers : public llvm::PassInfoMixin<StructurizeBuffers> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for structured buffers"; }
+  static llvm::StringRef name() { return "Lower structured buffers operations"; }
 };
 
 } // namespace lgc

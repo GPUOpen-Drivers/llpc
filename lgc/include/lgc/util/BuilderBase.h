@@ -95,6 +95,16 @@ public:
 
   // Create a waterfall end intrinsic.
   llvm::Instruction *CreateWaterfallEnd(llvm::Value *nonUniformInst, llvm::Value *waterfallBegin);
+
+  // Create an "s_setreg" to set specified bits of a hardware register.
+  //
+  // @param hwRegId : The hardware register ID
+  // @param offset: The starting offset
+  // @param size: The size of bits
+  // @param value : The value to set to the register
+  // @param instName : Name to give instruction(s)
+  llvm::Instruction *CreateSetReg(unsigned hwRegId, unsigned offset, unsigned size, llvm::Value *value,
+                                  const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

@@ -339,7 +339,7 @@ void PalMetadata::fixUpRegisters() {
         return gsOutputPrimitiveType;
       };
       // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
-      // see PatchResourceCollect::canUseNgg.
+      // see CollectResourceUsage::canUseNgg.
       auto graphicsRegisters = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
       if (graphicsRegisters.find(Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType) != graphicsRegisters.end()) {
         auto primType = getPrimType();

@@ -212,41 +212,6 @@ uint8_t lgc::cps::getPotentialCpsReturnLevels(RayTracingShaderStage stage) {
 }
 
 // =====================================================================================================================
-// Push the state passed to a lgc::cps::jump op to the stack and return the new
-// continuation stack pointer. Do nothing if there is no state to push.
-void lgc::cps::pushStateToCpsStack(llvm_dialects::Builder &builder, lgc::cps::JumpOp &jumpOp) {
-  Value *State = jumpOp.getState();
-
-  Type *StateType = State->getType();
-  if (StateType->isEmptyTy())
-    return;
-
-  const DataLayout &DL = jumpOp.getModule()->getDataLayout();
-  builder.SetInsertPoint(&jumpOp);
-
-  Value *NewCsp =
-      builder.create<lgc::cps::AllocOp>(builder.getInt32(static_cast<unsigned>(DL.getTypeStoreSize(StateType))));
-  builder.CreateStore(State, NewCsp);
-}
-
-// =====================================================================================================================
-// Load the CPS state from the CPS stack. Reduces the stack pointer by the
-// corresponding state size. Returns the popped state if eligible. If nothing
-// can to be popped, return nullptr. Assume that the builder has its insertion
-// point set after the CSP initializer.
-Value *lgc::cps::popStateFromCpsStack(llvm_dialects::Builder &builder, const DataLayout &DL, Type *stateType) {
-  if (stateType->isEmptyTy())
-    return nullptr;
-
-  ConstantInt *StateSize = builder.getInt32(static_cast<unsigned>(DL.getTypeStoreSize(stateType)));
-  Value *StatePtr = builder.create<lgc::cps::PeekOp>(StateSize);
-  Value *NewState = builder.CreateLoad(stateType, StatePtr);
-  builder.create<lgc::cps::FreeOp>(StateSize);
-
-  return NewState;
-}
-
-// =====================================================================================================================
 // Lower lgc.cps.as.continuation.reference operations into an integer
 // representation of the pointer or a passed relocation. Return the new
 // reference.

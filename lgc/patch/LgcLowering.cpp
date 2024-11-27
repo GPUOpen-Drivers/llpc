@@ -24,11 +24,11 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  Patch.cpp
+ * @file  LgcLowering.cpp
  * @brief LLPC source file: contains implementation of class lgc::Patch.
  ***********************************************************************************************************************
  */
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "GenerateNullFragmentShader.h"
 #include "LowerPopsInterlock.h"
 #include "LowerRayQueryWrapper.h"
@@ -77,12 +77,7 @@
 #include "lgc/util/Debug.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Module.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -100,12 +95,7 @@
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 475156
-// Old version of the code
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/Transforms/Scalar/InferAlignment.h"
-#endif
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/LICM.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
@@ -199,14 +189,14 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
       pipelineState->hasShaderStage(ShaderStage::TessEval))
     passMgr.addPass(TcsPassthroughShader());
 
-  passMgr.addPass(PatchNullFragShader());
-  passMgr.addPass(PatchResourceCollect()); // also removes inactive/unused resources
+  passMgr.addPass(GenerateNullFragmentShader());
+  passMgr.addPass(CollectResourceUsage()); // also removes inactive/unused resources
 
-  // CheckShaderCache depends on PatchResourceCollect
+  // CheckShaderCache depends on CollectResourceUsage
   passMgr.addPass(CheckShaderCache(std::move(checkShaderCacheFunc)));
 
   // First part of lowering to "AMDGCN-style"
-  passMgr.addPass(PatchWorkarounds());
+  passMgr.addPass(ApplyWorkarounds());
   passMgr.addPass(GenerateCopyShader());
   passMgr.addPass(LowerVertexFetch());
   passMgr.addPass(LowerFragColorExport());
@@ -242,7 +232,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     passMgr.addPass(CollectImageOperations());
 
   // Second part of lowering to "AMDGCN-style"
-  passMgr.addPass(PatchPreparePipelineAbi());
+  passMgr.addPass(PreparePipelineAbi());
 
   // Do inlining and global DCE to inline subfunctions that were introduced during preparing pipeline ABI.
   passMgr.addPass(AlwaysInlinerPass());
@@ -407,20 +397,14 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   FunctionPassManager fpm;
   fpm.addPass(InstCombinePass());
   fpm.addPass(SimplifyCFGPass());
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
-  // Old version of the code
-  fpm.addPass(SROAPass());
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
-#endif
   fpm.addPass(EarlyCSEPass(true));
   fpm.addPass(SpeculativeExecutionPass(/* OnlyIfDivergentTarget = */ true));
   fpm.addPass(CorrelatedValuePropagationPass());
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(AggressiveInstCombinePass());
   fpm.addPass(InstCombinePass());
-  fpm.addPass(PatchPeepholeOpt());
+  fpm.addPass(PeepholeOptimization());
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(ReassociatePass());
   LoopPassManager lpm;
@@ -437,15 +421,9 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464212
-  // Old version of the code
-  fpm.addPass(ScalarizerPass());
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   ScalarizerPassOptions scalarizerOptions;
   scalarizerOptions.ScalarizeMinBits = 32;
   fpm.addPass(ScalarizerPass(scalarizerOptions));
-#endif
   fpm.addPass(LowerMulDx9Zero());
   fpm.addPass(ScalarizeLoads());
   fpm.addPass(InstSimplifyPass());
@@ -465,13 +443,8 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
   // uses UniformityAnalysis
-  fpm.addPass(PatchReadFirstLane());
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 475156
-  // Old version of the code
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
+  fpm.addPass(LowerReadFirstLane());
   fpm.addPass(InferAlignmentPass());
-#endif
   fpm.addPass(InstCombinePass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());

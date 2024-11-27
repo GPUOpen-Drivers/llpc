@@ -5,11 +5,11 @@
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[BaryCoord:[^ ]*]] = external addrspace(64) global <3 x float>
-; SHADERTEST: call spir_func <3 x float> @interpolateAtCentroid.v3f32.p64(ptr addrspace(64) @[[BaryCoord]])
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> @interpolateAtCentroid.v3f32.p64(ptr addrspace(64) @[[BaryCoord]])
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; The second argument (i32 32) respects that interpLoc is InterpLocCentroid.
-; SHADERTEST: call <3 x float> (...) @lgc.create.read.bary.coord.v3f32(i32 5287, i32 35,
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.read.bary.coord.v3f32(i32 5287, i32 35,
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %[[InterpCenter0:[^ ]*]] = extractelement <2 x float> %LinearInterpCenter, i64 0
@@ -19,8 +19,8 @@
 ; SHADERTEST: %[[CMP:[0-9]*]] = icmp slt i32 %PrimMask, 0
 ; SHADERTEST: %[[ICoord:[^ ]*]] = select i1 %[[CMP]], float %[[InterpCenter0]], float %[[InterpCentroid0]]
 ; SHADERTEST: %[[JCoord:[^ ]*]] = select i1 %[[CMP]], float %[[InterpCenter1]], float %[[InterpCentroid1]]
-; SHADERTEST: %{{[0-9]*}} = fsub float 1.000000e+00, %[[ICoord]]
-; SHADERTEST: %{{[0-9]*}} = fsub float %{{[0-9]*}}, %[[JCoord]]
+; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract afn float 1.000000e+00, %{{[0-9]*}}
+; SHADERTEST: %{{[0-9]*}} = fsub reassoc nnan nsz arcp contract afn float %{{[0-9]*}}, %{{[0-9]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

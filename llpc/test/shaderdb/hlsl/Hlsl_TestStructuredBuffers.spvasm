@@ -1,16 +1,16 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s -validate-spirv=false | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.load.i32(<4 x i32> [[descriptor:%[0-9]+]], i32 [[index:%[0-9]+]], i32 32, i32 0, i32 0)
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.struct.buffer.load.v4i32(<4 x i32> [[descriptor]], i32 [[index]], i32 [[sink_idx:%.*]], i32 0, i32 0)
-; SHADERTEST: call void @llvm.amdgcn.struct.buffer.store.v4i32(<4 x i32> {{%[0-9]+}}, <4 x i32> {{%[0-9]+}}, i32 [[index]], i32 0, i32 0, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[descriptor:%[0-9]+]], i32 [[index:%[0-9]+]], i32 32, i32 0, i32 0)
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.struct.buffer.load.v4i32{{(\.v4i32)?}}(<4 x i32> [[descriptor]], i32 [[index]], i32 [[sink_idx:%.*]], i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.struct.buffer.store.v4i32{{(\.v4i32)?}}(<4 x i32> {{%[0-9]+}}, <4 x i32> {{%[0-9]+}}, i32 [[index]], i32 0, i32 0, i32 0)
 
 ; SHADERTEST-NOT: mul i32 {{%[0-9]+}}, 48
 ; SHADERTEST-NOT: add i32 {{%.*}}, 32
 ; SHADERTEST-NOT: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> {{%[0-9]+}}, i32 {{%.*}}, i32 0), !invariant.load !!{{[0-9]+}}
 ; SHADERTEST-NOT: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> [[descriptor]], i32 {{%.*}}, i32 0), !invariant.load !!{{[0-9]+}}
 ; SHADERTEST-NOT: shl i32 [[index]], 4
-; SHADERTEST-NOT: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> {{%[0-9]+}}, <4 x i32> [[descriptor]], i32 {{%[0-9]+}}, i32 0, i32 0)
+; SHADERTEST-NOT: call void @llvm.amdgcn.raw.buffer.store.v4i32{{(\.v4i32)?}}(<4 x i32> {{%[0-9]+}}, <4 x i32> [[descriptor]], i32 {{%[0-9]+}}, i32 0, i32 0)
 ; END_SHADERTEST
 
                OpCapability Shader

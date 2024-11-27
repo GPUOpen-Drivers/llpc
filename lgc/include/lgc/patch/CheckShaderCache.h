@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 
@@ -46,7 +46,7 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for checking shader cache"; }
+  static llvm::StringRef name() { return "Check shader cache"; }
 
   // Set the callback function that this pass uses to ask the front-end whether it wants to remove
   // any shader stages. The function takes the LLVM IR module and a per-shader-stage array of input/output

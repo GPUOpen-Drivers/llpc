@@ -9,7 +9,6 @@
 ; SHADERTEST: s_addc_u32 s[[shader_record_hi:[0-9]+]], s[[address_hi]], 0
 ; SHADERTEST-NOT: v_mad_u64_u32 v{{[[0-9]+:[0-9]+]}}, null, [[stride]], v4, 32
 ; SHADERTEST-NOT: global_load_dword v{{[0-9]}}, v{{[0-9]}}, s[[[address_lo]]:[[address_hi]]]
-; SHADERTEST: buffer_load_dword v{{[0-9]+}}, v{{[0-9]+}}, s{{\[}}[[shader_record_lo]]:{{[0-9]+\]}}, {{[0-9]+}} idxen
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -32,6 +32,7 @@
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcCpsDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Analysis.h"
 #include "llvm/IR/PassManager.h"
 
@@ -62,8 +63,10 @@ private:
   Module &Mod;
 
   using JumpVecTy = SmallVector<lgc::cps::JumpOp *>;
+  using AwaitFuncSetTy = SmallSet<Function *, 1>;
   JumpVecTy AllJumps;
-  void collectJumps();
+  AwaitFuncSetTy FuncsWithAwaits;
+  void collectCallInfo();
   void checkJumpTargets();
   void checkSetLocalRootIndex();
 
@@ -101,7 +104,7 @@ ContinuationsLintPassImpl::ContinuationsLintPassImpl(Module &M) : Mod{M}, Messag
 
 void ContinuationsLintPassImpl::run() {
   LLVM_DEBUG(dbgs() << "Run the pass continuations-lint\n");
-  collectJumps();
+  collectCallInfo();
 
   checkJumpTargets();
   checkSetLocalRootIndex();
@@ -113,13 +116,22 @@ void ContinuationsLintPassImpl::run() {
                        false);
 }
 
-void ContinuationsLintPassImpl::collectJumps() {
+void ContinuationsLintPassImpl::collectCallInfo() {
+  struct VisitorState {
+    JumpVecTy &Jumps;
+    AwaitFuncSetTy &FuncsWithAwaits;
+  };
+
   static const auto Visitor =
-      llvm_dialects::VisitorBuilder<JumpVecTy>()
-          .add<lgc::cps::JumpOp>([](JumpVecTy &Jumps, lgc::cps::JumpOp &Op) { Jumps.push_back(&Op); })
+      llvm_dialects::VisitorBuilder<VisitorState>()
+          .add<lgc::cps::JumpOp>([](VisitorState &S, lgc::cps::JumpOp &Op) { S.Jumps.push_back(&Op); })
+          .add<lgc::cps::AwaitOp>(
+              [](VisitorState &S, lgc::cps::AwaitOp &Op) { S.FuncsWithAwaits.insert(Op.getFunction()); })
           .build();
 
-  Visitor.visit(AllJumps, Mod);
+  VisitorState S{AllJumps, FuncsWithAwaits};
+
+  Visitor.visit(S, Mod);
 }
 
 // Check that every possible jump candidate has a valid jump target
@@ -141,6 +153,11 @@ void ContinuationsLintPassImpl::checkSetLocalRootIndex() {
     llvm::forEachCall(*SetF, [&](CallInst &CInst) {
       // Returns true if it is a new value
       Function *Func = CInst.getFunction();
+      // It is allowed to have multiple setLocalRootIndex calls if the call resides in a function that was not yet
+      // split.
+      if (FuncsWithAwaits.contains(Func))
+        return;
+
       auto Inserted = HasSetF.insert(Func);
       Check(Inserted.second, "Found a function with more than one call to setLocalRootIndex", Func);
     });

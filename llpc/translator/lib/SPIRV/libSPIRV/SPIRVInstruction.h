@@ -1560,7 +1560,7 @@ public:
       : ExtSetId(SPIRVWORD_MAX), ScopeId(SPIRVWORD_MAX), ExtOp(ExtOC), ExtSetKind(SetKind) {}
   void setExtSetId(unsigned Set) { ExtSetId = Set; }
   void setExtOp(unsigned ExtOC) { ExtOp = ExtOC; }
-  void setScope(unsigned scope) { ScopeId = scope; }
+  void setScopeId(unsigned scope) { ScopeId = scope; }
   SPIRVId getExtSetId() const { return ExtSetId; }
   SPIRVWord getExtOp() const { return ExtOp; }
   SPIRVWord getScope() const { return ScopeId; }
@@ -1621,7 +1621,7 @@ public:
         // The parent Scope of the member is implicit from DebugTypeComposite lists.
         for (unsigned idx = FirstMemberIdx; idx < Args.size(); idx++) {
           auto member = static_cast<SPIRVExtInst *>(Module->getEntry(Args[idx]));
-          member->setScope(Args[ScopeIdx]);
+          member->setScopeId(Args[ScopeIdx]);
         }
       }
     }

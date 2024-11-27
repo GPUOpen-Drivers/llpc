@@ -18,11 +18,11 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} <2 x float> @InterpolateAtVertexAMD.v2f32.p64.i32
-; SHADERTEST: call {{.*}} <2 x i32> @InterpolateAtVertexAMD.v2i32.p64.i32
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> @InterpolateAtVertexAMD.v2f32.p64.i32
+; SHADERTEST: call <2 x i32> @InterpolateAtVertexAMD.v2i32.p64.i32
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <2 x float> (...) @lgc.input.import.interpolated__v2f32{{.*}}
-; SHADERTEST: call <2 x i32> (...) @lgc.input.import.interpolated__v2i32{{.*}}
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.create.read.generic.input.v2f32{{.*}}
+; SHADERTEST: call <2 x i32> (...) @lgc.create.read.generic.input.v2i32{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

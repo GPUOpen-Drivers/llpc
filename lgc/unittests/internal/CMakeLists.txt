@@ -28,6 +28,7 @@ add_lgc_unittest(LgcInternalTests
 )
 
 target_link_libraries(LgcInternalTests PRIVATE
+  LLVMBinaryFormat
   LLVMCore
   LLVMlgc
 )

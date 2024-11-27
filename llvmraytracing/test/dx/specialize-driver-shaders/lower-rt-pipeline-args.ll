@@ -1,3 +1,4 @@
+; NOTE: Do not autogenerate
 ; RUN: opt --verify-each -passes="dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,sroa,specialize-driver-shaders,lint,remove-types-metadata" -S --lint-abort-on-error -debug-only='specialize-driver-shaders' %s 2>&1 | FileCheck %s
 ;
 ; Test that argument layouts (number of ignored arguments) expected in specialize-driver-shaders matches what lower-raytracing-pipeline does.
@@ -10,7 +11,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 %dx.types.Handle = type { i8* }
 %struct.DispatchSystemData = type { <3 x i32> }
-%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float, i64 }
+%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float, i32 }
 %struct.SystemData = type { %struct.DispatchSystemData }
 %struct.HitData = type { <3 x float>, <3 x float>, float, i32 }
 %struct.AnyHitTraversalData = type { %struct.TraversalData, %struct.HitData }
@@ -32,11 +33,11 @@ define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwin
   ret void
 }
 
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
+declare %struct.DispatchSystemData @_AmdAwaitTraversal(i32, %struct.TraversalData) #0
 
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i32, i32, %struct.DispatchSystemData) #0
 
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, i64, %struct.AnyHitTraversalData, float, i32) #0
+declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32, i32, %struct.AnyHitTraversalData, float, i32) #0
 
 define %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData* %data) #0 !pointeetys !32 {
   %resPtr = getelementptr %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, i32 0, i32 0
@@ -68,7 +69,7 @@ define i1 @_cont_IsEndSearch(%struct.TraversalData*) #0 !pointeetys !40 {
 declare !pointeetys !42 i32 @_cont_HitKind(%struct.SystemData*) #0
 
 ; Function Attrs: nounwind
-declare i64 @_AmdGetResumePointAddr() #1
+declare i32 @_AmdGetResumePointAddr() #1
 
 ; Function Attrs: nounwind
 declare !pointeetys !43 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
@@ -92,9 +93,9 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData zeroinitializer, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData zeroinitializer, %struct.SystemData %sys_data, 0
-  %addr = call i64 @_AmdGetResumePointAddr() #3
-  %trav_data2 = insertvalue %struct.TraversalData %trav_data, i64 %addr, 5
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data2)
+  %addr = call i32 @_AmdGetResumePointAddr() #3
+  %trav_data2 = insertvalue %struct.TraversalData %trav_data, i32 %addr, 5
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i32 4, %struct.TraversalData %trav_data2)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -102,7 +103,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !pointeetys !46 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i32 2, i32 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -116,7 +117,7 @@ define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hi
 
 callAHit:                                         ; preds = %0
   %trav_data = load %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, align 4
-  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, i64 poison, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
+  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32 3, i32 poison, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
   store %struct.AnyHitTraversalData %newdata, %struct.AnyHitTraversalData* %data, align 4
   call void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData* %data)
   ret i1 true
@@ -179,8 +180,8 @@ define float @_cont_RayTCurrent(%struct.DispatchSystemData* nocapture readnone %
 ;         argument incoming to RayGen. This is because we only allow arg preservation *within* Traversal.
 ; CHECK-LABEL: [SDS] Finished analysis of function MyRayGen
 ; CHECK-NEXT:  [SDS] 0         1         2         3         4     {{$}}
-; CHECK-NEXT:  [SDS] 0123456789012345678901234567890123456789012345{{$}}
-; CHECK-NEXT:  [SDS] DDDCCCCCCCCCCCCCCCDDUUUUUUUUUUUUUUUUCUUUUUUCCC{{$}}
+; CHECK-NEXT:  [SDS] 012345678901234567890123456789012345678901234{{$}}
+; CHECK-NEXT:  [SDS] DDDCCCCCCCCCCCCCCCDUUUUUUUUUUUUUUUUCUUUUUUCCC{{$}}
 ;                    ^^^ dynamic dispatch system data
 ;                       ^^^^^^^^^^^^^^^ constant ray
 ;                                      ^^ dynamic raygen.resume return addr
@@ -234,8 +235,8 @@ define void @MyClosestHitShader(%struct.RayPayload* noalias nocapture %payload, 
 ; AnyHit: Payload and committed hit attrs are preserved.
 ; CHECK-LABEL: [SDS] Finished analysis of function MyAnyHitShader
 ; CHECK-NEXT:  [SDS] 0         1         2         3         4     {{$}}
-; CHECK-NEXT:  [SDS] 0123456789012345678901234567890123456789012345{{$}}
-; CHECK-NEXT:  [SDS] DDDDDDDDDDDDDDDDDDDDDDDDDDDDUUUUUUUUPPPPPPPPPP{{$}}
+; CHECK-NEXT:  [SDS] 012345678901234567890123456789012345678901234{{$}}
+; CHECK-NEXT:  [SDS] DDDDDDDDDDDDDDDDDDDDDDDDDDDUUUUUUUUPPPPPPPPPP{{$}}
 define void @MyAnyHitShader(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readnone %attr) #2 !pointeetys !55 {
   %1 = getelementptr inbounds %struct.RayPayload, %struct.RayPayload* %payload, i32 0, i32 0
   %2 = load <4 x float>, <4 x float>* %1, align 4
@@ -292,8 +293,8 @@ define void @MyAnyHitShader(%struct.RayPayload* noalias nocapture %payload, %str
 ; Six Argument slots unused by the small hit attributes are undef.
 ; CHECK-LABEL: [SDS] Finished analysis of function MyIntersectionShader
 ; CHECK-NEXT:  [SDS] 0         1         2         3         4         5         6     {{$}}
-; CHECK-NEXT:  [SDS] 012345678901234567890123456789012345678901234567890123456789012345{{$}}
-; CHECK-NEXT:  [SDS] DDDPPPPPPPPPPPPPPPPPPPPPPPPPDCUUUUUUPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
+; CHECK-NEXT:  [SDS] 01234567890123456789012345678901234567890123456789012345678901234{{$}}
+; CHECK-NEXT:  [SDS] DDDPPPPPPPPPPPPPPPPPPPPPPPPDCUUUUUUPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
 define void @MyIntersectionShader() #2 {
   %1 = alloca %struct.BuiltInTriangleIntersectionAttributes, align 4
   %2 = call float @dx.op.rayTCurrent.f32(i32 154)
@@ -308,8 +309,8 @@ define void @MyIntersectionShader() #2 {
 ; because we don't repeatedly propagate through loops. This could be improved in ValueOriginTracking.
 ; CHECK-LABEL: [SDS] Finished analysis of function MyIntersectionShaderLoop
 ; CHECK-NEXT:  [SDS] 0         1         2         3         4         5         6     {{$}}
-; CHECK-NEXT:  [SDS] 012345678901234567890123456789012345678901234567890123456789012345{{$}}
-; CHECK-NEXT:  [SDS] DDDDDDDDDDDDDDDDDDDDDDDDDDDDDCUUUUUUDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD{{$}}
+; CHECK-NEXT:  [SDS] 01234567890123456789012345678901234567890123456789012345678901234{{$}}
+; CHECK-NEXT:  [SDS] DDDDDDDDDDDDDDDDDDDDDDDDDDDDCUUUUUUDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD{{$}}
 define void @MyIntersectionShaderLoop() #2 {
   %1 = alloca %struct.BuiltInTriangleIntersectionAttributes, align 4
   %2 = call float @dx.op.rayTCurrent.f32(i32 154)
@@ -334,8 +335,8 @@ define void @MyMissShader(%struct.RayPayload* noalias nocapture %payload) #2 !po
 ; Recursive Miss: The passes through the incoming payload to traceRay, but it's treated as dynamic because miss is outside of Traversal.
 ; CHECK-LABEL: [SDS] Finished analysis of function MyMissShaderRecursive
 ; CHECK-NEXT:  [SDS] 0         1         2         3         4     {{$}}
-; CHECK-NEXT:  [SDS] 0123456789012345678901234567890123456789012345{{$}}
-; CHECK-NEXT:  [SDS] DDDCCCCCCCCCCCCCCCDDUUUUUUUUUUUUUUUUDDDDDDDDDD{{$}}
+; CHECK-NEXT:  [SDS] 012345678901234567890123456789012345678901234{{$}}
+; CHECK-NEXT:  [SDS] DDDCCCCCCCCCCCCCCCDUUUUUUUUUUUUUUUUDDDDDDDDDD{{$}}
 define void @MyMissShaderRecursive(%struct.RayPayload* noalias nocapture %payload) #2 !pointeetys !58 {
   %tmp1 = load %dx.types.Handle, %dx.types.Handle* @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
   %tmp6 = call %dx.types.Handle @dx.op.createHandleForLib.dx.types.Handle(i32 160, %dx.types.Handle %tmp1)

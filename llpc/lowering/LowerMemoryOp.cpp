@@ -103,9 +103,9 @@ void LowerMemoryOp::visitExtractElementInst(ExtractElementInst &extractElementIn
 
     if (addrSpace == SPIRAS_Local || addrSpace == SPIRAS_Uniform) {
       Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), extractElementInst.getOperand(1)};
-      auto elementPtr = GetElementPtrInst::Create(src->getType(), loadPtr, idxs, "", &extractElementInst);
+      auto elementPtr = GetElementPtrInst::Create(src->getType(), loadPtr, idxs, "", extractElementInst.getIterator());
       auto elementTy = elementPtr->getResultElementType();
-      auto newLoad = new LoadInst(elementTy, elementPtr, "", &extractElementInst);
+      auto newLoad = new LoadInst(elementTy, elementPtr, "", extractElementInst.getIterator());
       extractElementInst.replaceAllUsesWith(newLoad);
 
       m_preRemoveInsts.insert(&extractElementInst);
@@ -266,15 +266,15 @@ void LowerMemoryOp::expandLoadInst(LoadInst *loadInst, ArrayRef<GetElementPtrIns
 
   bool isType64 = (dynIndex->getType()->getPrimitiveSizeInBits() == 64);
   auto loadTy = loadInst->getType();
-  Instruction *firstLoadValue = new LoadInst(loadTy, getElemPtrs[0], "", false, loadInst);
+  Instruction *firstLoadValue = new LoadInst(loadTy, getElemPtrs[0], "", false, loadInst->getIterator());
 
   for (unsigned i = 1, getElemPtrCount = getElemPtrs.size(); i < getElemPtrCount; ++i) {
     auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i)
                                : ConstantInt::get(Type::getInt32Ty(*m_context), i);
 
-    auto secondLoadValue = new LoadInst(loadTy, getElemPtrs[i], "", false, loadInst);
-    auto cond = new ICmpInst(loadInst, ICmpInst::ICMP_EQ, dynIndex, constIndex);
-    firstLoadValue = SelectInst::Create(cond, secondLoadValue, firstLoadValue, "", loadInst);
+    auto secondLoadValue = new LoadInst(loadTy, getElemPtrs[i], "", false, loadInst->getIterator());
+    auto cond = new ICmpInst(loadInst->getIterator(), ICmpInst::ICMP_EQ, dynIndex, constIndex);
+    firstLoadValue = SelectInst::Create(cond, secondLoadValue, firstLoadValue, "", loadInst->getIterator());
   }
 
   loadInst->replaceAllUsesWith(firstLoadValue);
@@ -347,15 +347,8 @@ void LowerMemoryOp::expandStoreInst(StoreInst *storeInst, ArrayRef<GetElementPtr
     auto storeBlock = checkStoreBlock->splitBasicBlock(storeInst);
     auto endStoreBlock = storeBlock->splitBasicBlock(storeInst);
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 445640
-    // Old version of the code
-    Instruction *checkStoreInsertPos = &checkStoreBlock->getInstList().back();
-    Instruction *storeInsertPos = &storeBlock->getInstList().front();
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
-    Instruction *checkStoreInsertPos = &checkStoreBlock->back();
-    Instruction *storeInsertPos = &storeBlock->front();
-#endif
+    BasicBlock::iterator checkStoreInsertPos = checkStoreBlock->back().getIterator();
+    BasicBlock::iterator storeInsertPos = storeBlock->begin();
 
     auto getElemPtrCountVal = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), getElemPtrCount)
                                        : ConstantInt::get(Type::getInt32Ty(*m_context), getElemPtrCount);
@@ -404,8 +397,8 @@ void LowerMemoryOp::expandStoreInst(StoreInst *storeInst, ArrayRef<GetElementPtr
       auto secondStoreDest = getElemPtrs[i];
       auto constIndex = isType64 ? ConstantInt::get(Type::getInt64Ty(*m_context), i)
                                  : ConstantInt::get(Type::getInt32Ty(*m_context), i);
-      auto cond = new ICmpInst(storeInst, ICmpInst::ICMP_EQ, dynIndex, constIndex);
-      firstStoreDest = SelectInst::Create(cond, secondStoreDest, firstStoreDest, "", storeInst);
+      auto cond = new ICmpInst(storeInst->getIterator(), ICmpInst::ICMP_EQ, dynIndex, constIndex);
+      firstStoreDest = SelectInst::Create(cond, secondStoreDest, firstStoreDest, "", storeInst->getIterator());
     }
 
     storeInst->setOperand(1, firstStoreDest);

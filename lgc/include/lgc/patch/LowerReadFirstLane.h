@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerReadFirstLane.h
- * @brief LLPC header file: contains declaration of class lgc::PatchReadFirstLane.
+ * @brief LLPC header file: contains declaration of class lgc::LowerReadFirstLane.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -34,12 +34,12 @@
 
 namespace lgc {
 
-class PatchReadFirstLane final : public llvm::PassInfoMixin<PatchReadFirstLane> {
+class LowerReadFirstLane final : public llvm::PassInfoMixin<LowerReadFirstLane> {
 public:
-  PatchReadFirstLane();
+  LowerReadFirstLane();
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for readfirstlane optimizations"; }
+  static llvm::StringRef name() { return "Lower readfirstlane optimizations"; }
 };
 
 } // namespace lgc

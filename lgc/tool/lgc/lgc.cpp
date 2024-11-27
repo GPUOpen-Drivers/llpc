@@ -36,7 +36,7 @@
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm-dialects/Dialect/Dialect.h"
@@ -46,13 +46,7 @@
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/IR/Verifier.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#include "llvm/IR/IRPrintingPasses.h"
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
@@ -160,20 +154,6 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   passMgr->addPass(VerifierPass());
   passMgr->addPass(PipelineStateRecorder());
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-  // Old version of the code
-  switch (codegen::getFileType()) {
-  case CGFT_AssemblyFile:
-    passMgr->addPass(PrintModulePass(outStream));
-    break;
-  case CGFT_ObjectFile:
-    passMgr->addPass(BitcodeWriterPass(outStream));
-    break;
-  case CGFT_Null:
-    break;
-  }
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   switch (codegen::getFileType()) {
   case CodeGenFileType::AssemblyFile:
     passMgr->addPass(PrintModulePass(outStream));
@@ -184,7 +164,6 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   case CodeGenFileType::Null:
     break;
   }
-#endif
 
   passMgr->run(module);
   return true;
@@ -256,23 +235,11 @@ int main(int argc, char **argv) {
     assert(optIterator != cl::getRegisteredOptions().end());
     cl::Option *opt = optIterator->second;
     if (opt->getNumOccurrences() == 0)
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-      // Old version of the code
-      *static_cast<cl::opt<CodeGenFileType> *>(opt) = CGFT_AssemblyFile;
-#else
-      // New version of the code (also handles unknown version, which we treat as latest)
       *static_cast<cl::opt<CodeGenFileType> *>(opt) = CodeGenFileType::AssemblyFile;
-#endif
   }
 
   // Create the LgcContext.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-  // Old version of the code
-  std::unique_ptr<TargetMachine> targetMachine(LgcContext::createTargetMachine(gpuName, CodeGenOpt::Level::Default));
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   std::unique_ptr<TargetMachine> targetMachine(LgcContext::createTargetMachine(gpuName, CodeGenOptLevel::Default));
-#endif
   if (!targetMachine) {
     errs() << progName << ": GPU type '" << gpuName << "' not recognized\n";
     return 1;

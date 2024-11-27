@@ -106,14 +106,8 @@ struct CompileInfo {
   optional_bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
   optional_bool enableImplicitInvariantExports; // Whether to enable implicit marking of position exports as invariant
   VfxPipelineType pipelineType;                 // Pipeline type
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-  // Old version of the code
-  std::optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
-#else
-                                // New version of the code (also handles unknown version, which we treat as latest)
   std::optional<llvm::CodeGenOptLevel> optimizationLevel; // The optimization level to pass the compiler
-#endif
-  bool internalRtShaders;       // Whether to enable intrinsics for internal RT shaders
+  bool internalRtShaders;                                 // Whether to enable intrinsics for internal RT shaders
   bool enableColorExportShader; // Enable color export shader, only compile each stage of the pipeline without linking
 };
 

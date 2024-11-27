@@ -25,7 +25,7 @@ void main()
 // CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(4)
 // CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP4]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP4]], i32 -1) ]
 // CHECK-NEXT:    [[TMP5:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP4]], align 16
-// CHECK-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 [[WORKGROUPID1]], <4 x i32> [[TMP5]], i32 0, i32 0, i32 0)
+// CHECK-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 [[WORKGROUPID1]], <4 x i32> [[TMP5]], i32 0, i32 0, i32 0)
 // CHECK-NEXT:    ret void
 //
 //.

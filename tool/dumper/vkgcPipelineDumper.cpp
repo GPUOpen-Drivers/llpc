@@ -713,6 +713,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
   dumpFile << "options.imageSampleDrefReturnsRgba = " << shaderInfo->options.imageSampleDrefReturnsRgba << "\n";
   dumpFile << "options.disableGlPositionOpt = " << shaderInfo->options.disableGlPositionOpt << "\n";
+  dumpFile << "options.viewIndexFromDeviceIndex = " << shaderInfo->options.viewIndexFromDeviceIndex << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -959,6 +960,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << glStatePrefix << "enableLineSmooth = " << options->getGlState().enableLineSmooth << "\n";
   dumpFile << glStatePrefix << "emulateWideLineStipple = " << options->getGlState().emulateWideLineStipple << "\n";
   dumpFile << glStatePrefix << "enablePointSmooth = " << options->getGlState().enablePointSmooth << "\n";
+  dumpFile << glStatePrefix << "enableRemapLocation = " << options->getGlState().enableRemapLocation << "\n";
   dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
   dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
   dumpFile << "options.optimizePointSizeWrite = " << options->optimizePointSizeWrite << "\n";
@@ -1058,6 +1060,27 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
                << "\n";
       dumpFile << "colorBuffer[" << i << "].blendEnable = " << cbTarget->blendEnable << "\n";
       dumpFile << "colorBuffer[" << i << "].blendSrcAlphaToColor = " << cbTarget->blendSrcAlphaToColor << "\n";
+    }
+  }
+
+  // Note: Remaps output locations according to the location map.
+  auto outLocationMaps = pipelineInfo->outLocationMaps;
+  if (outLocationMaps != nullptr) {
+    for (unsigned i = 0; i < ShaderStageFragment; ++i) {
+      if (outLocationMaps[i].count > 0) {
+        unsigned outLocationMapsCount = outLocationMaps[i].count;
+        dumpFile << "outLocationMaps[" << i << "].oldLocation = ";
+        for (unsigned j = 0; j < outLocationMapsCount - 1; j++)
+          dumpFile << outLocationMaps[i].oldLocation[j] << ", ";
+        dumpFile << outLocationMaps[i].oldLocation[outLocationMapsCount - 1] << "\n";
+
+        dumpFile << "outLocationMaps[" << i << "].newLocation = ";
+        for (unsigned j = 0; j < outLocationMapsCount - 1; j++)
+          dumpFile << outLocationMaps[i].newLocation[j] << ", ";
+        dumpFile << outLocationMaps[i].newLocation[outLocationMapsCount - 1] << "\n";
+
+        dumpFile << "outLocationMaps[" << i << "].count = " << outLocationMaps[i].count << "\n";
+      }
     }
   }
 
@@ -1580,6 +1603,20 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   hasher.Update(pipeline->dynamicTopology);
   hasher.Update(pipeline->enableInitUndefZero);
 
+  // Note: Remaps output locations according to the location map.
+  auto outLocationMaps = pipeline->outLocationMaps;
+  if (outLocationMaps != nullptr && unlinkedShaderType != UnlinkedStageFragment) {
+    for (unsigned i = 0; i < ShaderStageFragment; ++i) {
+      if (outLocationMaps[i].count > 0) {
+        hasher.Update(reinterpret_cast<const uint8_t *>(outLocationMaps->oldLocation),
+                      sizeof(uint32_t) * outLocationMaps->count);
+        hasher.Update(reinterpret_cast<const uint8_t *>(outLocationMaps->newLocation),
+                      sizeof(uint32_t) * outLocationMaps->count);
+        hasher.Update(outLocationMaps[i].count);
+      }
+    }
+  }
+
   if (unlinkedShaderType == UnlinkedStageFragment && isCacheHash)
     hasher.Update(pipeline->enableColorExportShader);
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, unlinkedShaderType);
@@ -1587,10 +1624,6 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   if (unlinkedShaderType != UnlinkedStageFragment) {
     if (!pipeline->enableUberFetchShader) {
       updateHashForVertexInputState(pipeline->pVertexInput, pipeline->dynamicVertexStride, &hasher);
-      if (pipeline->getGlState().vbAddressLowBitsKnown) {
-        hasher.Update(pipeline->getGlState().vbAddressLowBitsKnown);
-        hasher.Update(pipeline->getGlState().vbAddressLowBits, pipeline->pVertexInput->vertexAttributeDescriptionCount);
-      }
     }
 
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
@@ -1603,21 +1636,10 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   if (pipeline->clientMetadataSize > 0) {
     hasher.Update(reinterpret_cast<const uint8_t *>(pipeline->pClientMetadata), pipeline->clientMetadataSize);
   }
-  for (unsigned i = 0; i < pipeline->getGlState().numUniformConstantMaps; i++) {
-    if (pipeline->getGlState().ppUniformMaps[i] != nullptr) {
-      updateHashForUniformConstantMap(pipeline->getGlState().ppUniformMaps[i], &hasher);
-    }
-  }
 
   hasher.Update(pipeline->advancedBlendInfo.enableAdvancedBlend);
   hasher.Update(pipeline->advancedBlendInfo.enableRov);
   hasher.Update(pipeline->advancedBlendInfo.binding);
-
-  hasher.Update(pipeline->glState.enableColorClampVs);
-  hasher.Update(pipeline->glState.enableColorClampFs);
-  hasher.Update(pipeline->glState.enableFlatShade);
-  hasher.Update(pipeline->glState.enableMapClipDistMask);
-  hasher.Update(pipeline->glState.alphaTestFunc);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1783,6 +1805,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   bool enableNgg = nggState->enableNgg;
 
   auto iaState = &pipeline->iaState;
+  auto glState = &pipeline->getGlState();
   if (enableNgg) {
     hasher->Update(iaState->topology);
     hasher->Update(pipeline->rsState.provokingVertexMode);
@@ -1840,15 +1863,30 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (pipeline->iaState.tessLevel)
     hasher->Update(*pipeline->iaState.tessLevel);
 
-  hasher->Update(pipeline->getGlState().apiXfbOutData.forceDisableStreamOut);
-  for (unsigned i = 0; i < pipeline->getGlState().apiXfbOutData.numXfbOutInfo; i++) {
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].isBuiltIn);
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].location);
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].component);
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].xfbBuffer);
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].xfbOffset);
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].xfbStride);
-    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].streamId);
+  if (pipeline->getGlState().vbAddressLowBitsKnown) {
+    hasher->Update(glState->vbAddressLowBitsKnown);
+    hasher->Update(glState->vbAddressLowBits);
+  }
+
+  hasher->Update(glState->enableMapClipDistMask);
+  hasher->Update(glState->enableFlatShade);
+  hasher->Update(glState->enableColorClampVs);
+  hasher->Update(glState->apiXfbOutData.forceDisableStreamOut);
+
+  for (unsigned i = 0; i < glState->apiXfbOutData.numXfbOutInfo; i++) {
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].isBuiltIn);
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].location);
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].component);
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].xfbBuffer);
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].xfbOffset);
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].xfbStride);
+    hasher->Update(glState->apiXfbOutData.pXfbOutInfos[i].streamId);
+  }
+
+  unsigned nonFragmentStageBit = ~ShaderStageFragmentBit;
+  for (unsigned i = 0; i < glState->numUniformConstantMaps; i++) {
+    if (glState->ppUniformMaps[i] != nullptr && (glState->ppUniformMaps[i]->visibility & nonFragmentStageBit))
+      updateHashForUniformConstantMap(glState->ppUniformMaps[i], hasher);
   }
 }
 
@@ -1859,6 +1897,8 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 // @param [in/out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
   auto rsState = &pipeline->rsState;
+  auto glState = &pipeline->getGlState();
+
   hasher->Update(rsState->perSampleShading);
   hasher->Update(rsState->pixelShaderSamples);
 
@@ -1885,7 +1925,23 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     hasher->Update(cbState->target[i].format);
   }
 
-  hasher->Update(pipeline->getGlState().originUpperLeft);
+  hasher->Update(glState->originUpperLeft);
+  hasher->Update(glState->enableBitmap);
+  hasher->Update(glState->enableBitmapLsb);
+  hasher->Update(glState->enableTwoSideLighting);
+  hasher->Update(glState->drawPixelsType);
+  hasher->Update(glState->enableColorClampFs);
+  hasher->Update(glState->enableFlatShade);
+  hasher->Update(glState->alphaTestFunc);
+  hasher->Update(glState->pixelTransferScale);
+  hasher->Update(glState->pixelTransferBias);
+  hasher->Update(glState->lineSmooth);
+  hasher->Update(glState->pointSmooth);
+
+  for (unsigned i = 0; i < glState->numUniformConstantMaps; i++) {
+    if (glState->ppUniformMaps[i] != nullptr && (glState->ppUniformMaps[i]->visibility & ShaderStageFragmentBit))
+      updateHashForUniformConstantMap(pipeline->getGlState().ppUniformMaps[i], hasher);
+  }
 }
 
 // =====================================================================================================================
@@ -1943,6 +1999,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().enableLineSmooth);
   hasher->Update(options->getGlState().emulateWideLineStipple);
   hasher->Update(options->getGlState().enablePointSmooth);
+  hasher->Update(options->getGlState().enableRemapLocation);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
   hasher->Update(options->optimizePointSizeWrite);
 }
@@ -2034,6 +2091,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.forwardPropagateNoContract);
       hasher->Update(options.imageSampleDrefReturnsRgba);
       hasher->Update(options.disableGlPositionOpt);
+      hasher->Update(options.viewIndexFromDeviceIndex);
     }
   }
 }

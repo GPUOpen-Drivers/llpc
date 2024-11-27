@@ -971,7 +971,7 @@ public:
   // @param resultTy : Result type
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor or texel buffer descriptor.
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor.
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
   // @param instName : Name to give instruction(s)
@@ -988,8 +988,8 @@ public:
   // @param resultTy : Result type
   // @param dim : Image dimension, 2DMsaa or 2DArrayMsaa
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor
-  // @param fmaskDesc : Fmask descriptor
+  // @param imageDesc : The pointer to the image descriptor
+  // @param fmaskDesc : The pointer to the fmask descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width for given dimension excluding sample
   // @param sampleNum : Sample number, i32
   // @param instName : Name to give instruction(s)
@@ -1002,7 +1002,7 @@ public:
   // @param texel : Texel value to store; v4i16, v4i32, v4f16 or v4f32
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param mipLevel : Mipmap level if doing store_mip, otherwise nullptr
   // @param instName : Name to give instruction(s)
@@ -1021,8 +1021,8 @@ public:
   // @param resultTy : Result type
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor
-  // @param samplerDesc : Sampler descriptor
+  // @param imageDesc : The pointer to the image descriptor
+  // @param samplerDesc : The pointer to the sampler descriptor
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
@@ -1054,8 +1054,8 @@ public:
   // @param resultTy : Result type
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor
-  // @param samplerDesc : Sampler descriptor
+  // @param imageDesc : The pointer to the image descriptor
+  // @param samplerDesc : The pointer to the sampler descriptor
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
@@ -1072,7 +1072,7 @@ public:
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
   // @param ordering : Atomic ordering
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param inputValue : Input value: i32
   // @param instName : Name to give instruction(s)
@@ -1088,7 +1088,7 @@ public:
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
   // @param ordering : Atomic ordering
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param inputValue : Input value: i32
   // @param comparatorValue : Value to compare against: i32
@@ -1101,7 +1101,7 @@ public:
   //
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageQueryLevels(unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                       const llvm::Twine &instName = "");
@@ -1110,7 +1110,7 @@ public:
   //
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageQuerySamples(unsigned dim, unsigned flags, llvm::Value *imageDesc,
                                        const llvm::Twine &instName = "");
@@ -1120,7 +1120,7 @@ public:
   //
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param lod : LOD
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageQuerySize(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *lod,
@@ -1132,8 +1132,8 @@ public:
   //
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor
-  // @param samplerDesc : Sampler descriptor
+  // @param imageDesc : The pointer to the image descriptor
+  // @param samplerDesc : The pointer to the sampler descriptor
   // @param coord : Coordinates: scalar or vector f32, exactly right width without array layer
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
@@ -1143,7 +1143,7 @@ public:
   //
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : Image descriptor or texel buffer descriptor
+  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
   // @param sampleId : Sample ID
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageGetSamplePosition(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *sampleId,

@@ -66,6 +66,16 @@ static bool isInResources(Value *Handle, Metadata *MD) {
   return false;
 }
 
+static bool isAnyDxilLoad(StringRef Name) {
+  static const char *const LoadFunctions[] = {"dx.op.bufferLoad", "dx.op.rawBufferLoad", "dx.op.sample",
+                                              "dx.op.textureLoad"};
+
+  for (const auto *LoadFunc : LoadFunctions)
+    if (Name.starts_with(LoadFunc))
+      return true;
+  return false;
+}
+
 /// Check if a load comes from constant memory (SRV or CBV) and can be
 /// rematerialized.
 ///
@@ -76,17 +86,7 @@ static bool isInResources(Value *Handle, Metadata *MD) {
 /// check that, so we rematerialize all constant loads.
 static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
   // First, check if this is a dxil load
-  static const char *const LoadFunctions[] = {"dx.op.bufferLoad", "dx.op.rawBufferLoad", "dx.op.sample",
-                                              "dx.op.textureLoad"};
-
-  bool IsLoad = false;
-  for (const auto *LoadFunc : LoadFunctions) {
-    if (CalledName.starts_with(LoadFunc)) {
-      IsLoad = true;
-      break;
-    }
-  }
-  if (!IsLoad)
+  if (!isAnyDxilLoad(CalledName))
     return false;
 
   // Get the buffer handle
@@ -113,13 +113,43 @@ static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
     // in SRVs or CBVs
     if (isInResources(Handle, MD->getOperand(0).get()) || isInResources(Handle, MD->getOperand(2).get()))
       return true;
-  } else {
-    // Failing the check in release mode is fine, but we still want to know
-    // cases where this does not match, so assert in that case.
-    assert(false && "A handle should originate from a load instruction");
+    else
+      return false;
   }
 
-  // Not found in the lists, so not a constant buffer
+  // If we fail to match the above LoadInst then this is an unhandled pattern
+  // or a pattern we do not want to rematerialize. Note, it is always safe to
+  // return 'false' in the case of unhandled patterns.
+
+  LLVM_DEBUG({
+    auto IsDoNotRematerializeCase = [&]() {
+      // These patterns are recognized cases that we don't want to remat:
+      //
+      // Do not rematerialize an indirect handle load. Doing so would replace a
+      // store and N loads (from/to continuation state) by 2N loads (N is the
+      // number of resume functions using the value). 2N loads because every
+      // resume function would need to load the handle from cont state followed
+      // by the buffer load. For example:
+      //  %284 = call %dx.types.ResRet.i32 @dx.op.rawBufferLoad.i32(i32 139, %dx.types.Handle %281, ...
+      //  %285 = extractvalue %dx.types.ResRet.i32 %284, 0
+      //  %286 = call %dx.types.Handle @dx.op.createHandleFromHeap(i32 218, i32 %285, ...
+      //  %287 = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %286, ...
+      //  %289 = call %dx.types.ResRet.i32 @dx.op.rawBufferLoad.i32(i32 139, %dx.types.Handle %287, ...
+      // Where %dx.types.ResRet.i32 is an aggregate like { i32, i32, i32, i32, ...}
+      if (auto *EV = dyn_cast<ExtractValueInst>(Handle))
+        if (auto *HandleCall = dyn_cast<Instruction>(EV->getAggregateOperand()))
+          if (auto *BFCall = dyn_cast<CallInst>(HandleCall))
+            if (BFCall->getCalledFunction()->getName().starts_with("dx.op.rawBufferLoad"))
+              return true;
+      return false;
+    };
+
+    if (!IsDoNotRematerializeCase()) {
+      dbgs() << "Warning: isRematerializableDxilLoad unhandled pattern: ";
+      Handle->dump();
+    }
+  });
+
   return false;
 }
 

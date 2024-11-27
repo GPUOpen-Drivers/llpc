@@ -61,7 +61,7 @@ void main()
 // SHADERTEST-NEXT:    [[TMP17:%.*]] = and i1 [[TMP15]], [[TMP16]]
 // SHADERTEST-NEXT:    [[TMP18:%.*]] = fcmp oge half [[TMP7]], [[TMP8]]
 // SHADERTEST-NEXT:    [[TMP19:%.*]] = or i1 [[TMP17]], [[TMP18]]
-// SHADERTEST-NEXT:    [[TMP20:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP19]], <3 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, <3 x float> zeroinitializer
+// SHADERTEST-NEXT:    [[TMP20:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP19]], <3 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00>)}}, <3 x float> zeroinitializer
 // SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<3 x float> [[TMP20]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // SHADERTEST-NEXT:    ret void
 //

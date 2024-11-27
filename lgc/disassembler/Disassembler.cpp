@@ -175,15 +175,9 @@ static void disassembleArchive(MemoryBufferRef data, raw_ostream &ostream) {
   }
 
   if (!err) {
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 472105
     Expected<std::unique_ptr<MemoryBuffer>> newArchive =
         writeArchiveToBuffer(disassembledMembers, SymtabWritingMode::NoSymtab, object::Archive::Kind::K_GNU,
                              /*Deterministic=*/true, /*Thin=*/false);
-#else
-    Expected<std::unique_ptr<MemoryBuffer>> newArchive =
-        writeArchiveToBuffer(disassembledMembers, /*WriteSymtab=*/false, object::Archive::Kind::K_GNU,
-                             /*Deterministic=*/true, /*Thin=*/false);
-#endif
     if (!newArchive)
       err = newArchive.takeError();
     else
@@ -240,13 +234,8 @@ void ObjDisassembler::run() {
   if (!m_target)
     report_fatal_error(m_objFile->getFileName() + ": '" + m_tripleName + "': " + error);
 
-    // Get the CPU name.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444152
-  Optional<StringRef> mcpu = m_objFile->tryGetCPUName();
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
+  // Get the CPU name.
   std::optional<StringRef> mcpu = m_objFile->tryGetCPUName();
-#endif
   if (!mcpu)
     report_fatal_error(m_objFile->getFileName() + ": Cannot get CPU name");
 

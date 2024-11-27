@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/CollectImageOperations.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"

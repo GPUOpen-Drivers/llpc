@@ -38,7 +38,7 @@
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PalMetadata.h"
 #include "llvm/Support/Debug.h"
 
@@ -137,6 +137,7 @@ static CpsLevel getCpsLevelFromRtStage(int stage) {
 PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the Continufy pass \n");
   LLVMContext &context = module.getContext();
+  ContHelper::setStackAddrspace(module, ContStackAddrspace::ScratchLLPC);
 
   llvm_dialects::Builder builder(context);
   SmallVector<Instruction *> tobeErased;
@@ -196,8 +197,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
           if (retValue)
             tailArgs.push_back(retValue);
 
-          builder.create<JumpOp>(fnPtr->getArg(1), getReturnedLevels(currentRtStage.value()),
-                                 PoisonValue::get(StructType::get(context, {})) /* state */, poisonI32 /* csp */,
+          builder.create<JumpOp>(fnPtr->getArg(1), getReturnedLevels(currentRtStage.value()), poisonI32 /* csp */,
                                  poisonI32 /* rcr */, tailArgs);
         }
 

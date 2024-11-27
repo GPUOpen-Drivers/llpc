@@ -31,7 +31,7 @@ void main()
 // CHECK-NEXT:    [[TMP5:%.*]] = or i32 [[TMP3]], [[TMP4]]
 // CHECK-NEXT:    [[DOTFR:%.*]] = freeze i32 [[TMP5]]
 // CHECK-NEXT:    [[DOTNOT:%.*]] = icmp eq i32 [[DOTFR]], 0
-// CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[DOTNOT]], <4 x float> <float 5.000000e-01, float 5.000000e-01, float 5.000000e-01, float 5.000000e-01>, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+// CHECK-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[DOTNOT]], <4 x float> {{(splat \(float 5\.000000e\-01\))|(<float 5\.000000e\-01, float 5\.000000e\-01, float 5\.000000e\-01, float 5\.000000e\-01>)}}, <4 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00>)}}
 // CHECK-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[SPEC_SELECT]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // CHECK-NEXT:    ret void
 //

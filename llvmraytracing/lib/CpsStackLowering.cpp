@@ -31,6 +31,7 @@
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
+#include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
@@ -59,24 +60,18 @@ SmallVector<Type *> CpsStackLowering::convertStackPtrToI32(TypeLowering &TypeLow
 //                          can be converted with ptrtoint.
 // @param RequiresIncomingCsp: Whether the CSP argument should be appended to
 //                             Func's signature.
-// @param CpsStorage : the alloca used for the holding the latest continuation
-//                     stack pointer. TODO Remove this argument. This function
-//                     should be responsible for adding the alloca.
 // @return: The new function, if Function was mutated, or the Function argument.
-Function *CpsStackLowering::lowerCpsStackOps(Function *Func, Function *GetGlobalMemBase, bool RequiresIncomingCsp,
-                                             llvm::Value *CspStorage) {
+Function *CpsStackLowering::lowerCpsStackOps(Function *Func, Function *GetGlobalMemBase, bool RequiresIncomingCsp) {
   Mod = Func->getParent();
   StackSizeInBytes = 0;
 
-  if (CspStorage)
-    CpsStackAlloca = cast<AllocaInst>(CspStorage);
-  else
-    Func = addOrInitCsp(Func, GetGlobalMemBase, RequiresIncomingCsp);
+  Func = addOrInitCsp(Func, GetGlobalMemBase, RequiresIncomingCsp);
 
   TypeLower.addRule(
       std::bind(&CpsStackLowering::convertStackPtrToI32, this, std::placeholders::_1, std::placeholders::_2));
   if (lgc::cps::isCpsFunction(*Func))
     Func = TypeLower.lowerFunctionArguments(*Func);
+  SQ.emplace(Func->getDataLayout());
 
   static const auto Visitor = llvm_dialects::VisitorBuilder<CpsStackLowering>()
                                   .nest(&TypeLowering::registerVisitors)
@@ -85,6 +80,7 @@ Function *CpsStackLowering::lowerCpsStackOps(Function *Func, Function *GetGlobal
                                   .add(&CpsStackLowering::visitCpsPeek)
                                   .add(&CpsStackLowering::visitSetVsp)
                                   .add(&CpsStackLowering::visitGetVsp)
+                                  .add(&CpsStackLowering::visitJump)
                                   .add(&CpsStackLowering::visitGetElementPtr)
                                   .add(&CpsStackLowering::visitPtrToIntInst)
                                   .add(&CpsStackLowering::visitIntToPtrInst)
@@ -183,6 +179,28 @@ void CpsStackLowering::visitStore(llvm::StoreInst &Store) {
 }
 
 // =====================================================================================================================
+// Lower lgc.cps.jump instruction
+//
+// @param JumpOp: the instruction
+void CpsStackLowering::visitJump(lgc::cps::JumpOp &JumpOp) {
+  Builder.SetInsertPoint(&JumpOp);
+  Value *CSP = loadCsp(Builder);
+
+  // Update previously lowered arguments
+  SmallVector<Value *> TailArgs{JumpOp.getTail()};
+  for (auto &Arg : TailArgs) {
+    SmallVector<Value *> Mappings = TypeLower.getValueOptional(Arg);
+    if (!Mappings.empty()) {
+      assert(Mappings.size() == 1);
+      Arg = Mappings[0];
+    }
+  }
+
+  auto *NewJumpOp = JumpOp.replaceTail(TailArgs);
+  NewJumpOp->setCsp(CSP);
+}
+
+// =====================================================================================================================
 // Add stack pointer to a lgc.ilcps.continue call
 //
 // @param Continue: the instruction
@@ -247,20 +265,29 @@ void CpsStackLowering::visitBitCastInst(llvm::BitCastInst &BC) {
 // @param AllocOp: the instruction
 void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
   IRBuilder<> Builder(&AllocOp);
-
-  Value *VSP = loadCsp(Builder);
-
   Value *Size = AllocOp.getSize();
-  int AlignedSize = cast<ConstantInt>(Size)->getSExtValue();
+
+  if (Instruction *Inst = dyn_cast<Instruction>(Size))
+    if (auto *NewSize = llvm::simplifyInstruction(Inst, *SQ))
+      Size = NewSize;
+
+  Value *CSP = loadCsp(Builder);
+
+  // align Size to ContinuationStackAlignment
+  ConstantInt *Const = cast<ConstantInt>(Size);
+  int AlignedSize = Const->getSExtValue();
   assert(AlignedSize >= 0);
-  AlignedSize = alignTo(AlignedSize, ContinuationStackAlignment);
-  StackSizeInBytes += AlignedSize;
+  if (AlignedSize > 0) {
+    AlignedSize = alignTo(AlignedSize, ContinuationStackAlignment);
+    StackSizeInBytes += AlignedSize;
+    Size = Builder.getInt32(AlignedSize);
+  }
 
-  // update stack pointer
-  Value *NewVSP = Builder.CreateAdd(VSP, Builder.getInt32(AlignedSize));
-  Builder.CreateStore(NewVSP, CpsStackAlloca);
+  Value *NewCSP = Builder.CreateAdd(CSP, Size);
 
-  TypeLower.replaceInstruction(&AllocOp, {VSP});
+  Builder.CreateStore(NewCSP, CpsStackAlloca);
+
+  TypeLower.replaceInstruction(&AllocOp, {CSP});
 }
 
 // =====================================================================================================================
@@ -269,17 +296,26 @@ void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
 // @param FreeOp: the instruction
 void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
   IRBuilder<> Builder(&FreeOp);
-
-  Value *VSP = loadCsp(Builder);
-
   Value *Size = FreeOp.getSize();
-  int AlignedSize = cast<ConstantInt>(Size)->getSExtValue();
+
+  if (Instruction *Inst = dyn_cast<Instruction>(Size))
+    if (auto *NewSize = llvm::simplifyInstruction(Inst, *SQ))
+      Size = NewSize;
+
+  Value *CSP = loadCsp(Builder);
+
+  // align Size to ContinuationStackAlignment and subtract from CSP
+  ConstantInt *Const = cast<ConstantInt>(Size);
+  int AlignedSize = Const->getSExtValue();
   assert(AlignedSize >= 0);
-  AlignedSize = alignTo(AlignedSize, ContinuationStackAlignment);
-  Value *Ptr = Builder.CreateAdd(VSP, Builder.getInt32(-AlignedSize));
+  if (AlignedSize > 0) {
+    AlignedSize = alignTo(AlignedSize, ContinuationStackAlignment);
+    Size = Builder.getInt32(-AlignedSize);
+    CSP = Builder.CreateAdd(CSP, Size);
+  }
 
   // Assuming continuation stack grows upward.
-  Builder.CreateStore(Ptr, CpsStackAlloca);
+  Builder.CreateStore(CSP, CpsStackAlloca);
   TypeLower.replaceInstruction(&FreeOp, {});
 }
 
@@ -377,19 +413,18 @@ Function *CpsStackLowering::addOrInitCsp(Function *F, Function *GetGlobalMemBase
     auto *FTy = F->getFunctionType();
     SmallVector<Type *> NewArgTys{FTy->params()};
 
-    const size_t CspArgIndex = lgc::cps::isCpsFunction(*F) ? 1 : 0;
-    NewArgTys.insert(NewArgTys.begin() + CspArgIndex, Builder.getInt32Ty());
+    NewArgTys.insert(NewArgTys.begin(), Builder.getInt32Ty());
 
     Function *NewFunc = CompilerUtils::mutateFunctionArguments(*F, F->getReturnType(), NewArgTys, F->getAttributes());
 
-    Argument *CspArg = NewFunc->getArg(CspArgIndex);
+    Argument *CspArg = NewFunc->getArg(0);
     CspArg->setName("cspInit");
     Initializer = CspArg;
 
     for (unsigned Idx = 0; Idx < F->arg_size(); ++Idx) {
       // Skip the CSP argument during remapping.
       Value *OldArg = F->getArg(Idx);
-      Value *NewArg = NewFunc->getArg(Idx >= CspArgIndex ? Idx + 1 : Idx);
+      Value *NewArg = NewFunc->getArg(Idx + 1);
       NewArg->takeName(OldArg);
       OldArg->replaceAllUsesWith(NewArg);
     }

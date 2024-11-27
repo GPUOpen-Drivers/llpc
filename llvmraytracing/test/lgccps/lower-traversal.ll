@@ -12,11 +12,11 @@ declare  !pointeetys !6 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, 
 declare !pointeetys !10 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-declare i64 @_AmdGetCurrentFuncAddr()
+declare i32 @_AmdGetCurrentFuncAddr()
 
 define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal(ptr addrspace(5) %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !3 {
 ; CHECK-ATTRSIZE-16-LABEL: define dso_local spir_func void @_cont_Traversal(
-; CHECK-ATTRSIZE-16-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [7 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META5:![0-9]+]] !lgc.rt.shaderstage [[META6:![0-9]+]] !lgc.cps [[META7:![0-9]+]] !continuation [[META8:![0-9]+]] {
+; CHECK-ATTRSIZE-16-SAME: i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [7 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META5:![0-9]+]] !lgc.rt.shaderstage [[META6:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META7:![0-9]+]] !continuation [[META8:![0-9]+]] {
 ; CHECK-ATTRSIZE-16-NEXT:  .entry:
 ; CHECK-ATTRSIZE-16-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } }, align 16, addrspace(5)
 ; CHECK-ATTRSIZE-16-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [8 x i32], align 4
@@ -124,7 +124,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_2_7_INSERT:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_6_INSERT]], i32 [[TMP42]], 2, 7
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_2_8_INSERT:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_7_INSERT]], i64 [[TMP44]], 2, 8
 ; CHECK-ATTRSIZE-16-NEXT:    [[TMP109:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-16-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0128_0_EXTRACT_TRUNC]], i32 -1, {} poison, i32 [[DOTSROA_0130_0_EXTRACT_TRUNC]], i32 poison, i32 [[DOT0]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT]], [7 x i32] poison, [8 x i32] [[TMP109]]), !continuation.registercount [[META0:![0-9]+]]
+; CHECK-ATTRSIZE-16-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0128_0_EXTRACT_TRUNC]], i32 -1, i32 [[DOTSROA_0130_0_EXTRACT_TRUNC]], i32 poison, i32 [[DOT0]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT]], [7 x i32] poison, [8 x i32] [[TMP109]]), !continuation.registercount [[META0]]
 ; CHECK-ATTRSIZE-16-NEXT:    unreachable
 ; CHECK-ATTRSIZE-16:       68:
 ; CHECK-ATTRSIZE-16-NEXT:    [[TMP68:%.*]] = shl i32 [[DOTFR]], 3
@@ -175,9 +175,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-16-NEXT:    [[OR_COND:%.*]] = or i1 [[TMP103]], [[DOTNOT540]]
 ; CHECK-ATTRSIZE-16-NEXT:    br i1 [[OR_COND]], label [[TMP107]], label [[TMP104:%.*]]
 ; CHECK-ATTRSIZE-16:       105:
-; CHECK-ATTRSIZE-16-NEXT:    [[TMP105:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @_cont_Traversal)
-; CHECK-ATTRSIZE-16-NEXT:    [[TMP106:%.*]] = zext i32 [[TMP105]] to i64
-; CHECK-ATTRSIZE-16-NEXT:    [[DOTSROA_0320_0_EXTRACT_TRUNC:%.*]] = trunc i64 [[TMP106]] to i32
+; CHECK-ATTRSIZE-16-NEXT:    [[TMP106:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @_cont_Traversal)
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_0_0_INSERT322:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } poison, <3 x i32> [[TMP2]], 0, 0
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_0_1_INSERT323:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_0_0_INSERT322]], i32 [[TMP83]], 0, 1
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_1_0_INSERT324:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_0_1_INSERT323]], i64 [[TMP6]], 1, 0
@@ -201,19 +199,19 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_2_7_INSERT342:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_6_INSERT341]], i32 [[TMP42]], 2, 7
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_2_8_INSERT343:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_7_INSERT342]], i64 [[TMP44]], 2, 8
 ; CHECK-ATTRSIZE-16-NEXT:    [[TMP108:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-16-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0150_0_VEC_EXTRACT]], i32 -1, {} poison, i32 poison, i32 [[DOTSROA_0320_0_EXTRACT_TRUNC]], i32 [[TMP83]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT343]], [7 x i32] poison, [8 x i32] [[TMP108]]), !continuation.registercount [[META0]]
+; CHECK-ATTRSIZE-16-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0150_0_VEC_EXTRACT]], i32 -1, i32 poison, i32 [[TMP106]], i32 [[TMP83]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT343]], [7 x i32] poison, [8 x i32] [[TMP108]]), !continuation.registercount [[META0]]
 ; CHECK-ATTRSIZE-16-NEXT:    unreachable
-; CHECK-ATTRSIZE-16:       109:
+; CHECK-ATTRSIZE-16:       108:
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTSROA_7_0:%.*]] = phi i32 [ [[TMP4]], [[DOTEXIT2]] ], [ [[TMP83]], [[DOTEXIT5]] ]
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTSROA_0373_0_EXTRACT_TRUNC:%.*]] = trunc i64 [[TMP44]] to i32
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue { <3 x i32>, i32 } poison, <3 x i32> [[TMP2]], 0
 ; CHECK-ATTRSIZE-16-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue { <3 x i32>, i32 } [[DOTFCA_0_INSERT]], i32 [[DOTSROA_7_0]], 1
 ; CHECK-ATTRSIZE-16-NEXT:    [[TMP110:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-16-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0373_0_EXTRACT_TRUNC]], i32 -1, {} poison, i32 poison, i32 poison, i32 [[DOTSROA_7_0]], { <3 x i32>, i32 } [[DOTFCA_1_INSERT]], [34 x i32] poison, [8 x i32] [[TMP110]]), !continuation.registercount [[META0]]
+; CHECK-ATTRSIZE-16-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0373_0_EXTRACT_TRUNC]], i32 -1, i32 poison, i32 poison, i32 [[DOTSROA_7_0]], { <3 x i32>, i32 } [[DOTFCA_1_INSERT]], [34 x i32] poison, [8 x i32] [[TMP110]]), !continuation.registercount [[META0]]
 ; CHECK-ATTRSIZE-16-NEXT:    unreachable
 ;
 ; CHECK-ATTRSIZE-8-LABEL: define dso_local spir_func void @_cont_Traversal(
-; CHECK-ATTRSIZE-8-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [5 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META4:![0-9]+]] !lgc.rt.shaderstage [[META5:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation [[META7:![0-9]+]] {
+; CHECK-ATTRSIZE-8-SAME: i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [5 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META4:![0-9]+]] !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation [[META7:![0-9]+]] {
 ; CHECK-ATTRSIZE-8-NEXT:  .entry:
 ; CHECK-ATTRSIZE-8-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } }, align 16, addrspace(5)
 ; CHECK-ATTRSIZE-8-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [8 x i32], align 4
@@ -321,7 +319,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_2_7_INSERT:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_6_INSERT]], i32 [[TMP42]], 2, 7
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_2_8_INSERT:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_7_INSERT]], i64 [[TMP44]], 2, 8
 ; CHECK-ATTRSIZE-8-NEXT:    [[TMP109:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-8-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0128_0_EXTRACT_TRUNC]], i32 -1, {} poison, i32 [[DOTSROA_0130_0_EXTRACT_TRUNC]], i32 poison, i32 [[DOT0]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT]], [5 x i32] poison, [8 x i32] [[TMP109]]), !continuation.registercount [[META0:![0-9]+]]
+; CHECK-ATTRSIZE-8-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0128_0_EXTRACT_TRUNC]], i32 -1, i32 [[DOTSROA_0130_0_EXTRACT_TRUNC]], i32 poison, i32 [[DOT0]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT]], [5 x i32] poison, [8 x i32] [[TMP109]]), !continuation.registercount [[META0]]
 ; CHECK-ATTRSIZE-8-NEXT:    unreachable
 ; CHECK-ATTRSIZE-8:       68:
 ; CHECK-ATTRSIZE-8-NEXT:    [[TMP68:%.*]] = shl i32 [[DOTFR]], 3
@@ -372,9 +370,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-8-NEXT:    [[OR_COND:%.*]] = or i1 [[TMP103]], [[DOTNOT540]]
 ; CHECK-ATTRSIZE-8-NEXT:    br i1 [[OR_COND]], label [[TMP107]], label [[TMP104:%.*]]
 ; CHECK-ATTRSIZE-8:       105:
-; CHECK-ATTRSIZE-8-NEXT:    [[TMP105:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @_cont_Traversal)
-; CHECK-ATTRSIZE-8-NEXT:    [[TMP106:%.*]] = zext i32 [[TMP105]] to i64
-; CHECK-ATTRSIZE-8-NEXT:    [[DOTSROA_0320_0_EXTRACT_TRUNC:%.*]] = trunc i64 [[TMP106]] to i32
+; CHECK-ATTRSIZE-8-NEXT:    [[TMP106:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @_cont_Traversal)
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_0_0_INSERT322:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } poison, <3 x i32> [[TMP2]], 0, 0
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_0_1_INSERT323:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_0_0_INSERT322]], i32 [[TMP83]], 0, 1
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_1_0_INSERT324:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_0_1_INSERT323]], i64 [[TMP6]], 1, 0
@@ -398,15 +394,15 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_2_7_INSERT342:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_6_INSERT341]], i32 [[TMP42]], 2, 7
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_2_8_INSERT343:%.*]] = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_7_INSERT342]], i64 [[TMP44]], 2, 8
 ; CHECK-ATTRSIZE-8-NEXT:    [[TMP108:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-8-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0150_0_VEC_EXTRACT]], i32 -1, {} poison, i32 poison, i32 [[DOTSROA_0320_0_EXTRACT_TRUNC]], i32 [[TMP83]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT343]], [5 x i32] poison, [8 x i32] [[TMP108]]), !continuation.registercount [[META0]]
+; CHECK-ATTRSIZE-8-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0150_0_VEC_EXTRACT]], i32 -1, i32 poison, i32 [[TMP106]], i32 [[TMP83]], { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } [[DOTFCA_2_8_INSERT343]], [5 x i32] poison, [8 x i32] [[TMP108]]), !continuation.registercount [[META0]]
 ; CHECK-ATTRSIZE-8-NEXT:    unreachable
-; CHECK-ATTRSIZE-8:       109:
+; CHECK-ATTRSIZE-8:       108:
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTSROA_7_0:%.*]] = phi i32 [ [[TMP4]], [[DOTEXIT2]] ], [ [[TMP83]], [[DOTEXIT5]] ]
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTSROA_0373_0_EXTRACT_TRUNC:%.*]] = trunc i64 [[TMP44]] to i32
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue { <3 x i32>, i32 } poison, <3 x i32> [[TMP2]], 0
 ; CHECK-ATTRSIZE-8-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue { <3 x i32>, i32 } [[DOTFCA_0_INSERT]], i32 [[DOTSROA_7_0]], 1
 ; CHECK-ATTRSIZE-8-NEXT:    [[TMP110:%.*]] = load [8 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-8-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0373_0_EXTRACT_TRUNC]], i32 -1, {} poison, i32 poison, i32 poison, i32 [[DOTSROA_7_0]], { <3 x i32>, i32 } [[DOTFCA_1_INSERT]], [32 x i32] poison, [8 x i32] [[TMP110]]), !continuation.registercount [[META0]]
+; CHECK-ATTRSIZE-8-NEXT:    call void (...) @lgc.cps.jump(i32 [[DOTSROA_0373_0_EXTRACT_TRUNC]], i32 -1, i32 poison, i32 poison, i32 [[DOTSROA_7_0]], { <3 x i32>, i32 } [[DOTFCA_1_INSERT]], [32 x i32] poison, [8 x i32] [[TMP110]]), !continuation.registercount [[META0]]
 ; CHECK-ATTRSIZE-8-NEXT:    unreachable
 ;
 .entry:
@@ -515,7 +511,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
   %.fca.2.6.insert = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.5.insert, i32 %41, 2, 6
   %.fca.2.7.insert = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.6.insert, i32 %43, 2, 7
   %.fca.2.8.insert = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.7.insert, i64 %45, 2, 8
-  call void (...) @lgc.cps.jump(i32 %.sroa.0128.0.extract.trunc, i32 -1, {} poison, i32 %.sroa.0130.0.extract.trunc, i32 poison, i32 %.0, { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.8.insert)
+  call void (...) @lgc.cps.jump(i32 %.sroa.0128.0.extract.trunc, i32 -1, i32 %.sroa.0130.0.extract.trunc, i32 poison, i32 %.0, { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.8.insert)
   unreachable
 
 68:                                               ; preds = %.entry
@@ -570,8 +566,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
   br i1 %or.cond, label %106, label %105
 
 105:                                              ; preds = %.exit5
-  %addr = call i64 @_AmdGetCurrentFuncAddr()
-  %.sroa.0320.0.extract.trunc = trunc i64 %addr to i32
+  %addr = call i32 @_AmdGetCurrentFuncAddr()
   %.fca.0.0.insert322 = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } poison, <3 x i32> %3, 0, 0
   %.fca.0.1.insert323 = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.0.0.insert322, i32 %84, 0, 1
   %.fca.1.0.insert324 = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.0.1.insert323, i64 %7, 1, 0
@@ -594,7 +589,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
   %.fca.2.6.insert341 = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.5.insert340, i32 %41, 2, 6
   %.fca.2.7.insert342 = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.6.insert341, i32 %43, 2, 7
   %.fca.2.8.insert343 = insertvalue { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.7.insert342, i64 %45, 2, 8
-  call void (...) @lgc.cps.jump(i32 %.sroa.0150.0.vec.extract, i32 -1, {} poison, i32 poison, i32 %.sroa.0320.0.extract.trunc, i32 %84, { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.8.insert343)
+  call void (...) @lgc.cps.jump(i32 %.sroa.0150.0.vec.extract, i32 -1, i32 poison, i32 %addr, i32 %84, { { <3 x i32>, i32 }, { i64, i32, i32, <3 x float>, <3 x float>, float, float }, { { float, i32, i32, i32, i32 }, <2 x float>, i32, i32, i32, i32, i32, i32, i64 } } %.fca.2.8.insert343)
   unreachable
 
 106:                                              ; preds = %.exit5, %.exit2
@@ -602,7 +597,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
   %.sroa.0373.0.extract.trunc = trunc i64 %45 to i32
   %.fca.0.insert = insertvalue { <3 x i32>, i32 } poison, <3 x i32> %3, 0
   %.fca.1.insert = insertvalue { <3 x i32>, i32 } %.fca.0.insert, i32 %.sroa.7.0, 1
-  call void (...) @lgc.cps.jump(i32 %.sroa.0373.0.extract.trunc, i32 -1, {} poison, i32 poison, i32 poison, i32 %.sroa.7.0, { <3 x i32>, i32 } %.fca.1.insert)
+  call void (...) @lgc.cps.jump(i32 %.sroa.0373.0.extract.trunc, i32 -1, i32 poison, i32 poison, i32 %.sroa.7.0, { <3 x i32>, i32 } %.fca.1.insert)
   unreachable
 }
 
