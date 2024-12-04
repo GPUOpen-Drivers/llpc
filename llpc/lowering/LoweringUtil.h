@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "SPIRVInternal.h"
 #include "llpc.h"
 
 namespace llvm {
@@ -77,4 +78,6 @@ llvm::BasicBlock *clearBlock(llvm::Function *func);
 // Clear non entry external functions
 void clearNonEntryFunctions(llvm::Module *module, llvm::StringRef entryName);
 
+// Get in/out meta data recursively.
+void decodeInOutMetaRecursively(llvm::Type *valueTy, llvm::Constant *mds, llvm::SmallVector<ShaderInOutMetadata> &out);
 } // namespace Llpc

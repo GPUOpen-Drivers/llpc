@@ -10,34 +10,28 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !5 !continuation.entry !0 !continuation !3 {
+define void @RayGen(i32 %cspInit, i32 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !3 !continuation.entry !4 !continuation !5 {
 ; CHECK-LABEL: define void @RayGen(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[DUMMYRETADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] {
-; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[DUMMYRETADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] {
 ; CHECK-NEXT:    ret void
 ;
   ret void
 }
 
-define void @RayGen.resume.0(i64 %0, %struct.DispatchSystemData %1) !lgc.rt.shaderstage !5 !continuation !3 {
+define void @RayGen.resume.0(i32 %cspInit, i32 %0, %struct.DispatchSystemData %1) !lgc.rt.shaderstage !3 !continuation !5 {
 ; CHECK-LABEL: define void @RayGen.resume.0(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage [[META3]] !continuation [[META5]] {
-; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage [[META3]] !continuation [[META5]] {
 ; CHECK-NEXT:    ret void
 ;
   ret void
 }
 
-!dx.entryPoints = !{!1}
-!continuation.stackAddrspace = !{!4}
+!dx.entryPoints = !{!0}
+!continuation.stackAddrspace = !{!2}
 
-!0 = !{}
-!1 = !{void ()* @RayGen, !"RayGen", null, null, !2}
-!2 = !{i32 8, i32 7}
-!3 = !{void ()* @RayGen}
-!4 = !{i32 21}
-!5 = !{i32 0}
-
-attributes #0 = { nounwind }
+!0 = !{ptr @RayGen, !"RayGen", null, null, !1}
+!1 = !{i32 8, i32 7}
+!2 = !{i32 21}
+!3 = !{i32 0}
+!4 = !{}
+!5 = !{ptr @RayGen}

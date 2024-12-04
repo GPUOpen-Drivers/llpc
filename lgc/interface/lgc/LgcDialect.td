@@ -369,9 +369,25 @@ def InputImportGenericOp : DivergentLgcOp<"input.import.generic", [Memory<[]>, W
 
   let summary = "read a generic shader input variable";
   let description = [{
-    Reads a generic graphics shader input variable, either from a vertex buffer or from the previous stage outputs.
+    Reads a generic graphics shader input variable from the previous stage outputs.
 
-    Used in all graphics shader stages except task and mesh shader.
+    Used in all graphics shader stages except vertex, task and mesh shader.
+  }];
+}
+
+def LoadVertexInputOp : DivergentLgcOp<"load.vertex.input", [Memory<[]>, WillReturn]> {
+  let superclass = GenericLocationOp;
+
+  let arguments = (ins GenericLocationOp, I32:$vertex_index, I32:$instance_index);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "read from a vertex buffer input";
+  let description = [{
+    Reads a generic input variable from a vertex buffer according to vertex array and buffer bindings.
+
+    Used in vertex shaders and the transform compute shader (which inlines a vertex shader).
   }];
 }
 
@@ -1012,8 +1028,8 @@ def SparsityIndexLoadOp : DivergentLgcOp<"sparsityindex.load", [Memory<[(read)]>
 
 def SparseCooperativeMatrixMulAddOp : DivergentLgcOp<"sparseCooperativeMatrix.muladd", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix_a, value:$sparse_index, value:$matrix_b, value:$matrix_c, AttrI1:$is_signed_a, AttrI1:$is_signed_b,
-                   AttrI1:$is_sat, CooperativeMatrixElementType:$accu_elem_type,
-                   CooperativeMatrixElementType:$factor_elem_type);
+                   AttrI1:$is_sat, CooperativeMatrixElementType:$matrix_a_elem_type,
+                   CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -1033,8 +1049,9 @@ def SparseCooperativeMatrixMulAddOp : DivergentLgcOp<"sparseCooperativeMatrix.mu
     'is_signed_a' is the signess for matrixA's element type.
     'is_signed_b' is the signess for matrixB's element type.
     'is_sat' is the saturatingAccumulation for calculation,
-    'accu_elem_type' is the component type of the accumulator matrix.
-    'factor_elem_type' is the component type of the factor matrix.
+    '$matrix_a_elem_type' is the component type of the A matrix.
+    '$matrix_b_elem_type' is the component type of the B matrix.
+    '$matrix_c_elem_type' is the component type of the C matrix.
   }];
 }
 

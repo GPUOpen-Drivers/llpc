@@ -25,12 +25,12 @@
 /**
  ***********************************************************************************************************************
  * @file  CollectResourceUsage.h
- * @brief LLPC header file: contains declaration of class lgc::PatchResourceCollect.
+ * @brief LLPC header file: contains declaration of class lgc::CollectResourceUsage.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/IR/InstVisitor.h"
@@ -47,16 +47,16 @@ typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for resource collecting
-class PatchResourceCollect : public Patch,
-                             public llvm::InstVisitor<PatchResourceCollect>,
-                             public llvm::PassInfoMixin<PatchResourceCollect> {
+class CollectResourceUsage : public Patch,
+                             public llvm::InstVisitor<CollectResourceUsage>,
+                             public llvm::PassInfoMixin<CollectResourceUsage> {
 public:
-  PatchResourceCollect();
+  CollectResourceUsage();
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   virtual void visitCallInst(llvm::CallInst &callInst);
 
-  static llvm::StringRef name() { return "Patch LLVM for resource collecting"; }
+  static llvm::StringRef name() { return "Collect resource usage"; }
 
 private:
   // Determines whether GS on-chip mode is valid for this pipeline, also computes ES-GS/GS-VS ring item size.
@@ -109,6 +109,10 @@ private:
   std::vector<GenericLocationOp *> m_inputCalls;              // The input import calls
   std::vector<llvm::CallInst *> m_outputCalls;                // The output export calls
   llvm::DenseSet<unsigned> m_outputCallLocations;             // The output export calls' location
+
+  llvm::SmallVector<llvm::CallInst *, 16>
+      m_pointSizeWritesToOptimize;      // PointSize writes (PointSize = 1.0) that could be optimized
+  bool m_optimizePointSizeWrite = true; // Flag indicating whether we can optimize PointSize write
 
   ResourceUsage *m_resUsage; // Pointer to shader resource usage
   std::unique_ptr<InOutLocationInfoMapManager>

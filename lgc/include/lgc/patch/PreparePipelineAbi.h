@@ -25,12 +25,12 @@
 /**
  ***********************************************************************************************************************
  * @file  PreparePipelineAbi.h
- * @brief LLPC header file: contains declaration of class lgc::PatchPreparePipelineAbi.
+ * @brief LLPC header file: contains declaration of class lgc::PreparePipelineAbi.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -41,7 +41,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to prepare the pipeline ABI
-class PatchPreparePipelineAbi final : public Patch, public llvm::PassInfoMixin<PatchPreparePipelineAbi> {
+class PreparePipelineAbi final : public Patch, public llvm::PassInfoMixin<PreparePipelineAbi> {
 public:
   // A collection of handler functions to get the analysis info of the given function
   struct FunctionAnalysisHandlers {
@@ -51,11 +51,11 @@ public:
     std::function<llvm::CycleInfo &(llvm::Function &)> getCycleInfo;
   };
 
-  PatchPreparePipelineAbi();
+  PreparePipelineAbi();
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for preparing pipeline ABI"; }
+  static llvm::StringRef name() { return "Preparing pipeline ABI"; }
 
   static std::pair<llvm::Value *, llvm::Value *> readTessFactors(PipelineState *pipelineState, llvm::Value *relPatchId,
                                                                  llvm::IRBuilder<> &builder);

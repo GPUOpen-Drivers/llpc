@@ -25,13 +25,13 @@
 /**
  ***********************************************************************************************************************
  * @file  GenerateNullFragmentShader.cpp
- * @brief LLPC source file: contains declaration and implementation of class lgc::PatchNullFragShader.
+ * @brief LLPC source file: contains declaration and implementation of class lgc::GenerateNullFragmentShader.
  ***********************************************************************************************************************
  */
 #include "GenerateNullFragmentShader.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/FragmentColorExport.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
@@ -41,7 +41,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "lgc-patch-null-frag-shader"
+#define DEBUG_TYPE "lgc-generate-null-frag-shader"
 
 using namespace lgc;
 using namespace llvm;
@@ -52,7 +52,7 @@ using namespace llvm;
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchNullFragShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses GenerateNullFragmentShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
 
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Null-Frag-Shader\n");
@@ -77,7 +77,7 @@ PreservedAnalyses PatchNullFragShader::run(Module &module, ModuleAnalysisManager
 // Updates the the pipeline state with the data for the null fragment shader.
 //
 // @param [in/out] module : The LLVM module in which to add the shader.
-void PatchNullFragShader::updatePipelineState(PipelineState *pipelineState) const {
+void GenerateNullFragmentShader::updatePipelineState(PipelineState *pipelineState) const {
   auto resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
   pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | ShaderStageMask(ShaderStage::Fragment));
 

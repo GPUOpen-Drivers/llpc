@@ -37,6 +37,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.6 | Add enableRemapLocation to PipelineOptions. Add outLocationMaps to GraphicsPipelineBuildInfo.         |
 //  |     75.5 | Add optimizePointSizeWrite to PipelineShaderOptions in order to optimize the case PointSize = 1.0.    |
 //  |     75.4 | Add disableGlPositionOpt to PipelineShaderOptions.                                                    |
 //  |     75.3 | Add enableInitUndefZero to GraphicPipelineBuildInfo                                                   |
@@ -197,7 +198,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 5
+#define LLPC_INTERFACE_MINOR_VERSION 6
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

@@ -62,6 +62,8 @@
 #endif
 #endif
 
+#define PASS_32_BIT_CR 1
+
 //=====================================================================================================================
 // Continuation intrinsics
 //
@@ -103,17 +105,17 @@
 // Enqueue
 // -------
 // Enqueue just jumps to the function at the given address. Enqueue is noreturn, and following code is unreachable.
-// _AmdEnqueue*(uint64_t addr, ...)
+// _AmdEnqueue*(uint32_t addr, ...)
 #define DECLARE_ENQUEUE(Suffix, ...) GPURT_DECL \
-  void _AmdEnqueue##Suffix(uint64_t addr, __VA_ARGS__) DUMMY_VOID_FUNC
+  void _AmdEnqueue##Suffix(uint32_t addr, __VA_ARGS__) DUMMY_VOID_FUNC
 //
 // WaitEnqueue
 // -----------
 // WaitEnqueue waits until all lanes in the mask also have enqueued the same wait mask before performing the Enqueue.
 // Generic function arguments start with the third argument.
-// _AmdWaitEnqueue*(uint64_t addr, uint64_t waitMask, uint32_t csp, ...)
+// _AmdWaitEnqueue*(uint32_t addr, uint64_t waitMask, uint32_t csp, ...)
 #define DECLARE_WAIT_ENQUEUE(Suffix, ...) GPURT_DECL \
-  void _AmdWaitEnqueue##Suffix(uint64_t addr, uint64_t waitMask, __VA_ARGS__) DUMMY_VOID_FUNC
+  void _AmdWaitEnqueue##Suffix(uint32_t addr, uint64_t waitMask, __VA_ARGS__) DUMMY_VOID_FUNC
 //
 // Complete
 // --------
@@ -134,26 +136,26 @@ GPURT_DECL void _AmdComplete() DUMMY_VOID_FUNC
 // Any state in the containing function that is still needed in the resume function is stored in the continuation state
 // managed by the compiler.
 // Just like with enqueue, there is a waiting variant _AmdWaitAwait that waits on running the passed function.
-// ReturnTy _AmdAwait*(uint64_t addr, ...)
+// ReturnTy _AmdAwait*(uint32_t addr, ...)
 
 #define DECLARE_AWAIT(Suffix, ReturnTy, ...) GPURT_DECL \
-  ReturnTy _AmdAwait##Suffix(uint64_t addr, __VA_ARGS__) DUMMY_GENERIC_FUNC((ReturnTy)0)
+  ReturnTy _AmdAwait##Suffix(uint32_t addr, __VA_ARGS__) DUMMY_GENERIC_FUNC((ReturnTy)0)
 
-// ReturnTy _AmdWaitAwait*(uint64_t addr, uint64_t waitMask, ...)
+// ReturnTy _AmdWaitAwait*(uint32_t addr, uint64_t waitMask, ...)
 #define DECLARE_WAIT_AWAIT(Suffix, ReturnTy, ...) GPURT_DECL \
-  ReturnTy _AmdWaitAwait##Suffix(uint64_t addr, uint64_t waitMask, __VA_ARGS__) DUMMY_GENERIC_FUNC((ReturnTy)0)
+  ReturnTy _AmdWaitAwait##Suffix(uint32_t addr, uint64_t waitMask, __VA_ARGS__) DUMMY_GENERIC_FUNC((ReturnTy)0)
 //
 // GetResumePointAddr
 // ------------------
 // Returns the address of the resume function of the next resume point, i.e. at the next Await intrinsic.
 // Forbidden if the call site does not dominate a unique suspend point.
 // If this intrinsic is used, the implicit return address argument is removed from the next Await call.
-GPURT_DECL uint64_t _AmdGetResumePointAddr() DUMMY_GENERIC_FUNC(0)
+GPURT_DECL uint32_t _AmdGetResumePointAddr() DUMMY_GENERIC_FUNC(0)
 //
 // GetCurrentFuncAddr
 // ------------------
 // Returns the address of the caller function making this intrinsic call, after inlining and continuation function splitting.
-GPURT_DECL uint64_t _AmdGetCurrentFuncAddr() DUMMY_GENERIC_FUNC(0)
+GPURT_DECL uint32_t _AmdGetCurrentFuncAddr() DUMMY_GENERIC_FUNC(0)
 //
 // GetShaderRecordIndex
 // --------

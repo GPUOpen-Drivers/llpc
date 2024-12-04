@@ -3,7 +3,7 @@
 
 define amdgpu_gfx void @raw_atomic_load(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomic_load(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.atomic.buffer.load.i32(<4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 5)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.atomic.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 5)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -13,7 +13,7 @@ define amdgpu_gfx void @raw_atomic_load(<4 x i32> inreg %desc) !lgc.shaderstage 
 
 define amdgpu_gfx void @raw_atomicrmw_xchg(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_xchg(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.swap.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.swap.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -23,7 +23,7 @@ define amdgpu_gfx void @raw_atomicrmw_xchg(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_add(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_add(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.add.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.add.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -33,7 +33,7 @@ define amdgpu_gfx void @raw_atomicrmw_add(<4 x i32> inreg %desc) !lgc.shaderstag
 
 define amdgpu_gfx void @raw_atomicrmw_sub(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_sub(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.sub.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.sub.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -43,7 +43,7 @@ define amdgpu_gfx void @raw_atomicrmw_sub(<4 x i32> inreg %desc) !lgc.shaderstag
 
 define amdgpu_gfx void @raw_atomicrmw_and(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_and(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.and.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.and.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -53,7 +53,7 @@ define amdgpu_gfx void @raw_atomicrmw_and(<4 x i32> inreg %desc) !lgc.shaderstag
 
 define amdgpu_gfx void @raw_atomicrmw_or(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_or(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.or.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.or.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -63,7 +63,7 @@ define amdgpu_gfx void @raw_atomicrmw_or(<4 x i32> inreg %desc) !lgc.shaderstage
 
 define amdgpu_gfx void @raw_atomicrmw_xor(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_xor(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.xor.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.xor.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -73,7 +73,7 @@ define amdgpu_gfx void @raw_atomicrmw_xor(<4 x i32> inreg %desc) !lgc.shaderstag
 
 define amdgpu_gfx void @raw_atomicrmw_smax(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_smax(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.smax.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.smax.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -83,7 +83,7 @@ define amdgpu_gfx void @raw_atomicrmw_smax(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_smin(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_smin(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.smin.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.smin.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -93,7 +93,7 @@ define amdgpu_gfx void @raw_atomicrmw_smin(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_umax(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_umax(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.umax.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.umax.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -103,7 +103,7 @@ define amdgpu_gfx void @raw_atomicrmw_umax(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_umin(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_umin(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.umin.i64(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i64 @llvm.amdgcn.raw.buffer.atomic.umin.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -113,7 +113,7 @@ define amdgpu_gfx void @raw_atomicrmw_umin(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_fadd(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_fadd(
-; CHECK-NEXT:    [[TMP1:%.*]] = call float @llvm.amdgcn.raw.buffer.atomic.fadd.f32(float 1.000000e+00, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call float @llvm.amdgcn.raw.buffer.atomic.fadd.f32{{(\.v4i32)?}}(float 1.000000e+00, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -123,7 +123,7 @@ define amdgpu_gfx void @raw_atomicrmw_fadd(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_fmax(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_fmax(
-; CHECK-NEXT:    [[TMP1:%.*]] = call float @llvm.amdgcn.raw.buffer.atomic.fmax.f32(float 1.000000e+00, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call float @llvm.amdgcn.raw.buffer.atomic.fmax.f32{{(\.v4i32)?}}(float 1.000000e+00, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -133,7 +133,7 @@ define amdgpu_gfx void @raw_atomicrmw_fmax(<4 x i32> inreg %desc) !lgc.shadersta
 
 define amdgpu_gfx void @raw_atomicrmw_fmin(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @raw_atomicrmw_fmin(
-; CHECK-NEXT:    [[TMP1:%.*]] = call float @llvm.amdgcn.raw.buffer.atomic.fmin.f32(float 1.000000e+00, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call float @llvm.amdgcn.raw.buffer.atomic.fmin.f32{{(\.v4i32)?}}(float 1.000000e+00, <4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -154,7 +154,7 @@ define amdgpu_gfx void @struct_atomic_load(<4 x i32> inreg %desc, i32 %index) !l
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.struct.atomic.buffer.load.i32(<4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 5)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i32 @llvm.amdgcn.struct.atomic.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 5)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -177,7 +177,7 @@ define amdgpu_gfx void @struct_atomicrmw_xchg(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.swap.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.swap.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -200,7 +200,7 @@ define amdgpu_gfx void @struct_atomicrmw_add(<4 x i32> inreg %desc, i32 %index) 
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.add.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.add.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -223,7 +223,7 @@ define amdgpu_gfx void @struct_atomicrmw_sub(<4 x i32> inreg %desc, i32 %index) 
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.sub.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.sub.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -246,7 +246,7 @@ define amdgpu_gfx void @struct_atomicrmw_and(<4 x i32> inreg %desc, i32 %index) 
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.and.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.and.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -269,7 +269,7 @@ define amdgpu_gfx void @struct_atomicrmw_or(<4 x i32> inreg %desc, i32 %index) !
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.or.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.or.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -292,7 +292,7 @@ define amdgpu_gfx void @struct_atomicrmw_xor(<4 x i32> inreg %desc, i32 %index) 
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.xor.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.xor.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -315,7 +315,7 @@ define amdgpu_gfx void @struct_atomicrmw_smax(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.smax.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.smax.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -338,7 +338,7 @@ define amdgpu_gfx void @struct_atomicrmw_smin(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.smin.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.smin.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -361,7 +361,7 @@ define amdgpu_gfx void @struct_atomicrmw_umax(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.umax.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.umax.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -384,7 +384,7 @@ define amdgpu_gfx void @struct_atomicrmw_umin(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.umin.i64(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.struct.buffer.atomic.umin.i64{{(\.v4i32)?}}(i64 1, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -407,7 +407,7 @@ define amdgpu_gfx void @struct_atomicrmw_fadd(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call float @llvm.amdgcn.struct.buffer.atomic.fadd.f32(float 1.000000e+00, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call float @llvm.amdgcn.struct.buffer.atomic.fadd.f32{{(\.v4i32)?}}(float 1.000000e+00, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -430,7 +430,7 @@ define amdgpu_gfx void @struct_atomicrmw_fmax(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call float @llvm.amdgcn.struct.buffer.atomic.fmax.f32(float 1.000000e+00, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call float @llvm.amdgcn.struct.buffer.atomic.fmax.f32{{(\.v4i32)?}}(float 1.000000e+00, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
@@ -453,7 +453,7 @@ define amdgpu_gfx void @struct_atomicrmw_fmin(<4 x i32> inreg %desc, i32 %index)
 ; CHECK-NEXT:    [[TMP9:%.*]] = and i32 [[TMP8]], -805306369
 ; CHECK-NEXT:    [[TMP10:%.*]] = or i32 [[TMP9]], 268435456
 ; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[TMP10]], i64 3
-; CHECK-NEXT:    [[TMP12:%.*]] = call float @llvm.amdgcn.struct.buffer.atomic.fmin.f32(float 1.000000e+00, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP12:%.*]] = call float @llvm.amdgcn.struct.buffer.atomic.fmin.f32{{(\.v4i32)?}}(float 1.000000e+00, <4 x i32> [[TMP11]], i32 [[INDEX:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    ret void
 ;
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)

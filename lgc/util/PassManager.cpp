@@ -29,19 +29,13 @@
  ***********************************************************************************************************************
  */
 #include "lgc/PassManager.h"
+#include "compilerutils/MbStandardInstrumentations.h"
 #include "lgc/LgcContext.h"
-#include "lgc/MbStandardInstrumentations.h"
 #include "lgc/util/Debug.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/Verifier.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#include "llvm/IR/IRPrintingPasses.h"
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -208,13 +202,8 @@ LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
 // =====================================================================================================================
 PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine, LLVMContext &context)
     : PassManager(), m_targetMachine(targetMachine),
-      m_instrumentationStandard(
-#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 442861
-          // New version of the code (also handles unknown version, which we treat as latest)
-          context,
-#endif
-          cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
-          /*PrintPassOpts=*/{true, false, true}) {
+      m_instrumentationStandard(context, cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
+                                /*PrintPassOpts=*/{true, false, true}) {
 
   auto &options = cl::getRegisteredOptions();
 

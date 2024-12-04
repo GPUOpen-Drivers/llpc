@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerImageDerivatives.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/IntrinsicInst.h"

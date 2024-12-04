@@ -25,19 +25,19 @@
 /**
  ***********************************************************************************************************************
  * @file  GenerateNullFragmentShader.h
- * @brief LLPC header file: contains declaration of class lgc::PatchNullFragShader.
+ * @brief LLPC header file: contains declaration of class lgc::GenerateNullFragmentShader.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "llvm/IR/PassManager.h"
 
 namespace lgc {
 
 // =====================================================================================================================
 // Pass to generate null fragment shader if required
-class PatchNullFragShader : public Patch, public llvm::PassInfoMixin<PatchNullFragShader> {
+class GenerateNullFragmentShader : public Patch, public llvm::PassInfoMixin<GenerateNullFragmentShader> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

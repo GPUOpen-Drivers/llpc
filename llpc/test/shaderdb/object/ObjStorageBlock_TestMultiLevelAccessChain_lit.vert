@@ -29,7 +29,7 @@ void main()
 ; SHADERTEST: getelementptr {{(inbounds )?}}(<{ [3 x float], [4 x i8], <{ [4 x float] }> }>, ptr addrspace({{.*}}) @{{.*}}, i32 0, i32 2
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: store <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>,
+; SHADERTEST: store <4 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00>)}},
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "lgc/ModuleBunch.h"
+#include "compilerutils/ModuleBunch.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 
 namespace llvm {
@@ -116,14 +116,7 @@ public:
 
   // Register all the standard instrumentation callbacks. If \p FAM is nullptr
   // then PreservedCFGChecker is not enabled.
-  void registerCallbacks(PassInstrumentationCallbacks &PIC,
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 454783
-                         // Old version of the code
-                         FunctionAnalysisManager *FAM = nullptr);
-#else
-                         // New version of the code (also handles unknown version, which we treat as latest)
-                         ModuleAnalysisManager *MAM = nullptr);
-#endif
+  void registerCallbacks(PassInstrumentationCallbacks &PIC, ModuleAnalysisManager *MAM = nullptr);
 
   TimePassesHandler &getTimePasses() { return TimePasses; }
 };

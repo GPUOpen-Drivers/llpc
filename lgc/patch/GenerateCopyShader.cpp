@@ -565,7 +565,7 @@ Value *GenerateCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location
   for (unsigned i = 0; i < elemCount; ++i) {
     Value *ringOffset = calcGsVsRingOffsetForInput(location + i / 4, component + i % 4, streamId, builder);
     auto loadElem =
-        builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, elemTy,
+        builder.CreateIntrinsic(elemTy, Intrinsic::amdgcn_raw_buffer_load,
                                 {
                                     m_pipelineSysValues.get(entryPoint)->getGsVsRingBufDesc(streamId), ringOffset,
                                     builder.getInt32(0),              // soffset

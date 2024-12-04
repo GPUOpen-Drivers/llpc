@@ -44,7 +44,7 @@ class LLVMContext;
 namespace {
 
 // Shader stage metadata to identify the shader stage of a given function.
-constexpr const char ShaderStageMetadata[] = "lgc.rt.shaderstage";
+constexpr const char RtShaderStageMetadata[] = "lgc.rt.shaderstage";
 
 // PAQ (payload access qualifier) metadata on a shader function, with an array
 // of ints of the same form as the paq argument to the trace.ray dialect op,
@@ -133,7 +133,7 @@ std::optional<size_t> getMetadataNumericValue(const llvm::Module *module, String
 // Get the metadata IDs associated with the lgc.rt dialect, so the caller knows
 // which ones can be removed when the dialect is processed.
 void lgc::rt::getLgcRtMetadataIds(LLVMContext &context, SmallVectorImpl<unsigned> &ids) {
-  ids.push_back(context.getMDKindID(ShaderStageMetadata));
+  ids.push_back(context.getMDKindID(RtShaderStageMetadata));
   ids.push_back(context.getMDKindID(PaqMetadata));
   ids.push_back(context.getMDKindID(ArgSizeMetadata));
   ids.push_back(context.getMDKindID(AttributeSizeMetadata));
@@ -147,9 +147,9 @@ void lgc::rt::getLgcRtMetadataIds(LLVMContext &context, SmallVectorImpl<unsigned
 // mark it with a shader stage.
 void lgc::rt::setLgcRtShaderStage(GlobalObject *func, std::optional<RayTracingShaderStage> stage) {
   if (stage.has_value())
-    setMetadataNumericValue(func, ShaderStageMetadata, static_cast<size_t>(stage.value()));
+    setMetadataNumericValue(func, RtShaderStageMetadata, static_cast<size_t>(stage.value()));
   else
-    func->eraseMetadata(func->getContext().getMDKindID(ShaderStageMetadata));
+    func->eraseMetadata(func->getContext().getMDKindID(RtShaderStageMetadata));
 }
 
 // ==============================================================================================
@@ -159,7 +159,7 @@ void lgc::rt::setLgcRtShaderStage(GlobalObject *func, std::optional<RayTracingSh
 // GlobalVariable to represent a shader retrieved from the cache, and wants to
 // mark it with a shader stage.
 std::optional<lgc::rt::RayTracingShaderStage> lgc::rt::getLgcRtShaderStage(const GlobalObject *func) {
-  std::optional<size_t> mdValue = getMetadataNumericValue(func, ShaderStageMetadata);
+  std::optional<size_t> mdValue = getMetadataNumericValue(func, RtShaderStageMetadata);
   if (mdValue.has_value()) {
     return RayTracingShaderStage(*mdValue);
   }

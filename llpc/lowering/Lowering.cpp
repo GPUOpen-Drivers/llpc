@@ -56,13 +56,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/ReplaceConstant.h"
 #include "llvm/IR/Verifier.h"
-
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -152,13 +146,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Remove redundant load/store operations and do minimal optimization
   // It is required by SpirvLowerImageOp.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
-  // Old version of the code
-  passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass()));
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass(SROAOptions::ModifyCFG)));
-#endif
 
   // Lower SPIR-V precision / adjust fast math flags.
   // Must be done before instruction combining pass to prevent incorrect contractions.
@@ -168,13 +156,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   passMgr.addPass(GlobalOptPass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
-  // Old version of the code
-  unsigned instCombineOpt = 2;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   auto instCombineOpt = InstCombineOptions().setMaxIterations(2);
-#endif
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
   passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(EarlyCSEPass()));

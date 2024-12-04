@@ -410,9 +410,9 @@ struct ResourceUsage {
                                         // (in dword, correspond to "hsOutputBase")
           unsigned patchConstStart;     // Offset into LDS where patch constants start (in dword,
                                         // correspond to "patchConstBase")
-          unsigned tessFactorStart;     // Offset into LDS where tess factor start (in dword)
           unsigned hsPatchCountStart;   // Offset into LDS where count of HS patches start (in dword)
           unsigned specialTfValueStart; // Offset into LDS where special TF value start (in dword)
+          unsigned inPatchStart;        // Offset into LDS where vertices of input patches start (in dword)
         } onChip;
 
         // Off-chip calculation factors

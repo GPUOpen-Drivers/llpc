@@ -1,3 +1,4 @@
+; NOTE: Do not autogenerate
 ; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: Invalid system data struct: Did not contain the needed struct type
@@ -27,12 +28,6 @@ declare !pointeetys !33 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*
 declare !pointeetys !33 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
 declare %struct.DispatchSystemData @_AmdTraversal(%struct.TraversalData) #0
-
-declare void @_AmdEnqueue(i64, %struct.SystemData) #0
-
-declare void @_AmdWaitEnqueue(i64, i64, %struct.SystemData) #0
-
-declare void @_AmdEnqueueAnyHit(i64, %struct.TraversalData) #0
 
 declare !pointeetys !35 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #0
 

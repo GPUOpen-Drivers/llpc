@@ -8,7 +8,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 ; struct.DispatchSystemData
 %0 = type { <3 x i32> }
 ; struct.TraversalData
-%1 = type { %2, %struct.HitData, <3 x float>, <3 x float>, float, i64 }
+%1 = type { %2, %struct.HitData, <3 x float>, <3 x float>, float, i32 }
 ; struct.SystemData
 %2 = type { %0 }
 ; struct.AnyHitTraversalData
@@ -26,11 +26,11 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare i32 @_cont_GetContinuationStackAddr() #0
 
-declare %0 @_AmdAwaitTraversal(i64, %1) #0
+declare %0 @_AmdAwaitTraversal(i32, %1) #0
 
-declare %0 @_AmdAwaitShader(i64, %0) #0
+declare %0 @_AmdAwaitShader(i32, %0) #0
 
-declare %3 @_AmdAwaitAnyHit(i64, %3, float, i32) #0
+declare %3 @_AmdAwaitAnyHit(i32, %3, float, i32) #0
 
 declare !pointeetys !17 %struct.HitData @_cont_GetCandidateState(%3*) #0
 
@@ -47,7 +47,7 @@ declare !pointeetys !25 i1 @_cont_IsEndSearch(%1*) #0
 declare !pointeetys !27 i32 @_cont_HitKind(%2*) #0
 
 ; Function Attrs: nounwind
-declare i64 @_AmdGetResumePointAddr() #1
+declare i32 @_AmdGetResumePointAddr() #1
 
 ; Function Attrs: nounwind
 declare !pointeetys !28 void @_AmdRestoreSystemData(%0*) #1
@@ -75,9 +75,9 @@ define void @_cont_TraceRay(%0* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i
   %dis_data = load %0, %0* %data, align 4
   %sys_data = insertvalue %2 undef, %0 %dis_data, 0
   %trav_data = insertvalue %1 undef, %2 %sys_data, 0
-  %addr = call i64 @_AmdGetResumePointAddr() #3
-  %trav_data2 = insertvalue %1 %trav_data, i64 %addr, 5
-  %newdata = call %0 @_AmdAwaitTraversal(i64 4, %1 %trav_data2)
+  %addr = call i32 @_AmdGetResumePointAddr() #3
+  %trav_data2 = insertvalue %1 %trav_data, i32 %addr, 5
+  %newdata = call %0 @_AmdAwaitTraversal(i32 4, %1 %trav_data2)
   store %0 %newdata, %0* %data, align 4
   call void @_AmdRestoreSystemData(%0* %data)
   ret void
@@ -85,7 +85,7 @@ define void @_cont_TraceRay(%0* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i
 
 define void @_cont_CallShader(%0* %data, i32 %0) #0 !pointeetys !31 {
   %dis_data = load %0, %0* %data, align 4
-  %newdata = call %0 @_AmdAwaitShader(i64 2, %0 %dis_data)
+  %newdata = call %0 @_AmdAwaitShader(i32 2, %0 %dis_data)
   store %0 %newdata, %0* %data, align 4
   call void @_AmdRestoreSystemData(%0* %data)
   ret void
@@ -99,7 +99,7 @@ define i1 @_cont_ReportHit(%3* %data, float %t, i32 %hitKind) #0 !pointeetys !32
 
 callAHit:                                         ; preds = %0
   %trav_data = load %3, %3* %data, align 4
-  %newdata = call %3 @_AmdAwaitAnyHit(i64 3, %3 %trav_data, float %t, i32 %hitKind)
+  %newdata = call %3 @_AmdAwaitAnyHit(i32 3, %3 %trav_data, float %t, i32 %hitKind)
   store %3 %newdata, %3* %data, align 4
   call void @_AmdRestoreSystemDataAnyHit(%3* %data)
   ret i1 true
@@ -346,7 +346,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[TMP0:%.*]] [[TMP0]]) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META14:![0-9]+]] !continuation.entry [[META20:![0-9]+]] !continuation.registercount [[META14]] !continuation [[META21:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i32 [[RETURNADDR:%.*]], [[TMP0:%.*]] [[TMP0]]) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META14:![0-9]+]] !continuation.entry [[META20:![0-9]+]] !continuation.registercount [[META14]] !continuation [[META21:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP0]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
@@ -364,8 +364,8 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[TMP2]] undef, [[TMP0]] [[DIS_DATA_I]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[TMP1:%.*]] undef, [[TMP2]] [[SYS_DATA_I]], 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[ADDR_I:%.*]] = call i64 @_AmdGetResumePointAddr() #[[ATTR3:[0-9]+]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[TMP1]] [[TRAV_DATA_I]], i64 [[ADDR_I]], 5
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[ADDR_I:%.*]] = call i32 @_AmdGetResumePointAddr() #[[ATTR3:[0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[TMP1]] [[TRAV_DATA_I]], i32 [[ADDR_I]], 5
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP10]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP13]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
@@ -382,8 +382,8 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP20]], ptr [[TMP25]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = call { [[TMP0]], [33 x i32], [10 x i32] } (...) @lgc.cps.await__sl_s_sa33i32a10i32s(i64 4, i32 8, i64 poison, [[TMP1]] [[TRAV_DATA2_I]], [16 x i32] poison, [10 x i32] [[TMP21]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount [[META18]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = extractvalue { [[TMP0]], [33 x i32], [10 x i32] } [[TMP35]], 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = call { [[TMP0]], [32 x i32], [10 x i32] } (...) @lgc.cps.await__sl_s_sa32i32a10i32s(i32 4, i32 8, i32 poison, [[TMP1]] [[TRAV_DATA2_I]], [16 x i32] poison, [10 x i32] [[TMP21]]), !continuation.registercount [[META18:![0-9]+]], !continuation.returnedRegistercount [[META18]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = extractvalue { [[TMP0]], [32 x i32], [10 x i32] } [[TMP28]], 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [10 x i32] [[TMP24]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = freeze [[STRUCT_RAYPAYLOAD]] poison
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] [[TMP38]], ptr [[TMP4]], align 4
@@ -402,7 +402,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds i32, ptr [[TMP36]], i32 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr [[TMP34]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[TMP32]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = extractvalue { [[TMP0]], [33 x i32], [10 x i32] } [[TMP35]], 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = extractvalue { [[TMP0]], [32 x i32], [10 x i32] } [[TMP28]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP22]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
@@ -424,8 +424,8 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;
 ;
-; LOWERRAYTRACINGPIPELINE-LABEL: define %0 @MyClosestHit(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[TMP2:%.*]] [[TMP0:%.*]], [33 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR2]] !lgc.rt.shaderstage [[META25:![0-9]+]] !continuation.registercount [[META18]] !continuation [[META26:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyClosestHit(
+; LOWERRAYTRACINGPIPELINE-SAME: i32 [[RETURNADDR:%.*]], [[TMP2:%.*]] [[TMP0:%.*]], [32 x i32] [[PADDING:%.*]], [10 x i32] [[PAYLOAD:%.*]]) #[[ATTR2]] !lgc.rt.shaderstage [[META25:![0-9]+]] !continuation.registercount [[META18]] !continuation [[META26:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP2]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [10 x i32], align 4
@@ -489,6 +489,6 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr inbounds [[TMP2]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load [[TMP0]], ptr [[TMP46]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = load [10 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[TMP0]] [[TMP47]], [33 x i32] poison, [10 x i32] [[TMP49]]), !continuation.registercount [[META18]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, [[TMP0]] [[TMP47]], [32 x i32] poison, [10 x i32] [[TMP49]]), !continuation.registercount [[META18]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    unreachable
 ;

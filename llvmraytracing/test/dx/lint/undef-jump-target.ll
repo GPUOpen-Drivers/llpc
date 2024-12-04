@@ -1,4 +1,5 @@
-; RUN: not opt --verify-each -passes='continuations-lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
+; NOTE: Do not autogenerate
+; RUN: not opt --verify-each -passes='continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: Jump has undefined jump target
 
@@ -8,8 +9,8 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare void @lgc.cps.jump(...)
 
-define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !0 !continuation.entry !1 !continuation !2 {
-  call void (...) @lgc.cps.jump(i64 undef), !continuation.registercount !0
+define void @RayGen(i32 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !0 !continuation.entry !1 !continuation !2 {
+  call void (...) @lgc.cps.jump(i32 undef), !continuation.registercount !0
   unreachable
 }
 

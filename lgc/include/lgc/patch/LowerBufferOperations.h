@@ -31,22 +31,15 @@
 #pragma once
 
 #include "compilerutils/TypeLowering.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Analysis/UniformityAnalysis.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
-
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-// Old version of the code
-namespace llvm {
-class DivergenceInfo;
-}
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
-#endif
+#include <utility>
 
 namespace lgc {
 
@@ -86,15 +79,8 @@ class BufferOpLowering {
   };
 
 public:
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-  // Old version of the code
-  BufferOpLowering(CompilerUtils::TypeLowering &typeLowering, PipelineState &pipelineState,
-                   llvm::DivergenceInfo &divergenceInfo);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   BufferOpLowering(CompilerUtils::TypeLowering &typeLowering, PipelineState &pipelineState,
                    llvm::UniformityInfo &uniformityInfo);
-#endif
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLowering> &builder);
 
@@ -150,19 +136,14 @@ private:
   llvm::IRBuilder<> m_builder;
 
   PipelineState &m_pipelineState;
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-  // Old version of the code
-  llvm::DivergenceInfo &m_uniformityInfo;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   llvm::UniformityInfo &m_uniformityInfo;
-#endif
 
   // The proxy pointer type used to accumulate offsets.
   llvm::PointerType *m_offsetType = nullptr;
 
   // Map of buffer descriptor infos (for tracking invariance and divergence).
   llvm::DenseMap<llvm::Value *, DescriptorInfo> m_descriptors;
+  llvm::DenseMap<llvm::Value *, std::pair<llvm::Value *, llvm::ConstantInt *>> m_stridedDescriptors;
 
   llvm::SmallVector<llvm::PHINode *> m_divergentPhis;
 
@@ -178,7 +159,7 @@ class PatchBufferOp : public llvm::InstVisitor<PatchBufferOp>, public llvm::Pass
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for buffer operations"; }
+  static llvm::StringRef name() { return "Lower buffer operations"; }
 };
 
 } // namespace lgc

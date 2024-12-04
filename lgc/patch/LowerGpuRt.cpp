@@ -333,7 +333,6 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
   constexpr uint32_t sqHwRegMode = 1;
   constexpr uint32_t width = 2;
   constexpr uint32_t offset = 0;
-  uint32_t hwReg = ((sqHwRegMode) | (offset << 6) | ((width - 1) << 11));
 
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
   auto func = inst.getCalledFunction();
@@ -344,8 +343,7 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
   uint32_t op = cast<ConstantInt>(inst.getOperation())->getZExtValue();
 
   // WARNING: This isn't supported robustly by the IR semantics and the backend, but it's the best we can do for now.
-  m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_s_setreg,
-                             {m_builder->getInt32(hwReg), m_builder->getInt32(rm)});
+  BuilderBase::get(*m_builder).CreateSetReg(sqHwRegMode, offset, width, m_builder->getInt32(rm));
 
   Value *result = PoisonValue::get(retType);
   if (op == OperationType::Add)
@@ -357,8 +355,7 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
 
   // set back to RoundTiesToEven.
   uint32_t roundTiesToEven = 1;
-  m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_s_setreg,
-                             {m_builder->getInt32(hwReg), m_builder->getInt32(roundTiesToEven)});
+  BuilderBase::get(*m_builder).CreateSetReg(sqHwRegMode, offset, width, m_builder->getInt32(roundTiesToEven));
 
   inst.replaceAllUsesWith(result);
   m_callsToLower.push_back(&inst);

@@ -31,7 +31,7 @@
 
 #include "NullFragmentShader.h"
 #include "lgc/patch/FragmentColorExport.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Target/TargetMachine.h"
 

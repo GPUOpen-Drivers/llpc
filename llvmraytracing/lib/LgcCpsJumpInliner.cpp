@@ -92,15 +92,7 @@ PreservedAnalyses LgcCpsJumpInlinerPassImpl::run() {
     assert(JumpTargetFunc && !JumpTargetFunc->isDeclaration());
 
     Builder.SetInsertPoint(Jump);
-    SmallVector<Value *> ArgList;
-    assert(Jump->getState()->getType()->isEmptyTy());
-
-    if (isCpsFunction(*JumpTargetFunc)) {
-      // TODO: We need to ensure we properly pass in RCR and shader index.
-      ArgList.push_back(Jump->getState());
-    }
-
-    ArgList.push_back(Jump->getRcr());
+    SmallVector<Value *> ArgList{Jump->getRcr()};
 
     ArgList.append(Jump->getTail().begin(), Jump->getTail().end());
 

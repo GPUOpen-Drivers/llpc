@@ -85,13 +85,24 @@ const unsigned GlobalMaxHitAttributeBytes = 32;
 ///       this pessimism.
 const unsigned MinimumContinuationStateBytes = 8;
 
-constexpr uint32_t CpsArgIdxContState = 0;
-constexpr uint32_t CpsArgIdxReturnAddr = 1;
-constexpr uint32_t CpsArgIdxShaderIndex = 2;
-constexpr uint32_t CpsArgIdxSystemData = 3;
-constexpr uint32_t CpsArgIdxHitAttributes = 4;
-constexpr uint32_t CpsArgIdxPadding = 5;
-constexpr uint32_t CpsArgIdxPayload = 6;
+struct CpsArgIdx {
+  static constexpr uint32_t ReturnAddr = 0;
+  static constexpr uint32_t ShaderIndex = 1;
+  static constexpr uint32_t SystemData = 2;
+  static constexpr uint32_t HitAttributes = 3;
+  static constexpr uint32_t Padding = 4;
+  static constexpr uint32_t Payload = 5;
+};
+
+struct CpsArgIdxWithStackPtr {
+  static constexpr uint32_t ReturnAddr = 0;
+  static constexpr uint32_t ShaderIndex = 1;
+  static constexpr uint32_t CspInit = 2;
+  static constexpr uint32_t SystemData = 3;
+  static constexpr uint32_t HitAttributes = 4;
+  static constexpr uint32_t Padding = 5;
+  static constexpr uint32_t Payload = 6;
+};
 
 struct DxRayIntrinsic {
   unsigned int Id;
@@ -375,12 +386,11 @@ public:
     auto AddrSpace = extractZExtI32Constant(MD->getOperand(0));
     if (!AddrSpace)
       return {};
-    assert((*AddrSpace == static_cast<uint32_t>(ContStackAddrspace::Scratch) ||
-            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::Global) ||
-            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::ScratchLLPC) ||
-            *AddrSpace == static_cast<uint32_t>(ContStackAddrspace::GlobalLLPC)) &&
+    ContStackAddrspace ContAddrSpace = static_cast<ContStackAddrspace>(*AddrSpace);
+    assert((ContAddrSpace == ContStackAddrspace::Scratch || ContAddrSpace == ContStackAddrspace::Global ||
+            ContAddrSpace == ContStackAddrspace::ScratchLLPC || ContAddrSpace == ContStackAddrspace::GlobalLLPC) &&
            "Unexpected continuation stack address space");
-    return static_cast<ContStackAddrspace>(*AddrSpace);
+    return ContAddrSpace;
   };
 
   static void setStackAddrspace(Module &M, ContStackAddrspace StackAddrspace) {

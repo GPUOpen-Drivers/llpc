@@ -41,7 +41,7 @@ void main()
 // SHADERTEST-NEXT:    [[TMP9:%.*]] = or i1 [[TMP4]], [[TMP6]]
 // SHADERTEST-NEXT:    [[TMP10:%.*]] = or i1 [[TMP9]], [[TMP8]]
 // SHADERTEST-NEXT:    [[COND_FREEZE:%.*]] = freeze i1 [[TMP10]]
-// SHADERTEST-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[COND_FREEZE]], <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>, <4 x float> <float 5.000000e-01, float 5.000000e-01, float 5.000000e-01, float 5.000000e-01>
+// SHADERTEST-NEXT:    [[SPEC_SELECT:%.*]] = select i1 [[COND_FREEZE]], <4 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00>)}}, <4 x float> {{(splat \(float 5\.000000e\-01\))|(<float 5\.000000e\-01, float 5\.000000e\-01, float 5\.000000e\-01, float 5\.000000e\-01>)}}
 // SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[SPEC_SELECT]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // SHADERTEST-NEXT:    ret void
 //

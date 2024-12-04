@@ -25,12 +25,12 @@
 /**
  ***********************************************************************************************************************
  * @file  ApplyWorkarounds.h
- * @brief LLPC header file: contains declaration of class lgc::PatchWorkarounds.
+ * @brief LLPC header file: contains declaration of class lgc::ApplyWorkarounds.
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/util/Internal.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/IRBuilder.h"
@@ -47,11 +47,11 @@ namespace lgc {
 //   require a fix so the hardware will ignore this difference (actually an app error, but common enough to require
 //   handling)
 //
-class PatchWorkarounds final : public Patch, public llvm::PassInfoMixin<PatchWorkarounds> {
+class ApplyWorkarounds final : public Patch, public llvm::PassInfoMixin<ApplyWorkarounds> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for workarounds"; }
+  static llvm::StringRef name() { return "Apply workarounds"; }
 
 private:
   std::unique_ptr<llvm::IRBuilder<>> m_builder; // The IRBuilder.

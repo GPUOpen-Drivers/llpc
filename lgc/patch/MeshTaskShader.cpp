@@ -30,8 +30,8 @@
  */
 #include "MeshTaskShader.h"
 #include "ShaderMerger.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/MutateEntryPoint.h"
-#include "lgc/patch/Patch.h"
 #include "lgc/util/Debug.h"
 #include "lgc/util/WorkgroupLayout.h"
 #include "llvm-dialects/Dialect/Visitor.h"
@@ -52,7 +52,7 @@ namespace lgc {
 // @param pipelineState : Pipeline state
 // @param getPostDomTree : Function to get the post dominator tree of the given function
 MeshTaskShader::MeshTaskShader(PipelineState *pipelineState,
-                               PatchPreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers)
+                               PreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers)
     : m_pipelineState(pipelineState), m_analysisHandlers(analysisHandlers), m_builder(pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
   assert(pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
@@ -1281,8 +1281,9 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
   if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
     const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
     const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
+    bool enableLinearDispatch = constGroupCountY == 1 && constGroupCountZ == 1;
     m_pipelineState->getShaderResourceUsage(ShaderStage::Task)->builtInUsage.task.meshLinearDispatch =
-        constGroupCountY == 1 && constGroupCountZ == 1;
+        enableLinearDispatch;
   }
 
   auto emitMeshTasksCall = m_builder.GetInsertPoint();
@@ -1363,7 +1364,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
 
     CoherentFlag coherent = {};
 
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
+    m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                               {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset,
                                m_builder.getInt32(coherent.u32All)});
 
@@ -1371,7 +1372,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
     Value *readyBit = getDrawDataReadyBit(entryPoint);
     readyBit = m_builder.CreateZExt(readyBit, m_builder.getInt8Ty());
 
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
+    m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                               {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
                                drawDataRingEntryOffset, m_builder.getInt32(coherent.u32All)});
   }
@@ -1544,8 +1545,12 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
   }
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
-      input = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
+      if (m_pipelineState->getShaderOptions(ShaderStage::Mesh).viewIndexFromDeviceIndex) {
+        input = m_builder.getInt32(m_pipelineState->getDeviceIndex());
+      } else {
+        auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
+        input = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
+      }
     } else {
       input = m_builder.getInt32(0);
     }
@@ -2081,7 +2086,7 @@ void MeshTaskShader::exportPrimitive() {
   if (enableMultiView) {
     auto entryPoint = m_builder.GetInsertBlock()->getParent();
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
-    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
+    auto viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
 
     // RT layer is view ID in simple mode (view index only).
     Value *layerFromViewId = viewId;
@@ -2576,7 +2581,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
           coherent.bits.glc = true;
         }
 
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
+        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
                                   {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.primOrVertexIndex,
                                    locationOffset, m_attribRingBaseOffset, m_builder.getInt32(coherent.u32All)});
       }

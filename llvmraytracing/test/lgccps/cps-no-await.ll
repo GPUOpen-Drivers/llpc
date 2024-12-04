@@ -5,7 +5,7 @@ define void @_cont_Traversal() !lgc.cps !{i32 2} !continuation !{ptr @_cont_Trav
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 32)
   %fn = load ptr, ptr addrspace(4) %pushconst
   %cr = ptrtoint ptr %fn to i32
-  call void (...) @lgc.cps.jump(i32 %cr, i32 2, {} poison, i32 poison)
+  call void (...) @lgc.cps.jump(i32 %cr, i32 2,  i32 poison)
   unreachable
 }
 
@@ -20,6 +20,6 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 32)
 ; LOWER-AWAIT-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; LOWER-AWAIT-NEXT:    [[CR:%.*]] = ptrtoint ptr [[FN]] to i32
-; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, {} poison, i32 poison)
+; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 poison)
 ; LOWER-AWAIT-NEXT:    unreachable
 ;

@@ -32,7 +32,7 @@
 #include "lgc/Builder.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/PassManager.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -77,23 +77,12 @@ static cl::opt<bool> EmitLgc("emit-lgc", cl::desc("Emit LLVM assembly suitable f
 static cl::opt<bool> ShowEncoding("show-encoding", cl::desc("Show instruction encodings"), cl::init(false));
 
 // -opt: Override the optimization level passed in to LGC with the given one.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-// Old version of the code
-static cl::opt<CodeGenOpt::Level> OptLevel("opt", cl::desc("Set the optimization level for LGC:"),
-                                           cl::init(CodeGenOpt::Default),
-                                           values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
-                                                  clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
-                                                  clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
-                                                  clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 static cl::opt<CodeGenOptLevel>
     OptLevel("opt", cl::desc("Set the optimization level for LGC:"), cl::init(CodeGenOptLevel::Default),
              values(clEnumValN(CodeGenOptLevel::None, "none", "no optimizations"),
                     clEnumValN(CodeGenOptLevel::Less, "quick", "quick compilation time"),
                     clEnumValN(CodeGenOptLevel::Default, "default", "default optimizations"),
                     clEnumValN(CodeGenOptLevel::Aggressive, "fast", "fast execution time")));
-#endif
 
 // =====================================================================================================================
 // Set default for a command-line option, but only if command-line processing has not happened yet, or did not see
@@ -157,24 +146,7 @@ void LgcContext::initialize() {
   // disable this to avoid miscompilation, see (https://github.com/GPUOpen-Drivers/llpc/issues/1206).
   setOptionDefault("enable-phi-of-ops", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464446
-  // Old version of the code
-  setOptionDefault("amdgpu-atomic-optimizations", "1");
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
-#endif
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463788
-  // Old version of the code
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   setOptionDefault("amdgpu-atomic-optimizer-strategy", "DPP");
-#endif
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-  // Old version of the code
-  setOptionDefault("use-gpu-divergence-analysis", "1");
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
-#endif
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
   setOptionDefault("spec-exec-max-speculation-cost", "10");
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
@@ -224,14 +196,7 @@ bool LgcContext::isGpuNameValid(llvm::StringRef gpuName) {
 //
 // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
 // @param optLevel : LLVM optimization level used to initialize target machine
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-// Old version of the code
-std::unique_ptr<TargetMachine> LgcContext::createTargetMachine(StringRef gpuName, CodeGenOpt::Level optLevel)
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
-std::unique_ptr<TargetMachine> LgcContext::createTargetMachine(StringRef gpuName, CodeGenOptLevel optLevel)
-#endif
-{
+std::unique_ptr<TargetMachine> LgcContext::createTargetMachine(StringRef gpuName, CodeGenOptLevel optLevel) {
   assert(Initialized && "Must call LgcContext::initialize before LgcContext::createTargetMachine");
 
   std::string mcpuName = codegen::getMCPU(); // -mcpu setting from llvm/CodeGen/CommandFlags.h
@@ -373,13 +338,7 @@ void LgcContext::addTargetPasses(lgc::LegacyPassManager &passMgr, Timer *codeGen
     passMgr.add(createStartStopTimer(codeGenTimer, false));
 }
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-// Old version of the code
-llvm::CodeGenOpt::Level LgcContext::getOptimizationLevel() const {
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 llvm::CodeGenOptLevel LgcContext::getOptimizationLevel() const {
-#endif
 
   return m_targetMachine->getOptLevel();
 }

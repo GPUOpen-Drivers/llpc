@@ -3,7 +3,7 @@
 
 define amdgpu_gfx float @simple(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @simple(
-; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.buffer.load.i32(<4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[DESC:%.*]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    [[TMP2:%.*]] = bitcast i32 [[TMP1]] to float
 ; CHECK-NEXT:    ret float [[TMP2]]
 ;
@@ -15,7 +15,7 @@ define amdgpu_gfx float @simple(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 define amdgpu_gfx float @uniform_select(<4 x i32> inreg %desc0, <4 x i32> inreg %desc1, i1 inreg %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @uniform_select(
 ; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.buffer.load.i32(<4 x i32> [[PTR_0]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[PTR_0]], i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    [[TMP2:%.*]] = bitcast i32 [[TMP1]] to float
 ; CHECK-NEXT:    ret float [[TMP2]]
 ;
@@ -97,7 +97,7 @@ define amdgpu_gfx void @divergent_phi_uniform_desc(<4 x i32> inreg %desc0, i32 %
 ; CHECK-NEXT:    [[PTR_PHI_1:%.*]] = phi ptr addrspace(6) [ null, [[ENTRY:%.*]] ], [ [[TMP1:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[CTR:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[CTR_NEXT:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[TMP0:%.*]] = ptrtoint ptr addrspace(6) [[PTR_PHI_1]] to i32
-; CHECK-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 0, <4 x i32> [[DESC0:%.*]], i32 [[TMP0]], i32 0, i32 0)
+; CHECK-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 0, <4 x i32> [[DESC0:%.*]], i32 [[TMP0]], i32 0, i32 0)
 ; CHECK-NEXT:    [[TMP1]] = getelementptr i32, ptr addrspace(6) [[PTR_PHI_1]], i32 [[STRIDE:%.*]]
 ; CHECK-NEXT:    [[CTR_NEXT]] = add i32 [[CTR]], 1
 ; CHECK-NEXT:    [[CC:%.*]] = icmp ne i32 [[CTR_NEXT]], 1024

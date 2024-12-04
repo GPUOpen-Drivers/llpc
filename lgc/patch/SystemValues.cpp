@@ -179,7 +179,7 @@ Value *ShaderSystemValues::getInvocationId() {
 Value *ShaderSystemValues::getRelativeId() {
   assert(m_shaderStage == ShaderStage::TessControl);
   if (!m_relativeId) {
-    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
+    auto insertPos = m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
     auto relPatchId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
 
@@ -207,7 +207,7 @@ Value *ShaderSystemValues::getOffChipLdsDesc() {
 Value *ShaderSystemValues::getTessCoord() {
   assert(m_shaderStage == ShaderStage::TessEval);
   if (!m_tessCoord) {
-    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
+    auto insertPos = m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     Value *tessCoordX = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
@@ -237,7 +237,7 @@ Value *ShaderSystemValues::getTessCoord() {
 Value *ShaderSystemValues::getEsGsOffsets() {
   assert(m_shaderStage == ShaderStage::Geometry);
   if (!m_esGsOffsets) {
-    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
+    auto insertPos = m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     // TODO: We should only insert those offsets required by the specified input primitive.
@@ -323,7 +323,7 @@ std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
   if (m_emitCounterPtrs.empty()) {
     // Setup GS emit vertex counter
     auto &dataLayout = m_entryPoint->getParent()->getDataLayout();
-    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
+    auto insertPos = m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     for (int i = 0; i < MaxGsStreams; ++i) {
       auto emitCounterPtr = new AllocaInst(emitCounterTy, dataLayout.getAllocaAddrSpace(), "", insertPos);
       new StoreInst(ConstantInt::get(emitCounterTy, 0), emitCounterPtr, insertPos);
@@ -405,7 +405,7 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
   if (!m_streamOutBufDescs[xfbBuffer]) {
     auto streamOutTablePair = getStreamOutTablePtr();
     auto streamOutTablePtr = streamOutTablePair.second;
-    auto insertPos = streamOutTablePtr->getNextNode();
+    auto insertPos = streamOutTablePtr->getNextNode()->getIterator();
 
     Value *idxs[] = {ConstantInt::get(Type::getInt64Ty(*m_context), 0),
                      ConstantInt::get(Type::getInt64Ty(*m_context), xfbBuffer)};
@@ -468,12 +468,12 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
 // @param highValue : Value to use for high part, or InvalidValue to use PC
 Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsigned highValue) {
   // Insert extending code after lowValue if it is an instruction.
-  Instruction *insertPos = nullptr;
+  BasicBlock::iterator insertPos{};
   auto lowValueInst = dyn_cast<Instruction>(lowValue);
   if (lowValueInst)
-    insertPos = lowValueInst->getNextNode();
+    insertPos = lowValueInst->getNextNode()->getIterator();
   else
-    insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
+    insertPos = m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
 
   Value *extendedPtrValue = nullptr;
   if (highValue == InvalidValue) {
@@ -490,7 +490,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
       Value *pc = emitCall("llvm.amdgcn.s.getpc", Type::getInt64Ty(*m_context), ArrayRef<Value *>(), {}, pcInsertPos);
       m_pc = new BitCastInst(pc, FixedVectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
     } else
-      insertPos = m_pc->getNextNode();
+      insertPos = m_pc->getNextNode()->getIterator();
     extendedPtrValue = m_pc;
   } else {
     // Use constant highValue value.

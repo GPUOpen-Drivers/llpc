@@ -78,7 +78,7 @@ attributes #0 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="fa
 !26 = !{i32 0, %struct.TraversalData poison}
 !27 = !{%struct.TraversalData poison}
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR1:[0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META16]] !continuation [[META19:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR1:[0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META16]] !continuation [[META19:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4

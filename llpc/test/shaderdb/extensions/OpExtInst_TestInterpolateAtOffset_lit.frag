@@ -20,18 +20,20 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -gfxip=11.0.0 %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtOffset.f32.p64.v2f32(ptr addrspace(64) @{{.*}}, <2 x float> %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtOffset.v4f32.p64.v2f32(ptr addrspace(64) @{{.*}}, <2 x float> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @interpolateAtOffset.f32.p64.v2f32(ptr addrspace(64) @{{.*}}, <2 x float> %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn <4 x float> @interpolateAtOffset.v4f32.p64.v2f32(ptr addrspace(64) @{{.*}}, <2 x float> %{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: = call <3 x float> @lgc.input.import.builtin.InterpPullMode
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> @lgc.input.import.builtin.InterpPullMode
 ; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST: = call float (...) @lgc.input.import.interpolated__f32(
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p1(float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.p2(float %{{.*}}, float %{{.*}}, i32 0, i32 0, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call float @llvm.amdgcn.interp.mov(i32 {{.*}}2, i32 1, i32 1, i32 %{{.*}})
+; SHADERTEST: fmul reassoc nnan nsz arcp contract afn <3 x float>
+; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <3 x float>
+; SHADERTEST: fmul reassoc nnan nsz arcp contract afn <3 x float>
+; SHADERTEST: fadd reassoc nnan nsz arcp contract afn <3 x float>
+; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(
+; SHADERTEST-LABEL: _amdgpu_ps_main
+; SHADERTEST-COUNT-6: v_fmac_f32_e32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -52,8 +52,6 @@ private:
   unsigned getUniformLocation(llvm::GlobalVariable *var);
   void decodeInOutMetaRecursivelyByIndex(llvm::Type *valueTy, llvm::Constant *mds, ArrayRef<Value *> index,
                                          llvm::SmallVector<ShaderInOutMetadata> &out);
-  void decodeInOutMetaRecursively(llvm::Type *valueTy, llvm::Constant *mds,
-                                  llvm::SmallVector<ShaderInOutMetadata> &out);
   void unifyFunctionReturn(Function *func);
   void collectEmitInst();
   void collectEmulationResource();

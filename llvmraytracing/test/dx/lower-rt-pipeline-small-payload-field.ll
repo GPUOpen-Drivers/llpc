@@ -40,15 +40,6 @@ define void @MissNoPAQ(%struct.NoPAQPayload* noalias nocapture %payload) #0 !poi
 }
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #1
-
-; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #1
-
-; Function Attrs: alwaysinline
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #1
-
-; Function Attrs: alwaysinline
 declare !pointeetys !19 %struct.BuiltInTriangleIntersectionAttributes @_cont_GetTriangleHitAttributes(%struct.SystemData*) #1
 
 ; Function Attrs: alwaysinline
@@ -125,8 +116,8 @@ attributes #3 = { nounwind memory(none) }
 !34 = !{i32 8, i32 11, i32 6, i32 24, i32 5, !35}
 !35 = !{i32 0}
 
-; CHECK-LABEL: define %struct.DispatchSystemData @MissPAQ(
-; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [16 x i32] [[PADDING:%.*]], [11 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META21:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] !continuation [[META23:![0-9]+]] {
+; CHECK-LABEL: define void @MissPAQ(
+; CHECK-SAME: i32 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [16 x i32] [[PADDING:%.*]], [11 x i32] [[PAYLOAD:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META21:![0-9]+]] !continuation.registercount [[META22:![0-9]+]] !continuation [[META23:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [11 x i32], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
@@ -178,12 +169,12 @@ attributes #3 = { nounwind memory(none) }
 ; CHECK-NEXT:    [[TMP32:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP33:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP32]], align 4
 ; CHECK-NEXT:    [[TMP36:%.*]] = load [11 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP33]], [16 x i32] poison, [11 x i32] [[TMP36]]), !continuation.registercount [[META22]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP33]], [16 x i32] poison, [11 x i32] [[TMP36]]), !continuation.registercount [[META22]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
-; CHECK-LABEL: define %struct.DispatchSystemData @MissNoPAQ(
-; CHECK-SAME: i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [16 x i32] [[PADDING:%.*]], [14 x i32] [[PAYLOAD:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage [[META21]] !continuation.registercount [[META19:![0-9]+]] !continuation [[META24:![0-9]+]] {
+; CHECK-LABEL: define void @MissNoPAQ(
+; CHECK-SAME: i32 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]], [16 x i32] [[PADDING:%.*]], [14 x i32] [[PAYLOAD:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage [[META21]] !continuation.registercount [[META19:![0-9]+]] !continuation [[META24:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [14 x i32], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_NOPAQPAYLOAD:%.*]], align 8
@@ -258,7 +249,7 @@ attributes #3 = { nounwind memory(none) }
 ; CHECK-NEXT:    [[TMP45:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP46:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP45]], align 4
 ; CHECK-NEXT:    [[TMP53:%.*]] = load [14 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i64 [[RETURNADDR]], i32 -1, {} poison, i32 poison, i64 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP46]], [16 x i32] poison, [14 x i32] [[TMP53]]), !continuation.registercount [[META19]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP46]], [16 x i32] poison, [14 x i32] [[TMP53]]), !continuation.registercount [[META19]]
 ; CHECK-NEXT:    unreachable
 ;
 ;

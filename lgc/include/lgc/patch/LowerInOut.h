@@ -31,7 +31,7 @@
 #pragma once
 
 #include "SystemValues.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -49,7 +49,7 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for input import and output export operations"; }
+  static llvm::StringRef name() { return "Lower input import and output export operations"; }
 
   void visitCallInst(llvm::CallInst &callInst);
   void visitReturnInst(llvm::ReturnInst &retInst);

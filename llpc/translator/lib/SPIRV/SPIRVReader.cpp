@@ -879,6 +879,13 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
       hasSamplerOrNested = true;
     } else if (spvMemberType->getOpCode() == OpTypeStruct || spvMemberType->getOpCode() == OpTypeArray ||
                spvMemberType->getOpCode() == OpTypeRuntimeArray) {
+      if (spvMemberType->isTypeArray()) {
+        if (spvMemberType->getArrayElementType()->isTypeSampledImage() ||
+            spvMemberType->getArrayElementType()->isTypeImage() ||
+            spvMemberType->getArrayElementType()->isTypeSampler()) {
+          memberType = emptyStructType;
+        }
+      }
       auto it = m_imageTypeMap.find(ctxMemberType.asTuple());
       if (it != m_imageTypeMap.end()) {
         imageMemberType = static_cast<StructType *>(it->second);
@@ -1286,6 +1293,7 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   lgc::CooperativeMatrixLayout srcLayout = lgc::CooperativeMatrixLayout::InvalidLayout;
   lgc::CooperativeMatrixLayout dstLayout = lgc::CooperativeMatrixLayout::InvalidLayout;
 
+  bool isExt = dstType->getScalarSizeInBits() > srcType->getScalarSizeInBits();
   if (bv->getType()->isTypeCooperativeMatrixKHR()) {
     auto srcCompType = static_cast<SPIRVTypeCooperativeMatrixKHR *>(srcSpvType)->getCooperativeMatrixKHRComponentType();
     srcElemTy = mapToBasicType(srcCompType);
@@ -1298,7 +1306,6 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
     srcLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(dstUse), srcElemTy, rows, columns);
   }
 
-  bool isExt = dstType->getScalarSizeInBits() > srcType->getScalarSizeInBits();
   switch (bc->getOpCode()) {
   case OpSConvert:
     co = isExt ? Instruction::SExt : Instruction::Trunc;
@@ -2015,8 +2022,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
       SmallVector<Value *, 2> indices = {zero, getBuilder()->getInt32(memberIndex)};
 
-      Value *memberLoadPointer = useSGep ? getBuilder()->create<StructuralGepOp>(loadPointer, loadType, false, indices)
-                                         : getBuilder()->CreateGEP(loadType, loadPointer, indices);
+      Value *memberLoadPointer = useSGep ? getBuilder()->create<StructuralGepOp>(loadPointer, loadType, true, indices)
+                                         : getBuilder()->CreateInBoundsGEP(loadType, loadPointer, indices);
 
       Type *memberLoadType = nullptr;
 
@@ -2066,8 +2073,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       if (needsPad)
         indices.push_back(zero);
 
-      Value *elementLoadPointer = useSGep ? getBuilder()->create<StructuralGepOp>(loadPointer, loadType, false, indices)
-                                          : getBuilder()->CreateGEP(loadType, loadPointer, indices);
+      Value *elementLoadPointer = useSGep ? getBuilder()->create<StructuralGepOp>(loadPointer, loadType, true, indices)
+                                          : getBuilder()->CreateInBoundsGEP(loadType, loadPointer, indices);
       Type *const elementLoadType = GetElementPtrInst::getIndexedType(loadType, indices);
       Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementLoadType, isVolatile,
                                                         isCoherent, isNonTemporal);
@@ -2083,7 +2090,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     Value *load = PoisonValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
       Value *const elementLoadPointer =
-          getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
+          getBuilder()->CreateInBoundsGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
       Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementType, isVolatile,
                                                         isCoherent, isNonTemporal);
       load = getBuilder()->CreateInsertElement(load, elementLoad, i);
@@ -2169,8 +2176,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
       Value *indices[] = {zero, getBuilder()->getInt32(memberIndex)};
       Value *const memberStorePointer =
-          useSGep ? getBuilder()->create<StructuralGepOp>(storePointer, storeType, false, indices)
-                  : getBuilder()->CreateGEP(storeType, storePointer, indices);
+          useSGep ? getBuilder()->create<StructuralGepOp>(storePointer, storeType, true, indices)
+                  : getBuilder()->CreateInBoundsGEP(storeType, storePointer, indices);
       Type *const memberStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       Value *const memberStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
       addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreType, memberStoreValue,
@@ -2190,8 +2197,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       if (needsPad)
         indices.push_back(zero);
       Value *const elementStorePointer =
-          useSGep ? getBuilder()->create<StructuralGepOp>(storePointer, storeType, false, indices)
-                  : getBuilder()->CreateGEP(storeType, storePointer, indices);
+          useSGep ? getBuilder()->create<StructuralGepOp>(storePointer, storeType, true, indices)
+                  : getBuilder()->CreateInBoundsGEP(storeType, storePointer, indices);
       Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractValue(storeValue, i);
       addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreType, elementStoreValue, isVolatile,
@@ -2203,7 +2210,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
       Value *indices[] = {zero, getBuilder()->getInt32(i)};
-      Value *const elementStorePointer = getBuilder()->CreateGEP(storeType, storePointer, indices);
+      Value *const elementStorePointer = getBuilder()->CreateInBoundsGEP(storeType, storePointer, indices);
       Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       Value *const elementStoreValue = getBuilder()->CreateExtractElement(storeValue, i);
       addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreType, elementStoreValue, isVolatile,
@@ -5912,7 +5919,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     PHINode *phiNode = nullptr;
     if (bb->getFirstInsertionPt() != bb->end())
       phiNode = PHINode::Create(transType(phi->getType()), phi->getPairs().size() / 2, phi->getName(),
-                                &*bb->getFirstInsertionPt());
+                                bb->getFirstInsertionPt());
     else
       phiNode = PHINode::Create(transType(phi->getType()), phi->getPairs().size() / 2, phi->getName(), bb);
 
@@ -6067,7 +6074,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     // inlining. Try to move those alloc instructions to the entry block.
     auto firstInst = bb->getParent()->getEntryBlock().getFirstInsertionPt();
     if (firstInst != bb->getParent()->getEntryBlock().end())
-      ai = new AllocaInst(at, m_m->getDataLayout().getAllocaAddrSpace(), "", &*firstInst);
+      ai = new AllocaInst(at, m_m->getDataLayout().getAllocaAddrSpace(), "", firstInst);
     else
       ai = new AllocaInst(at, m_m->getDataLayout().getAllocaAddrSpace(), "", bb);
 
@@ -9073,7 +9080,6 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeZ = workgroupSizeZ;
         }
         Pipeline::setComputeShaderMode(*m_m, computeMode);
-
       } else
         llvm_unreachable("Invalid execution model");
 
@@ -9104,6 +9110,28 @@ bool SPIRVToLLVM::checkContains64BitType(SPIRVType *bt) {
   }
   llvm_unreachable("Invalid type");
   return false;
+}
+
+// Function to remap output locations based on the location map
+unsigned SPIRVToLLVM::remapOutputLocation(unsigned loc) {
+  unsigned remappedLocation = loc;
+  Vkgc::ShaderStage stage = convertToShaderStage(m_execModule);
+  assert(stage < ShaderStageGfxCount);
+  Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+  auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+  auto outLocationMaps = buildInfo->outLocationMaps;
+  assert(outLocationMaps);
+
+  if (outLocationMaps[stage].count > 0) {
+    for (unsigned j = 0; j < outLocationMaps[stage].count; j++) {
+      if (loc == outLocationMaps[stage].oldLocation[j]) {
+        remappedLocation = outLocationMaps[stage].newLocation[j];
+        break;
+      }
+    }
+  }
+
+  return remappedLocation;
 }
 
 bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
@@ -9145,7 +9173,10 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
       SPIRVWord loc = SPIRVID_INVALID;
       if (bv->hasDecorate(DecorationLocation, 0, &loc)) {
         inOutDec.IsBuiltIn = false;
-        inOutDec.Value.Loc = loc;
+        if (getPipelineOptions()->getGlState().enableRemapLocation && as == SPIRAS_Output)
+          inOutDec.Value.Loc = remapOutputLocation(loc);
+        else
+          inOutDec.Value.Loc = loc;
       }
 
       SPIRVWord index = SPIRVID_INVALID;
@@ -9427,7 +9458,7 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
           // NOTE: For OpCopyObject, we use the operand value directly, which may be in another block that already has a
           // terminator. In this case, insert the call before the terminator.
           assert(bv->getOpCode() == OpCopyObject);
-          CallInst::Create(f, args, "", bb->getTerminator());
+          CallInst::Create(f, args, "", bb->getTerminator()->getIterator());
         } else {
           CallInst::Create(f, args, "", bb);
         }
@@ -10659,10 +10690,7 @@ Value *SPIRVToLLVM::transGLSLBuiltinFromExtInst(SPIRVExtInst *bc, BasicBlock *bb
     if (isFuncNoUnwind())
       func->addFnAttr(Attribute::NoUnwind);
   }
-  CallInst *call = CallInst::Create(func, args, bc->getName(), bb);
-  setCallingConv(call);
-  call->addFnAttr(Attribute::NoUnwind);
-  return call;
+  return getBuilder()->CreateCall(func, args, bc->getName());
 }
 
 void SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord memScope) {

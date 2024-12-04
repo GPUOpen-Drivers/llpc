@@ -123,6 +123,45 @@ private:
 };
 
 // =====================================================================================================================
+// Represents one entry in a default output location map
+class SectionOutputLocationMap : public Section {
+public:
+  typedef Vkgc::OutputLocationMap SubState;
+
+  SectionOutputLocationMap() : Section(getAddrTable(), SectionTypeUnset, "outLocationMaps") {
+    m_oldLocation = &m_oldLocationData;
+    m_newLocation = &m_newLocationData;
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  SubState &getSubStateRef() { return m_state; }
+
+  void getSubState(SubState &state) {
+    state = m_state;
+    state.oldLocation = m_oldLocationData.size() > 0 ? (uint32_t *)(&m_oldLocationData[0]) : nullptr;
+    state.newLocation = m_newLocationData.size() > 0 ? (uint32_t *)(&m_newLocationData[0]) : nullptr;
+  }
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_MEMBER_NAME_TO_ADDR(SectionOutputLocationMap, m_oldLocation, MemberTypeUArray, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionOutputLocationMap, m_newLocation, MemberTypeUArray, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionOutputLocationMap, count, MemberTypeUint, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+  std::vector<uint8_t> *m_oldLocation;
+  std::vector<uint8_t> *m_newLocation;
+  std::vector<uint8_t> m_oldLocationData;
+  std::vector<uint8_t> m_newLocationData;
+};
+
+// =====================================================================================================================
 // Represents one entry in a default uniform constant map
 class SectionUniformConstantMapEntry : public Section {
 public:
@@ -258,6 +297,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, constantBufferBindingOffset, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, imageSampleDrefReturnsRgba, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableGlPositionOpt, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, viewIndexFromDeviceIndex, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -458,6 +498,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableLineSmooth, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, emulateWideLineStipple, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enablePointSmooth, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableRemapLocation, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -536,6 +577,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableLineSmooth, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, emulateWideLineStipple, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePointSmooth, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableRemapLocation, MemberTypeBool, false);
 #else
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_glState, MemberTypeGlState, true);
 #endif
@@ -895,7 +937,8 @@ public:
   typedef Vkgc::GraphicsPipelineBuildInfo SubState;
 
   SectionGraphicsState()
-      : Section(getAddrTable(), SectionTypeGraphicsState, nullptr), m_pUniformMaps{}, m_uniformMaps{} {
+      : Section(getAddrTable(), SectionTypeGraphicsState, nullptr), m_pUniformMaps{}, m_uniformMaps{},
+        m_outLocationMap{} {
     memset(&m_state, 0, sizeof(m_state));
 
     m_usrClipPlaneMask = 0;
@@ -964,7 +1007,8 @@ public:
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableInitUndefZero, MemberTypeBool, false);
-
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_outLocationMaps, MemberTypeOutputLocationMap,
+                                     Vkgc::ShaderStageCount, true);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_clientMetadata, MemberTypeU8Array, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_uniformConstantMaps, MemberTypeUniformConstantMap,
                                      Vkgc::ShaderStageGfxCount, true);
@@ -978,6 +1022,8 @@ public:
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_forceDisableStreamOut, MemberTypeBool, false);
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionGraphicsState, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_advancedBlendInfo, MemberTypeAdvancedBlendInfo, true);
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_outLocationMaps, MemberTypeOutputLocationMap,
+                                     Vkgc::ShaderStageCount, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -1006,6 +1052,11 @@ public:
         pGlState->ppUniformMaps[pGlState->numUniformConstantMaps++] = &m_uniformMaps[i];
       }
     }
+
+    for (unsigned i = 0; i < Vkgc::ShaderStageFragment; ++i) {
+      m_outLocationMaps[i].getSubState(m_outLocationMap[i]);
+    }
+    m_state.outLocationMaps = m_outLocationMap;
 
     pGlState->apiXfbOutData.forceDisableStreamOut = m_forceDisableStreamOut;
     if (m_xfbOutInfo.size() > 0) {
@@ -1050,26 +1101,28 @@ public:
   SubState &getSubStateRef() { return m_state; };
 
 private:
-  SectionNggState m_nggState;
   SubState m_state;
-  SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
+  bool m_forceDisableStreamOut;
+  unsigned m_usrClipPlaneMask;
+  SectionNggState m_nggState;
+  SectionRtState m_rtState;
   SectionPipelineOption m_options;
+  std::string m_shaderLibrary;
+  std::vector<uint8_t> m_shaderLibraryBytes;
   Vkgc::UniformConstantMap *m_pUniformMaps[Vkgc::ShaderStageGfxCount];
   Vkgc::UniformConstantMap m_uniformMaps[Vkgc::ShaderStageGfxCount];
   SectionUniformConstantMap m_uniformConstantMaps[Vkgc::ShaderStageGfxCount];
-  std::string m_shaderLibrary;
-  std::vector<uint8_t> m_shaderLibraryBytes;
-  std::vector<uint8_t> *m_clientMetadata;
-  std::vector<uint8_t> m_clientMetadataBufMem;
-  SectionRtState m_rtState;
-  bool m_forceDisableStreamOut;
+  Vkgc::OutputLocationMap m_outLocationMap[Vkgc::ShaderStageGfxCount];
+  SectionOutputLocationMap m_outLocationMaps[Vkgc::ShaderStageGfxCount];
   float m_tessLevelInner[2];
   float m_tessLevelOuter[4];
   Vkgc::TessellationLevel m_tessLevel;
   std::vector<SectionXfbOutInfo> m_xfbOutInfo;
   std::vector<Vkgc::XfbOutInfo> m_xfbOutInfoData;
-  unsigned m_usrClipPlaneMask;
   SectionAdvancedBlendInfo m_advancedBlendInfo;
+  std::vector<uint8_t> *m_clientMetadata;
+  std::vector<uint8_t> m_clientMetadataBufMem;
+  SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
 };
 
 // =====================================================================================================================

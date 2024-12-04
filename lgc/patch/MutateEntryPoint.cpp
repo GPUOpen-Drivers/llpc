@@ -56,9 +56,11 @@
 #include "lgc/patch/MutateEntryPoint.h"
 #include "ShaderMerger.h"
 #include "compilerutils/CompilerUtils.h"
+#include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/AbiMetadata.h"
@@ -125,8 +127,6 @@ PreservedAnalyses MutateEntryPoint::run(Module &module, ModuleAnalysisManager &a
   Patch::init(&module);
 
   m_pipelineState = pipelineState;
-
-  stackLowering = std::make_unique<CpsStackLowering>(module.getContext(), ADDR_SPACE_PRIVATE);
 
   const auto stageMask = m_pipelineState->getShaderStageMask();
   m_hasTs = stageMask.contains_any({ShaderStage::TessControl, ShaderStage::TessEval});
@@ -477,6 +477,8 @@ void MutateEntryPoint::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCps
 
   Value *loweredReference = lgc::cps::lowerAsContinuationReference(builder, asCpsReferenceOp, reloc);
 
+  assert(asCpsReferenceOp.getType()->getIntegerBitWidth() == 32);
+
   loweredReference =
       builder.CreateAdd(loweredReference, builder.getIntN(loweredReference->getType()->getScalarSizeInBits(),
                                                           static_cast<uint64_t>(cps::getCpsLevelFromFunction(callee))));
@@ -519,13 +521,6 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   if (!isCpsFunc && cpsJumps.empty())
     return false;
 
-  if (!isCpsFunc) {
-    IRBuilder<> builder(func->getContext());
-    builder.SetInsertPointPastAllocas(func);
-    Value *vspStorage = builder.CreateAlloca(builder.getInt32Ty());
-    m_funcCpsStackMap[func] = vspStorage;
-  }
-
   // Get the number of user-data arguments.
   const auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
   bool haveLocalInvocationId = !mode.noLocalInvocationIdInCalls;
@@ -556,16 +551,13 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   IRBuilder<> builder(func->getContext());
 
   // Lower cps jumps.
-  unsigned stackSize = 0;
-  for (auto *jump : cpsJumps) {
-    unsigned stateSize = lowerCpsJump(func, jump, tailBlock, exitInfos);
-    stackSize = std::max(stackSize, stateSize);
-  }
+  for (auto *jump : cpsJumps)
+    lowerCpsJump(func, jump, tailBlock, exitInfos);
 
   // Lower returns.
   for (auto *ret : retInstrs) {
-    auto *vspTy = builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace());
-    exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(vspTy)}));
+    auto *cspTy = builder.getInt32Ty();
+    exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(cspTy)}));
     builder.SetInsertPoint(ret);
     builder.CreateBr(tailBlock);
     ret->eraseFromParent();
@@ -576,7 +568,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     vgprNum = std::max(exit.vgpr.size(), vgprNum);
 
   SmallVector<Value *> newVgpr;
-  // Put LocalInvocationId before {vcr, vsp}.
+  // Put LocalInvocationId before {vcr, csp}.
   if (haveLocalInvocationId)
     newVgpr.push_back(func->getArg(numUserdata));
 
@@ -586,7 +578,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     newVgpr.append(exitInfos[0].vgpr);
   } else {
     for (size_t vgprIdx = 0; vgprIdx < vgprNum; vgprIdx++) {
-      // We always have the leading two fixed vgpr arguments: vcr, vsp. The other remaining payloads are i32 type.
+      // We always have the leading two fixed vgpr arguments: vcr, csp. The other remaining payloads are i32 type.
       Type *phiTy = vgprIdx < 2 ? exitInfos[0].vgpr[vgprIdx]->getType() : builder.getInt32Ty();
       PHINode *phi = builder.CreatePHI(phiTy, exitInfos.size());
       for (size_t exitIdx = 0; exitIdx < exitInfos.size(); exitIdx++) {
@@ -616,7 +608,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   //      ret void
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage.value());
   Type *waveMaskTy = builder.getIntNTy(waveSize);
-  // For continufy based continuation, the vgpr list: LocalInvocationId(optional), vcr, vsp, ...
+  // For continufy based continuation, the vgpr list: LocalInvocationId(optional), vcr, csp, ...
   unsigned vcrIndexInVgpr = haveLocalInvocationId ? 1 : 0;
   auto *vcr = builder.CreateExtractValue(vgprArg, vcrIndexInVgpr);
   auto *vcrTy = vcr->getType();
@@ -700,34 +692,18 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     chainArgs.push_back(builder.getInt32(0));
   }
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465197
-  // Old version of the code
-  SmallVector<Type *> chainArgTys = {builder.getPtrTy(), builder.getIntNTy(waveSize), sgprVec->getType(),
-                                     vgprArg->getType(), builder.getInt32Ty()};
-
-  FunctionType *chainFuncTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
-  auto chainFunc =
-      Function::Create(chainFuncTy, GlobalValue::ExternalLinkage, "llvm.amdgcn.cs.chain", func->getParent());
-  builder.CreateCall(chainFunc, chainArgs);
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
   Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), sgprVec->getType(), vgprArg->getType()};
   auto *chainCall = builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
   // Add inreg attribute for (fn, exec, sgprs).
   for (unsigned arg = 0; arg < 3; arg++)
     chainCall->addParamAttr(arg, Attribute::InReg);
-#endif
   builder.CreateUnreachable();
 
   auto *doc = m_pipelineState->getPalMetadata()->getDocument();
   auto funcName = doc->getNode(func->getName(), /*copy=*/true);
-  // Lower cps stack operations
-  Value *cspStorage = m_funcCpsStackMap[func];
-  stackLowering->lowerCpsStackOps(func, nullptr, false, cspStorage);
 
-  stackSize += stackLowering->getStackSizeInBytes();
   // Set per-function .frontend_stack_size PAL metadata.
+  unsigned stackSize = ContHelper::tryGetStackSize(func).value_or(0);
   auto &shaderFunctions = m_pipelineState->getPalMetadata()
                               ->getPipelineNode()
                               .getMap(true)[Util::Abi::PipelineMetadataKey::ShaderFunctions]
@@ -741,22 +717,20 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
 // Mutate the argument list of the cps function
 //
 // Mutate the function type from:
-// void @func({} state, args...)
+// void @func(args...)
 // into:
-// amdgpu_cs_chain void @func(fixed_shader_args, i32 %vcr, ptr addrspace(5) %vsp, args...)
+// amdgpu_cs_chain void @func(fixed_shader_args, i32 %vcr, i32 %csp, args...)
 //
 // @param func : the cps function to be mutated
 // @param fixedShaderArgTys : the types of the fixed shader arguments(userdata + possibly shader inputs)
 // @param argNames : the name string of the fixed shader arguments
 Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fixedShaderArgTys,
                                              ArrayRef<std::string> argNames) {
-  Value *state = func->getArg(0);
-  const DataLayout &layout = func->getParent()->getDataLayout();
   IRBuilder<> builder(func->getContext());
   SmallVector<Type *> newArgTys;
   newArgTys.append(fixedShaderArgTys.begin(), fixedShaderArgTys.end());
-  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace())});
-  auto remainingArgs = func->getFunctionType()->params().drop_front(1);
+  newArgTys.push_back(builder.getInt32Ty());
+  auto remainingArgs = func->getFunctionType()->params();
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
   auto newFunc = createFunctionHelper(newFuncTy, func->getLinkage(), func->getParent());
@@ -786,9 +760,9 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
 
   // %vcr attribute
   argAttrs.push_back(emptyAttrSet);
-  // %vsp attribute
+  // %csp attribute
   argAttrs.push_back(emptyAttrSet);
-  for (unsigned idx = 1; idx != func->getFunctionType()->getNumParams(); ++idx)
+  for (unsigned idx = 0; idx != func->getFunctionType()->getNumParams(); ++idx)
     argAttrs.push_back(oldAttrs.getParamAttrs(idx));
   newFunc->setAttributes(
       AttributeList::get(func->getContext(), oldAttrs.getFnAttrs(), oldAttrs.getRetAttrs(), argAttrs));
@@ -797,45 +771,24 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
   newFunc->splice(newFunc->begin(), func);
 
   builder.SetInsertPointPastAllocas(newFunc);
-  Value *vspStorage = builder.CreateAlloca(builder.getInt32Ty());
-  m_funcCpsStackMap[newFunc] = vspStorage;
-
-  // Function arguments: {fixed_shader_arguments, vcr, vsp, original_func_arguments_exclude_state}
-  Value *vsp = newFunc->getArg(fixedShaderArgTys.size() + 1);
-  if (!state->getType()->isEmptyTy()) {
-    // Get stack address of pushed state and load it from continuation stack.
-    unsigned stateSize = layout.getTypeStoreSize(state->getType());
-    vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, ContinuationStackAlignment));
-    auto *newState = builder.CreateLoad(state->getType(), vsp, "cps.state");
-    CompilerUtils::setIsLastUseLoad(*newState);
-    state->replaceAllUsesWith(newState);
-  }
-  vsp = builder.CreatePtrToInt(vsp, builder.getInt32Ty());
-  builder.CreateStore(vsp, vspStorage);
 
   // Set name string for arguments.
   SmallVector<std::string> newArgNames(argNames);
-  newArgNames.append({"vcr", "vsp"});
+  newArgNames.push_back("vcr");
   for (unsigned idx = 0; idx < newArgNames.size(); idx++)
     newFunc->getArg(idx)->setName(newArgNames[idx]);
 
-  // Replace old arguments with new ones (excluding the very first `state`).
-  unsigned argOffsetInNew = fixedShaderArgTys.size() + 2;
-  for (unsigned idx = 1; idx < func->arg_size(); idx++) {
+  // Replace old arguments with new ones.
+  unsigned argOffsetInNew = fixedShaderArgTys.size() + 1;
+  for (unsigned idx = 0; idx < func->arg_size(); idx++) {
     Value *oldArg = func->getArg(idx);
-    Value *newArg = newFunc->getArg(idx - 1 + argOffsetInNew);
+    Value *newArg = newFunc->getArg(idx + argOffsetInNew);
     newArg->setName(oldArg->getName());
     oldArg->replaceAllUsesWith(newArg);
   }
   setShaderStage(newFunc, getShaderStage(func));
   newFunc->setAlignment(Align(64));
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465196
-  // Old version of the code
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
   newFunc->setCallingConv(CallingConv::AMDGPU_CS_Chain);
-#endif
   return newFunc;
 }
 
@@ -845,13 +798,14 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
 // @param level : the level to select
 // @param builder: IRBuilder to build instructions
 // @param waveMaskTy : Wave Mask type
-// @param priorties : Priorities list
-Value *MutateEntryPoint::takeLevel(Value *level, IRBuilder<> &builder, Type *waveMaskTy, ArrayRef<CpsLevel> priorties) {
+// @param priorities : Priorities list
+Value *MutateEntryPoint::takeLevel(Value *level, IRBuilder<> &builder, Type *waveMaskTy,
+                                   ArrayRef<CpsLevel> priorities) {
   auto levelMask = builder.CreateICmpNE(level, builder.getInt32(0));
   Value *levelBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, levelMask);
   Value *cond = nullptr;
 
-  for (auto cpsLevel : priorties) {
+  for (auto cpsLevel : priorities) {
     auto lvMask = builder.CreateICmpEQ(level, builder.getInt32(static_cast<unsigned>(cpsLevel)));
     Value *lvBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, lvMask);
     cond = builder.CreateICmpNE(lvBallot, builder.getInt32(0));
@@ -861,43 +815,28 @@ Value *MutateEntryPoint::takeLevel(Value *level, IRBuilder<> &builder, Type *wav
 }
 
 // =====================================================================================================================
-// Lower cps.jump, fill cps exit information and branch to tailBlock. Return the state size.
+// Lower cps.jump, fill cps exit information and branch to tailBlock.
 // This assume the arguments of the parent function are setup correctly.
 //
 // @param parent : the parent function of the cps.jump operation
 // @param jumpOp : the call instruction of cps.jump
 // @param [in/out] exitInfos : the vector of cps exit information to be filled
-unsigned MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, BasicBlock *tailBlock,
-                                        SmallVectorImpl<CpsExitInfo> &exitInfos) {
+void MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, BasicBlock *tailBlock,
+                                    SmallVectorImpl<CpsExitInfo> &exitInfos) {
   IRBuilder<> builder(parent->getContext());
   const DataLayout &layout = parent->getParent()->getDataLayout();
-  // Translate @lgc.cps.jump(CR %target, i32 %levels, T %state, i32 %csp, ...) into:
+  // Translate @lgc.cps.jump(CR %target, i32 %levels, i32 %csp, ...) into:
   // @llvm.amdgcn.cs.chain(ptr %fn, i{32,64} %exec, T %sgprs, U %vgprs, i32 immarg %flags, ...)
-  Value *vcr = jumpOp->getTarget();
   builder.SetInsertPoint(jumpOp);
 
-  // Pushing state onto stack and get new vsp.
-  Value *state = jumpOp->getState();
-  Value *vsp = builder.CreateLoad(builder.getInt32Ty(), m_funcCpsStackMap[parent]);
-  vsp = builder.CreateIntToPtr(vsp, builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()));
-  unsigned stateSize = 0;
-  if (!state->getType()->isEmptyTy()) {
-    stateSize = layout.getTypeStoreSize(state->getType());
-    builder.CreateStore(state, vsp);
-    // Make vsp properly aligned across cps function.
-    stateSize = alignTo(stateSize, ContinuationStackAlignment);
-    vsp = builder.CreateConstGEP1_32(builder.getInt8Ty(), vsp, stateSize);
-  }
-
   // Add extra args specific to the target function.
-  SmallVector<Value *> remainingArgs;
-  for (Value *arg : drop_begin(jumpOp->args(), 4))
-    remainingArgs.push_back(arg);
+  SmallVector<Value *> remainingArgs{jumpOp->getTail()};
 
-  // Packing VGPR arguments {vcr, vsp, args...}
+  // Packing VGPR arguments {vcr, csp, rcr, args...}
   SmallVector<Value *> vgprArgs;
-  vgprArgs.push_back(vcr);
-  vgprArgs.push_back(vsp);
+  vgprArgs.push_back(jumpOp->getTarget());
+  vgprArgs.push_back(jumpOp->getCsp());
+  vgprArgs.push_back(jumpOp->getRcr());
   splitIntoI32(layout, builder, remainingArgs, vgprArgs);
 
   // Fill exit information.
@@ -909,7 +848,6 @@ unsigned MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, B
   builder.CreateBr(tailBlock);
 
   jumpOp->eraseFromParent();
-  return stateSize;
 }
 
 // =====================================================================================================================
@@ -1293,6 +1231,10 @@ void MutateEntryPoint::processComputeFuncs(ShaderInputs *shaderInputs, Module &m
   ArrayRef<std::string> calleeArgNames;
   uint64_t inRegMask;
 
+  auto StackAddrspaceMD = ContHelper::tryGetStackAddrspace(module);
+  auto StackAddrspace = StackAddrspaceMD.value_or(ContStackAddrspace::ScratchLLPC);
+  m_cpsStackAddrspace = static_cast<unsigned>(StackAddrspace);
+
   for (Function *origFunc : origFuncs) {
     auto *origType = origFunc->getFunctionType();
 
@@ -1542,15 +1484,7 @@ void MutateEntryPoint::setFuncAttrs(Function *entryPoint) {
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
   // LLVM optimization to remove sendmsg(GS_DONE). It is unexpected.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 440919
-  // Old version of the code
-  if (entryPoint->hasFnAttribute(Attribute::ReadNone))
-    entryPoint->removeFnAttr(Attribute::ReadNone);
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
   entryPoint->setMemoryEffects(MemoryEffects::unknown());
-#endif
 }
 
 // =====================================================================================================================
@@ -1990,7 +1924,9 @@ void MutateEntryPoint::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       else
         userDataArgs.emplace_back(builder.getInt32Ty(), "pad" + Twine(i));
     }
-    if (userDataSgprs < userDataDwords)
+    // If there are user data to set or all users data are forced to be spilled, call setUserDataSpillUsage to update
+    // spill_threshold correctly.
+    if (userDataSgprs < userDataDwords || m_pipelineState->getOptions().forceUserDataSpill)
       m_pipelineState->getPalMetadata()->setUserDataSpillUsage(userDataSgprs, m_shaderStage);
 
     // We must conservatively assume that there are functions with dynamic push constant accesses, and that therefore

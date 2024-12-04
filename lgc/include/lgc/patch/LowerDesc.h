@@ -31,7 +31,7 @@
 #pragma once
 #include "SystemValues.h"
 #include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"

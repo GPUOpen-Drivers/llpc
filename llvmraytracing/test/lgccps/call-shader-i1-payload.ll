@@ -15,10 +15,7 @@
 declare  !pointeetys !8 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
-
-; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i32, %struct.DispatchSystemData) #0
 
 declare !pointeetys !1 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 
@@ -30,7 +27,7 @@ define i32 @_cont_GetLocalRootIndex(ptr %data) #0 !pointeetys !1 {
 ; Function Attrs: alwaysinline
 define void @_cont_CallShader(ptr %data, i32 %0) #0 !pointeetys !2 {
   %dis_data = load %struct.DispatchSystemData, ptr %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i32 2, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, ptr %data, align 4
   ret void
 }
@@ -64,7 +61,7 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ;
 ;
 ; LOWER-RAYTRACING-PIPELINE-LABEL: define void @called(
-; LOWER-RAYTRACING-PIPELINE-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [2 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META4:![0-9]+]] !lgc.cps [[META1:![0-9]+]] !continuation [[META5:![0-9]+]] {
+; LOWER-RAYTRACING-PIPELINE-SAME: i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [2 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META4:![0-9]+]] !lgc.cps [[META1:![0-9]+]] !continuation.registercount [[META1]] !continuation [[META5:![0-9]+]] {
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [2 x i32], align 4
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_MYPARAMS:%.*]], align 8
@@ -86,7 +83,7 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP23]], align 4
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    store i32 [[TMP11]], ptr [[TMP10]], align 4
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP12:%.*]] = load [2 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP13:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa8i32a2i32s(i32 2, i32 4, i32 5, [9 x i32] poison, [2 x i32] [[TMP12]]), !continuation.returnedRegistercount [[META1]], !continuation.registercount [[META1]]
+; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP13:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa8i32a2i32s(i32 2, i32 4, i32 5, [9 x i32] poison, [2 x i32] [[TMP12]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP14:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } [[TMP13]], 2
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    store [2 x i32] [[TMP14]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP29:%.*]] = freeze [[STRUCT_MYPARAMS]] poison
@@ -107,9 +104,9 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP28:%.*]] = getelementptr inbounds i32, ptr [[TMP21]], i32 1
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP28]], align 4
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    store i32 [[TMP25]], ptr [[TMP24]], align 4
-; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP26:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP30:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    [[TMP27:%.*]] = load [2 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; LOWER-RAYTRACING-PIPELINE-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP26]], [8 x i32] poison, [2 x i32] [[TMP27]]), !continuation.registercount [[META1]]
+; LOWER-RAYTRACING-PIPELINE-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP30]], [8 x i32] poison, [2 x i32] [[TMP27]]), !continuation.registercount [[META1]]
 ; LOWER-RAYTRACING-PIPELINE-NEXT:    unreachable
 ;
 ;
@@ -119,7 +116,7 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ;
 ;
 ; SROA-LABEL: define void @called(
-; SROA-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [2 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META4:![0-9]+]] !lgc.cps [[META1:![0-9]+]] !continuation [[META5:![0-9]+]] {
+; SROA-SAME: i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [2 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META4:![0-9]+]] !lgc.cps [[META1:![0-9]+]] !continuation.registercount [[META1]] !continuation [[META5:![0-9]+]] {
 ; SROA-NEXT:    [[DOTSROA_5:%.*]] = alloca i8, align 4
 ; SROA-NEXT:    [[PAYLOAD_FCA_0_EXTRACT:%.*]] = extractvalue [2 x i32] [[PAYLOAD]], 0
 ; SROA-NEXT:    [[PAYLOAD_FCA_1_EXTRACT:%.*]] = extractvalue [2 x i32] [[PAYLOAD]], 1
@@ -139,7 +136,7 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ; SROA-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_MASK16:%.*]] = and i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_16_4_INSERT_INSERT22]], -256
 ; SROA-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_INSERT17:%.*]] = or i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_MASK16]], [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_EXT15]]
 ; SROA-NEXT:    [[DOTFCA_1_INSERT8:%.*]] = insertvalue [2 x i32] [[DOTFCA_0_INSERT5]], i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_INSERT17]], 1
-; SROA-NEXT:    [[TMP1:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa8i32a2i32s(i32 2, i32 4, i32 5, [9 x i32] poison, [2 x i32] [[DOTFCA_1_INSERT8]]), !continuation.returnedRegistercount [[META1]], !continuation.registercount [[META1]]
+; SROA-NEXT:    [[TMP1:%.*]] = call { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } (...) @lgc.cps.await__sl_s_struct.DispatchSystemDatasa8i32a2i32s(i32 2, i32 4, i32 5, [9 x i32] poison, [2 x i32] [[DOTFCA_1_INSERT8]]), !continuation.registercount [[META1]], !continuation.returnedRegistercount [[META1]]
 ; SROA-NEXT:    [[TMP2:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } [[TMP1]], 2
 ; SROA-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [2 x i32] [[TMP2]], 0
 ; SROA-NEXT:    [[DOTFCA_1_EXTRACT:%.*]] = extractvalue [2 x i32] [[TMP2]], 1
@@ -154,7 +151,7 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ; SROA-NEXT:    [[TMP3:%.*]] = extractvalue { [[STRUCT_DISPATCHSYSTEMDATA]], [8 x i32], [2 x i32] } [[TMP1]], 0
 ; SROA-NEXT:    [[DOTFCA_0_EXTRACT27:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], 0
 ; SROA-NEXT:    [[DOTSROA_5_0__SROA_5_4_:%.*]] = load i8, ptr [[DOTSROA_5]], align 4
-; SROA-NEXT:    [[DOTFCA_0_INSERT26:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT27]], 0
+; SROA-NEXT:    [[DOTFCA_0_INSERT38:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT27]], 0
 ; SROA-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [2 x i32] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; SROA-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_16_4_INSERT_EXT:%.*]] = zext i24 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_16_4_EXTRACT_TRUNC24]] to i32
 ; SROA-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_16_4_INSERT_SHIFT:%.*]] = shl i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_16_4_INSERT_EXT]], 8
@@ -164,6 +161,6 @@ attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem:
 ; SROA-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_MASK:%.*]] = and i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_16_4_INSERT_INSERT]], -256
 ; SROA-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_INSERT:%.*]] = or i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_MASK]], [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_EXT]]
 ; SROA-NEXT:    [[DOTFCA_1_INSERT:%.*]] = insertvalue [2 x i32] [[DOTFCA_0_INSERT]], i32 [[PAYLOAD_SERIALIZATION_ALLOCA_SROA_8_4_INSERT_INSERT]], 1
-; SROA-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, {} poison, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT26]], [8 x i32] poison, [2 x i32] [[DOTFCA_1_INSERT]]), !continuation.registercount [[META1]]
+; SROA-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURNADDR]], i32 6, i32 poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT38]], [8 x i32] poison, [2 x i32] [[DOTFCA_1_INSERT]]), !continuation.registercount [[META1]]
 ; SROA-NEXT:    unreachable
 ;

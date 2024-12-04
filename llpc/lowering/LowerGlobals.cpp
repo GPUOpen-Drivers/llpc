@@ -61,6 +61,16 @@ using namespace lgc::rt;
 
 namespace Llpc {
 
+// Enumerates transform vertex shader function parameters
+enum TransformShaderFunParam {
+  TransformVertexId = 0,
+  TransformInstanceId = 1,
+  TransformDrawId = 2,
+  TransformBaseVertex = 3,
+  TransformBaseInstance = 4,
+  TransformParamCount = 5,
+};
+
 // The code here relies on the SPIR-V built-in kind being the same as the Builder built-in kind.
 
 static_assert(lgc::BuiltInBaryCoord == static_cast<lgc::BuiltInKind>(spv::BuiltInBaryCoordKHR),
@@ -210,6 +220,12 @@ PreservedAnalyses LowerGlobals::run(Module &module, ModuleAnalysisManager &analy
   if (m_shaderStage == ShaderStageFragment)
     handleCallInst(false, true);
 
+  if (m_shaderStage == ShaderStageVertex) {
+    m_transformVertex = static_cast<GraphicsContext *>(m_context->getPipelineContext())
+                            ->getPipelineShaderInfo(m_shaderStage)
+                            ->options.enableTransformShader;
+  }
+
   // Preparations for output lowering
   m_unifiedReturn = nullptr;
 
@@ -217,7 +233,7 @@ PreservedAnalyses LowerGlobals::run(Module &module, ModuleAnalysisManager &analy
     // Collect "emit" calls
     handleCallInst(true, false);
   } else if (m_shaderStage < ShaderStageGfxCount) {
-    ensureUnifiedReturn();
+    m_unifiedReturn = CompilerUtils::unifyReturns(*m_entryPoint, *m_builder);
   }
 
   // Preparations for XFB handling
@@ -269,7 +285,7 @@ PreservedAnalyses LowerGlobals::run(Module &module, ModuleAnalysisManager &analy
   m_emitCalls.clear();
 
   // Do further lowering operations
-  if (m_shaderStage == ShaderStageVertex)
+  if (m_shaderStage == ShaderStageVertex && !m_transformVertex)
     lowerEdgeFlag();
 
   lowerBufferBlock();
@@ -303,43 +319,13 @@ void LowerGlobals::lowerEdgeFlag() {
       Value *zeroValue = m_builder->getInt32(0);
 
       lgc::InOutInfo inOutInfo;
-      Value *edgeflagValue = m_builder->CreateReadGenericInput(int32Ty, edgeflagInputLocation, zeroValue, zeroValue, 0,
-                                                               inOutInfo, nullptr);
+      Value *edgeflagValue = m_builder->create<lgc::LoadVertexInputOp>(
+          int32Ty, false, edgeflagInputLocation, zeroValue, zeroValue, PoisonValue::get(int32Ty),
+          PoisonValue::get(int32Ty), PoisonValue::get(int32Ty));
       m_builder->CreateWriteBuiltInOutput(edgeflagValue, lgc::BuiltInEdgeFlag, inOutInfo, nullptr, nullptr);
       return;
     }
   }
-}
-
-// =====================================================================================================================
-// Ensure that there is exactly one "ret" instruction. This is used for writing output variables for many shader types.
-void LowerGlobals::ensureUnifiedReturn() {
-  SmallVector<ReturnInst *> retInsts;
-
-  for (BasicBlock &block : *m_entryPoint) {
-    if (auto *retInst = dyn_cast<ReturnInst>(block.getTerminator()))
-      retInsts.push_back(retInst);
-  }
-
-  if (retInsts.size() == 1) {
-    m_unifiedReturn = retInsts[0];
-    return;
-  }
-
-  // There are more than 2 returns; create a unified return block.
-  //
-  // Also create a "unified return block" if there are no returns at all. Such a shader will surely hang or otherwise
-  // trigger UB if it is ever executed, but we still need to compile it correctly in case it never runs.
-  BasicBlock *retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
-
-  for (ReturnInst *retInst : retInsts) {
-    m_builder->SetInsertPoint(retInst);
-    m_builder->CreateBr(retBlock);
-    retInst->eraseFromParent();
-  }
-
-  m_builder->SetInsertPoint(retBlock);
-  m_unifiedReturn = m_builder->CreateRetVoid();
 }
 
 // =====================================================================================================================
@@ -405,6 +391,9 @@ void LowerGlobals::handleCallInst(bool checkEmitCall, bool checkInterpCall) {
           } else {
             gv = cast<GlobalVariable>(loadSrc);
           }
+          lgc::Builder::FastMathFlagGuard guard(*m_builder);
+          if (isa<FPMathOperator>(callInst))
+            m_builder->setFastMathFlags(callInst->getFastMathFlags());
           Value *result = interpolateInputElement(callInst->getType(), interpLoc, auxInterpValue, gv, indexOperands);
           callInst->replaceAllUsesWith(result);
           callInst->eraseFromParent();
@@ -539,7 +528,11 @@ void LowerGlobals::lowerInOut(llvm::GlobalVariable *globalVar) {
           m_shaderStage == ShaderStageFragment) {
         m_builder->SetInsertPoint(m_unifiedReturn);
         Value *outputValue = m_builder->CreateLoad(ty, proxy);
-        addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue);
+
+        // Don't need to generate instructions for output variables for transform vertex shader, because transform
+        // vertex shader will be inlined in a compute shader, it is invalid to export variables in a compute shader
+        if (!m_transformVertex)
+          addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, InvalidValue);
       } else {
         assert(m_shaderStage == ShaderStageGeometry);
 
@@ -972,12 +965,38 @@ Value *LowerGlobals::addCallInstForInOutImport(Type *inOutTy, unsigned addrSpace
           inOutInfo.setInterpMode(inOutMeta.InterpMode);
           inOutInfo.setPerPrimitive(inOutMeta.PerPrimitive);
         }
-        if (isPerVertexDimension)
+
+        if (isPerVertexDimension) {
           inOutValue = m_builder->CreateReadPerVertexInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
                                                            inOutInfo, vertexIdx);
-        else
-          inOutValue = m_builder->CreateReadGenericInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
-                                                         inOutInfo, vertexIdx);
+        } else {
+          if (m_shaderStage == ShaderStageVertex) {
+            if (vertexIdx == nullptr)
+              vertexIdx = PoisonValue::get(m_builder->getInt32Ty());
+            Value *instanceIdx = PoisonValue::get(m_builder->getInt32Ty());
+            Value *arrayIdx = PoisonValue::get(m_builder->getInt32Ty());
+
+            if (m_transformVertex) {
+              assert(TransformParamCount == m_entryPoint->arg_size());
+              vertexIdx = m_builder->CreateAdd(m_entryPoint->getArg(TransformVertexId),
+                                               m_entryPoint->getArg(TransformBaseVertex));
+              instanceIdx = m_builder->CreateAdd(m_entryPoint->getArg(TransformInstanceId),
+                                                 m_entryPoint->getArg(TransformBaseInstance));
+            }
+
+            // Fold constant locationOffset into location.
+            uint32_t location = (uint32_t)inOutMeta.Value;
+            if (isa<ConstantInt>(locOffset)) {
+              auto vtxLocOffset = cast<ConstantInt>(locOffset)->getZExtValue();
+              location += vtxLocOffset;
+            }
+            inOutValue = m_builder->create<lgc::LoadVertexInputOp>(inOutTy, false, location, m_builder->getInt32(0),
+                                                                   elemIdx, arrayIdx, vertexIdx, instanceIdx);
+          } else {
+            inOutValue = m_builder->CreateReadGenericInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
+                                                           inOutInfo, vertexIdx);
+          }
+        }
       } else {
         inOutValue = m_builder->CreateReadGenericOutput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
                                                         inOutInfo, vertexIdx);
@@ -2328,10 +2347,15 @@ void LowerGlobals::changeRtFunctionSignature() {
   Type *pointerTy = PointerType::get(*m_context, SPIRAS_Private);
   switch (m_shaderStage) {
   case ShaderStageRayTracingIntersect:
-    // We don't have hit attribute in argument for IS in continuations mode.
-    if (rayTracingContext->isContinuationsMode())
+    if (rayTracingContext->isContinuationsMode()) {
+      // We don't have any argument for IS in continuations mode.
       break;
-    LLVM_FALLTHROUGH; // Fall through: Legacy RT still requires hit attribute in argument
+    } else {
+      // For non-continuations, we only have payload in argument for IS.
+      argTys.push_back(pointerTy);
+      setShaderPaq(m_entryPoint, getPaqFromSize(*m_context, rayTracingContext->getPayloadSizeInBytes()));
+      break;
+    }
   case ShaderStageRayTracingAnyHit:
   case ShaderStageRayTracingClosestHit:
     // Hit attribute

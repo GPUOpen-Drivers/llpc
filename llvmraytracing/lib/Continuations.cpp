@@ -334,7 +334,6 @@ void llvm::forwardContinuationFrameStoreToLoad(DominatorTree &DT, Value *FramePt
       const DataLayout &DL = Load->getModule()->getDataLayout();
       unsigned LoadBytes = DL.getTypeStoreSize(Load->getType());
       auto IntersectionsRight = StoreIntervals.getContaining(Offset + LoadBytes - 1);
-      assert(!IntersectionsRight.empty());
       // Make sure the store we found fully covers the loaded range and is the
       // only one.
       if (IntersectionsRight.size() != 1 || IntersectionsRight.front()->value() != StoreInfo.value())
@@ -517,7 +516,7 @@ void ContHelper::addContinuationPasses(ModulePassManager &MPM) {
   MPM.addPass(createModuleToFunctionPassAdaptor(CoroElidePass()));
   MPM.addPass(CoroCleanupPass());
 
-  MPM.addPass(DXILCleanupContinuationsPass());
+  MPM.addPass(CleanupContinuationsPass());
   MPM.addPass(ContinuationsStatsReportPass());
   MPM.addPass(DXILContPostProcessPass());
 
@@ -572,7 +571,7 @@ void ContHelper::addDxilContinuationPasses(ModulePassManager &MPM, Module *Gpurt
 void ContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
   MPM.addPass(CompilerUtils::DxilToLlvmPass());
 
-  MPM.addPass(llvm::DXILContIntrinsicPreparePass());
+  MPM.addPass(llvm::DXILContPrepareGpurtLibraryPass());
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
 
   // Run some light optimizations to remove code guarded by intrinsics that were
@@ -709,12 +708,17 @@ Function *llvm::extractFunctionOrNull(Metadata *N) {
   return dyn_cast_or_null<Function>(C);
 }
 
-bool llvm::isStartFunc(Function *Func) {
+Function *llvm::getStartFunc(Function *Func) {
   if (auto *MD = dyn_cast_or_null<MDTuple>(Func->getMetadata(ContHelper::MDContinuationName))) {
-    auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
-    return Func == EntryF;
+    Function *StartFunc = extractFunctionOrNull(MD->getOperand(0));
+    if (StartFunc != nullptr)
+      return StartFunc;
   }
-  return false;
+  return Func;
+}
+
+bool llvm::isStartFunc(Function *Func) {
+  return Func == getStartFunc(Func);
 }
 
 /// Recurse into the first member of the given SystemData to find an object of
@@ -743,10 +747,11 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDa
   return B.CreateInBoundsGEP(OrigSystemDataTy, SystemData, Indices);
 }
 
-CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData,
-                                     lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
-                                     CompilerUtils::CrossModuleInliner &Inliner) {
-  B.SetInsertPoint(Call);
+Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData,
+                                  lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
+                                  CompilerUtils::CrossModuleInliner &Inliner, bool KeepBuilderPos) {
+  if (!KeepBuilderPos)
+    B.SetInsertPoint(Call);
 
   auto IntrImplEntry = findIntrImplEntryByIntrinsicCall(Call);
   if (IntrImplEntry == std::nullopt)
@@ -840,12 +845,23 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *
   }
 
   LLVM_DEBUG(dbgs() << "Replacing " << *Call << " by " << *NewCall << "\n");
-  if (!Call->getType()->isVoidTy())
+  // Add a fake-use so we can get the replaced value afterwards
+  FreezeInst *FakeUse = nullptr;
+  if (!Call->getType()->isVoidTy()) {
     Call->replaceAllUsesWith(Replacement);
+    FakeUse = cast<FreezeInst>(B.CreateFreeze(Replacement));
+  }
   Inliner.inlineCall(*NewCall);
   B.SetInsertPoint(&*B.GetInsertPoint());
   Call->eraseFromParent();
-  return NewCall;
+  // Inlined, so original replacement is now invalid
+  Replacement = nullptr;
+
+  if (FakeUse) {
+    Replacement = FakeUse->getOperand(0);
+    FakeUse->eraseFromParent();
+  }
+  return Replacement;
 }
 
 /// Transform enqueue intrinsics to continuation intrinsics
@@ -874,10 +890,8 @@ static bool replaceEnqueueIntrinsic(Function &F) {
     // For DX, these arguments are unused right now and are just here to fulfill the `JumpOp`s requirements as being
     // defined in the LgcCpsDialect.
     const uint32_t DummyLevelsArg = -1;
-    Value *DummyContState = PoisonValue::get(StructType::get(B.getContext()));
     Value *DummyCsp = PoisonValue::get(B.getInt32Ty());
-    NewCall =
-        B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyContState, DummyCsp, RetAddr, TailArgs);
+    NewCall = B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyCsp, RetAddr, TailArgs);
 
     if (WaitMask) {
       // The only supported wait mask is a constant -1. We don't enforce having a constant here because the SPIR-V
@@ -899,6 +913,41 @@ static bool replaceEnqueueIntrinsic(Function &F) {
   });
 
   return Changed;
+}
+
+/// Remove wait mask from WaitAwait intrinsic calls and set waitmask metadata
+static bool replaceAwaitIntrinsic(Function &F) {
+  StringRef FuncName = F.getName();
+
+  if (FuncName.contains("AmdAwait"))
+    return false;
+
+  if (!FuncName.contains("AmdWaitAwait"))
+    report_fatal_error("replaceAwaitIntrinsic: Unexpected await call!");
+
+  IRBuilder<> B{F.getContext()};
+  SmallVector<CallInst *> ErasableAwaits;
+
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    [[maybe_unused]] ConstantInt *WaitMask = cast<ConstantInt>(CInst.getArgOperand(1));
+    assert(WaitMask->getSExtValue() == -1);
+
+    SmallVector<Value *> NewArgs{CInst.args()};
+    NewArgs.erase(NewArgs.begin() + 1);
+
+    B.SetInsertPoint(&CInst);
+    auto *NewCall = CompilerUtils::createNamedCall(B, "_AmdAwait", CInst.getType(), NewArgs, {});
+    CInst.replaceAllUsesWith(NewCall);
+    ContHelper::setWaitMask(*NewCall);
+
+    ErasableAwaits.push_back(&CInst);
+  });
+
+  // Cleanup old await calls
+  for (auto *OldAwait : ErasableAwaits)
+    OldAwait->eraseFromParent();
+
+  return !ErasableAwaits.empty();
 }
 
 static void handleContinuationStackIsGlobal(Function &Func, ContStackAddrspace StackAddrspace) {
@@ -990,9 +1039,8 @@ void ContHelper::handleGetSetting(Function &F, ArrayRef<ContSetting> Settings) {
 
 void ContHelper::handleGetFuncAddr(Function &F, llvm_dialects::Builder &Builder) {
   assert(F.arg_empty()
-         // returns i64 or i32
-         && (F.getFunctionType()->getReturnType()->isIntegerTy(64) ||
-             F.getFunctionType()->getReturnType()->isIntegerTy(32)));
+         // returns i32
+         && F.getFunctionType()->getReturnType()->isIntegerTy(32));
 
   auto Name = F.getName();
   [[maybe_unused]] bool Consumed = Name.consume_front("_AmdGetFuncAddr");
@@ -1003,9 +1051,8 @@ void ContHelper::handleGetFuncAddr(Function &F, llvm_dialects::Builder &Builder)
     report_fatal_error(Twine("Did not find function '") + Name + "' requested by _AmdGetFuncAddr");
 
   llvm::forEachCall(F, [&](llvm::CallInst &CInst) {
-    auto *RetTy = F.getReturnType();
     Builder.SetInsertPoint(&CInst);
-    Value *AsContRef = Builder.create<lgc::cps::AsContinuationReferenceOp>(RetTy, Impl);
+    Value *AsContRef = Builder.create<lgc::cps::AsContinuationReferenceOp>(Impl);
     CInst.replaceAllUsesWith(AsContRef);
     CInst.eraseFromParent();
   });
@@ -1064,37 +1111,6 @@ void ContHelper::handleValueSetI32(Function &F, IRBuilder<> &Builder) {
   });
 }
 
-void llvm::terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall) {
-  Builder.SetInsertPoint(CompleteCall);
-
-  [[maybe_unused]] Instruction *OldTerminator = CompleteCall->getParent()->getTerminator();
-  Type *FuncRetTy = CompleteCall->getFunction()->getReturnType();
-  // For functions returning a value, return a poison. Resume functions
-  // and other shaders will simply return a void value when this helper is being
-  // called from CleanupContinuations. These will be treated as
-  // continuation.complete by the translator.
-  ReturnInst *Ret = nullptr;
-  if (FuncRetTy->isVoidTy())
-    Ret = Builder.CreateRetVoid();
-  else
-    Ret = Builder.CreateRet(PoisonValue::get(FuncRetTy));
-
-  assert(OldTerminator != CompleteCall && "terminateShader: Invalid terminator instruction provided!");
-
-  // If there is some code after the call to _AmdComplete or the intended
-  // lgc.cps.return that aborts the shader, do the following:
-  // - Split everything after the completion call into a separate block
-  // - Remove the newly inserted unconditional branch to the split block
-  // - Remove the complete call.
-  // This is intended to work for _AmdComplete appearing in conditional code
-  // or the unreachable inserted by various passes before
-  // CleanupContinuations.
-  SplitBlock(CompleteCall->getParent(), CompleteCall);
-  // Remove the branch to the split block.
-  Ret->getParent()->getTerminator()->eraseFromParent();
-  CompleteCall->eraseFromParent();
-}
-
 bool llvm::earlyGpurtTransform(Module &M) {
   // Import StackAddrspace from metadata if set, otherwise from default
   auto StackAddrspaceMD = ContHelper::tryGetStackAddrspace(M);
@@ -1112,6 +1128,8 @@ bool llvm::earlyGpurtTransform(Module &M) {
 
     if (Name.contains("Enqueue")) {
       Changed = replaceEnqueueIntrinsic(F);
+    } else if (Name.contains("Await")) {
+      Changed = replaceAwaitIntrinsic(F);
     }
 
     if (Name.starts_with("_AmdContinuationStackIsGlobal")) {

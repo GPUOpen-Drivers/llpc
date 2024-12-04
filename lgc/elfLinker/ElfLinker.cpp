@@ -348,8 +348,8 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
             uint64_t relocSectionOffset = m_outputSections[relocSectionId].getOutputOffset(relocIdxInSection);
             uint64_t targetSectionOffset = m_outputSections[targetSectionIdx].getOutputOffset(targetIdxInSection);
             StringRef id = sys::path::filename(elfInput.objectFile->getFileName());
-            m_outputSections[relocSectionId].addRelocation(reloc, id, relocSectionOffset, targetSectionOffset,
-                                                           sectType);
+            m_outputSections[relocSectionId].addRelocation(reloc, id, relocSectionOffset, targetSectionOffset, sectType,
+                                                           m_mappingTable);
           }
         }
       }
@@ -466,13 +466,7 @@ void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile, bool
       auto shdr = cantFail(elfFile.getSection(elfSection.getIndex()));
       for (auto note : elfFile.notes(*shdr, err)) {
         if (note.getName() == Util::Abi::AmdGpuArchName && note.getType() == ELF::NT_AMDGPU_METADATA) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 460558
-          // Old version of the code
-          ArrayRef<uint8_t> desc = note.getDesc();
-#else
-          // New version of the code (also handles unknown version, which we treat as latest)
           ArrayRef<uint8_t> desc = note.getDesc(shdr->sh_addralign);
-#endif
           m_pipelineState->mergePalMetadataFromBlob(StringRef(reinterpret_cast<const char *>(desc.data()), desc.size()),
                                                     isGlueCode);
         }
@@ -496,13 +490,7 @@ void ElfLinkerImpl::readIsaName(object::ObjectFile &objectFile) {
       auto shdr = cantFail(elfFile.getSection(elfSection.getIndex()));
       for (auto note : elfFile.notes(*shdr, err)) {
         if (note.getName() == Util::Abi::AmdGpuVendorName && note.getType() == ELF::NT_AMD_HSA_ISA_NAME) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 460558
-          // Old version of the code
-          ArrayRef<uint8_t> desc = note.getDesc();
-#else
-          // New version of the code (also handles unknown version, which we treat as latest)
           ArrayRef<uint8_t> desc = note.getDesc(shdr->sh_addralign);
-#endif
           m_isaName = StringRef(reinterpret_cast<const char *>(desc.data()), desc.size());
           return;
         }
@@ -762,7 +750,8 @@ void OutputSection::addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned in
 
 // Add a relocation to the output elf
 void OutputSection::addRelocation(object::ELFRelocationRef relocRef, StringRef id, unsigned int relocSectionOffset,
-                                  unsigned int targetSectionOffset, unsigned sectType) {
+                                  unsigned int targetSectionOffset, unsigned sectType,
+                                  const std::vector<uint64_t> &mappingTable) {
   object::ELFSymbolRef relocSymRef(*relocRef.getSymbol());
   std::string rodataSymName = cantFail(relocSymRef.getName()).str();
   rodataSymName += ".";
@@ -780,16 +769,23 @@ void OutputSection::addRelocation(object::ELFRelocationRef relocRef, StringRef i
     rodataSymIdx = m_linker->getSymbols().size();
     m_linker->getSymbols().push_back(newSym);
   }
+
+  auto newOffset = relocRef.getOffset();
+  if (mappingTable.size()) {
+    newOffset = mappingTable[newOffset / sizeof(uint32_t)];
+    assert(newOffset != -1);
+  }
+
   if (sectType == ELF::SHT_REL) {
     ELF::Elf64_Rel newReloc = {};
     newReloc.setSymbolAndType(rodataSymIdx, relocRef.getType());
-    newReloc.r_offset = targetSectionOffset + relocRef.getOffset();
+    newReloc.r_offset = targetSectionOffset + newOffset;
     m_linker->getRelocations().push_back(newReloc);
   } else {
     assert(sectType == ELF::SHT_RELA);
     ELF::Elf64_Rela newReloc = {};
     newReloc.setSymbolAndType(rodataSymIdx, relocRef.getType());
-    newReloc.r_offset = targetSectionOffset + relocRef.getOffset();
+    newReloc.r_offset = targetSectionOffset + newOffset;
     newReloc.r_addend = cantFail(relocRef.getAddend());
     m_linker->getRelocationsA().push_back(newReloc);
   }

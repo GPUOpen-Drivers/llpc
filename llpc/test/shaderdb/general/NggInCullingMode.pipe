@@ -1,0 +1,106 @@
+; This test is to verify NGG culling mode is enabled as expected.
+
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: .vgt_shader_stages_en
+; SHADERTEST: .primgen_en: 1
+; SHADERTEST: .primgen_passthru_en: 0
+	
+[Version]
+version = 75
+
+[VsGlsl]
+#version 430
+
+layout(location = 0) in vec4 in_position;
+layout(location = 1) in vec4 in_color;
+layout(location = 2) in int in_refVertexIndex;
+
+layout(location = 0) out vec4 out_color;
+
+void main() {
+  gl_Position = in_position;
+  if (gl_VertexIndex == in_refVertexIndex)
+    out_color = in_color;
+  else
+    out_color = vec4(1.0, 0.0, 0.0, 1.0);
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 430
+
+layout(location = 0) in vec4 in_color;
+layout(location = 0) out vec4 out_color;
+
+void main() {
+  out_color = in_color;
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+userDataNode[1].visibility = 66
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 6
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = DescriptorConstBufferCompact
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 2
+userDataNode[1].next[0].set = 0x0000005D
+userDataNode[1].next[0].binding = 17
+userDataNode[1].next[0].strideInDwords = 0
+userDataNode[1].next[1].type = DescriptorConstBuffer
+userDataNode[1].next[1].offsetInDwords = 2
+userDataNode[1].next[1].sizeInDwords = 8
+userDataNode[1].next[1].set = 0x0000005D
+userDataNode[1].next[1].binding = 0
+userDataNode[1].next[1].strideInDwords = 0
+userDataNode[1].next[2].type = DescriptorBuffer
+userDataNode[1].next[2].offsetInDwords = 10
+userDataNode[1].next[2].sizeInDwords = 8
+userDataNode[1].next[2].set = 0x0000005D
+userDataNode[1].next[2].binding = 1
+userDataNode[1].next[2].strideInDwords = 0
+userDataNode[2].visibility = 4
+userDataNode[2].type = StreamOutTableVaPtr
+userDataNode[2].offsetInDwords = 2
+userDataNode[2].sizeInDwords = 1
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 1
+nggState.forceCullingMode = 1
+nggState.compactVertex = 1
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 36
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[0].vbAddressLowBits = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 16
+attribute[1].vbAddressLowBits = 0
+attribute[2].location = 2
+attribute[2].binding = 0
+attribute[2].format = VK_FORMAT_R32_SINT
+attribute[2].offset = 32
+attribute[2].vbAddressLowBits = 0

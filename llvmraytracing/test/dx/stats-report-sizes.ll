@@ -1,3 +1,4 @@
+; NOTE: Do not autogenerate
 ; RUN: opt --report-cont-state-sizes --verify-each -passes='continuations-stats-report,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-CONT-SIZES
 ; RUN: opt --report-payload-register-sizes=max --verify-each -passes='continuations-stats-report,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-PAYLOAD-SIZES
 ; RUN: opt --report-system-data-sizes      --verify-each -passes='continuations-stats-report,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s --check-prefix=REPORT-SYSTEM-DATA-SIZES
@@ -14,26 +15,26 @@ declare void @lgc.cps.jump(...)
 
 ; REPORT-CONT-SIZES: Continuation state size of "RayGen" (raygeneration): 108 bytes
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "RayGen" (raygeneration): 7 and 6 dwords
-define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
+define void @RayGen(i32 %cspInit, i32 %dummyRetAddr, %struct.DispatchSystemData %0) !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
   %ptr = alloca i32, align 4
-  %cspInit = call i32 @continuation.initialContinuationStackPtr()
-  store i32 %cspInit, i32* %ptr
+  %cspInit1 = call i32 @continuation.initialContinuationStackPtr()
+  store i32 %cspInit1, i32* %ptr
   %csp = load i32, ptr %ptr, align 4
-  call void (...) @lgc.cps.jump(i64 2, i32 poison, {} poison, i32 %csp, i64 poison), !continuation.registercount !6
+  call void (...) @lgc.cps.jump(i32 2, i32 poison, i32 %csp, i32 poison), !continuation.registercount !6
   ret void
 }
 
 ; This is needed as fake continuation of RayGen, because we only report continuation state sizes
 ; if we find a continuation function using !continuation metadata.
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "RayGen.resume.0" (raygeneration) is "struct.DispatchSystemData", size: 4 bytes
-define void @RayGen.resume.0(i64 %0, { %struct.DispatchSystemData } %1) !continuation !3 !lgc.rt.shaderstage !12 {
+define void @RayGen.resume.0(i32 %cspInit, i32 %0, %struct.DispatchSystemData %1) !continuation !3 !lgc.rt.shaderstage !12 {
   ret void
 }
 
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "CHS" (closesthit): 8 and 9 dwords
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "CHS" (closesthit) is "struct.CHSSystemData", size: 400 bytes
-define void @CHS(i64 %returnAddr, %struct.CHSSystemData %0) !continuation !14 !continuation.registercount !8 !lgc.rt.shaderstage !13 {
-  call void ( ...) @lgc.cps.jump(i64 2, i32 poison, {} poison, i32 poison, i64 poison), !continuation.registercount !9
+define void @CHS(i32 %cspInit, i32 %returnAddr, %struct.CHSSystemData %0) !continuation !14 !continuation.registercount !8 !lgc.rt.shaderstage !13 {
+  call void ( ...) @lgc.cps.jump(i32 2, i32 poison, i32 poison, i32 poison), !continuation.registercount !9
   ret void
 }
 

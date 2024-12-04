@@ -24,10 +24,10 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-DAG: call i16 @lgc.input.import.generic__i16{{.*}}
-; SHADERTEST-DAG: call <3 x i16> @lgc.input.import.generic__v3i16{{.*}}
-; SHADERTEST-DAG: call half @lgc.input.import.generic__f16{{.*}}
-; SHADERTEST-DAG: call <3 x half> @lgc.input.import.generic__v3f16{{.*}}
+; SHADERTEST-DAG: call i16 @lgc.load.vertex.input__i16{{.*}}
+; SHADERTEST-DAG: call <3 x i16> @lgc.load.vertex.input__v3i16{{.*}}
+; SHADERTEST-DAG: call half @lgc.load.vertex.input__f16{{.*}}
+; SHADERTEST-DAG: call <3 x half> @lgc.load.vertex.input__v3f16{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -50,15 +50,15 @@ static const unsigned GsAllocReq = 9;    // GS requests that parameter cache spa
 static const unsigned GsCut = 0x12;      // [3:0] = 2 (GS), [5:4] = 1 (cut)
 static const unsigned GsEmit = 0x22;     // [3:0] = 2 (GS), [5:4] = 2 (emit)
 
-static const unsigned GsCutStreaM0 = 0x12;  // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 0 (stream0)
-static const unsigned GsCutStreaM1 = 0x112; // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 1 (stream1)
-static const unsigned GsCutStreaM2 = 0x212; // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 2 (stream2)
-static const unsigned GsCutStreaM3 = 0x312; // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 3 (stream3)
+static const unsigned GsCutStream0 = 0x12;  // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 0 (stream0)
+static const unsigned GsCutStream1 = 0x112; // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 1 (stream1)
+static const unsigned GsCutStream2 = 0x212; // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 2 (stream2)
+static const unsigned GsCutStream3 = 0x312; // [3:0] = 2 (GS), [5:4] = 1 (cut), [9:8] = 3 (stream3)
 
-static const unsigned GsEmitStreaM0 = 0x22;  // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 0 (stream0)
-static const unsigned GsEmitStreaM1 = 0x122; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 1 (stream1)
-static const unsigned GsEmitStreaM2 = 0x222; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 2 (stream2)
-static const unsigned GsEmitStreaM3 = 0x322; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 3 (stream3)
+static const unsigned GsEmitStream0 = 0x22;  // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 0 (stream0)
+static const unsigned GsEmitStream1 = 0x122; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 1 (stream1)
+static const unsigned GsEmitStream2 = 0x222; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 2 (stream2)
+static const unsigned GsEmitStream3 = 0x322; // [3:0] = 2 (GS), [5:4] = 2 (emit), [9:8] = 3 (stream3)
 
 static const unsigned GsEmitCutStreamIdShift = 0x8;  // Shift of STREAM_ID of the message GS_EMIT/GS_CUT
 static const unsigned GsEmitCutStreamIdMask = 0x300; // Mask of STREAM_ID of the message GS_EMIT/GS_CUT

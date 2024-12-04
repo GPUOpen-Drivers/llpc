@@ -85,7 +85,7 @@ public:
 
   // Add a relocation to the output elf
   void addRelocation(llvm::object::ELFRelocationRef relocRef, llvm::StringRef id, unsigned int relocSectionOffset,
-                     unsigned int targetSectionOffset, unsigned sectType);
+                     unsigned int targetSectionOffset, unsigned sectType, const std::vector<uint64_t> &mappingTable);
 
   // Get the output file offset of a particular input section in the output section
   uint64_t getOutputOffset(unsigned inputIdx) { return m_offset + m_inputSections[inputIdx].offset; }
@@ -226,6 +226,7 @@ private:
   std::string m_notes;                                                  // Notes to go in .note section
   bool m_doneInputs = false;                                            // Set when caller has done adding inputs
   llvm::StringRef m_isaName;                                            // ISA name to include in the .note section
+  std::vector<uint64_t> m_mappingTable;                                 // mapping table from SDL
 };
 
 } // namespace lgc

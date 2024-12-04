@@ -147,4 +147,35 @@ void clearNonEntryFunctions(Module *module, StringRef entryName) {
   }
 }
 
+// =====================================================================================================================
+// Get in/out meta data recursively.
+//
+// @param [in]  valueTy : The metadata's embellish type.
+// @param [in]  mds     : The metadata constant of InOut Global variable to be decode.
+// @param [out] out     : Use to output the element's metadatas of the InOut Global variable.
+void decodeInOutMetaRecursively(llvm::Type *valueTy, llvm::Constant *mds, llvm::SmallVector<ShaderInOutMetadata> &out) {
+  ShaderInOutMetadata md = {};
+  if (valueTy->isSingleValueType()) {
+    // Single type's metadata:{uint64, uint64}
+    md.U64All[0] = cast<ConstantInt>(mds->getOperand(0))->getZExtValue();
+    md.U64All[1] = cast<ConstantInt>(mds->getOperand(1))->getZExtValue();
+    out.push_back(md);
+  } else if (valueTy->isArrayTy()) {
+    // Array type's metadata:{uint32, {element metadata type}, uint64, uint64}
+    assert(mds->getType()->getStructNumElements() == 4);
+    decodeInOutMetaRecursively(valueTy->getArrayElementType(), cast<Constant>(mds->getOperand(1)), out);
+    md.U64All[0] = cast<ConstantInt>(mds->getOperand(2))->getZExtValue();
+    md.U64All[1] = cast<ConstantInt>(mds->getOperand(3))->getZExtValue();
+    out.push_back(md);
+  } else if (valueTy->isStructTy()) {
+    // Structure type's metadata:[{element metadata type}, ...]
+    auto elementCount = valueTy->getStructNumElements();
+    assert(elementCount == mds->getType()->getStructNumElements());
+    for (signed opIdx = 0; opIdx < elementCount; opIdx++) {
+      decodeInOutMetaRecursively(valueTy->getStructElementType(opIdx), cast<Constant>(mds->getOperand(opIdx)), out);
+    }
+  } else {
+    llvm_unreachable("The Type can't be handle in decodeInOutMetaRecursively.");
+  }
+}
 } // namespace Llpc

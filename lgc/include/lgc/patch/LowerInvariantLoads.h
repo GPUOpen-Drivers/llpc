@@ -42,7 +42,7 @@ class LowerInvariantLoads : public llvm::PassInfoMixin<LowerInvariantLoads> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch metadata for invariant loads"; }
+  static llvm::StringRef name() { return "Lower metadata for invariant loads"; }
 };
 
 } // namespace lgc
