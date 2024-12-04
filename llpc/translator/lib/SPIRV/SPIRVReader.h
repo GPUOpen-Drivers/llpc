@@ -147,6 +147,7 @@ public:
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
   bool transDecoration(SPIRVValue *, ArrayRef<Value *>);
+  unsigned remapOutputLocation(unsigned loc);
   bool checkContains64BitType(SPIRVType *bt);
   Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy, bool vs64bitsAttrib);
   Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,

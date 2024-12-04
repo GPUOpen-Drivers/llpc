@@ -25,21 +25,15 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerReadFirstLane.cpp
- * @brief LLPC source file: contains declaration and implementation of class lgc::PatchReadFirstLane.
+ * @brief LLPC source file: contains declaration and implementation of class lgc::LowerReadFirstLane.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerReadFirstLane.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-// Old version of the code
-#include "llvm/Analysis/DivergenceAnalysis.h"
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/Analysis/UniformityAnalysis.h"
-#endif
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Instructions.h"
@@ -49,7 +43,7 @@
 #include "llvm/Support/Debug.h"
 #include <deque>
 
-#define DEBUG_TYPE "lgc-patch-read-first-lane"
+#define DEBUG_TYPE "lgc-lower-read-first-lane"
 
 using namespace lgc;
 using namespace llvm;
@@ -58,13 +52,7 @@ namespace {
 
 class ReadFirstLaneOptimizer {
 public:
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-  // Old version of the code
-  using UniformityInfo = llvm::DivergenceInfo;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   using UniformityInfo = llvm::UniformityInfo;
-#endif
 
   ReadFirstLaneOptimizer(UniformityInfo &uniformityInfo, TargetTransformInfo &targetTransformInfo)
       : m_uniformityInfo(uniformityInfo), m_targetTransformInfo(targetTransformInfo) {}
@@ -122,7 +110,7 @@ static bool areAllUserReadFirstLane(Instruction *inst) {
 }
 
 // =====================================================================================================================
-PatchReadFirstLane::PatchReadFirstLane() = default;
+LowerReadFirstLane::LowerReadFirstLane() = default;
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
@@ -130,16 +118,10 @@ PatchReadFirstLane::PatchReadFirstLane() = default;
 // @param [in/out] function : Function that we will peephole optimize.
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchReadFirstLane::run(Function &function, FunctionAnalysisManager &analysisManager) {
+PreservedAnalyses LowerReadFirstLane::run(Function &function, FunctionAnalysisManager &analysisManager) {
   auto &targetTransformInfo = analysisManager.getResult<TargetIRAnalysis>(function);
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-  // Old version of the code
-  auto &uniformityInfo = analysisManager.getResult<DivergenceAnalysis>(function);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   auto &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
-#endif
 
   ReadFirstLaneOptimizer rflo(uniformityInfo, targetTransformInfo);
   bool changed = rflo.run(function);

@@ -59,6 +59,7 @@
 #include "compilerutils/CompilerUtils.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
+#include "llvmraytracing/CpsStackLowering.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcIlCpsDialect.h"
@@ -67,6 +68,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Analysis/AssumptionCache.h"
+#include "llvm/Analysis/InstructionSimplify.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Module.h"
@@ -81,8 +84,7 @@ namespace {
 
 class CleanupContinuationsPassImpl {
 public:
-  CleanupContinuationsPassImpl(llvm::Module &M, llvm::ModuleAnalysisManager &AM,
-                               bool Use64BitContinuationReferences = false);
+  CleanupContinuationsPassImpl(llvm::Module &M, llvm::Module &GpurtLibrary, llvm::ModuleAnalysisManager &AM);
 
   PreservedAnalyses run();
 
@@ -110,19 +112,21 @@ private:
   void handleContinue(ContinuationData &Data, Instruction *Ret);
   void handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun);
   void lowerIntrinsicCall(Function *F, ContinuationData &Data);
+  bool handleIntrinsics(llvm::ModuleAnalysisManager &AnalysisManager);
+  void handleContStackIntrinsic(FunctionAnalysisManager &FAM, Function &F);
   void lowerGetResumePoint(Module &Mod);
   bool lowerCompleteOp(Module &Mod);
 
   llvm::Module &Mod;
   llvm::ModuleAnalysisManager &AnalysisManager;
-  llvm_dialects::Builder *Builder = nullptr;
+  llvm_dialects::Builder Builder;
   Function *ContMalloc = nullptr;
   Function *ContFree = nullptr;
   MapVector<Function *, ContinuationData> ToProcess;
   uint32_t MaxContStateBytes;
   llvm::Module *GpurtLibrary = nullptr;
-  bool Use64BitContinuationReferences;
-  llvm::Type *ContinuationReferenceType = nullptr;
+  std::optional<CpsStackLowering> StackLowering;
+  Function *GetGlobalMemBase = nullptr;
 };
 
 /// Find the original call that created the continuation token and the matching
@@ -200,9 +204,13 @@ findTokenOrigin(BasicBlock *BB, Value *V, SmallVectorImpl<Instruction *> &ToRemo
 }
 
 void CleanupContinuationsPassImpl::analyzeContinuation(Function &F, MDNode *MD) {
+  Function *EntryF = &F;
+
   // Only analyze main continuation
-  auto *MDTup = cast<MDTuple>(MD);
-  auto *EntryF = mdconst::extract<Function>(MDTup->getOperand(0));
+  if (MD) {
+    auto *MDTup = cast<MDTuple>(MD);
+    EntryF = mdconst::extract<Function>(MDTup->getOperand(0));
+  }
 
   auto &Data = ToProcess[EntryF];
 
@@ -236,21 +244,21 @@ void CleanupContinuationsPassImpl::analyzeContinuation(Function &F, MDNode *MD) 
 void CleanupContinuationsPassImpl::updateCpsStack(Function *F, Function *NewFunc, bool IsStart,
                                                   ContinuationData &CpsInfo) {
 
-  Builder->SetInsertPoint(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+  Builder.SetInsertPointPastAllocas(NewFunc);
   Value *CpsStack = nullptr;
   if (IsStart) {
-    CpsStack = Builder->create<cps::AllocOp>(Builder->getInt32(CpsInfo.ContStateBytes));
+    CpsStack = Builder.create<cps::AllocOp>(Builder.getInt32(CpsInfo.ContStateBytes));
     CpsStack->setName("cont.state.stack.segment");
     ContHelper::StackSize::setValue(NewFunc, CpsInfo.ContStateBytes);
   } else {
-    CpsStack = Builder->create<cps::PeekOp>(Builder->getInt32(CpsInfo.ContStateBytes));
+    CpsStack = Builder.create<cps::PeekOp>(Builder.getInt32(CpsInfo.ContStateBytes));
   }
 
   SmallVector<Instruction *> ToBeRemoved;
   Value *ContFrame = getContinuationFramePtr(F, IsStart, CpsInfo, &ToBeRemoved);
 
   if (CpsInfo.ContStateBytes != 0) {
-    CompilerUtils::replaceAllPointerUses(Builder, ContFrame, CpsStack, ToBeRemoved);
+    CompilerUtils::replaceAllPointerUses(&Builder, ContFrame, CpsStack, ToBeRemoved);
   } else {
     // If there is no continuation state, replace it with a poison
     // value instead of a zero-sized stack allocation.
@@ -273,9 +281,9 @@ static void updateFunctionArgs(Function *OldFunc, Function *NewFunc, const Small
 }
 
 static void buildArgInfos(Function *F, bool IsStart, SmallVector<Type *> &AllArgTypes,
-                          SmallVector<Value *> &AllArgValues, SmallVector<AttributeSet> &ParamAttrs,
-                          SmallVector<Instruction *> &InstsToRemove) {
-
+                          SmallVector<Value *> &AllArgValues, uint32_t &StartReturnArg,
+                          SmallVector<AttributeSet> &ParamAttrs, SmallVector<Instruction *> &InstsToRemove,
+                          SmallVector<lgc::ilcps::GetReturnValueOp *> &ReturnValueOps) {
   auto &Context = F->getContext();
   AttributeList FAttrs = F->getAttributes();
   if (IsStart) {
@@ -290,28 +298,32 @@ static void buildArgInfos(Function *F, bool IsStart, SmallVector<Type *> &AllArg
       ArgNo++;
     }
   } else {
+    // Add i32 %rcr here
+    Type *I32 = Type::getInt32Ty(Context);
+    AllArgTypes.push_back(I32);
+    AllArgValues.push_back(nullptr);
     if (lgc::cps::isCpsFunction(*F)) {
-      //  Add extra arguments ({} %state, i32 %rcr, i32 %shader-index) for resume
-      //  part. But for now, we always use continuation stack to pass continuation
-      //  state.
-      Type *I32 = Type::getInt32Ty(Context);
-      AllArgTypes.push_back(StructType::get(Context, {}));
-      AllArgValues.push_back(nullptr);
+      //  Add i32 %shader-index for resume part.
       AllArgTypes.push_back(I32);
-      AllArgValues.push_back(nullptr);
-      AllArgTypes.push_back(I32);
-      AllArgValues.push_back(nullptr);
-    } else {
-      AllArgTypes.push_back(Type::getInt64Ty(Context)); // Dummy return address for resume functions
       AllArgValues.push_back(nullptr);
     }
 
     // Find arguments from lgc.ilcps.getreturnvalue calls
     for (auto &I : F->getEntryBlock()) {
       if (auto *Intr = dyn_cast<lgc::ilcps::GetReturnValueOp>(&I)) {
-        AllArgTypes.push_back(Intr->getType());
-        AllArgValues.push_back(Intr);
+        StartReturnArg = AllArgValues.size();
+
+        // The type is always a struct. Unfold it so we are able to use the same CpsArgIdx* indices as for non-resume
+        // functions.
+        auto *StructTy = cast<StructType>(Intr->getType());
+
+        for (auto [Index, Ty] : llvm::enumerate(StructTy->elements())) {
+          AllArgTypes.push_back(Ty);
+          AllArgValues.push_back(nullptr);
+        }
+
         InstsToRemove.push_back(Intr);
+        ReturnValueOps.push_back(Intr);
       }
     }
   }
@@ -354,7 +366,7 @@ void CleanupContinuationsPassImpl::removeContFreeCall(Function *F, Function *Con
 void CleanupContinuationsPassImpl::freeCpsStack(Function *F, ContinuationData &CpsInfo) {
   struct VisitState {
     ContinuationData &CpsInfo;
-    llvm_dialects::Builder *Builder;
+    llvm_dialects::Builder &Builder;
     Function *F;
   };
   VisitState State = {CpsInfo, Builder, F};
@@ -362,8 +374,8 @@ void CleanupContinuationsPassImpl::freeCpsStack(Function *F, ContinuationData &C
       llvm_dialects::VisitorBuilder<VisitState>()
           .addSet<cps::JumpOp, cps::CompleteOp>([](auto &State, auto &Instruction) {
             if (Instruction.getFunction() == State.F && State.CpsInfo.ContStateBytes) {
-              State.Builder->SetInsertPoint(&Instruction);
-              State.Builder->template create<cps::FreeOp>(State.Builder->getInt32(State.CpsInfo.ContStateBytes));
+              State.Builder.SetInsertPoint(&Instruction);
+              State.Builder.template create<cps::FreeOp>(State.Builder.getInt32(State.CpsInfo.ContStateBytes));
             }
           })
           .build();
@@ -373,15 +385,15 @@ void CleanupContinuationsPassImpl::freeCpsStack(Function *F, ContinuationData &C
 /// Handle lgc.cps.complete calls.
 bool CleanupContinuationsPassImpl::lowerCompleteOp(Module &Mod) {
   struct VisitState {
-    llvm_dialects::Builder *Builder;
+    llvm_dialects::Builder &Builder;
     bool CompleteLowered;
   };
 
   VisitState State = {Builder, false};
   static auto Visitor = llvm_dialects::VisitorBuilder<VisitState>()
                             .add<cps::CompleteOp>([](VisitState &State, auto &Complete) {
-                              State.Builder->SetInsertPoint(&Complete);
-                              State.Builder->CreateRetVoid();
+                              State.Builder.SetInsertPoint(&Complete);
+                              State.Builder.CreateRetVoid();
                               BasicBlock *BB = Complete.getParent();
                               BB->getTerminator()->eraseFromParent();
                               Complete.eraseFromParent();
@@ -440,6 +452,12 @@ void CleanupContinuationsPassImpl::processContinuations() {
   for (auto &FuncData : ToProcess) {
     LLVM_DEBUG(dbgs() << "Processing function: " << FuncData.first->getName() << "\n");
     for (auto *F : FuncData.second.Functions) {
+      // Not a new function but we want to run stack lowering on KernelEntry
+      if (!F->hasMetadata(ContHelper::MDContinuationName)) {
+        FuncData.second.NewFunctions.push_back(F);
+        continue;
+      }
+
       if (F != FuncData.first) {
         // Set same linkage as for start function
         F->setLinkage(FuncData.first->getLinkage());
@@ -462,8 +480,10 @@ void CleanupContinuationsPassImpl::processContinuations() {
       SmallVector<Value *> AllArgValues;
       SmallVector<AttributeSet> ParamAttrs;
       SmallVector<Instruction *> InstsToRemove;
+      SmallVector<lgc::ilcps::GetReturnValueOp *> ReturnValueOps;
+      uint32_t StartReturnArg = 0;
 
-      buildArgInfos(F, IsStart, AllArgTypes, AllArgValues, ParamAttrs, InstsToRemove);
+      buildArgInfos(F, IsStart, AllArgTypes, AllArgValues, StartReturnArg, ParamAttrs, InstsToRemove, ReturnValueOps);
 
       if (ContFree)
         removeContFreeCall(F, ContFree);
@@ -475,6 +495,17 @@ void CleanupContinuationsPassImpl::processContinuations() {
       auto *NewFuncTy = FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);
       Function *NewFunc = CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
       NewFunc->takeName(F);
+
+      // Create helper struct for return values and RAUW on them
+      for (lgc::ilcps::GetReturnValueOp *RetValOp : ReturnValueOps) {
+        Value *RetHelperStruct = PoisonValue::get(RetValOp->getType());
+        Builder.SetInsertPointPastAllocas(RetValOp->getFunction());
+        for (auto [Idx, RetArg] :
+             llvm::enumerate(llvm::make_range(NewFunc->arg_begin() + StartReturnArg, NewFunc->arg_end())))
+          RetHelperStruct = Builder.CreateInsertValue(RetHelperStruct, &RetArg, Idx);
+
+        RetValOp->replaceAllUsesWith(RetHelperStruct);
+      }
 
       ToErase.push_back(F);
       FuncData.second.NewFunctions.push_back(NewFunc);
@@ -566,7 +597,7 @@ void CleanupContinuationsPassImpl::processContinuations() {
 ///  %cr = call i32 @lgc.cps.as.continuation.reference(ptr @callee)
 ///  %cr2 = call i32 (...) @lgc.cps.as.continuation.reference(ptr
 ///                          @test.resume.0)
-///   call void (...) @lgc.cps.jump(i32 %cr, i32 2, {} poison,
+///   call void (...) @lgc.cps.jump(i32 %cr, i32 2,
 ///                                 i32 %cr2, ...)
 ///
 /// Also handles cases where the token and resume function are behind a phi.
@@ -596,7 +627,7 @@ void CleanupContinuationsPassImpl::handleContinue(ContinuationData &Data, Instru
 }
 
 void CleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &Data, CallInst *Call, Value *ResumeFun) {
-  Builder->SetInsertPoint(Call);
+  Builder.SetInsertPoint(Call);
 
   SmallVector<Value *> TailArgs;
   Value *ResumeAddr = nullptr;
@@ -608,10 +639,10 @@ void CleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &Data, 
     SkipCount = ContHelper::isWaitAwaitCall(*Call) ? 3 : 2;
 
   if (lgc::rt::getLgcRtShaderStage(Call->getFunction()) != lgc::rt::RayTracingShaderStage::KernelEntry) {
-    ResumeAddr = Builder->create<cps::AsContinuationReferenceOp>(ContinuationReferenceType, ResumeFun);
+    ResumeAddr = Builder.create<cps::AsContinuationReferenceOp>(ResumeFun);
   } else {
     // For entry-point compute kernel, pass a poison %rcr.
-    ResumeAddr = PoisonValue::get(ContinuationReferenceType);
+    ResumeAddr = PoisonValue::get(Builder.getInt32Ty());
   }
 
   CR = Call->getArgOperand(0);
@@ -622,16 +653,14 @@ void CleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &Data, 
     LevelImm = cast<ConstantInt>(Level)->getZExtValue();
   }
 
-  // TODO: Continuation state is passed through stack for now.
-  auto *State = PoisonValue::get(StructType::get(Builder->getContext(), {}));
-  auto *Csp = PoisonValue::get(Builder->getInt32Ty());
-  auto *JumpCall = Builder->create<cps::JumpOp>(CR, LevelImm, State, Csp, ResumeAddr, TailArgs);
+  auto *Csp = PoisonValue::get(Builder.getInt32Ty());
+  auto *JumpCall = Builder.create<cps::JumpOp>(CR, LevelImm, Csp, ResumeAddr, TailArgs);
   // Replace this instruction with a call to cps.jump.
   JumpCall->copyMetadata(*Call);
 
   // Remove instructions at the end of the block
-  Builder->SetInsertPoint(Call);
-  auto *Unreachable = Builder->CreateUnreachable();
+  Builder.SetInsertPoint(Call);
+  auto *Unreachable = Builder.CreateUnreachable();
   for (auto &I : make_early_inc_range(reverse(*JumpCall->getParent()))) {
     if (&I == Unreachable)
       break;
@@ -649,33 +678,166 @@ void CleanupContinuationsPassImpl::lowerIntrinsicCall(Function *F, ContinuationD
     return;
 
   CompilerUtils::CrossModuleInliner CrossInliner;
-  // Signature of cps function: { state, rcr, shader-index, system-data}
-  const uint32_t SystemDataArgIdx = lgc::cps::isCpsFunction(*F) ? CpsArgIdxSystemData : 1;
+  // Signature of cps function: { rcr, shader-index, system-data}
+  const uint32_t SystemDataArgIdx = lgc::cps::isCpsFunction(*F) ? CpsArgIdx::SystemData : 1;
 
   Value *SystemDataArg = F->getArg(SystemDataArgIdx);
   Type *SystemDataTy = SystemDataArg->getType();
-  // Extract the original system data from the { systemData, padding, payload }
-  // struct returned by await.
-  if (!Data.IsStart)
-    SystemDataTy = SystemDataTy->getStructElementType(0);
 
-  Builder->SetInsertPointPastAllocas(F);
-  auto *SystemData = Builder->CreateAlloca(SystemDataTy);
-
+  Builder.SetInsertPointPastAllocas(F);
+  auto *SystemData = Builder.CreateAlloca(SystemDataTy);
   SystemData->setName("system.data.alloca");
+  assert(SystemDataTy->isStructTy() && "SystemData should be struct type");
 
-  if (!Data.IsStart)
-    SystemDataArg = Builder->CreateExtractValue(SystemDataArg, 0);
+  Builder.CreateStore(SystemDataArg, SystemData);
 
-  assert(SystemDataArg->getType()->isStructTy() && "SystemData should be struct type");
+  // All intrinsics that we need to inline are rematerializable/constant, the others have been inlined
+  // by LowerRaytracingPipeline.
+  // Therefore it is enough to inline every used intrinsic once at the start of the function. This
+  // reduces the generated code size.
 
-  Builder->CreateStore(SystemDataArg, SystemData);
+  // Map intrinsic function to value
+  SmallDenseMap<Function *, Value *> CachedIntrinsics;
+
   while (!Data.CpsIntrinsicCalls.empty()) {
     // Ensure the list gets freed, since otherwise we will process the same calls twice by accident.
     auto *Call = Data.CpsIntrinsicCalls.pop_back_val();
-    replaceIntrinsicCall(*Builder, SystemDataArg->getType(), SystemData, *Stage, Call,
-                         GpurtLibrary ? GpurtLibrary : &Mod, CrossInliner);
+    assert(Call->arg_empty() && "Expect only calls without arguments");
+    Value *&Cached = CachedIntrinsics[Call->getCalledFunction()];
+    if (Cached != nullptr) {
+      Call->replaceAllUsesWith(Cached);
+      Call->eraseFromParent();
+    } else {
+      Cached = replaceIntrinsicCall(Builder, SystemDataTy, SystemData, *Stage, Call, GpurtLibrary ? GpurtLibrary : &Mod,
+                                    CrossInliner, true);
+    }
   }
+}
+
+bool CleanupContinuationsPassImpl::handleIntrinsics(llvm::ModuleAnalysisManager &AnalysisManager) {
+  bool Changed = false;
+
+  for (auto &F : Mod.functions()) {
+    auto Name = F.getName();
+    if (Name.starts_with("_AmdValueI32Count")) {
+      Changed = true;
+      ContHelper::handleValueI32Count(F, Builder);
+    } else if (Name.starts_with("_AmdValueGetI32")) {
+      Changed = true;
+      ContHelper::handleValueGetI32(F, Builder);
+    } else if (Name.starts_with("_AmdValueSetI32")) {
+      Changed = true;
+      ContHelper::handleValueSetI32(F, Builder);
+    } else if (F.getName().starts_with("_AmdContStack")) {
+      Changed = true;
+
+      auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod).getManager();
+
+      handleContStackIntrinsic(FAM, F);
+    }
+  }
+
+  return Changed;
+}
+
+// Replace calls to _AmdContStack* with calls to lgc.cps dialect ops.
+// Do some simple constant propagation on the fly.
+void CleanupContinuationsPassImpl::handleContStackIntrinsic(FunctionAnalysisManager &FAM, Function &F) {
+  // Check if the function is either of void return type or i32 return type and
+  // has no arguments or a single integer argument dividable by 32 (to allow
+  // storing and loading multiple dwords via AmdContStackLoad /
+  // AmdContStackStore).
+  Type *ReturnTy = F.getReturnType();
+  (void)ReturnTy;
+  assert((ReturnTy->isVoidTy() || (ReturnTy->isIntegerTy() && (ReturnTy->getIntegerBitWidth() % 32 == 0))) &&
+         "CleanupContinuationsPassImpl::handleContStackIntrinsic: Invalid "
+         "return type!");
+
+  Type *FuncTy = F.getFunctionType();
+  (void)(FuncTy);
+  assert((FuncTy->getFunctionNumParams() == 0 || FuncTy->getFunctionParamType(0)->isIntegerTy()) &&
+         "CleanupContinuationsPassImpl::handleContStackIntrinsic: Invalid "
+         "argument signature!");
+
+  StringRef FuncName = F.getName();
+  FuncName.consume_front("_AmdContStack");
+
+  auto ConstantFoldInstruction = [&](Function *Parent, Value *SizeArg) -> Value * {
+    if (!isa<Instruction>(SizeArg))
+      return SizeArg;
+
+    if (auto *I = dyn_cast<Instruction>(SizeArg)) {
+      // Do some basic constant-propagation
+      // This is needed because this pass just replaced the ValueI32Count
+      // and ContPayloadRegistersI32Count intrinsics and the allocated size
+      // usually depends on these values.
+      auto &DT = FAM.getResult<DominatorTreeAnalysis>(*Parent);
+      auto &TLI = FAM.getResult<TargetLibraryAnalysis>(*Parent);
+      auto &AC = FAM.getResult<AssumptionAnalysis>(*Parent);
+      const SimplifyQuery SQ(Parent->getParent()->getDataLayout(), &TLI, &DT, &AC);
+
+      if (auto *NewSize = simplifyInstruction(I, SQ))
+        return NewSize;
+    }
+
+    return SizeArg;
+  };
+
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Value *Replacement = nullptr;
+    Builder.SetInsertPoint(&CInst);
+
+    Type *DestTy = CInst.getType();
+
+    bool IsMemoryAccess = false;
+    if (FuncName.starts_with("Alloc")) {
+      Value *SizeArg = ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
+      Replacement = Builder.create<lgc::cps::AllocOp>(SizeArg);
+
+      if (auto *Size = dyn_cast<ConstantInt>(SizeArg))
+        ContHelper::StackSize::inc(CInst.getFunction(), Size->getSExtValue());
+    } else if (FuncName.starts_with("Free")) {
+      Value *SizeArg = ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
+      Replacement = Builder.create<lgc::cps::FreeOp>(SizeArg);
+    } else if (FuncName.starts_with("SetPtr")) {
+      Value *Vsp = CInst.getArgOperand(0);
+      Replacement = Builder.create<lgc::cps::SetVspOp>(
+          Builder.CreateIntToPtr(Vsp, PointerType::get(Builder.getInt8Ty(), lgc::cps::stackAddrSpace)));
+    } else if (FuncName.starts_with("GetPtr")) {
+      Replacement = Builder.create<lgc::cps::GetVspOp>();
+    } else if (FuncName.starts_with("Load")) {
+      Value *Addr = ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
+      Value *Ptr = Builder.CreateIntToPtr(Addr, CInst.getType()->getPointerTo(lgc::cps::stackAddrSpace));
+      Replacement = Builder.CreateAlignedLoad(DestTy, Ptr, Align(CpsStackLowering::getContinuationStackAlignment()));
+
+      if (FuncName.starts_with("LoadLastUse"))
+        CompilerUtils::setIsLastUseLoad(*cast<LoadInst>(Replacement));
+
+      IsMemoryAccess = true;
+    } else if (FuncName.starts_with("Store")) {
+      assert(FuncTy->getFunctionNumParams() == 2 && "CleanupContinuationsPassImpl::handleContStackIntrinsic: Invalid "
+                                                    "argument signature for AmdContStackStore!");
+
+      Value *Addr = ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
+      Value *Val = CInst.getArgOperand(1);
+      Value *Ptr = Builder.CreateIntToPtr(Addr, Val->getType()->getPointerTo(lgc::cps::stackAddrSpace));
+      Builder.CreateAlignedStore(Val, Ptr, Align(CpsStackLowering::getContinuationStackAlignment()));
+
+      IsMemoryAccess = true;
+    } else {
+      llvm_unreachable("CleanupContinuationsPassImpl::handleContStackIntrinsic: "
+                       "Unknown intrinsic!");
+    }
+
+    if (Replacement) {
+      if (!DestTy->isVoidTy() && !IsMemoryAccess)
+        Replacement = Builder.CreatePtrToInt(Replacement, DestTy);
+
+      CInst.replaceAllUsesWith(Replacement);
+    }
+
+    CInst.eraseFromParent();
+  });
 }
 
 void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
@@ -694,9 +856,8 @@ void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
       assert(ResumeFn && isa<cps::AsContinuationReferenceOp>(ResumeFn));
       // We can always move this as.continuation.reference call.
       cast<Instruction>(ResumeFn)->moveBefore(GetResumeCall);
-      Builder->SetInsertPoint(GetResumeCall);
-      auto *ResumePtr = Builder->CreateZExt(ResumeFn, Builder->getInt64Ty());
-      GetResumeCall->replaceAllUsesWith(ResumePtr);
+      Builder.SetInsertPoint(GetResumeCall);
+      GetResumeCall->replaceAllUsesWith(ResumeFn);
       GetResumeCall->eraseFromParent();
 
       // Re-create the lgc.cps.jump call without the return address
@@ -704,12 +865,12 @@ void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
       if (!lgc::cps::isCpsFunction(*Jump->getFunction())) {
         SmallVector<Value *> Args;
         for (unsigned I = 0; I < Jump->arg_size(); I++) {
-          if (I != 4) // Return address argument
+          if (I != 3) // Return address argument
             Args.push_back(Jump->getArgOperand(I));
         }
 
-        Builder->SetInsertPoint(Jump);
-        auto *NewCall = Builder->CreateCall(Jump->getCalledFunction(), Args);
+        Builder.SetInsertPoint(Jump);
+        auto *NewCall = Builder.CreateCall(Jump->getCalledFunction(), Args);
         NewCall->copyMetadata(*Jump);
 
         Jump->eraseFromParent();
@@ -718,41 +879,31 @@ void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
   }
 }
 
-CleanupContinuationsPassImpl::CleanupContinuationsPassImpl(llvm::Module &M, llvm::ModuleAnalysisManager &AM,
-                                                           bool Use64BitContinuationReferences)
-    : Mod(M), AnalysisManager(AM), Use64BitContinuationReferences{Use64BitContinuationReferences} {
+CleanupContinuationsPassImpl::CleanupContinuationsPassImpl(llvm::Module &M, llvm::Module &GpurtLibrary,
+                                                           llvm::ModuleAnalysisManager &AM)
+    : Mod(M), AnalysisManager(AM), Builder{Mod.getContext()}, ContMalloc{Mod.getFunction("continuation.malloc")},
+      ContFree{Mod.getFunction("continuation.free")}, GpurtLibrary{&GpurtLibrary} {
 }
 
 llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
-  LLVM_DEBUG(dbgs() << "Run the lgc-cleanup-continuations pass\n");
-  AnalysisManager.getResult<DialectContextAnalysis>(Mod);
   auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod).getManager();
-
-  ToProcess.clear();
-  MaxContStateBytes = 0;
-  ContMalloc = Mod.getFunction("continuation.malloc");
-  ContFree = Mod.getFunction("continuation.free");
-  GpurtLibrary = GpurtContext::get(Mod.getContext()).theModule;
-
-  llvm_dialects::Builder B(Mod.getContext());
-  Builder = &B;
-
-  if (Use64BitContinuationReferences)
-    ContinuationReferenceType = Builder->getInt64Ty();
-  else
-    ContinuationReferenceType = Builder->getInt32Ty();
 
   // Map the entry function of a continuation to the analysis result
   for (auto &F : Mod.functions()) {
     if (F.empty())
       continue;
-    if (auto *MD = F.getMetadata(ContHelper::MDContinuationName))
+    if (auto *MD = F.getMetadata(ContHelper::MDContinuationName)) {
       analyzeContinuation(F, MD);
+    } else if (lgc::rt::getLgcRtShaderStage(&F) == lgc::rt::RayTracingShaderStage::KernelEntry) {
+      analyzeContinuation(F, nullptr);
+    }
   }
 
   // Check if the continuation state is used in any function part
   for (auto &FuncData : ToProcess) {
-    if (!FuncData.second.MallocCall) {
+    // Kernel entry functions do not have FuncData.MD and we do not need to
+    // handle them here.
+    if (!FuncData.second.MallocCall && FuncData.second.MD) {
       for (auto *F : FuncData.second.Functions) {
         // If this is the continuation start part.
         bool IsStart = (F == FuncData.first);
@@ -783,22 +934,45 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
 
   // Try to do store->load forwarding here.
   for (auto &FuncData : ToProcess) {
-    for (auto *F : FuncData.second.Functions) {
-      auto &DT = FAM.getResult<DominatorTreeAnalysis>(*F);
-      // If this is the continuation start part.
-      bool IsStart = (F == FuncData.first);
-      Value *ContFrame = getContinuationFramePtr(F, IsStart, FuncData.second);
-      // Traversal the users to forward store to load instruction.
-      forwardContinuationFrameStoreToLoad(DT, ContFrame);
+    // Kernel entry functions do not have FuncData.MD and we do not need to
+    // handle them here.
+    if (FuncData.second.MD) {
+      for (auto *F : FuncData.second.Functions) {
+        auto &DT = FAM.getResult<DominatorTreeAnalysis>(*F);
+        // If this is the continuation start part.
+        bool IsStart = (F == FuncData.first);
+        Value *ContFrame = getContinuationFramePtr(F, IsStart, FuncData.second);
+        // Traversal the users to forward store to load instruction.
+        forwardContinuationFrameStoreToLoad(DT, ContFrame);
+      }
     }
   }
 
   bool Changed = false;
   if (!ToProcess.empty()) {
+    auto StackAddrspaceMD = ContHelper::tryGetStackAddrspace(Mod);
+    assert(StackAddrspaceMD.has_value() && "Missing continuation.stackAddrspace metadata");
+    auto StackAddrspace = StackAddrspaceMD.value();
+
+    if (StackAddrspace == ContStackAddrspace::Global)
+      GetGlobalMemBase = getContinuationStackGlobalMemBase(*GpurtLibrary);
+
+    StackLowering.emplace(Mod.getContext(), static_cast<unsigned>(StackAddrspace));
+
     processContinuations();
 
     lowerGetResumePoint(Mod);
     Changed = true;
+  }
+
+  Changed |= handleIntrinsics(AnalysisManager);
+
+  // Run stack lowering
+  for (auto &FuncData : ToProcess) {
+    for (Function *F : FuncData.second.NewFunctions) {
+      bool RequiresIncomingCsp = lgc::rt::getLgcRtShaderStage(F) != lgc::rt::RayTracingShaderStage::KernelEntry;
+      StackLowering->lowerCpsStackOps(F, GetGlobalMemBase, RequiresIncomingCsp);
+    }
   }
 
   Changed |= lowerCompleteOp(Mod);
@@ -811,6 +985,9 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
 llvm::PreservedAnalyses CleanupContinuationsPass::run(llvm::Module &Mod, llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the cleanup-continuations pass\n");
   AnalysisManager.getResult<DialectContextAnalysis>(Mod);
-  CleanupContinuationsPassImpl Impl(Mod, AnalysisManager, Use64BitContinuationReferences);
+
+  auto &GpurtContext = GpurtContext::get(Mod.getContext());
+  Module &GpurtLibrary = GpurtContext.theModule ? *GpurtContext.theModule : Mod;
+  CleanupContinuationsPassImpl Impl(Mod, GpurtLibrary, AnalysisManager);
   return Impl.run();
 }

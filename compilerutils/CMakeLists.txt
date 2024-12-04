@@ -15,6 +15,9 @@ add_llvm_library(LLVMCompilerUtils
   lib/ArgPromotion.cpp
   lib/CompilerUtils.cpp
   lib/DxilToLlvm.cpp
+  lib/IRSerializationUtils.cpp
+  lib/MbStandardInstrumentations.cpp
+  lib/ModuleBunch.cpp
   lib/TypeLowering.cpp
   lib/TypesMetadata.cpp
   lib/ValueOriginTracking.cpp
@@ -28,6 +31,8 @@ add_llvm_library(LLVMCompilerUtils
   LINK_COMPONENTS
   Analysis
   Core
+  IPO
+  Passes
   Support
   TransformUtils
 )

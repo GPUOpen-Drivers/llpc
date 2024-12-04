@@ -32,7 +32,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -59,7 +59,6 @@ class PipelineState;
 namespace {
 
 // Map vkgc
-static constexpr unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static constexpr unsigned FetchShaderInternalBufferBinding = 5; // Descriptor binding for uber fetch shader
 static constexpr unsigned CurrentAttributeBufferBinding = 1;    // Descriptor binding for current attribute
 static constexpr unsigned GenericVertexFetchShaderBinding = 0;  // Descriptor binding for generic vertex fetch shader
@@ -97,10 +96,10 @@ public:
 
   // Generate code to fetch a vertex value
   Value *fetchVertex(Type *inputTy, const VertexInputDescription *description, unsigned location, unsigned compIdx,
-                     BuilderImpl &builderImpl) override;
+                     BuilderImpl &builderImpl, llvm::Value *vertexIndex, llvm::Value *instanceIndex) override;
 
   // Generate code to fetch a vertex value for uber shader
-  Value *fetchVertex(InputImportGenericOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder,
+  Value *fetchVertex(LoadVertexInputOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder,
                      bool disablePerCompFetch) override;
 
 private:
@@ -616,13 +615,15 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][9] = {
 PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
 
-  // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader.
+  // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader, or compute shader for
+  // transform pipeline.
   // We can assume that multiple fetches of the same location, component and type have been CSEd.
-  SmallVector<InputImportGenericOp *, 8> vertexFetches;
-  static const auto fetchVisitor = llvm_dialects::VisitorBuilder<SmallVectorImpl<InputImportGenericOp *>>()
+  SmallVector<LoadVertexInputOp *, 8> vertexFetches;
+  static const auto fetchVisitor = llvm_dialects::VisitorBuilder<SmallVectorImpl<LoadVertexInputOp *>>()
                                        .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                                       .add<InputImportGenericOp>([](auto &fetches, InputImportGenericOp &op) {
-                                         if (lgc::getShaderStage(op.getFunction()) == ShaderStage::Vertex)
+                                       .add<LoadVertexInputOp>([](auto &fetches, LoadVertexInputOp &op) {
+                                         if (lgc::getShaderStage(op.getFunction()) == ShaderStage::Vertex ||
+                                             lgc::getShaderStage(op.getFunction()) == ShaderStage::Compute)
                                            fetches.push_back(&op);
                                        })
                                        .build();
@@ -649,7 +650,7 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
     Value *locationMasks = builder.CreateLoad(builder.getInt64Ty(), descPtr);
     descPtr = builder.CreateGEP(builder.getInt64Ty(), descPtr, {builder.getInt32(1)});
 
-    for (InputImportGenericOp *inst : vertexFetches) {
+    for (LoadVertexInputOp *inst : vertexFetches) {
       builder.SetInsertPoint(inst);
       Value *vertex = vertexFetch->fetchVertex(inst, descPtr, locationMasks, BuilderBase::get(builder),
                                                pipelineState->getOptions().disablePerCompFetch);
@@ -662,7 +663,7 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
 
   // Whole-pipeline compilation (or shader compilation where we were given the vertex input descriptions).
   // Lower each vertex fetch.
-  for (InputImportGenericOp *fetch : vertexFetches) {
+  for (LoadVertexInputOp *fetch : vertexFetches) {
     Value *vertex = nullptr;
 
     // Find the vertex input description.
@@ -681,7 +682,17 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
       // Fetch the vertex.
       builder.SetInsertPoint(fetch);
       builder.setShaderStage(ShaderStage::Vertex);
-      vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder);
+
+      // Get vertexIndex and instanceIndex from function args for transform shader
+      Value *vertexIndex = nullptr;
+      Value *instanceIndex = nullptr;
+      if (lgc::getShaderStage(fetch->getFunction()) == ShaderStage::Compute) {
+        vertexIndex = fetch->getVertexIndex();
+        instanceIndex = fetch->getInstanceIndex();
+      }
+
+      vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder, vertexIndex,
+                                        instanceIndex);
     }
 
     // Replace and erase this call.
@@ -702,7 +713,7 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
 // @param builder : Builder to use to insert vertex fetch instructions
 // @param disablePerCompFetch : disable per component fetch
 // @returns : vertex
-Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder,
+Value *VertexFetchImpl::fetchVertex(LoadVertexInputOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder,
                                     bool disablePerCompFetch) {
   if (!m_vertexIndex) {
     IRBuilderBase::InsertPointGuard ipg(builder);
@@ -874,11 +885,11 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   Value *wholeVertex = nullptr;
   {
     builder.SetInsertPoint(wholeVertexBlock);
-    wholeVertex = builder.CreateIntrinsic(instId, fetchType, args, {});
+    wholeVertex = builder.CreateIntrinsic(fetchType, instId, args, {});
     if (is64bitFetch) {
       // If it is 64-bit, we need the second fetch
       args[offsetIdx] = builder.CreateAdd(args[offsetIdx], builder.getInt32(SizeOfVec4));
-      auto secondFetch = builder.CreateIntrinsic(instId, fetchType, args, {});
+      auto secondFetch = builder.CreateIntrinsic(fetchType, instId, args, {});
       wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
     }
     builder.CreateBr(fetchUberEndBlock);
@@ -926,14 +937,14 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
 
       args[offsetIdx] = byteOffset;
       if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
+        Value *comp = builder.CreateIntrinsic(fetch64Type, instId, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
         lastVert = builder.CreateInsertElement(lastVert, elem, uint64_t(0));
         elem = builder.CreateExtractElement(comp, 1);
         lastVert = builder.CreateInsertElement(lastVert, elem, 1);
         comp0 = lastVert;
       } else {
-        comp0 = builder.CreateIntrinsic(instId, compType, args, {});
+        comp0 = builder.CreateIntrinsic(compType, instId, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp0, uint64_t(0));
         comp0 = lastVert;
       }
@@ -948,14 +959,14 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
       // Add offset. offset = offset + componentSize
       args[offsetIdx] = builder.CreateAdd(args[offsetIdx], componentSize);
       if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
+        Value *comp = builder.CreateIntrinsic(fetch64Type, instId, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
         lastVert = builder.CreateInsertElement(lastVert, elem, 2);
         elem = builder.CreateExtractElement(comp, 1);
         lastVert = builder.CreateInsertElement(lastVert, elem, 3);
         comp1 = lastVert;
       } else {
-        comp1 = builder.CreateIntrinsic(instId, compType, args, {});
+        comp1 = builder.CreateIntrinsic(compType, instId, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
         comp1 = lastVert;
       }
@@ -968,14 +979,14 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
       builder.SetInsertPoint(comp2Block);
       args[offsetIdx] = builder.CreateAdd(args[offsetIdx], componentSize);
       if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
+        Value *comp = builder.CreateIntrinsic(fetch64Type, instId, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
         lastVert = builder.CreateInsertElement(lastVert, elem, 4);
         elem = builder.CreateExtractElement(comp, 1);
         lastVert = builder.CreateInsertElement(lastVert, elem, 5);
         comp2 = lastVert;
       } else {
-        comp2 = builder.CreateIntrinsic(instId, compType, args, {});
+        comp2 = builder.CreateIntrinsic(compType, instId, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
         comp2 = lastVert;
       }
@@ -988,14 +999,14 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
       builder.SetInsertPoint(comp3Block);
       args[offsetIdx] = builder.CreateAdd(args[offsetIdx], componentSize);
       if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
+        Value *comp = builder.CreateIntrinsic(fetch64Type, instId, args, {});
         Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
         lastVert = builder.CreateInsertElement(lastVert, elem, 6);
         elem = builder.CreateExtractElement(comp, 1);
         lastVert = builder.CreateInsertElement(lastVert, elem, 7);
         comp3 = lastVert;
       } else {
-        comp3 = builder.CreateIntrinsic(instId, compType, args, {});
+        comp3 = builder.CreateIntrinsic(compType, instId, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp3, 3);
         comp3 = lastVert;
       }
@@ -1183,9 +1194,12 @@ Type *VertexFetchImpl::getVertexFetchType(bool isFloat, unsigned byteSize, Build
 // @param description : Vertex input description
 // @param location : Vertex input location (only used for an IR name, not for functionality)
 // @param compIdx : Index used for vector element indexing
-// @param builder : Builder to use to insert vertex fetch instructions
+// @param builderImpl : Builder to use to insert vertex fetch instructions
+// @param vertexIndex : Vertex index, unique for each vertex
+// @param instanceIndex : Instance index, unique for each instance
 Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription *description, unsigned location,
-                                    unsigned compIdx, BuilderImpl &builderImpl) {
+                                    unsigned compIdx, BuilderImpl &builderImpl, llvm::Value *vertexIndex,
+                                    llvm::Value *instanceIndex) {
   Value *vertex = nullptr;
   BuilderBase &builder = BuilderBase::get(builderImpl);
   Instruction *insertPos = &*builder.GetInsertPoint();
@@ -1193,6 +1207,12 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   Value *srdStride = nullptr;
   if (m_useSoftwareVertexBufferDescriptors)
     std::tie(vbDesc, srdStride) = convertSrdToOffsetMode(vbDesc, builderImpl);
+
+  if (vertexIndex)
+    m_vertexIndex = vertexIndex;
+  if (instanceIndex)
+    m_instanceIndex = instanceIndex;
+
   Value *vbIndex = nullptr;
   if (description->inputRate == VertexInputRateVertex) {
     // Use vertex index

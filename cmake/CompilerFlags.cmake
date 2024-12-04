@@ -11,6 +11,7 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             target_compile_options("${PROJECT_NAME}" PRIVATE
                 -Werror
                 -Wno-error=deprecated-declarations
+                -Wno-error=unknown-attributes
             )
         endif()
 
@@ -74,7 +75,7 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
                 -Wno-gnu-anonymous-struct
                 -Wno-nested-anon-types
             )
-            if(XGL_ENABLE_LTO)
+            if(LLPC_ENABLE_LTO)
                 target_link_libraries("${PROJECT_NAME}" PRIVATE -flto=thin)
             endif()
         endif()

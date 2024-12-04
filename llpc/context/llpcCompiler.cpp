@@ -58,6 +58,8 @@
 #include "vkgcDefs.h"
 #include "vkgcElfReader.h"
 #include "vkgcPipelineDumper.h"
+#include "llvmraytracing/Continuations.h"
+#include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/EnumIterator.h"
@@ -77,18 +79,10 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/Support/ErrorHandling.h"
-
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
-#include "llvmraytracing/Continuations.h"
-#include "llvmraytracing/GpurtContext.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Mutex.h"
@@ -257,9 +251,6 @@ std::condition_variable_any Compiler::m_helperThreadConditionVariable;
 // @param genCrashDiag : Whether diagnostic should be generated
 static void fatalErrorHandler(void *userData, const char *reason, bool genCrashDiag) {
   LLPC_ERRS("LLVM FATAL ERROR: " << reason << "\n");
-#if LLPC_ENABLE_EXCEPTION
-  throw("LLVM fatal error");
-#endif
 }
 
 // =====================================================================================================================
@@ -335,9 +326,6 @@ public:
       diagInfo.print(printStream);
       printStream << "\n";
       errs().flush();
-#if LLPC_ENABLE_EXCEPTION
-      throw("LLVM fatal error");
-#endif
       abort();
     }
 
@@ -1971,11 +1959,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       // Stop timer for translate.
       timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
-      if (!success) {
-        LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-        result = Result::ErrorInvalidShader;
-      }
+      lowerPassMgr->run(*modules[shaderIndex]);
 
       // If this is TCS, set inputVertices from patchControlPoints in the pipeline state.
       if (entryStage == ShaderStageTessControl ||
@@ -2012,11 +1996,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       flag.usesAdvancedBlend = enableAdvancedBlend;
       SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower), flag);
       // Run the passes.
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
-      if (!success) {
-        LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-        result = Result::ErrorInvalidShader;
-      }
+      lowerPassMgr->run(*modules[shaderIndex]);
 
       context->getBuilder()->SetCurrentDebugLocation(nullptr);
 
@@ -2066,26 +2046,13 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   raw_svector_ostream elfStream(*pipelineElf);
 
   if (result == Result::Success) {
-#if LLPC_ENABLE_EXCEPTION
-    result = Result::ErrorInvalidShader;
-    try
-#endif
-    {
-      Timer *timers[] = {
-          timerProfiler.getTimer(TimerPatch),
-          timerProfiler.getTimer(TimerOpt),
-          timerProfiler.getTimer(TimerCodeGen),
-      };
+    Timer *timers[] = {
+        timerProfiler.getTimer(TimerPatch),
+        timerProfiler.getTimer(TimerOpt),
+        timerProfiler.getTimer(TimerCodeGen),
+    };
 
-      pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
-#if LLPC_ENABLE_EXCEPTION
-      result = Result::Success;
-#endif
-    }
-#if LLPC_ENABLE_EXCEPTION
-    catch (const char *) {
-    }
-#endif
+    pipeline->generate(std::move(pipelineModule), elfStream, checkShaderCacheFunc, timers);
   }
   if (checkPerStageCache) {
     // For graphics, update shader caches with results of compile, and merge ELF outputs if necessary.
@@ -2930,9 +2897,7 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     passMgr->addPass(createModuleToFunctionPassAdaptor(SROAPass(llvm::SROAOptions::ModifyCFG)));
     passMgr->addPass(SpecializeDriverShadersPass());
 
-    bool success = runPasses(&*passMgr, module.get());
-    assert(success);
-    (void(success)); // unused
+    passMgr->run(*module);
 
     auto moduleStateOrErr = llvmraytracing::PipelineState::fromModuleMetadata(*module);
     if (auto err = moduleStateOrErr.takeError()) {
@@ -2978,23 +2943,13 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
 
   raw_svector_ostream elfStream(pipelineElf);
 
-#if LLPC_ENABLE_EXCEPTION
-  try
-#endif
-  {
-    Timer *timers[] = {
-        timerProfiler.getTimer(TimerPatch),
-        timerProfiler.getTimer(TimerOpt),
-        timerProfiler.getTimer(TimerCodeGen),
-    };
+  Timer *timers[] = {
+      timerProfiler.getTimer(TimerPatch),
+      timerProfiler.getTimer(TimerOpt),
+      timerProfiler.getTimer(TimerCodeGen),
+  };
 
-    pipeline->generate(std::move(pipelineModule), elfStream, nullptr, timers);
-  }
-#if LLPC_ENABLE_EXCEPTION
-  catch (const char *) {
-    return Result::ErrorInvalidShader;
-  }
-#endif
+  pipeline->generate(std::move(pipelineModule), elfStream, nullptr, timers);
 
   return Result::Success;
 }
@@ -3202,11 +3157,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     lowerPassMgr->addPass(AlwaysInlinerPass());
 
     // Run the passes.
-    bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
-    if (!success) {
-      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-      return Result::ErrorInvalidShader;
-    }
+    lowerPassMgr->run(*modules[shaderIndex]);
   }
 
   // Step 2: Set up traversal module and kernel entry
@@ -3291,11 +3242,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     if (isContinuationsMode) {
       passMgr->addPass(PrepareContinuations());
     }
-    bool success = runPasses(&*passMgr, module);
-    if (!success) {
-      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-      return Result::ErrorInvalidShader;
-    }
+    passMgr->run(*module);
   }
 
   // Step 4: Link module if necessary
@@ -3307,11 +3254,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     }
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
     passMgr->addPass(AlwaysInlinerPass());
-    bool success = runPasses(&*passMgr, mainModule.get());
-    if (!success) {
-      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-      return Result::ErrorInvalidShader;
-    }
+    passMgr->run(*mainModule);
     clearNonEntryFunctions(mainModule.get(), "main");
     newModules.erase(newModules.begin() + 1, newModules.end());
   }
@@ -3615,28 +3558,6 @@ Context *Compiler::acquireContext() const {
   freeContext->setInUse(true);
 
   return freeContext;
-}
-
-// =====================================================================================================================
-// Run pass manager's passes on a module, catching any LLVM fatal error and returning a success indication
-//
-// @param passMgr : Pass manager
-// @param [in/out] module : Module
-bool Compiler::runPasses(lgc::PassManager *passMgr, Module *module) const {
-  bool success = false;
-#if LLPC_ENABLE_EXCEPTION
-  try
-#endif
-  {
-    passMgr->run(*module);
-    success = true;
-  }
-#if LLPC_ENABLE_EXCEPTION
-  catch (const char *) {
-    success = false;
-  }
-#endif
-  return success;
 }
 
 // =====================================================================================================================

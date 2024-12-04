@@ -292,17 +292,11 @@ void LowerPopsInterlock::lowerBeginInterlock(PopsBeginInterlockOp &popsBeginInte
   {
     m_builder->SetInsertPoint(processOverlapBlock->getTerminator());
 
-    auto packerId = m_builder->CreateAnd(m_builder->CreateLShr(collisionWaveId, 28), 0x3);
     // POPS_PACKER: [0] Enable; [2:1] Packer ID
-    auto hwReg = [=](unsigned hwRegId, unsigned offset, unsigned size) {
-      // The HW register of s_setreg has this layout:
-      //   [5:0] ID of HW register; [10:6] Offset; [15:11] Size
-      return ((hwRegId) | (offset << 6) | ((size - 1) << 11));
-    };
+    auto packerId = m_builder->CreateAnd(m_builder->CreateLShr(collisionWaveId, 28), 0x3);
     static const unsigned HwRegPopsPacker = 25;
     auto popsPacker = m_builder->CreateOr(m_builder->CreateShl(packerId, 1), 0x1);
-    m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_s_setreg,
-                               {m_builder->getInt32(hwReg(HwRegPopsPacker, 0, 3)), popsPacker});
+    m_builder->CreateSetReg(HwRegPopsPacker, 0, 3, popsPacker);
 
     // waveIdRemapOffset = -(currentWaveId + 1) = ~currentWaveId
     auto currentWaveId = m_builder->CreateAnd(collisionWaveId, 0x3FF);

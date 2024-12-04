@@ -238,13 +238,7 @@ DIType *SPIRVToLLVMDbgTran::transTypePointer(const SPIRVExtInst *DebugInst) {
   DIType *PointeeTy = nullptr;
   if (BM->getEntry(Ops[BaseTypeIdx])->getOpCode() != OpTypeVoid)
     PointeeTy = transDebugInst<DIType>(BM->get<SPIRVExtInst>(Ops[BaseTypeIdx]));
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444152
-  // Old version of the code
-  Optional<unsigned> AS;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   std::optional<unsigned> AS;
-#endif
   auto storageClass = getConstant(Ops[StorageClassIdx]);
   if (storageClass != ~0U) {
     auto SC = static_cast<SPIRVStorageClassKind>(storageClass);
@@ -330,11 +324,8 @@ DICompositeType *SPIRVToLLVMDbgTran::transTypeComposite(const SPIRVExtInst *Debu
   switch (getConstant(Ops[TagIdx])) {
   case SPIRVDebug::Class:
     CT = Builder.createClassType(ParentScope, Name, File, LineNo, Size, Align, 0, Flags, DerivedFrom,
-                                 DINodeArray() /*elements*/,
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480873
-                                 0 /*RunTimeLang*/,
-#endif
-                                 nullptr /*VTableHolder*/, nullptr /*TemplateParams*/, Identifier);
+                                 DINodeArray() /*elements*/, 0 /*RunTimeLang*/, nullptr /*VTableHolder*/,
+                                 nullptr /*TemplateParams*/, Identifier);
     break;
   case SPIRVDebug::Structure:
     CT = Builder.createStructType(ParentScope, Name, File, LineNo, Size, Align, Flags, DerivedFrom,
@@ -376,15 +367,8 @@ DINode *SPIRVToLLVMDbgTran::transTypeMember(const SPIRVExtInst *DebugInst) {
     SPIRVValue *ConstVal = BM->get<SPIRVValue>(Ops[ValueIdx]);
     assert(isConstantOpCode(ConstVal->getOpCode()) && "Static member must be a constant");
     llvm::Value *Val = SPIRVReader->transValue(ConstVal, nullptr, nullptr);
-    return Builder.createStaticMemberType(
-        Scope, Name, File, LineNo, BaseType, Flags,
-        cast<llvm::Constant>(Val)
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480812
-        // New version of the code (also handles unknown version, which we treat as latest)
-        ,
-        llvm::dwarf::DW_TAG_member
-#endif
-    );
+    return Builder.createStaticMemberType(Scope, Name, File, LineNo, BaseType, Flags, cast<llvm::Constant>(Val),
+                                          llvm::dwarf::DW_TAG_member);
   }
   uint64_t Size = getConstant(Ops[SizeIdx]);
   uint64_t Alignment = 0;
@@ -420,10 +404,7 @@ DINode *SPIRVToLLVMDbgTran::transTypeEnum(const SPIRVExtInst *DebugInst) {
   if (!isa<OpTypeVoid>(E))
     UnderlyingType = transDebugInst<DIType>(static_cast<SPIRVExtInst *>(E));
   return Builder.createEnumerationType(Scope, Name, File, LineNo, SizeInBits, AlignInBits, Enumerators, UnderlyingType,
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480873
-                                       0 /*RunTimeLang*/,
-#endif
-                                       "", UnderlyingType);
+                                       0 /*RunTimeLang*/, "", UnderlyingType);
 }
 
 DINode *SPIRVToLLVMDbgTran::transTypeFunction(const SPIRVExtInst *DebugInst) {
@@ -876,12 +857,7 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
   auto GetExpression = [&](SPIRVId Id) -> DIExpression * {
     return transDebugInst<DIExpression>(BM->get<SPIRVExtInst>(Id));
   };
-  using LLPCDbgInstPtr =
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 492382
-      DbgInstPtr;
-#else
-      Instruction *;
-#endif
+  using LLPCDbgInstPtr = DbgInstPtr;
   SPIRVWordVec Ops = DebugInst->getArguments();
   switch (DebugInst->getExtOp()) {
   case SPIRVDebug::Scope:
@@ -921,7 +897,6 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
       DbgInst = Builder.insertDeclare(GetValue(Ops[VariableIdx]), LocalVar.first, GetExpression(Ops[ExpressionIdx]),
                                       LocalVar.second, BB);
     }
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 492382
     // Debug Info Format is in transition phase right now.
     // If new Debug Info Format is turned ON then 'insertDeclare' will return DbgRecord.
     // If new Debug Info Format is turned OFF then 'insertDeclare' will return Instruction (Intrinsic) which we are
@@ -932,24 +907,17 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
     } else {
       return nullptr;
     }
-#else
-    return DbgInst;
-#endif
   }
   case SPIRVDebug::Value: {
     using namespace SPIRVDebug::Operand::DebugValue;
     auto LocalVar = GetLocalVar(Ops[DebugLocalVarIdx]);
     LLPCDbgInstPtr DbgInst = Builder.insertDbgValueIntrinsic(GetValue(Ops[ValueIdx]), LocalVar.first,
                                                              GetExpression(Ops[ExpressionIdx]), LocalVar.second, BB);
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 492382
     if (DbgInst.is<Instruction *>()) {
       return DbgInst.get<Instruction *>();
     } else {
       return nullptr;
     }
-#else
-    return DbgInst;
-#endif
   }
   default:
     llvm_unreachable("Unknown debug intrinsic!");

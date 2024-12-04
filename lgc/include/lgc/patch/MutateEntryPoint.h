@@ -34,7 +34,7 @@
 #include "llvmraytracing/CpsStackLowering.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -55,7 +55,7 @@ public:
   MutateEntryPoint();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for entry-point mutation"; }
+  static llvm::StringRef name() { return "Mutate entry point"; }
 
   static void processGroupMemcpy(GroupMemcpyOp &groupMemcpyOp, BuilderBase &builder, llvm::Value *threadIndex,
                                  unsigned scopeSize);
@@ -157,10 +157,10 @@ private:
                                    llvm::ArrayRef<std::string> argNames);
 
   llvm::Value *takeLevel(llvm::Value *level, llvm::IRBuilder<> &builder, llvm::Type *waveMaskTy,
-                         llvm::ArrayRef<lgc::cps::CpsLevel> priority);
+                         llvm::ArrayRef<lgc::cps::CpsLevel> priorities);
 
-  unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
-                        llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
+  void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
+                    llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
   void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
 
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
@@ -209,10 +209,8 @@ private:
     bool m_cpsCacheAvailable = false;
   };
   CpsShaderInputCache m_cpsShaderInputCache;
-  // Map from a cps function to the alloca where we are holding the latest continuation stack pointer.
-  llvm::DenseMap<llvm::Function *, llvm::Value *> m_funcCpsStackMap;
   llvm::Intrinsic::ID m_setInactiveChainArgId;
-  std::unique_ptr<CpsStackLowering> stackLowering;
+  unsigned m_cpsStackAddrspace;
 };
 
 } // namespace lgc

@@ -31,28 +31,28 @@
 ; SHADERTEST-NEXT: [[v4:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr1]], align 4
 ; SHADERTEST-NEXT: [[offset1:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
 ; SHADERTEST-NEXT: [[offset2:%[0-9]*]] = or disjoint i32 [[offset1]], 508
-; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v4]], <4 x i32> %{{[0-9]*}}, i32 [[offset2]], i32 %{{[0-9]*}}, i32 22, i32 3)
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32{{(\.v4i32)?}}(float [[v4]], <4 x i32> %{{[0-9]*}}, i32 [[offset2]], i32 %{{[0-9]*}}, i32 22, i32 3)
 
 ; Read v3[31] <- LDS
 ; SHADERTEST: [[ldsPtr2:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 128
 ; SHADERTEST-NEXT: [[v3:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr2]], align 4
 ; SHADERTEST-NEXT: [[offset3:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
 ; SHADERTEST-NEXT: [[offset4:%[0-9]*]] = or disjoint i32 [[offset3]], 380
-; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v3]], <4 x i32> %{{[0-9]*}}, i32 [[offset4]], i32 %{{[0-9]*}}, i32 22, i32 3)
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32{{(\.v4i32)?}}(float [[v3]], <4 x i32> %{{[0-9]*}}, i32 [[offset4]], i32 %{{[0-9]*}}, i32 22, i32 3)
   
 ; Read v2[31] <- LDS
 ; SHADERTEST: [[ldsPtr3:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 256
 ; SHADERTEST-NEXT: [[v2:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr3]], align 4
 ; SHADERTEST-NEXT: [[offset5:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
 ; SHADERTEST-NEXT: [[offset6:%[0-9]*]] = or disjoint i32 [[offset5]], 252
-; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v2]], <4 x i32> %{{[0-9]*}}, i32 [[offset6]], i32 %{{[0-9]*}}, i32 22, i32 3)
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32{{(\.v4i32)?}}(float [[v2]], <4 x i32> %{{[0-9]*}}, i32 [[offset6]], i32 %{{[0-9]*}}, i32 22, i32 3)
 
 : Read v1[31] <- LDS
 ; SHADERTEST: [[ldsPtr4:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 384
 ; SHADERTEST-NEXT: [[v1:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr4]], align 4
 ; SHADERTEST-NEXT: [[offset7:%[0-9]*]] = mul i32 %threadIdInSubgroup, 1536
 ; SHADERTEST-NEXT: [[offset8:%[0-9]*]] = or disjoint i32 [[offset7]], 124
-; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32(float [[v1]], <4 x i32> %{{[0-9]*}}, i32 [[offset8]], i32 %{{[0-9]*}}, i32 22, i32 3)
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.f32{{(\.v4i32)?}}(float [[v1]], <4 x i32> %{{[0-9]*}}, i32 [[offset8]], i32 %{{[0-9]*}}, i32 22, i32 3)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

@@ -30,7 +30,7 @@
  */
 #include "lgc/patch/FragmentColorExport.h"
 #include "lgc/LgcContext.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -504,9 +504,12 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
 // @param builder : builder to use
 void LowerFragColorExport::updateFragColors(CallInst *callInst, MutableArrayRef<ColorOutputValueInfo> outFragColors,
                                             BuilderBase &builder) {
+  Value *output = callInst->getOperand(2);
+  if (isa<UndefValue>(output))
+    return;
+
   const unsigned location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
   const unsigned component = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
-  Value *output = callInst->getOperand(2);
   assert(output->getType()->getScalarSizeInBits() <= 32); // 64-bit output is not allowed
   assert(component < 4);
 

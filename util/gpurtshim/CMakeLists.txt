@@ -23,7 +23,8 @@
  #
  #######################################################################################################################
 
-if(VKI_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
+#if LLPC_RAY_TRACING
+if(LLPC_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
     # The shim is built as a separate miniature library so that the GPURT include path doesn't "leak" into the main
     # LLPC compile.
     add_library(vkgc_gpurtshim STATIC GpurtShim.cpp)
@@ -35,3 +36,4 @@ if(VKI_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
     target_link_libraries(vkgc_gpurtshim PUBLIC vkgc_headers)
     target_link_libraries(vkgc_gpurtshim PRIVATE gpurt)
 endif()
+#endif

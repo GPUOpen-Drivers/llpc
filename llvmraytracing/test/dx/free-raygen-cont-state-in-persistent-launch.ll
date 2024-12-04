@@ -1,16 +1,45 @@
+; NOTE: Do not autogenerate
 ; Tests that if _cont_ExitRayGen ends with an enqueue, then we still free RayGen continuation state.
 ; This is a regression test, in an earlier version we only freed for returns and missed this case.
-; RUN: grep -v "lgc.cps.module" %s | opt --verify-each -passes="dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata" -S --lint-abort-on-error | FileCheck %s
-; RUN: opt --verify-each -passes="dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,remove-types-metadata" -S %s --lint-abort-on-error | FileCheck %s
+; RUN: grep -v "lgc.cps.module" %s | opt --verify-each -passes="dxil-cont-prepare-gpurt-library,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,remove-types-metadata" -S --lint-abort-on-error | FileCheck %s
+; RUN: opt --verify-each -passes="dxil-cont-prepare-gpurt-library,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,remove-types-metadata" -S %s --lint-abort-on-error | FileCheck %s
 
 ; There is just a single RayGen shader in this module, so any free must come from it.
-; CHECK: call void @lgc.cps.free
+; lgc.cps.free is lowered during cleanup-continuations.
+
+; CHECK-LABEL: define void @MyRayGen
+; CHECK: [[CSP:%.*]] = alloca i32, align 4
+
+; alloc(VALUE)
+; CHECK: [[LOAD:%.*]] = load i32, ptr [[CSP]], align 4
+; CHECK: [[NEW:%.*]] = add i32 [[LOAD]], [[VALUE:[0-9]+]]
+; CHECK: store i32 [[NEW]], ptr [[CSP]], align 4
+
+; jump
+; CHECK: [[LOAD2:%.*]] = load i32, ptr [[CSP]], align 4
+; CHECK: call void (...) @lgc.cps.jump({{i64|i32}} {{.*}}, i32 {{.*}}, i32 [[LOAD2]]
+
+; CHECK-LABEL: define dso_local void @MyRayGen.resume.0
+; CHECK: [[CSP2:%.*]] = alloca i32, align 4
+
+; peek(VALUE)
+; CHECK: [[LOAD3:%.*]] = load i32, ptr [[CSP2]], align 4
+; CHECK: [[NEW3:%.*]] = add i32 [[LOAD3]], -[[VALUE]]
+
+; free(VALUE)
+; CHECK: [[LOAD4:%.*]] = load i32, ptr [[CSP2]], align 4
+; CHECK: [[NEW4:%.*]] = add i32 [[LOAD4]], -[[VALUE]]
+; CHECK: store i32 [[NEW4]], ptr [[CSP2]], align 4
+
+; jump
+; CHECK: [[LOAD5:%.*]] = load i32, ptr [[CSP2]], align 4
+; CHECK: call void (...) @lgc.cps.jump({{i64|i32}} {{.*}}, i32 {{.*}}, i32 [[LOAD5]]
 
 target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:16-i32:32-i64:32-f16:16-f32:32-f64:32-v8:8-v16:16-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
 %dx.types.Handle = type { i8* }
 %struct.DispatchSystemData = type { <3 x i32> }
-%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float, i64 }
+%struct.TraversalData = type { %struct.SystemData, %struct.HitData, <3 x float>, <3 x float>, float, i32 }
 %struct.SystemData = type { %struct.DispatchSystemData }
 %struct.HitData = type { <3 x float>, <3 x float>, float, i32 }
 %struct.AnyHitTraversalData = type { %struct.TraversalData, %struct.HitData }
@@ -28,18 +57,14 @@ define i32 @_cont_GetContinuationStackAddr() #0 {
   ret i32 0
 }
 
-declare void @_AmdEnqueue(i64, i64, %struct.SystemData)
+declare void @_AmdEnqueue(i32, i32, %struct.SystemData)
 
 define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwind !pointeetys !{%struct.DispatchSystemData poison} {
-  call void @_AmdEnqueue(i64 1, i64 1, %struct.SystemData poison)
+  call void @_AmdEnqueue(i32 1, i32 1, %struct.SystemData poison)
   unreachable
 }
 
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
-
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
-
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #0
+declare %struct.DispatchSystemData @_AmdAwaitTraversal(i32, %struct.TraversalData) #0
 
 declare !pointeetys !32 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData* %data) #0
 
@@ -63,7 +88,7 @@ define i1 @_cont_IsEndSearch(%struct.TraversalData*) #0 !pointeetys !40 {
 declare !pointeetys !42 i32 @_cont_HitKind(%struct.SystemData*) #0
 
 ; Function Attrs: nounwind
-declare i64 @_AmdGetResumePointAddr() #1
+declare i32 @_AmdGetResumePointAddr() #1
 
 ; Function Attrs: nounwind
 declare !pointeetys !43 void @_AmdRestoreSystemData(%struct.DispatchSystemData*) #1
@@ -87,9 +112,9 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
-  %addr = call i64 @_AmdGetResumePointAddr() #3
-  %trav_data2 = insertvalue %struct.TraversalData %trav_data, i64 %addr, 5
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data2)
+  %addr = call i32 @_AmdGetResumePointAddr() #3
+  %trav_data2 = insertvalue %struct.TraversalData %trav_data, i32 %addr, 5
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i32 4, %struct.TraversalData %trav_data2)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void

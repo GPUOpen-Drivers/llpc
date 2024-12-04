@@ -88,7 +88,6 @@ public:
   // Dump the module to stderr (for debugging).
   void dump() const;
 
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 494698
   // API used by PassManager.h.
   void setIsNewDbgInfoFormat(bool UseNewFormat) {
     IsNewDbgInfoFormat = UseNewFormat;
@@ -99,7 +98,6 @@ public:
 
   // Public field used by PassManager.h.
   bool IsNewDbgInfoFormat = false;
-#endif
 
 private:
   SmallVector<std::unique_ptr<Module>> Modules;
@@ -171,12 +169,8 @@ private:
 template <typename ModulePassT>
 std::unique_ptr<ModuleBunchToModulePassAdaptor::PassConceptT>
 createForModuleBunchToModulePassAdaptor(ModulePassT Pass) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 488550
-  using PassModelT = detail::PassModel<Module, ModulePassT, PreservedAnalyses, ModuleAnalysisManager>;
-#else
   // Analysis are always preserved.
   using PassModelT = detail::PassModel<Module, ModulePassT, ModuleAnalysisManager>;
-#endif
   return std::unique_ptr<ModuleBunchToModulePassAdaptor::PassConceptT>(new PassModelT(std::forward<ModulePassT>(Pass)));
 }
 

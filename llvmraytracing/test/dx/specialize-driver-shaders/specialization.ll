@@ -15,66 +15,66 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 ; Ignored prefix args: shaderAddr, levels, state, returnAddr, shaderRecIdx
 declare void @lgc.cps.jump(...)
 
-define void @SimpleArray({}, i32 %ret.addr, i32, [4 x i32] %args) !lgc.rt.shaderstage !{i32 6} {
+define void @SimpleArray(i32 %ret.addr, i32, [4 x i32] %args) !lgc.rt.shaderstage !{i32 6} {
 ; CHECK-LABEL: define void @SimpleArray(
-; CHECK-SAME: {} [[TMP0:%.*]], i32 [[RET_ADDR:%.*]], i32 [[TMP1:%.*]], [4 x i32] [[ARGS:%.*]]) !lgc.rt.shaderstage [[META2:![0-9]+]] {
+; CHECK-SAME: i32 [[RET_ADDR:%.*]], i32 [[TMP0:%.*]], [4 x i32] [[ARGS:%.*]]) !lgc.rt.shaderstage [[META2:![0-9]+]] {
 ; CHECK-NEXT:    [[ARGS_SPECIALIZED:%.*]] = insertvalue [4 x i32] [[ARGS]], i32 42, 1
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze i32 poison
 ; CHECK-NEXT:    [[ARGS_SPECIALIZED1:%.*]] = insertvalue [4 x i32] [[ARGS_SPECIALIZED]], i32 [[TMP3]], 2
 ; CHECK-NEXT:    [[TMP4:%.*]] = freeze i32 poison
 ; CHECK-NEXT:    [[ARGS_SPECIALIZED2:%.*]] = insertvalue [4 x i32] [[ARGS_SPECIALIZED1]], i32 [[TMP4]], 3
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, [4 x i32] [[ARGS_SPECIALIZED2]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, [4 x i32] [[ARGS_SPECIALIZED2]])
 ; CHECK-NEXT:    unreachable
 ;
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, [4 x i32] %args)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, [4 x i32] %args)
   unreachable
 }
 
-define void @SimpleScalars({}, i32 %ret.addr, i32, i32 %arg0, i32 %arg1, i32 %arg2, i32 %arg3) !lgc.rt.shaderstage !{i32 6} {
+define void @SimpleScalars(i32 %ret.addr, i32, i32 %arg0, i32 %arg1, i32 %arg2, i32 %arg3) !lgc.rt.shaderstage !{i32 6} {
 ; CHECK-LABEL: define void @SimpleScalars(
-; CHECK-SAME: {} [[TMP0:%.*]], i32 [[RET_ADDR:%.*]], i32 [[TMP1:%.*]], i32 [[ARG0:%.*]], i32 [[ARG1:%.*]], i32 [[ARG2:%.*]], i32 [[ARG3:%.*]]) !lgc.rt.shaderstage [[META2]] {
+; CHECK-SAME: i32 [[RET_ADDR:%.*]], i32 [[TMP0:%.*]], i32 [[ARG0:%.*]], i32 [[ARG1:%.*]], i32 [[ARG2:%.*]], i32 [[ARG3:%.*]]) !lgc.rt.shaderstage [[META2]] {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze i32 poison
 ; CHECK-NEXT:    [[TMP4:%.*]] = freeze i32 poison
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 [[ARG0]], i32 42, i32 [[TMP3]], i32 [[TMP4]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 [[ARG0]], i32 42, i32 [[TMP3]], i32 [[TMP4]])
 ; CHECK-NEXT:    unreachable
 ;
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i32 %arg0, i32 %arg1, i32 %arg2, i32 %arg3)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i32 %arg0, i32 %arg1, i32 %arg2, i32 %arg3)
   unreachable
 }
 
-define void @I16s({}, i32 %ret.addr, i32, i16 %arg0, i16 %arg1, i16 %arg2, i16 %arg3) !lgc.rt.shaderstage !{i32 6} {
+define void @I16s(i32 %ret.addr, i32, i16 %arg0, i16 %arg1, i16 %arg2, i16 %arg3) !lgc.rt.shaderstage !{i32 6} {
 ; CHECK-LABEL: define void @I16s(
-; CHECK-SAME: {} [[TMP0:%.*]], i32 [[RET_ADDR:%.*]], i32 [[TMP1:%.*]], i16 [[ARG0:%.*]], i16 [[ARG1:%.*]], i16 [[ARG2:%.*]], i16 [[ARG3:%.*]]) !lgc.rt.shaderstage [[META2]] {
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i16 [[ARG0]], i16 [[ARG1]], i16 [[ARG2]], i16 [[ARG3]])
+; CHECK-SAME: i32 [[RET_ADDR:%.*]], i32 [[TMP0:%.*]], i16 [[ARG0:%.*]], i16 [[ARG1:%.*]], i16 [[ARG2:%.*]], i16 [[ARG3:%.*]]) !lgc.rt.shaderstage [[META2]] {
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i16 [[ARG0]], i16 [[ARG1]], i16 [[ARG2]], i16 [[ARG3]])
 ; CHECK-NEXT:    unreachable
 ;
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i16 %arg0, i16 %arg1, i16 %arg2, i16 %arg3)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i16 %arg0, i16 %arg1, i16 %arg2, i16 %arg3)
   unreachable
 }
 
 ; Test that even if specialization of i16 arguments is ignored, we still specialize i32s.
-define void @MixedI16I32s({}, i32 %ret.addr, i32, i16 %arg0, i32 %arg1, i16 %arg2, i32 %arg3) !lgc.rt.shaderstage !{i32 6} {
+define void @MixedI16I32s(i32 %ret.addr, i32, i16 %arg0, i32 %arg1, i16 %arg2, i32 %arg3) !lgc.rt.shaderstage !{i32 6} {
 ; CHECK-LABEL: define void @MixedI16I32s(
-; CHECK-SAME: {} [[TMP0:%.*]], i32 [[RET_ADDR:%.*]], i32 [[TMP1:%.*]], i16 [[ARG0:%.*]], i32 [[ARG1:%.*]], i16 [[ARG2:%.*]], i32 [[ARG3:%.*]]) !lgc.rt.shaderstage [[META2]] {
+; CHECK-SAME: i32 [[RET_ADDR:%.*]], i32 [[TMP0:%.*]], i16 [[ARG0:%.*]], i32 [[ARG1:%.*]], i16 [[ARG2:%.*]], i32 [[ARG3:%.*]]) !lgc.rt.shaderstage [[META2]] {
 ; CHECK-NEXT:    [[TMP3:%.*]] = freeze i32 poison
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i16 [[ARG0]], i32 42, i16 [[ARG2]], i32 [[TMP3]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i16 [[ARG0]], i32 42, i16 [[ARG2]], i32 [[TMP3]])
 ; CHECK-NEXT:    unreachable
 ;
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, i16 %arg0, i32 %arg1, i16 %arg2, i32 %arg3)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, i16 %arg0, i32 %arg1, i16 %arg2, i32 %arg3)
   unreachable
 }
 
 ; Test that specializing an arg slot that occupies a full misaligned dword in the argument isn't supported
 ; In this test, the first contained float scalar is specialized, because it is dword-aligned,
 ; but the second isn't, because it is not aligned. This is because i16 and float use 16-bit alignment in this test.
-define void @MisalignedDwords({}, i32 %ret.addr, i32, { i32, float, i16, float, i32 } %args) !lgc.rt.shaderstage !{i32 6} {
+define void @MisalignedDwords(i32 %ret.addr, i32, { i32, float, i16, float, i32 } %args) !lgc.rt.shaderstage !{i32 6} {
 ; CHECK-LABEL: define void @MisalignedDwords(
-; CHECK-SAME: {} [[TMP0:%.*]], i32 [[RET_ADDR:%.*]], i32 [[TMP1:%.*]], { i32, float, i16, float, i32 } [[ARGS:%.*]]) !lgc.rt.shaderstage [[META2]] {
+; CHECK-SAME: i32 [[RET_ADDR:%.*]], i32 [[TMP0:%.*]], { i32, float, i16, float, i32 } [[ARGS:%.*]]) !lgc.rt.shaderstage [[META2]] {
 ; CHECK-NEXT:    [[ARGS_SPECIALIZED:%.*]] = insertvalue { i32, float, i16, float, i32 } [[ARGS]], float 0x36F5000000000000, 1
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, { i32, float, i16, float, i32 } [[ARGS_SPECIALIZED]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, { i32, float, i16, float, i32 } [[ARGS_SPECIALIZED]])
 ; CHECK-NEXT:    unreachable
 ;
-  call void (...) @lgc.cps.jump(i32 poison, i32 poison, {} poison, i32 poison, i32 poison, { i32, float, i16, float, i32 } %args)
+  call void (...) @lgc.cps.jump(i32 poison, i32 poison, i32 poison, i32 poison, { i32, float, i16, float, i32 } %args)
   unreachable
 }
 

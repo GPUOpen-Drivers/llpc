@@ -31,7 +31,7 @@
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm-dialects/Dialect/Visitor.h"

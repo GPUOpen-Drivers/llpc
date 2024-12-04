@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgc/ModuleBunch.h"
+#include "compilerutils/ModuleBunch.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/PassManager.h"
 

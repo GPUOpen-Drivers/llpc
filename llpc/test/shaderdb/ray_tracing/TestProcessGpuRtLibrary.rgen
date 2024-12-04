@@ -1,0 +1,16 @@
+// RUN: amdllpc %gfxip --print-after=lower-gpurt-library 2>&1 %s | FileCheck -check-prefix=CHECK %s
+#version 460
+#extension GL_EXT_ray_tracing : enable
+
+void main()
+{
+}
+// Check these _Amd intrinsics's bodies are deleted.
+// CHECK: declare dso_local spir_func i32 @_AmdGetShaderKind()
+// CHECK: declare dso_local spir_func i32 @_AmdGetResumePointAddr()
+// CHECK: declare dso_local spir_func {{.*}} @_AmdAwait{{.*}}(
+
+// Check these functions started with `_Amd` but are not intrinsics are preserved
+// CHECK-NOT: declare dso_local spir_func {{.*}} @_AmdSystemData.{{.*}}(
+// CHECK-NOT: declare dso_local spir_func {{.*}} @_AmdDispatchSystemData.{{.*}}(
+// CHECK-NOT: declare dso_local spir_func {{.*}} @_AmdPrimitiveSystemState.{{.*}}(

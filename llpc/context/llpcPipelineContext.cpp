@@ -712,6 +712,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
                 "Mismatch");
   shaderOptions.aggressiveInvariantLoads =
       static_cast<InvariantLoadsOption>(shaderInfo.options.aggressiveInvariantLoads);
+  shaderOptions.viewIndexFromDeviceIndex = shaderInfo.options.viewIndexFromDeviceIndex;
 
   return shaderOptions;
 }

@@ -37,7 +37,7 @@ void main()
 // SHADERTEST-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(7) [[TMP6]], align 4
 // SHADERTEST-NEXT:    [[TMP8:%.*]] = icmp ne i32 [[TMP2]], [[TMP7]]
 // SHADERTEST-NEXT:    [[TMP9:%.*]] = and i1 [[TMP8]], [[TMP5]]
-// SHADERTEST-NEXT:    [[TMP10:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP9]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+// SHADERTEST-NEXT:    [[TMP10:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP9]], <4 x float> zeroinitializer, <4 x float> {{(splat \(float 1\.000000e\+00\))|(<float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00, float 1\.000000e\+00>)}}
 // SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP10]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // SHADERTEST-NEXT:    ret void
 //

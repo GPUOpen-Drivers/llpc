@@ -39,11 +39,11 @@ class LgcCpsOp<string mnemonic_, list<Trait> traits_>
 def StackPointer : TgConstant<(PointerType 32)>, Type;
 
 // A pointer to a CPS function, combined with additional metadata
-def ContinuationReference : TgConstant<(or I32, I64)>, Type;
+def ContinuationReference : TgConstant<(I32)>, Type;
 
 // =====================================================================================================================
 def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
-    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, value:$state, I32:$csp, ContinuationReference:$rcr, varargs:$tail);
+    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, I32:$csp, ContinuationReference:$rcr, varargs:$tail);
     let results = (outs);
 
     let summary = "Jump to a CPS function.";
@@ -51,7 +51,6 @@ def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
         Jump to a CPS function via:
             * target, the continuation reference
             * levels, a bitmask of levels in which target may run
-            * state, which is pushed to the continuation stack before jumping,
             * csp, continuation stack pointer,
             * rcr, a continuation reference the called function can potentially return to
             * an arbitrary set of arguments appended to the tail of the argument list.
@@ -90,8 +89,6 @@ def CompleteOp : LgcCpsOp<"complete", [NoReturn]> {
 def AsContinuationReferenceOp : LgcCpsOp<"as.continuation.reference", [NoUnwind, WillReturn]> {
     let arguments = (ins PointerType:$fn);
     let results = (outs ContinuationReference:$ref);
-
-    let defaultBuilderHasExplicitResultType = true;
 
     let summary = "Obtain a continuation reference from a function pointer.";
     let description = [{

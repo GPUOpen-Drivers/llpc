@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  ApplyWorkarounds.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchWorkarounds.
+ * @brief LLPC source file: contains implementation of class lgc::ApplyWorkarounds.
  ***********************************************************************************************************************
  */
 
@@ -39,7 +39,7 @@
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "lgc-patch-workarounds"
+#define DEBUG_TYPE "lgc-apply-workarounds"
 
 using namespace lgc;
 using namespace llvm;
@@ -52,7 +52,7 @@ namespace lgc {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchWorkarounds::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses ApplyWorkarounds::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
 
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Workarounds\n");
@@ -76,7 +76,7 @@ PreservedAnalyses PatchWorkarounds::run(Module &module, ModuleAnalysisManager &a
 // be an image descriptor. We only have to apply the workaround for gfx10.1 (note: this is an application error that
 // are handling gracefully)
 //
-void PatchWorkarounds::applyImageDescWorkaround(void) {
+void ApplyWorkarounds::applyImageDescWorkaround(void) {
   if (!m_pipelineState->getOptions().disableImageResourceCheck &&
       m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waFixBadImageDescriptor) {
 
@@ -128,7 +128,7 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
 //
 // @param callInst  : The image intrinsic call instruction
 // @param isLastUse : The intrinsic being considered is a waterfall.last.use
-void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLastUse) {
+void ApplyWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLastUse) {
   Function *const calledFunc = callInst.getCalledFunction();
   if (!calledFunc)
     return;

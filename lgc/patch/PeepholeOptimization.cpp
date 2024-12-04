@@ -25,12 +25,12 @@
 /**
  ***********************************************************************************************************************
  * @file  PeepholeOptimization.cpp
- * @brief LLPC source file: contains implementation of class lgc::PatchPeepholeOpt.
+ * @brief LLPC source file: contains implementation of class lgc::PeepholeOptimization.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PeepholeOptimization.h"
 #include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/PatternMatch.h"
@@ -38,7 +38,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "lgc-patch-peephole-opt"
+#define DEBUG_TYPE "lgc-peephole-optimization"
 
 using namespace lgc;
 using namespace llvm;
@@ -52,8 +52,8 @@ namespace lgc {
 // @param [in/out] function : Function that we will peephole optimize.
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchPeepholeOpt::run(Function &function, FunctionAnalysisManager &analysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
+PreservedAnalyses PeepholeOptimization::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the pass Peephole optimization\n");
 
   m_changed = false;
 
@@ -85,7 +85,7 @@ PreservedAnalyses PatchPeepholeOpt::run(Function &function, FunctionAnalysisMana
 // Reference: https://groups.google.com/g/llvm-dev/c/x4K7ppGLbg8/m/f_3NySRhjlcJ
 
 // @param intToPtr: The "inttoptr" instruction to visit.
-void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
+void PeepholeOptimization::visitIntToPtr(IntToPtrInst &intToPtr) {
   // Check if we are using add to do pointer arithmetic.
   auto *const binaryOperator = dyn_cast<BinaryOperator>(intToPtr.getOperand(0));
   if (!binaryOperator || binaryOperator->getOpcode() != Instruction::Add)
@@ -144,7 +144,7 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
 // This addresses a potential precision underflow in applications intolerant to in-spec math reordering.
 //
 // @param callInst: The call instruction to visit.
-void PatchPeepholeOpt::visitCallInst(CallInst &callInst) {
+void PeepholeOptimization::visitCallInst(CallInst &callInst) {
   if (callInst.getIntrinsicID() != Intrinsic::log2)
     return;
 

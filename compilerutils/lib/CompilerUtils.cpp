@@ -27,6 +27,7 @@
 #include "ValueOriginTrackingTestPass.h"
 #include "ValueSpecializationTestPass.h"
 #include "compilerutils/DxilToLlvm.h"
+#include "compilerutils/DxilUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Attributes.h"
@@ -124,10 +125,8 @@ Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType,
   } else {
     // Insert new function before f to facilitate writing tests
     f.getParent()->getFunctionList().insert(f.getIterator(), newFunc);
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
     // If targetModule is null then take flag from original function.
     newFunc->setIsNewDbgInfoFormat(f.IsNewDbgInfoFormat);
-#endif
   }
 
   newFunc->copyAttributesFrom(&f);
@@ -161,6 +160,64 @@ void CompilerUtils::createUnreachable(llvm::IRBuilder<> &b) {
 
 void CompilerUtils::setIsLastUseLoad(llvm::LoadInst &Load) {
   Load.setMetadata(MDIsLastUseName, MDTuple::get(Load.getContext(), {}));
+}
+
+// =====================================================================================================================
+// Ensures that the given function has a single, unified return point. This function modifies the LLVM IR to create a
+// single return block for functions with multiple return statements.
+//
+// @param function: The Function to modify
+// @param builder: An IRBuilder instance used for inserting new instructions
+// @param blockName: The name to give to the new unified return block
+llvm::ReturnInst *CompilerUtils::unifyReturns(Function &function, llvm::IRBuilder<> &builder, const Twine &blockName) {
+  SmallVector<ReturnInst *> retInsts;
+
+  for (BasicBlock &block : function) {
+    if (auto *retInst = dyn_cast<ReturnInst>(block.getTerminator()))
+      retInsts.push_back(retInst);
+  }
+
+  // It is expected when unifyReturns is called, the input function should not be empty, it is expected to have at
+  // least one return instruction.
+  assert(!retInsts.empty() && "Function has no return instruction");
+  if (retInsts.size() == 1) {
+    return retInsts[0];
+  }
+
+  // There are more than 2 returns; create a unified return block.
+  //
+  // Also create a "unified return block" if there are no returns at all. Such a shader will surely hang or otherwise
+  // trigger UB if it is ever executed, but we still need to compile it correctly in case it never runs.
+  BasicBlock *retBlock = BasicBlock::Create(builder.getContext(), blockName, &function);
+  Type *returnType = function.getReturnType();
+  PHINode *phiNode = nullptr;
+
+  // If the function has multiple returns and a non-void return type, create a PHI node to collect the return values
+  // from different paths.
+  if (!returnType->isVoidTy()) {
+    builder.SetInsertPoint(retBlock);
+    phiNode = builder.CreatePHI(returnType, retInsts.size(), "retval");
+  }
+
+  for (ReturnInst *retInst : retInsts) {
+    BasicBlock *predBlock = retInst->getParent();
+    Value *retVal = retInst->getReturnValue();
+
+    builder.SetInsertPoint(retInst);
+    builder.CreateBr(retBlock);
+
+    if (phiNode)
+      phiNode->addIncoming(retVal, predBlock);
+
+    retInst->eraseFromParent();
+  }
+
+  builder.SetInsertPoint(retBlock);
+
+  if (returnType->isVoidTy())
+    return builder.CreateRetVoid();
+  else
+    return builder.CreateRet(phiNode);
 }
 
 namespace {
@@ -295,17 +352,13 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
 
   // Copy code
   InlineFunctionInfo ifi;
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
   // calleeFunc is not from targetMod, check if we need to convert it.
   bool shouldConvert = !calleeFunc->IsNewDbgInfoFormat && targetMod->IsNewDbgInfoFormat;
   if (shouldConvert)
     calleeFunc->convertToNewDbgValues();
-#endif
   auto res = InlineFunction(cb, ifi);
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
   if (shouldConvert)
     calleeFunc->convertFromNewDbgValues();
-#endif
   if (!res.isSuccess())
     report_fatal_error(Twine("Failed to inline ") + calleeFunc->getName() + ": " + res.getFailureReason());
 
@@ -475,13 +528,7 @@ std::string CrossModuleInliner::getCrossModuleName(GlobalValue &gv) {
 }
 
 PointerType *llvm::getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace) {
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 482880
-  return PointerType::getWithSamePointeeType(ptrTy, addressSpace);
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
   return PointerType::get(ptrTy->getContext(), addressSpace);
-#endif
 }
 
 void CrossModuleInliner::checkTargetModule(llvm::Module &targetModule) {

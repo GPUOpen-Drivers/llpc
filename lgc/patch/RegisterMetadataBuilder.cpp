@@ -1060,15 +1060,10 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStageEnum shaderStage) {
 
   // Only check X dimension of original size
   if (computeMode.origWorkgroupSizeX) {
-    if (foldWorkgroupXY) {
-      workgroupSizes[0] = computeMode.origWorkgroupSizeX * computeMode.origWorkgroupSizeY;
-      workgroupSizes[1] = computeMode.origWorkgroupSizeZ;
-      workgroupSizes[2] = 1;
-    } else {
-      workgroupSizes[0] = computeMode.origWorkgroupSizeX;
-      workgroupSizes[1] = computeMode.origWorkgroupSizeY;
-      workgroupSizes[2] = computeMode.origWorkgroupSizeZ;
-    }
+    workgroupSizes[0] = computeMode.origWorkgroupSizeX;
+    workgroupSizes[1] = computeMode.origWorkgroupSizeY;
+    workgroupSizes[2] = computeMode.origWorkgroupSizeZ;
+
     setOrigThreadgroupDimensions(workgroupSizes);
   }
 }

@@ -401,6 +401,7 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
     CASE_SUBSECTION(MemberTypeUniformConstantMap, SectionUniformConstantMap)
+    CASE_SUBSECTION(MemberTypeOutputLocationMap, SectionOutputLocationMap)
     CASE_SUBSECTION(MemberTypeUniformConstantMapEntry, SectionUniformConstantMapEntry)
     CASE_SUBSECTION(MemberTypeXfbOutInfo, SectionXfbOutInfo)
     CASE_SUBSECTION(MemberTypeShaderGroup, SectionShaderGroup)

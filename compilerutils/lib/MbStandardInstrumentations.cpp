@@ -28,7 +28,7 @@
 // Most code here is copied from LLVM's StandardInstrumentations.cpp and
 // edited.
 
-#include "lgc/MbStandardInstrumentations.h"
+#include "compilerutils/MbStandardInstrumentations.h"
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -444,28 +444,14 @@ MbStandardInstrumentations::MbStandardInstrumentations(bool DebugLogging, bool V
 }
 
 // Copied from LLVM's StandardInstrumentations.cpp and edited.
-void MbStandardInstrumentations::registerCallbacks(
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 454783
-    // Old version of the code
-    PassInstrumentationCallbacks &PIC, FunctionAnalysisManager *FAM) {
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
-    PassInstrumentationCallbacks &PIC, ModuleAnalysisManager *MAM) {
-#endif
+void MbStandardInstrumentations::registerCallbacks(PassInstrumentationCallbacks &PIC, ModuleAnalysisManager *MAM) {
   PrintIR.registerCallbacks(PIC);
   PrintPass.registerCallbacks(PIC);
   TimePasses.registerCallbacks(PIC);
   OptNone.registerCallbacks(PIC);
   // OptPassGate.registerCallbacks(PIC);
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 454783
-  // Old version of the code
-  if (FAM)
-    PreservedCFGChecker.registerCallbacks(PIC, *FAM);
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   if (MAM)
     PreservedCFGChecker.registerCallbacks(PIC, *MAM);
-#endif
   PrintChangedIR.registerCallbacks(PIC);
   PseudoProbeVerification.registerCallbacks(PIC);
   if (VerifyEach)

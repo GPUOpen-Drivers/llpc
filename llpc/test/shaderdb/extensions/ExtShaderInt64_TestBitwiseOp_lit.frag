@@ -28,7 +28,7 @@ void main()
 ; SHADERTEST: or <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: and <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: xor <3 x i64> %{{[0-9]*}}, %{{[0-9]*}}
-; SHADERTEST: xor <3 x i64> %{{[0-9]*}}, <i64 -1, i64 -1, i64 -1>
+; SHADERTEST: xor <3 x i64> %{{[0-9]*}}, {{(splat \(i64 -1\))|(<i64 -1, i64 -1, i64 -1>)}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -23,7 +23,7 @@
  *
  **********************************************************************************************************************/
 
-//===- DXILContIntrinsicPrepare.cpp - Change signature of functions -------===//
+//===- DXILContPrepareGpurtLibrary.cpp - Change signature of functions -------===//
 //
 // A pass that prepares driver implemented functions for later use.
 //
@@ -43,13 +43,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include <cassert>
-#include <cctype>
 
 using namespace llvm;
 
-#define DEBUG_TYPE "dxil-cont-intrinsic-prepare"
+#define DEBUG_TYPE "dxil-cont-prepare-gpurt-library"
 
-DXILContIntrinsicPreparePass::DXILContIntrinsicPreparePass() {
+DXILContPrepareGpurtLibraryPass::DXILContPrepareGpurtLibraryPass() {
 }
 
 /// - Unmangle the function names to be more readable and to prevent confusion
@@ -184,9 +183,9 @@ static void handleGetShaderRecordIndex(llvm_dialects::Builder &B, Function &Func
   });
 }
 
-llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(llvm::Module &M,
-                                                          llvm::ModuleAnalysisManager &AnalysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the dxil-cont-intrinsic-prepare pass\n");
+llvm::PreservedAnalyses DXILContPrepareGpurtLibraryPass::run(llvm::Module &M,
+                                                             llvm::ModuleAnalysisManager &AnalysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the dxil-cont-prepare-gpurt-library pass\n");
 
   AnalysisManager.getResult<DialectContextAnalysis>(M);
 

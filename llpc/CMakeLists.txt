@@ -42,96 +42,9 @@ if(ICD_BUILD_LLPC)
     set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
-### Set Options and build LLVM #########################################################################################
+### Link against LLVM and the components we build as LLVM external projects ############################################
 if(ICD_BUILD_LLPC)
-    # Add LGC and its dependencies as LLVM external projects.
-    include("../cmake/lgc.cmake")
-    add_lgc_projects()
-
-    # Set other LLVM settings.
-    set(LLVMRAYTRACING_BUILD_TESTS ${LLPC_BUILD_TESTS})
-    set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING "LLVM targets to build")
-    set(LLVM_BUILD_TESTS OFF CACHE BOOL "LLVM build tests")
-    set(LLVM_BUILD_TOOLS ${LLPC_BUILD_LLVM_TOOLS} CACHE BOOL "LLVM build tools")
-    set(LLVM_BUILD_UTILS OFF CACHE BOOL "LLVM build utils")
-    set(LLVM_INCLUDE_DOCS OFF CACHE BOOL "LLVM include docs")
-    set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "LLVM include examples")
-    set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL "LLVM include go tests")
-    set(LLVM_INCLUDE_TESTS ${LLPC_BUILD_TESTS} CACHE BOOL "LLVM include tests")
-    set(LLVM_INCLUDE_TOOLS ON CACHE BOOL "LLVM include tools")
-    set(LLVM_INCLUDE_UTILS ON CACHE BOOL "LLVM include utils")
-    set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "LLVM enable terminfo")
-    set(LLVM_RAM_PER_TABLEGEN_JOB 4000 CACHE STRING "LLVM RAM per tablegen job")
-    set(LLVM_RAM_PER_LINK_JOB 5000 CACHE STRING "LLVM RAM per link job")
-    if(CMAKE_BUILD_TYPE_DEBUG)
-        # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
-        set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "Build optimized llvm-tblgen")
-#if _WIN32
-        if(LLVM_OPTIMIZED_TABLEGEN AND WIN32 AND (CMAKE_GENERATOR MATCHES "Ninja"))
-            # LLVM implements the Release build of llvm-tblgen as a cross-compile target, which fails to find
-            # our DK-based toolchain (created with amd_generate_msvc_toolchain). However, we can inject the toolchain
-            # argument into LLVM's add_custom_target that sets up this cross-compile build.
-            # See: llvm-project/llvm/cmake/modules/CrossCompile.cmake
-            set(CROSS_TOOLCHAIN_FLAGS_NATIVE "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" CACHE STRING
-                "Toolchain flags for native build" FORCE)
-        endif()
-#endif
-    endif()
-
-    # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
-    set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL "LLVM build LLVM-C dylib")
-
-    if(EXISTS ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm)
-        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../../imported/llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
-    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm)
-        set(XGL_LLVM_SRC_PATH ${PROJECT_SOURCE_DIR}/../../llvm-project/llvm CACHE PATH "Specify the path to the LLVM.")
-    endif()
-
-    add_subdirectory(${XGL_LLVM_SRC_PATH} ${PROJECT_BINARY_DIR}/llvm)
-    set(XGL_LLVM_BUILD_PATH ${PROJECT_BINARY_DIR}/llvm)
-    # Export the LLVM build path so that it's available in XGL.
-    set(XGL_LLVM_BUILD_PATH ${XGL_LLVM_BUILD_PATH} PARENT_SCOPE)
-
-    if (LLVM_LINK_LLVM_DYLIB)
-        # Link dynamically against libLLVM-${version}.so
-        target_link_libraries(llpcinternal PUBLIC LLVM)
-    else()
-        # Link statically against the required component libraries
-        llvm_map_components_to_libnames(llvm_libs
-            AMDGPUAsmParser
-            AMDGPUCodeGen
-            AMDGPUDisassembler
-            AMDGPUInfo
-            Analysis
-            BinaryFormat
-            Core
-            Coroutines
-            LTO
-            ipo
-            BitReader
-            BitWriter
-            CodeGen
-            InstCombine
-            IRPrinter
-            IRReader
-            Linker
-            MC
-            Passes
-            ScalarOpts
-            Support
-            Target
-            TransformUtils
-        )
-        # Some of the games using old versions of the tcmalloc lib are crashing
-        # when allocating aligned memory. C++17 enables aligned new by default,
-        # so we need to disable it to prevent those crashes.
-        if(NOT WIN32)
-            foreach (lib ${llvm_libs})
-                target_compile_options(${lib} PRIVATE "-fno-aligned-new")
-            endforeach()
-        endif()
-        target_link_libraries(llpcinternal PUBLIC ${llvm_libs})
-    endif()
+    target_link_libraries(llpcinternal PUBLIC ${LLPC_LLVM_LIBS})
 
     # Always link statically against libLLVMlgc
     llvm_map_components_to_libnames(extra_llvm_libs lgc Raytracing)
@@ -173,10 +86,6 @@ endif()
 
 ### Defines/Includes/Sources ###########################################################################################
 if(ICD_BUILD_LLPC)
-    list(APPEND CMAKE_MODULE_PATH
-        "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm"
-        "${XGL_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/lib/cmake/llvm" # Workaround for VS generator with older LLVM.
-    )
     include(LLVMConfig)
     message(STATUS "LLVM executables: " ${LLVM_TOOLS_BINARY_DIR})
     message(STATUS "LLVM libraries: " ${LLVM_BUILD_LIBRARY_DIR})
@@ -192,12 +101,6 @@ target_compile_definitions(llpcinternal PRIVATE _SPIRV_LLVM_API)
 target_compile_definitions(llpcinternal PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
 if(ICD_BUILD_LLPC)
     target_compile_definitions(llpcinternal PRIVATE ICD_BUILD_LLPC)
-endif()
-
-if(ICD_BUILD_LLPC)
-    if(XGL_LLVM_UPSTREAM)
-        target_compile_definitions(llpcinternal PRIVATE XGL_LLVM_UPSTREAM)
-    endif()
 endif()
 
 #if _WIN32
@@ -388,9 +291,11 @@ target_link_libraries(llpcinternal PUBLIC
     khronos_spirv_interface
 )
 
-if(VKI_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
+#if LLPC_RAY_TRACING
+if(LLPC_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
     target_link_libraries(llpcinternal PRIVATE vkgc_gpurtshim)
 endif()
+#endif
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

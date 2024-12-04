@@ -128,9 +128,9 @@ void LowerTerminator::visitCallInst(CallInst &callInst) {
   auto returnType = parentBlock->getParent()->getReturnType();
   if (returnType && !returnType->isVoidTy()) {
     auto returnValue = PoisonValue::get(returnType);
-    ReturnInst::Create(*m_context, returnValue, &*instIter);
+    ReturnInst::Create(*m_context, returnValue, instIter);
   } else {
-    ReturnInst::Create(*m_context, nullptr, &*instIter);
+    ReturnInst::Create(*m_context, nullptr, instIter);
   }
 
   // Mark all other instructions for removal

@@ -8,7 +8,7 @@ define <8 x float> @convert_f16_to_accumulator(<8 x float> %fact) {
 ; CHECK-NEXT:    [[TMP3:%.*]] = and i32 [[TMP2]], 1
 ; CHECK-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[TMP3]], 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = bitcast <8 x float> [[FACT:%.*]] to <8 x i32>
-; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[TMP4]], <8 x i32> zeroinitializer, <8 x i32> <i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16>
+; CHECK-NEXT:    [[TMP6:%.*]] = select i1 [[TMP4]], <8 x i32> zeroinitializer, <8 x i32> {{(splat \(i32 16\))|(<i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16>)}}
 ; CHECK-NEXT:    [[ACCUM1:%.*]] = lshr <8 x i32> [[TMP5]], [[TMP6]]
 ; CHECK-NEXT:    [[ACCUM2:%.*]] = bitcast <8 x i32> [[ACCUM1]] to <8 x float>
 ; CHECK-NEXT:    [[TMP7:%.*]] = shufflevector <8 x float> [[ACCUM2]], <8 x float> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
@@ -60,8 +60,8 @@ define <8 x float> @convert_f16_to_factor(<8 x float> %accum) {
 ; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <8 x i32> [[TMP37]], i32 [[TMP30]], i64 7
 ; CHECK-NEXT:    [[TMP39:%.*]] = select i1 [[TMP5]], <8 x i32> [[TMP6]], <8 x i32> [[TMP38]]
 ; CHECK-NEXT:    [[TMP40:%.*]] = select i1 [[TMP5]], <8 x i32> [[TMP38]], <8 x i32> [[TMP6]]
-; CHECK-NEXT:    [[TMP41:%.*]] = and <8 x i32> [[TMP39]], <i32 65535, i32 65535, i32 65535, i32 65535, i32 65535, i32 65535, i32 65535, i32 65535>
-; CHECK-NEXT:    [[TMP42:%.*]] = shl <8 x i32> [[TMP40]], <i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16>
+; CHECK-NEXT:    [[TMP41:%.*]] = and <8 x i32> [[TMP39]], {{(splat \(i32 65535\))|(<i32 65535, i32 65535, i32 65535, i32 65535, i32 65535, i32 65535, i32 65535, i32 65535>)}}
+; CHECK-NEXT:    [[TMP42:%.*]] = shl <8 x i32> [[TMP40]], {{(splat \(i32 16\))|(<i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16, i32 16>)}}
 ; CHECK-NEXT:    [[TMP43:%.*]] = or <8 x i32> [[TMP41]], [[TMP42]]
 ; CHECK-NEXT:    [[TMP44:%.*]] = bitcast <8 x i32> [[TMP43]] to <8 x float>
 ; CHECK-NEXT:    ret <8 x float> [[TMP44]]

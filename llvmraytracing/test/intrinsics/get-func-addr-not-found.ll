@@ -1,3 +1,4 @@
+; NOTE: Do not autogenerate
 ; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: ERROR: Did not find function '' requested by _AmdGetFuncAddr
@@ -5,7 +6,7 @@
 %struct.DispatchSystemData = type { i32 }
 %struct.TraversalData = type { }
 
-declare i64 @_AmdGetFuncAddr()
+declare i32 @_AmdGetFuncAddr()
 
 declare !pointeetys !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare !pointeetys !8 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
@@ -15,10 +16,10 @@ define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwin
   ret void
 }
 
-define i64 @main() {
+define i32 @main() {
 entry:
-  %val = call i64 @_AmdGetFuncAddr()
-  ret i64 %val
+  %val = call i32 @_AmdGetFuncAddr()
+  ret i32 %val
 }
 
 !dx.entryPoints = !{!0, !3}

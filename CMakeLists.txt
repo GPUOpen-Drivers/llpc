@@ -25,7 +25,7 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-project(VKGC LANGUAGES C CXX)
+project(LLPCrepo LANGUAGES C CXX)
 
 ### Standalone LLPC build handling
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -33,104 +33,52 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(LLPC_IS_STANDALONE ON)
 endif()
 
+### Find LLVM (needed by llpc_version.cmake).
+include("cmake/findllvm.cmake")
+
 ### Version info ###
 include(cmake/llpc_version.cmake)
-if(NOT ICD_BUILD_LLPC)
-    set(DISABLE_LLPC_VERSION_USES_LLVM ON)
-endif()
 
 add_llpc_version_projects()
 
-### Top-level VKGC Interface ###
-add_library(vkgc INTERFACE)
-
-### VKGC header-only library ###
-add_library(vkgc_headers INTERFACE)
-
-target_link_libraries(vkgc_headers INTERFACE llpc_version)
-
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
-### Options that affect the headers ####################################################################################
-#if VKI_BUILD_GFX11
-if(LLPC_BUILD_GFX11)
-    target_compile_definitions(vkgc_headers INTERFACE VKI_BUILD_GFX11)
-endif()
+
+#if LLPC_RAY_TRACING
+option(LLPC_RAY_TRACING "Enable raytracing" OFF)
+#endif
+#if LLPC_AMD_YUV_IMAGE
+option(LLPC_AMD_YUV_IMAGE "Build with AMD_YUV_IMAGE" OFF)
+#endif
+#if LLPC_AMD_LVR_INTEROP
+option(LLPC_AMD_LVR_INTEROP "Build with AMD_LVR_INTEROP" OFF)
 #endif
 
-if(VKI_RAY_TRACING)
-    if(NOT LLPC_IS_STANDALONE)
-        target_compile_definitions(vkgc_headers INTERFACE HAVE_GPURT_SHIM)
-    endif()
-
-    target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
-    target_compile_definitions(vkgc_headers INTERFACE GPURT_CLIENT_INTERFACE_MAJOR_VERSION=${GPURT_CLIENT_INTERFACE_MAJOR_VERSION})
-endif()
-
-target_link_libraries(vkgc INTERFACE vkgc_headers)
-
-### Expose header files ################################################################################################
-target_include_directories(vkgc_headers
-    INTERFACE
-        ${PROJECT_SOURCE_DIR}/include
+### VKGC aspects ###################################################################
+# For drivers that use VKGC, as the interface to the LLPC front-end
+if (FALSE
+          OR ICD_BUILD_LLPC
 )
+    include("cmake/vkgc.cmake")
+endif()
 
-### external SPIRV headers #########################################################
-if (NOT SPIRV_HEADERS_PATH)
-    if(EXISTS ${PROJECT_SOURCE_DIR}/../SPIRV-Headers)
-        set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
-    elseif(EXISTS ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers)
-        set(SPIRV_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../../../../SPIRV-Headers CACHE PATH "The path of SPIRV headers.")
+### LGC for LLPC ###################################################################
+if (ICD_BUILD_LLPC)
+    # Add LGC and its dependencies as LLVM external projects for LLPC to use.
+    include("cmake/lgc.cmake")
+    add_lgc_projects()
+endif()
+
+### LLVM ###########################################################################
+if (LLVM_EXTERNAL_PROJECTS)
+    if (ICD_BUILD_LLPC AND LLPC_BUILD_TESTS)
+        set(LLVM_INCLUDE_TESTS ON CACHE BOOL "Force enable LLVM_INCLUDE_TESTS to include gmock" FORCE)
     endif()
+    # Build LLVM.
+    include("cmake/llvm.cmake")
 endif()
 
-### Interface Target ###################################################################################################
-### SPIRV Interface ###
-add_library(khronos_spirv_interface INTERFACE)
-
-if(EXISTS ${SPIRV_HEADERS_PATH})
-    target_include_directories(khronos_spirv_interface
-        INTERFACE
-            ${SPIRV_HEADERS_PATH}/include
-            ${PROJECT_SOURCE_DIR}/include/khronos
-    )
-    if (NOT SPIRV_HEADERS_PATH_INTERNAL)
-        target_compile_definitions(khronos_spirv_interface
-            INTERFACE
-                EXTERNAL_SPIRV_HEADERS=1
-        )
-    endif()
-else()
-    target_include_directories(khronos_spirv_interface
-        INTERFACE
-            ${PROJECT_SOURCE_DIR}/include/khronos
-    )
-endif()
-
-if(LLPC_BUILD_TOOLS)
-# SPVGEN
-if(EXISTS ${PROJECT_SOURCE_DIR}/../spvgen)
-    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../spvgen CACHE PATH "Specify the path to SPVGEN.")
-elseif(EXISTS ${PROJECT_SOURCE_DIR}/../xgl/tools/spvgen)
-    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../xgl/tools/spvgen CACHE PATH "Specify the path to SPVGEN.")
-else()
-    set(XGL_SPVGEN_PATH ${PROJECT_SOURCE_DIR}/../../../tools/spvgen CACHE PATH "Specify the path to SPVGEN.")
-endif()
-
-if(EXISTS ${XGL_SPVGEN_PATH})
-    set(XGL_SPVGEN_BUILD_PATH ${CMAKE_BINARY_DIR}/spvgen)
-    add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
-endif()
-
-endif(LLPC_BUILD_TOOLS)
-
-if(ICD_BUILD_LLPC)
-    # Generate Strings for LLPC standalone tool and vkgc_gpurtshim
-    add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
-    add_subdirectory(gfxruntime ${PROJECT_BINARY_DIR}/gfxruntime)
-endif()
-
-### VKGC build LLPC ################################################################
+### Build LLPC #####################################################################
 if(ICD_BUILD_LLPC)
     include("cmake/compilerutils.cmake")
     add_compilerutils_projects()
@@ -144,7 +92,6 @@ if(ICD_BUILD_LLPC)
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
     if(LLPC_BUILD_TESTS)
-        set(LLVM_INCLUDE_TESTS ON CACHE BOOL "Force enable LLVM_INCLUDE_TESTS to include gmock" FORCE)
         add_subdirectory(test)
     endif()
 
@@ -179,9 +126,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     if(ICD_BUILD_LLPC)
         set_property(TARGET llpc PROPERTY FOLDER Compiler)
         set_property(TARGET llpcinternal PROPERTY FOLDER Compiler)
-        if(VKI_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
+#if LLPC_RAY_TRACING
+        if(LLPC_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
             set_property(TARGET vkgc_gpurtshim PROPERTY FOLDER Compiler)
         endif()
+#endif
         set_property(TARGET vkgc_util PROPERTY FOLDER Compiler)
         if (LLPC_BUILD_TOOLS)
             set_property(TARGET amdllpc PROPERTY FOLDER Compiler)

@@ -343,8 +343,12 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
       SmallVector<Value *> args;
       args.push_back(shaderIdentifier);
       args.push_back(m_shaderRecordIndex);
-      for (unsigned i = 0; i < TraceParam::Count; ++i)
-        args.push_back(m_traceParams[i]);
+      for (unsigned i = 0; i < TraceParam::Count; ++i) {
+        if (i == TraceParam::HitAttributes)
+          args.push_back(inst.getAttributes());
+        else
+          args.push_back(m_traceParams[i]);
+      }
 
       createAnyHitFunc(shaderIdentifier, m_shaderRecordIndex);
       m_builder->CreateNamedCall(RtName::CallAnyHitShader, m_builder->getVoidTy(), args,
@@ -362,6 +366,17 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
     Value *endRay = m_builder->CreateOr(endFromAhs, endFromRayFlags);
 
     {
+      IRBuilderBase::InsertPointGuard ipg(*m_builder);
+      // Snapshot hit attribute, so that CHS sees the same value as the AHS that accepted the hit.
+      Instruction *endAccepted = SplitBlockAndInsertIfThen(accepted, m_builder->GetInsertPoint(), false);
+      m_builder->SetInsertPoint(endAccepted);
+
+      m_builder->CreateMemCpy(m_traceParams[TraceParam::HitAttributes], Align(4), inst.getAttributes(), Align(4),
+                              inst.getSize());
+    }
+
+    {
+      IRBuilderBase::InsertPointGuard ipg(*m_builder);
       // Accept the hit and end the ray for one reason or another. Immediately return from the IS.
       Instruction *endEndRay = SplitBlockAndInsertIfThen(endRay, m_builder->GetInsertPoint(), true);
       m_builder->SetInsertPoint(endEndRay);
@@ -371,7 +386,6 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
       m_builder->CreateRetVoid();
       endEndRay->eraseFromParent(); // erase `unreachable`
     }
-    m_builder->SetInsertPoint(endThitAccept); // also reset the insert block
 
     // Restore the old committed hit if the candidate wasn't accepted
     Value *newTCurrent =
@@ -1158,6 +1172,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
   auto endBlock = BasicBlock::Create(*m_context, ".end", func);
 
   lgc::Pipeline::markShaderEntryPoint(func, lgc::ShaderStage::Compute);
+  lgc::rt::setLgcRtShaderStage(func, lgc::rt::RayTracingShaderStage::KernelEntry);
 
   // Construct entry block guard the launchId from launchSize
   m_builder->SetInsertPoint(entryBlock);
@@ -1515,7 +1530,6 @@ void SpirvLowerRayTracing::inlineTraceRay(llvm::CallInst *callInst, ModuleAnalys
   auto &psi = analysisManager.getResult<ProfileSummaryAnalysis>(*m_module);
   auto calleeFunc = callInst->getCalledFunction();
   auto callingFunc = callInst->getCaller();
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
   // Check if conversion to NewDbgFormat is needed for calleeFunc.
   // If we are inside PassManger then m_module and all its Functions and BB may be converted (depending if feature is
   // turned on) to new Debug Info format. Since calleeFunc is a new function which will be added/inlined into m_module,
@@ -1526,7 +1540,6 @@ void SpirvLowerRayTracing::inlineTraceRay(llvm::CallInst *callInst, ModuleAnalys
   bool shouldConvert = m_module->IsNewDbgInfoFormat && !calleeFunc->IsNewDbgInfoFormat;
   if (shouldConvert)
     calleeFunc->convertToNewDbgValues();
-#endif
   InlineFunctionInfo IFI(getAssumptionCache, &psi, &getBFI(*callingFunc), &getBFI(*calleeFunc));
   InlineResult res = InlineFunction(*callInst, IFI, /*MergeAttributes=*/true, &getAAR(*calleeFunc), true);
   (void(res)); // unused
@@ -1738,9 +1751,7 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
   createTraceParams(func);
   func->getArg(0)->replaceAllUsesWith(m_traceParams[TraceParam::Payload]);
   setShaderPaq(newFunc, getShaderPaq(func));
-  if (m_shaderStage != ShaderStageRayTracingMiss) {
-    assert((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit) ||
-           (m_shaderStage == ShaderStageRayTracingClosestHit));
+  if ((m_shaderStage == ShaderStageRayTracingAnyHit) || (m_shaderStage == ShaderStageRayTracingClosestHit)) {
     func->getArg(1)->replaceAllUsesWith(m_traceParams[TraceParam::HitAttributes]);
     setShaderHitAttributeSize(newFunc, getShaderHitAttributeSize(func).value_or(0));
   }
@@ -2913,28 +2924,6 @@ void SpirvLowerRayTracing::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBuffer
   const unsigned shaderIdsSize = sizeof(Vkgc::RayTracingShaderIdentifier);
   Value *shaderIdsSizeVal = m_builder->getInt32(shaderIdsSize);
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 484034
-  // Old version without the strided buffer pointers
-
-  // Byte offset = (tableStride * tableIndex) + shaderIdsSize
-  Value *offset = m_builder->CreateMul(tableIndex, tableStride);
-  offset = m_builder->CreateAdd(offset, shaderIdsSizeVal);
-
-  // Zero-extend offset value to 64 bit
-  offset = m_builder->CreateZExt(offset, m_builder->getInt64Ty());
-
-  // Final addr
-  tableAddr = m_builder->CreateAdd(tableAddr, offset);
-
-  Type *gpuAddrAsPtrTy = PointerType::get(m_builder->getContext(), SPIRAS_Global);
-  tableAddr = m_builder->CreateIntToPtr(tableAddr, gpuAddrAsPtrTy);
-
-  inst.replaceAllUsesWith(tableAddr);
-
-  m_callsToLower.push_back(&inst);
-  m_funcsToLower.insert(inst.getCalledFunction());
-#else
-  // New version of the code with strided buffer pointers (also handles unknown version, which we treat as latest)
   tableAddr = m_builder->CreateAdd(tableAddr, m_builder->CreateZExt(shaderIdsSizeVal, m_builder->getInt64Ty()));
   tableAddr = m_builder->create<lgc::StridedBufferAddrAndStrideToPtrOp>(tableAddr, tableStride);
   tableAddr = m_builder->create<lgc::StridedIndexAddOp>(tableAddr, tableIndex);
@@ -2945,7 +2934,6 @@ void SpirvLowerRayTracing::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBuffer
 
   for (auto *I : reverse(toRemove))
     I->eraseFromParent();
-#endif
 }
 
 // =====================================================================================================================

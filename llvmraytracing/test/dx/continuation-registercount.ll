@@ -1,9 +1,10 @@
+; NOTE: Do not autogenerate
 ; RUN: grep -v MAX_REG_10 %s | \
-; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
+; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-prepare-gpurt-library,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
 ; RUN:    FileCheck -check-prefixes=COMMON,MAX30 %s
 ;
 ; RUN: grep -v MAX_REG_30 %s | \
-; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
+; RUN:    opt --verify-each --report-payload-register-sizes=byjump -passes='dxil-cont-prepare-gpurt-library,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,continuations-stats-report,remove-types-metadata' -S --lint-abort-on-error 2>&1 | \
 ; RUN:    FileCheck -check-prefixes=COMMON,MAX10 %s
 
 ; The order of metadata on functions is non-deterministic, so make two different runs to match both of them.
@@ -36,13 +37,13 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 declare i32 @_cont_GetContinuationStackAddr() #0
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
+declare %struct.DispatchSystemData @_AmdAwaitTraversal(i32, %struct.TraversalData) #0
 
 ; Function Attrs: alwaysinline
-declare %struct.DispatchSystemData @_AmdAwaitShader(i64, i64, %struct.DispatchSystemData) #0
+declare %struct.DispatchSystemData @_AmdAwaitShader(i32, i32, %struct.DispatchSystemData) #0
 
 ; Function Attrs: alwaysinline
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, i64, %struct.AnyHitTraversalData) #0
+declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32, i32, %struct.AnyHitTraversalData) #0
 
 ; Function Attrs: nounwind memory(read)
 declare !pointeetys !24 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #1
@@ -95,7 +96,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i32 4, %struct.TraversalData %trav_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -104,7 +105,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 ; Function Attrs: alwaysinline
 define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !pointeetys !37 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, i64 poison, %struct.DispatchSystemData %dis_data)
+  %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i32 2, i32 poison, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -113,7 +114,7 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !poi
 ; Function Attrs: alwaysinline
 define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind) #0 !pointeetys !38 {
   %trav_data = load %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, align 4
-  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, i64 poison, %struct.AnyHitTraversalData %trav_data)
+  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32 3, i32 poison, %struct.AnyHitTraversalData %trav_data)
   store %struct.AnyHitTraversalData %newdata, %struct.AnyHitTraversalData* %data, align 4
   call void @_AmdRestoreSystemDataAnyHit(%struct.AnyHitTraversalData* %data)
   ret i1 true
@@ -121,7 +122,7 @@ define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hi
 
 ; COMMON-DAG: Incoming payload VGPR size of "main" (raygeneration): 0 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
-; COMMON-DAG: call void (...) @lgc.cps.jump(i64 2, {{.*}} %struct.DispatchSystemData %{{.*}}: 10 dwords
+; COMMON-DAG: call void (...) @lgc.cps.jump(i32 2, {{.*}} %struct.DispatchSystemData %{{.*}}: 10 dwords
 
 define void @main() {
   %params = alloca %struct.TheirParams, align 4
@@ -131,8 +132,8 @@ define void @main() {
 
 ; COMMON-DAG: Incoming payload VGPR size of "mainTrace" (raygeneration): 0 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
-; MAX10-DAG: call void (...) @lgc.cps.jump(i64 4, {{.*}} %struct.TraversalData %{{.*}}: 10 dwords
-; MAX30-DAG: call void (...) @lgc.cps.jump(i64 4, {{.*}} %struct.TraversalData %{{.*}}: 15 dwords
+; MAX10-DAG: call void (...) @lgc.cps.jump(i32 4, {{.*}} %struct.TraversalData %{{.*}}: 10 dwords
+; MAX30-DAG: call void (...) @lgc.cps.jump(i32 4, {{.*}} %struct.TraversalData %{{.*}}: 15 dwords
 define void @mainTrace() {
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
   %2 = load %dx.types.Handle, %dx.types.Handle* @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
@@ -159,14 +160,14 @@ define void @called(%struct.MyParams* %arg) !pointeetys !39 {
 ; MAX10-DAG: Incoming payload VGPR size of "Intersection" (intersection): 10 dwords
 ; MAX30-DAG: Incoming payload VGPR size of "Intersection" (intersection): 30 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
-; MAX10-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}}: 10 dwords
-; MAX30-DAG: call void (...) @lgc.cps.jump(i64 3, {{.*}}: 30 dwords
+; MAX10-DAG: call void (...) @lgc.cps.jump(i32 3, {{.*}}: 10 dwords
+; MAX30-DAG: call void (...) @lgc.cps.jump(i32 3, {{.*}}: 30 dwords
 
 ; MAX10-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 10 dwords
 ; MAX30-DAG: Incoming payload VGPR size of "Intersection.resume.0" (intersection): 30 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
-; MAX10-DAG: call void (...) @lgc.cps.jump(i64 %returnAddr.reload{{.*}}: 10 dwords
-; MAX30-DAG: call void (...) @lgc.cps.jump(i64 %returnAddr.reload{{.*}}: 30 dwords
+; MAX10-DAG: call void (...) @lgc.cps.jump(i32 %returnAddr.reload{{.*}}: 10 dwords
+; MAX30-DAG: call void (...) @lgc.cps.jump(i32 %returnAddr.reload{{.*}}: 30 dwords
 
 define void @Intersection() #3 {
   %a = alloca %struct.BuiltInTriangleIntersectionAttributes, align 4
@@ -194,7 +195,7 @@ define void @Miss16(%struct.PayloadWithI16* noalias nocapture %payload) !pointee
   ret void
 }
 
-declare void @_AmdEnqueueAnyHit(i64, i64, %struct._AmdSystemData, <2 x float>) #0
+declare void @_AmdEnqueueAnyHit(i32, i32, %struct._AmdSystemData, <2 x float>) #0
 
 ; MAX10-DAG: Incoming payload VGPR size of "_cont_Traversal" (compute): 10 dwords
 ; COMMON-DAG: Outgoing payload VGPR size by jump:
@@ -204,7 +205,7 @@ declare void @_AmdEnqueueAnyHit(i64, i64, %struct._AmdSystemData, <2 x float>) #
 ; MAX30-DAG: call {{.*}} @lgc.cps.jump({{.*}}: 27 dwords
 
 define void @_cont_Traversal(%struct._AmdTraversalResultData* noalias nocapture sret(%struct._AmdTraversalResultData) %agg.result, %struct._AmdSystemData* noalias %data) !pointeetys !44 {
-  call void @_AmdEnqueueAnyHit(i64 0, i64 poison, %struct.BuiltInTriangleIntersectionAttributes undef, <2 x float> undef)
+  call void @_AmdEnqueueAnyHit(i32 0, i32 poison, %struct.BuiltInTriangleIntersectionAttributes undef, <2 x float> undef)
   unreachable
 }
 

@@ -66,8 +66,6 @@ private:
   void lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, llvm::Value *current,
                               SmallVectorImpl<llvm::Value *> &indexStack);
 
-  void ensureUnifiedReturn();
-
   void lowerBufferBlock();
   void lowerTaskPayload();
   void lowerPushConsts();
@@ -117,8 +115,9 @@ private:
   llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
       m_builtInXfbMap; // Map built-in to XFB output info specified by API interface
   llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
-      m_genericXfbMap;           // Map generic location to XFB output info specified by API interface
-  bool m_printedXfbInfo = false; // It marks if the XFB info has not been printed yet
+      m_genericXfbMap;            // Map generic location to XFB output info specified by API interface
+  bool m_printedXfbInfo = false;  // It marks if the XFB info has not been printed yet
+  bool m_transformVertex = false; // Indicate whether the current stage is a transform vertex shader
 };
 
 } // namespace Llpc

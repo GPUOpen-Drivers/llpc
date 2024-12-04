@@ -31,7 +31,7 @@
 #pragma once
 
 #include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/IR/InstVisitor.h"
@@ -46,7 +46,7 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for load scalarizer optimization"; }
+  static llvm::StringRef name() { return "Scalarize loads optimization"; }
 
   void visitLoadInst(llvm::LoadInst &loadInst);
 

@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  PreparePipelineAbi.cpp
-* @brief LLPC source file: contains implementation of class lgc::PatchPreparePipelineAbi.
+* @brief LLPC source file: contains implementation of class lgc::PreparePipelineAbi.
 ***********************************************************************************************************************
 */
 #include "lgc/patch/PreparePipelineAbi.h"
@@ -44,7 +44,7 @@ using namespace llvm;
 using namespace lgc;
 
 // =====================================================================================================================
-PatchPreparePipelineAbi::PatchPreparePipelineAbi() {
+PreparePipelineAbi::PreparePipelineAbi() {
 }
 
 // =====================================================================================================================
@@ -53,7 +53,7 @@ PatchPreparePipelineAbi::PatchPreparePipelineAbi() {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses PreparePipelineAbi::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
 
@@ -107,8 +107,8 @@ PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisMan
 // @param pipelineState : Pipeline state
 // @param relPatchId : Relative patch ID
 // @param builder : IR builder to insert instructions
-std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineState *pipelineState, Value *relPatchId,
-                                                                     IRBuilder<> &builder) {
+std::pair<Value *, Value *> PreparePipelineAbi::readTessFactors(PipelineState *pipelineState, Value *relPatchId,
+                                                                IRBuilder<> &builder) {
   auto func = builder.GetInsertBlock()->getParent();
   auto lds = Patch::getLdsVariable(pipelineState, func);
 
@@ -143,13 +143,9 @@ std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineSta
     break;
   }
 
-  const auto tessFactorStart =
-      pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor.onChip.tessFactorStart;
-
   assert(numOuterTfs >= 2 && numOuterTfs <= 4);
-  // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch
+  // ldsOffset = relativeId * MaxTessFactorsPerPatch
   Value *ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(MaxTessFactorsPerPatch));
-  ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(tessFactorStart));
   Value *outerTf = readValueFromLds(FixedVectorType::get(builder.getFloatTy(), numOuterTfs), ldsOffset);
 
   // NOTE: For isoline, the outer tessellation factors have to be exchanged, which is required by HW.
@@ -161,9 +157,9 @@ std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineSta
   assert(numInnerTfs <= 2);
   Value *innerTf = nullptr;
   if (numInnerTfs > 0) {
-    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + 4
+    // ldsOffset = relativeId * MaxTessFactorsPerPatch + 4
     Value *ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(MaxTessFactorsPerPatch));
-    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(tessFactorStart + 4));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(4));
     innerTf = readValueFromLds(FixedVectorType::get(builder.getFloatTy(), numInnerTfs), ldsOffset);
   }
 
@@ -180,9 +176,8 @@ std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineSta
 // @param outerTf : Outer tessellation factors to write to TF buffer
 // @param innerTf : Inner tessellation factors to write to TF buffer
 // @param builder : IR builder to insert instructions
-void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *tfBufferDesc, Value *tfBufferBase,
-                                               Value *relPatchId, Value *outerTf, Value *innerTf,
-                                               IRBuilder<> &builder) {
+void PreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *tfBufferDesc, Value *tfBufferBase,
+                                          Value *relPatchId, Value *outerTf, Value *innerTf, IRBuilder<> &builder) {
   // NOTE: Tessellation factors are from tessellation level array and we have:
   //   Isoline:
   //     TF[0] = outerTF[0]
@@ -227,8 +222,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   auto primitiveMode = pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
   if (primitiveMode == PrimitiveMode::Isolines) {
     assert(numOuterTfs == 2 && numInnerTfs == 0);
-
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                             {outerTf,                             // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
@@ -244,7 +238,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
     tessFactor =
         builder.CreateInsertElement(tessFactor, builder.CreateExtractElement(innerTf, static_cast<uint64_t>(0)), 3);
 
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, tessFactor->getType(),
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                             {tessFactor,                          // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
@@ -255,7 +249,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
     assert(primitiveMode == PrimitiveMode::Quads);
     assert(numOuterTfs == 4 && numInnerTfs == 2);
 
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                             {outerTf,                             // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
@@ -264,7 +258,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
                              builder.getInt32(coherent.u32All)}); // glc
 
     tfBufferOffset = builder.CreateAdd(tfBufferOffset, builder.getInt32(4 * sizeof(float)));
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, innerTf->getType(),
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                             {innerTf,                             // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
@@ -278,7 +272,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
 // Merge shaders and set calling convention for the entry-point of each shader (GFX9+)
 //
 // @param module : LLVM module
-void PatchPreparePipelineAbi::mergeShader(Module &module) {
+void PreparePipelineAbi::mergeShader(Module &module) {
   const bool hasTs = (m_hasTcs || m_hasTes);
 
   if (m_pipelineState->isGraphics()) {
@@ -403,7 +397,7 @@ void PatchPreparePipelineAbi::mergeShader(Module &module) {
 // Set ABI-specified entrypoint name for each shader
 //
 // @param module : LLVM module
-void PatchPreparePipelineAbi::setAbiEntryNames(Module &module) {
+void PreparePipelineAbi::setAbiEntryNames(Module &module) {
 
   for (auto &func : module) {
     if (!func.empty()) {
@@ -419,7 +413,7 @@ void PatchPreparePipelineAbi::setAbiEntryNames(Module &module) {
 // Add ABI metadata
 //
 // @param module : LLVM module
-void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
+void PreparePipelineAbi::addAbiMetadata(Module &module) {
   RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState, m_pipelineShaders);
   regMetadataBuilder.buildPalMetadata();
 }
@@ -428,7 +422,7 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
 // Handle the store of tessellation factors.
 //
 // @param entryPoint : Entry-point of tessellation control shader
-void PatchPreparePipelineAbi::storeTessFactors(Function *entryPoint) {
+void PreparePipelineAbi::storeTessFactors(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStage::TessControl); // Must be tessellation control shader
 
   if (m_pipelineState->canOptimizeTessFactor())

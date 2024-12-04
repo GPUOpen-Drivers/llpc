@@ -984,8 +984,7 @@ void ProcessGpuRtLibrary::createEnqueue(Function *func) {
   }
 
   // TODO: pass the levelMask correctly.
-  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(StructType::get(*m_context, {})),
-                                 PoisonValue::get(m_builder->getInt32Ty()), retAddr, tailArgs);
+  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(m_builder->getInt32Ty()), retAddr, tailArgs);
   m_builder->CreateUnreachable();
 
   // Clear the name so that earlyGpurtTransform doesn't try to handle the function.

@@ -581,7 +581,6 @@ private:
   Type *HitMissDataTy;
   /// Dispatch system data type passed to RayGen and others
   Type *DispatchSystemDataTy;
-  Type *RcrTy;
 
   // Function definitions and declarations from HLSL
   // Driver implementation that returns if AcceptHitAndEndSearch was called
@@ -646,6 +645,8 @@ void ModuleMetadataState::updateModuleMetadata() const {
 CallInst *LowerRaytracingPipelinePassImpl::insertCpsAwait(Type *ReturnTy, Value *ShaderAddr, Instruction *Call,
                                                           ArrayRef<Value *> Args, ContinuationCallType CallType,
                                                           RayTracingShaderStage ShaderStage) {
+  assert(ShaderAddr->getType() == Builder.getInt32Ty());
+
   Builder.SetInsertPoint(Call);
 
   RayTracingShaderStage CallStage = RayTracingShaderStage::Count;
@@ -659,8 +660,8 @@ CallInst *LowerRaytracingPipelinePassImpl::insertCpsAwait(Type *ReturnTy, Value 
   assert(CallStage != RayTracingShaderStage::Count && "LowerRaytracingPipelinePassImpl::insertCpsAwait: Invalid "
                                                       "call stage before inserting lgc.cps.await operation!");
 
-  return Builder.create<AwaitOp>(ReturnTy, Builder.CreateTrunc(ShaderAddr, RcrTy),
-                                 1 << static_cast<uint8_t>(getCpsLevelForShaderStage(CallStage)), Args);
+  return Builder.create<AwaitOp>(ReturnTy, ShaderAddr, 1 << static_cast<uint8_t>(getCpsLevelForShaderStage(CallStage)),
+                                 Args);
 }
 
 Function *llvm::getSetLocalRootIndex(Module &M) {
@@ -922,14 +923,12 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(ContinuationCallTy
   SmallVector<Type *, 2> ArgTys;
   SmallVector<Value *, 2> Args;
 
-  bool IsWait = (Call->getCalledFunction()->getName().starts_with("_AmdWaitAwait"));
-
   Value *RetAddr = nullptr;
-  if (MetadataState.isInLgcCpsMode()) {
+  const bool IsLgcCpsMode = MetadataState.isInLgcCpsMode();
+  if (IsLgcCpsMode) {
     // For LgcCps, skip function-addr, the return address will be filled at late
     // stage of continuation transform. Add shader index so that the callee cps
     // function get correct shader-index being passed in.
-
     ArgTys.push_back(I32);
     auto *ShaderIndex = CrossInliner
                             .inlineCall(Builder, GetLocalRootIndex,
@@ -944,14 +943,13 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(ContinuationCallTy
     // We want to avoid having the return address included in the padding
     // computation, since it is included nowhere else. This allows us to compute
     // padding only on the actual tail arguments, which is the only varying part
-    // of the final continue call at the end. WaitAwaitTraversal calls don't
-    // have a return address, so keep that in mind here.
-    uint32_t RetAddrArgIndex = IsWait ? 2 : 1;
+    // of the final continue call at the end.
+    uint32_t RetAddrArgIndex = 1;
     if (CallType == ContinuationCallType::Traversal) {
-      RetAddr = PoisonValue::get(Builder.getInt64Ty());
+      RetAddr = PoisonValue::get(Builder.getInt32Ty());
     } else {
       RetAddr = Call->getArgOperand(RetAddrArgIndex);
-      assert(RetAddr->getType()->isIntegerTy(32) || RetAddr->getType()->isIntegerTy(64));
+      assert(RetAddr->getType()->isIntegerTy(32));
       ++RetAddrArgIndex;
     }
 
@@ -977,7 +975,6 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(ContinuationCallTy
 
   SmallVector<Type *> ReturnedArgTys{Call->getType()};
 
-  const bool IsLgcCpsMode = MetadataState.isInLgcCpsMode();
   const bool HasPayload = Data.FirstPayloadArgumentDword.has_value();
 
   // Add padding so that returned payload starts at a fixed dword.
@@ -987,10 +984,6 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(ContinuationCallTy
     Args.push_back(PoisonValue::get(OutgoingPaddingTy));
     Args.push_back(Builder.CreateLoad(OutgoingPayloadTy, Data.PayloadStorage));
   }
-
-  Value *WaitMask = nullptr;
-  if (IsWait)
-    WaitMask = Call->getArgOperand(1);
 
   uint32_t PaddingOffset = 1;
   if (!IsLgcCpsMode) {
@@ -1011,12 +1004,7 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(ContinuationCallTy
   auto *NewRetTy = StructType::get(Builder.getContext(), ReturnedArgTys);
 
   auto *NewCall = insertCpsAwait(NewRetTy, ShaderAddr, Call, Args, CallType, Data.Kind);
-
-  if (WaitMask) {
-    // The only supported wait mask is a constant -1.
-    assert(cast<ConstantInt>(WaitMask)->getSExtValue() == -1);
-    ContHelper::setWaitMask(*NewCall);
-  }
+  NewCall->copyMetadata(*Call);
 
   // Copy back returned payload to the payload serialization alloca as part of
   // the payload copying.
@@ -1069,7 +1057,7 @@ void LowerRaytracingPipelinePassImpl::replaceShaderIndexCall(FunctionData &Data,
   } else {
     Value *ShaderIndex = nullptr;
     if (MetadataState.isInLgcCpsMode()) {
-      ShaderIndex = Call->getFunction()->getArg(CpsArgIdxShaderIndex);
+      ShaderIndex = Call->getFunction()->getArg(CpsArgIdx::ShaderIndex);
     } else {
       assert(Data.SystemDataFirstStore != nullptr);
       Builder.SetInsertPoint(&*++Data.SystemDataFirstStore->getIterator());
@@ -1145,8 +1133,7 @@ void LowerRaytracingPipelinePassImpl::handleGetCurrentFuncAddr(Function &Func) {
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
     auto *F = CInst.getFunction();
     Builder.SetInsertPoint(&CInst);
-    Value *AsContRef = Builder.create<AsContinuationReferenceOp>(RcrTy, F);
-    AsContRef = MetadataState.isInLgcCpsMode() ? Builder.CreateZExt(AsContRef, Builder.getInt64Ty()) : AsContRef;
+    Value *AsContRef = Builder.create<AsContinuationReferenceOp>(F);
     CInst.replaceAllUsesWith(AsContRef);
     CInst.eraseFromParent();
   });
@@ -1396,9 +1383,6 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(FunctionData &Data, Valu
 }
 
 void LowerRaytracingPipelinePassImpl::setGpurtEntryRegisterCountMetadata() {
-  if (MetadataState.isInLgcCpsMode())
-    return;
-
   // Even if PreservedPayloadRegisterCount is set, there may be
   // additional shaders in the current module whose usage is recorded
   // in MaxUsedPayloadRegisterCount, to take the max with it.
@@ -1643,8 +1627,7 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(FunctionData &Data, Fun
         std::min(EData.OutgoingSerializationLayout->NumStorageI32s, MetadataState.getMaxPayloadRegisterCount());
   }
 
-  Value *ReturnAddr = Parent->getArg(MetadataState.isInLgcCpsMode() ? CpsArgIdxReturnAddr : 0);
-  const uint32_t Levels = MetadataState.isInLgcCpsMode() ? getPotentialCpsReturnLevels(Data.Kind) : -1;
+  Value *ReturnAddr = Parent->getArg(CpsArgIdx::ReturnAddr);
 
   if (RetValue)
     PaddingArgs.push_back(RetValue);
@@ -1655,9 +1638,9 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(FunctionData &Data, Fun
   PayloadHelper.appendPaddingAndPayloadValues(PaddingArgs, TailArgList, OutgoingRegisterCount,
                                               Data.FirstPayloadArgumentDword, Data.PayloadStorage);
 
-  Instruction *Jump =
-      Builder.create<lgc::cps::JumpOp>(ReturnAddr, Levels, PoisonValue::get(StructType::get(Builder.getContext())),
-                                       PoisonValue::get(I32), PoisonValue::get(RcrTy), TailArgList);
+  Value *DummyI32 = PoisonValue::get(I32);
+  Instruction *Jump = Builder.create<lgc::cps::JumpOp>(ReturnAddr, getPotentialCpsReturnLevels(Data.Kind), DummyI32,
+                                                       DummyI32, TailArgList);
   Builder.CreateUnreachable();
   EData.Terminator->eraseFromParent();
 
@@ -1703,7 +1686,6 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
     // Create the CPS function header.
 
     // A CPS function signature consists of:
-    //  * State: {}
     //  * Return continuation reference (RCR): i32
     //  * Shader index
     //  * Remaining arguments (system data, optionally hit attributes)
@@ -1713,10 +1695,9 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
     // | returnAddr | shaderIndex | systemData | hitAttrs | padding | payload |
     // For systemData and hitAttrs, use the max possible sizes for calculation.
 
-    AllArgTypes.push_back(StructType::get(Mod->getContext()));
     AllArgTypes.push_back(Builder.getInt32Ty());
 
-    SystemDataArgumentIndex = 3;
+    SystemDataArgumentIndex = 2;
   } else {
     // The overall layout is:
     // | returnAddr | systemData | (hitAttrs, remaining args) | padding |
@@ -1806,8 +1787,8 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
   const bool HasPayloadArgument = Data.Kind != RayTracingShaderStage::RayGeneration;
   if (HasPayloadArgument) {
     if (MetadataState.isInLgcCpsMode() && Data.Kind != RayTracingShaderStage::AnyHit) {
-      // Add a dummy argument for CpsArgIdxHitAttributes so that the arg index
-      // of payload matches CpsArgIdxPayload
+      // Add a dummy argument for CpsArgIdx::HitAttributes so that the arg index
+      // of payload matches CpsArgIdx::Payload
       AllArgTypes.push_back(StructType::get(*Context, {}));
     }
 
@@ -1817,18 +1798,16 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
 
   // Pass in the return address argument
   {
-    const uint32_t RetAddrSize = MetadataState.isInLgcCpsMode() ? 32 : 64;
     const uint32_t RetAddrPos = MetadataState.isInLgcCpsMode() ? 1 : 0;
-    AllArgTypes.insert(AllArgTypes.begin() + RetAddrPos, Builder.getIntNTy(RetAddrSize));
+    AllArgTypes.insert(AllArgTypes.begin() + RetAddrPos, Builder.getInt32Ty());
   }
 
   Data.PayloadSpillSize =
       computePayloadSpillSize(Data.MaxOutgoingPayloadI32s, MetadataState.getMaxPayloadRegisterCount());
   assert(Data.PayloadSpillSize == 0 || Data.Kind != RayTracingShaderStage::Intersection);
 
-  auto *FunctionTypeRetTy = MetadataState.isInLgcCpsMode() ? Builder.getVoidTy() : NewRetTy;
   // Create new function to change signature
-  auto *NewFuncTy = FunctionType::get(FunctionTypeRetTy, AllArgTypes, false);
+  auto *NewFuncTy = FunctionType::get(Builder.getVoidTy(), AllArgTypes, false);
   Function *NewFunc = CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ArrayRef<AttributeSet>{});
   NewFunc->takeName(F);
   // FIXME: Remove !pointeetypes metadata to workaround an llvm bug. If struct types
@@ -1841,12 +1820,8 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
   Data.SystemDataTy = cast<StructType>(SystemDataTy);
   processFunctionEntry(Data, NewFunc->getArg(SystemDataArgumentIndex));
 
-  uint64_t RetAddrArgIdx = 0;
-
   if (MetadataState.isInLgcCpsMode()) {
-    NewFunc->getArg(CpsArgIdxContState)->setName("cont.state");
-    RetAddrArgIdx = CpsArgIdxReturnAddr;
-    NewFunc->getArg(CpsArgIdxShaderIndex)->setName("shader.index");
+    NewFunc->getArg(CpsArgIdx::ShaderIndex)->setName("shader.index");
 
     // Mark as CPS function with the corresponding level.
     CpsLevel Level = getCpsLevelForShaderStage(Data.Kind);
@@ -1855,8 +1830,8 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
 
   if (Data.Kind != RayTracingShaderStage::RayGeneration) {
     if (MetadataState.isInLgcCpsMode()) {
-      NewFunc->getArg(CpsArgIdxSystemData)->setName("system.data");
-      NewFunc->getArg(CpsArgIdxHitAttributes)->setName("hit.attrs");
+      NewFunc->getArg(CpsArgIdx::SystemData)->setName("system.data");
+      NewFunc->getArg(CpsArgIdx::HitAttributes)->setName("hit.attrs");
     }
 
     NewFunc->getArg(NewFunc->arg_size() - 2)->setName("padding");
@@ -1891,16 +1866,15 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
   if (NewSystemData)
     F->getArg(0)->replaceAllUsesWith(NewSystemData);
 
-  NewFunc->getArg(RetAddrArgIdx)->setName("returnAddr");
+  NewFunc->getArg(CpsArgIdx::ReturnAddr)->setName("returnAddr");
 
   FunctionEndData EData;
   if (Data.Kind == RayTracingShaderStage::RayGeneration) {
-    if (!MetadataState.isInLgcCpsMode()) {
+    if (!MetadataState.isInLgcCpsMode())
       NewFunc->setMetadata(ContHelper::MDEntryName, MDTuple::get(*Context, {}));
 
-      // Entry functions have no incoming payload or continuation state
-      ContHelper::IncomingRegisterCount::setValue(NewFunc, 0);
-    }
+    // Entry functions have no incoming payload or continuation state
+    ContHelper::IncomingRegisterCount::setValue(NewFunc, 0);
   } else {
     // Ignore payload for intersection shaders, they don't touch payload
     Value *NewPayload = nullptr;
@@ -1955,10 +1929,8 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
       auto IncomingRegisterCount =
           std::min(IncomingSerializationLayout.NumStorageI32s, MetadataState.getMaxPayloadRegisterCount());
       MetadataState.updateMaxUsedPayloadRegisterCount(IncomingRegisterCount);
-      if (!MetadataState.isInLgcCpsMode()) {
-        // Annotate function with the number of registers for incoming payload
-        ContHelper::IncomingRegisterCount::setValue(NewFunc, IncomingRegisterCount);
-      }
+      // Annotate function with the number of registers for incoming payload
+      ContHelper::IncomingRegisterCount::setValue(NewFunc, IncomingRegisterCount);
 
       // Copy global payload into local payload at start of shader
       if (IncomingSerializationLayout.NumStorageI32s) {
@@ -1996,7 +1968,7 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
         // Copy new hit attributes from argument:
         // Since the argument list of NewFunc ends with padding and payload,
         // subtract 3 to get the hit attributes.
-        unsigned HitAttributesIdx = MetadataState.isInLgcCpsMode() ? CpsArgIdxHitAttributes : NewFunc->arg_size() - 3;
+        unsigned HitAttributesIdx = MetadataState.isInLgcCpsMode() ? CpsArgIdx::HitAttributes : NewFunc->arg_size() - 3;
         Builder.CreateStore(NewFunc->getArg(HitAttributesIdx), HitAttrsAlloca);
         HitAttrs->replaceAllUsesWith(HitAttrsAlloca);
       } else if (Data.Kind == RayTracingShaderStage::ClosestHit) {
@@ -2017,24 +1989,20 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
         OrigHitAttrs->replaceAllUsesWith(NewHitAttrs);
         copyHitAttributes(Data, Data.SystemData, Data.SystemDataTy, NewHitAttrs, true, &IncomingSerializationLayout);
       }
+    } else if (Data.Kind == RayTracingShaderStage::Intersection) {
+      // Annotate intersection shader with the maximum number of registers
+      // used for payload
+      // TODO: When compiling a pipeline and not a library, we could figure
+      //       out the pipeline-wide max (on a higher level than here) and
+      //       use that instead. For a library compile, we can't know the
+      //       max payload size of shaders in pipelines this shader is used
+      //       in.
+      ContHelper::IncomingRegisterCount::setValue(NewFunc, MetadataState.getMaxPayloadRegisterCount());
+      // Intentionally do NOT update MaxUsedPayloadRegisterCount
     } else {
-      if (!MetadataState.isInLgcCpsMode()) {
-        if (Data.Kind == RayTracingShaderStage::Intersection) {
-          // Annotate intersection shader with the maximum number of registers
-          // used for payload
-          // TODO: When compiling a pipeline and not a library, we could figure
-          //       out the pipeline-wide max (on a higher level than here) and
-          //       use that instead. For a library compile, we can't know the
-          //       max payload size of shaders in pipelines this shader is used
-          //       in.
-          ContHelper::IncomingRegisterCount::setValue(NewFunc, MetadataState.getMaxPayloadRegisterCount());
-          // Intentionally do NOT update MaxUsedPayloadRegisterCount
-        } else {
-          assert(Data.Kind == RayTracingShaderStage::Traversal);
-          // Intentionally do nothing for Traversal. We explicitly add Traversal
-          // register count metadata elsewhere.
-        }
-      }
+      assert(Data.Kind == RayTracingShaderStage::Traversal);
+      // Intentionally do nothing for Traversal. We explicitly add Traversal
+      // register count metadata elsewhere.
     }
 
     EData.OutgoingSerializationLayout = OutgoingSerializationLayout;
@@ -2114,12 +2082,17 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F, FunctionData 
   }
 
 #ifndef NDEBUG
-  if (!MetadataState.isInLgcCpsMode() && Data.Kind != RayTracingShaderStage::RayGeneration) {
+  if (Data.Kind != RayTracingShaderStage::RayGeneration) {
     // Check that all returns have registercount metadata
     for (const auto &BB : *F) {
       auto *Terminator = BB.getTerminator();
-      if (Terminator->getOpcode() == Instruction::Ret && !ContHelper::OutgoingRegisterCount::tryGetValue(Terminator))
-        report_fatal_error("Missing registercount metadata!");
+      if (Terminator->getOpcode() == Instruction::Ret) {
+        // Traversal needs to end with jumps + unreachable
+        if (Data.Kind == RayTracingShaderStage::Traversal)
+          report_fatal_error("Disallowed return found in Traversal, all code paths need to end with an Enqueue");
+        else if (!ContHelper::OutgoingRegisterCount::tryGetValue(Terminator))
+          report_fatal_error("Missing registercount metadata!");
+      }
     }
   }
 #endif
@@ -2398,7 +2371,6 @@ LowerRaytracingPipelinePassImpl::LowerRaytracingPipelinePassImpl(llvm::Module &M
     : Mod{&M}, GpurtLibrary{&GpurtLibrary}, Context{&M.getContext()}, DL{&M.getDataLayout()},
       Builder{Mod->getContext()}, MetadataState{*Mod},
       PAQManager{Mod, &GpurtLibrary, MetadataState.getMaxPayloadRegisterCount()}, PayloadHelper{*Mod, *DL, Builder} {
-  RcrTy = MetadataState.isInLgcCpsMode() ? Builder.getInt32Ty() : Builder.getInt64Ty();
 }
 
 PreservedAnalyses LowerRaytracingPipelinePassImpl::run() {

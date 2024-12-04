@@ -34,7 +34,7 @@
 #include "llvmraytracing/CpsStackLowering.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"

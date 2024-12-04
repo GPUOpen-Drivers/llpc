@@ -54,13 +54,7 @@ Value *BuilderCommon::CreatePtrDiff(Type *ty, Value *lhs, Value *rhs, const Twin
   Type *const rhsType = rhs->getType();
   if (!lhsType->isPointerTy() || lhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER ||
       !rhsType->isPointerTy() || rhsType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 412285
-    // Old version of the code
-    return IRBuilderBase::CreatePtrDiff(lhs, rhs, instName);
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     return IRBuilderBase::CreatePtrDiff(ty, lhs, rhs, instName);
-#endif
 
   Value *difference = create<BufferPtrDiffOp>(lhs, rhs);
   return CreateExactSDiv(difference, ConstantExpr::getSizeOf(ty), instName);
@@ -327,4 +321,20 @@ Value *BuilderCommon::CreateBuildVector(llvm::ArrayRef<llvm::Value *> elements, 
     vector = CreateInsertElement(vector, elements[idx], idx);
   vector = CreateInsertElement(vector, elements.back(), elements.size() - 1, instName);
   return vector;
+}
+
+// =====================================================================================================================
+// Create an "s_setreg" to set specified bits of a hardware register.
+//
+// @param hwRegId : The hardware register ID
+// @param offset: The starting offset
+// @param size: The size of bits
+// @param value : The value to set to the register
+// @param instName : Name to give instruction(s)
+Instruction *BuilderBase::CreateSetReg(unsigned hwRegId, unsigned offset, unsigned size, llvm::Value *value,
+                                       const llvm::Twine &instName) {
+  assert(size > 0 && size <= 32);
+  assert(offset + size <= 32);
+  unsigned hwReg = hwRegId | offset << 6 | (size - 1) << 11;
+  return CreateIntrinsic(getVoidTy(), Intrinsic::amdgcn_s_setreg, {getInt32(hwReg), value});
 }

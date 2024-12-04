@@ -36,7 +36,7 @@ define spir_func i32 @chs(i32 %x) !lgc.shaderstage !{i32 7} !continufy.stage !{i
 ; CHECK-NEXT:    [[TMP1:%.*]] = ptrtoint ptr [[FN]] to i32
 ; CHECK-NEXT:    [[TMP2:%.*]] = or i32 [[TMP1]], 2
 ; CHECK-NEXT:    [[TMP3:%.*]] = call i32 (...) @lgc.cps.await__i32(i32 [[TMP2]], i32 4, i32 poison, i32 [[X]]), !continuation.returnedRegistercount [[META3]]
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 8, {} poison, i32 poison, i32 poison, i32 poison, i32 [[TMP3]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 8, i32 poison, i32 poison, i32 poison, i32 [[TMP3]])
 ; CHECK-NEXT:    unreachable
 ;
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 24)

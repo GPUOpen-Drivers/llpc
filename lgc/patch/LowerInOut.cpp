@@ -281,15 +281,12 @@ void LowerInOut::processShader() {
       //
       // NOTE: The LDS for tessellation is as follow:
       //
-      //          +-------------+--------------+-------------+-------------+
-      // On-chip  | Input Patch | Output Patch | Patch Const | Tess Factor | (LDS)
-      //          +-------------+--------------+-------------+-------------+
+      //          +-------------+----------------+------------------+-------------+
+      // On-chip  | Tess Factor | HS Patch Count | Special TF Value | Input Patch | (LDS)
+      //          +-------------+----------------+------------------+-------------+
       //
-      //          +-------------+-------------+----------------+------------------+
-      // Off-chip | Input Patch | Tess Factor | HS Patch Count | Special TF Value | (LDS)
-      //          +-------------+-------------+----------------+------------------+
       //          +--------------+-------------+
-      //          | Output Patch | Patch Const | (LDS Buffer)
+      // Off-chip | Output Patch | Patch Const | (LDS Buffer)
       //          +--------------+-------------+
       //
       // inPatchTotalSize = inVertexCount * inVertexStride * patchCountPerThreadGroup
@@ -351,10 +348,10 @@ void LowerInOut::processShader() {
       // LDS buffer (which will be loaded by TES).
       calcFactor.offChip.outPatchStart = 0;
       calcFactor.offChip.patchConstStart = calcFactor.offChip.outPatchStart + outPatchTotalSize;
-      calcFactor.onChip.tessFactorStart = inPatchTotalSize;
 
       calcFactor.tessFactorStride = tessFactorStride;
-      calcFactor.tessOnChipLdsSize = calcFactor.onChip.tessFactorStart + tessFactorTotalSize;
+      calcFactor.onChip.inPatchStart = tessFactorTotalSize;
+      calcFactor.tessOnChipLdsSize = tessFactorTotalSize + inPatchTotalSize;
 
       if (m_pipelineState->canOptimizeTessFactor()) {
         //
@@ -368,14 +365,14 @@ void LowerInOut::processShader() {
         //                  |<---- Wave 0 --->|     |<---- Wave N --->|
         //
         assert(m_gfxIp.major >= 11);
-        calcFactor.onChip.hsPatchCountStart = calcFactor.tessOnChipLdsSize; // One dword to store actual HS wave count
+        calcFactor.onChip.hsPatchCountStart = calcFactor.onChip.inPatchStart; // One dword to store actual HS wave count
         calcFactor.onChip.specialTfValueStart = calcFactor.onChip.hsPatchCountStart + 1;
 
         const unsigned maxNumHsWaves =
             MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
         calcFactor.specialTfValueSize = maxNumHsWaves * 2;
-
         calcFactor.tessOnChipLdsSize += 1 + calcFactor.specialTfValueSize;
+        calcFactor.onChip.inPatchStart += 1 + calcFactor.specialTfValueSize;
       }
 
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
@@ -390,10 +387,13 @@ void LowerInOut::processShader() {
       LLPC_OUTS("// LLPC tessellation calculation factor results\n\n");
       LLPC_OUTS("Patch count per thread group: " << calcFactor.patchCountPerThreadGroup << "\n");
       LLPC_OUTS("\n");
+      LLPC_OUTS("Tess factor start: 0 (LDS)\n");
+      LLPC_OUTS("Tess factor total size (in dwords): " << tessFactorTotalSize << "\n");
+      LLPC_OUTS("\n");
       LLPC_OUTS("Input vertex count: " << inVertexCount << "\n");
       LLPC_OUTS("Input vertex stride: " << calcFactor.inVertexStride << "\n");
       LLPC_OUTS("Input patch size (in dwords): " << inPatchSize << "\n");
-      LLPC_OUTS("Input patch start: 0 (LDS)\n");
+      LLPC_OUTS("Input patch start: " << calcFactor.onChip.inPatchStart << " (LDS)\n");
       LLPC_OUTS("Input patch total size (in dwords): " << inPatchTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Output vertex count: " << outVertexCount << "\n");
@@ -406,9 +406,6 @@ void LowerInOut::processShader() {
       LLPC_OUTS("Patch constant size (in dwords): " << calcFactor.patchConstSize << "\n");
       LLPC_OUTS("Patch constant start: " << calcFactor.offChip.patchConstStart << " (LDS buffer)\n");
       LLPC_OUTS("Patch constant total size (in dwords): " << patchConstTotalSize << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Tess factor start: " << calcFactor.onChip.tessFactorStart << " (LDS)\n");
-      LLPC_OUTS("Tess factor total size (in dwords): " << tessFactorTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("HS patch count start: " << calcFactor.onChip.hsPatchCountStart << " (LDS)\n");
       LLPC_OUTS("HS wave count size (in dwords): " << 1 << "\n");
@@ -1045,8 +1042,8 @@ void LowerInOut::visitCallInst(CallInst &callInst) {
     if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg) {
       unsigned emitStream = InvalidValue;
       uint64_t message = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
-      if (message == GsEmitStreaM0 || message == GsEmitStreaM1 || message == GsEmitStreaM2 ||
-          message == GsEmitStreaM3) {
+      if (message == GsEmitStream0 || message == GsEmitStream1 || message == GsEmitStream2 ||
+          message == GsEmitStream3) {
         // NOTE: MSG[9:8] = STREAM_ID
         emitStream = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
       }
@@ -1061,6 +1058,8 @@ void LowerInOut::visitCallInst(CallInst &callInst) {
           auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
           if (emitStream == rasterStream) {
+            // When multiview and viewIndexFromDeviceIndex enable, it can't use the device id
+            // as viewId to storeValueToGsVsRing when multiview in the same device
             auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
             auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
 
@@ -1244,11 +1243,19 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
     const auto enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     if (enableMultiView) {
       if (m_shaderStage == ShaderStage::Vertex) {
-        auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex)->entryArgIdxs.vs;
-        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+        if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+          m_viewIndex = builder.getInt32(m_pipelineState->getDeviceIndex());
+        } else {
+          auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex)->entryArgIdxs.vs;
+          m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+        }
       } else if (m_shaderStage == ShaderStage::TessEval) {
-        auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval)->entryArgIdxs.tes;
-        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+        if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+          m_viewIndex = builder.getInt32(m_pipelineState->getDeviceIndex());
+        } else {
+          auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval)->entryArgIdxs.tes;
+          m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+        }
       } else {
         assert(m_shaderStage == ShaderStage::CopyShader);
         assert(m_viewIndex); // Must have been explicitly loaded in copy shader
@@ -1559,17 +1566,18 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
     builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_barrier, {});
     builder.CreateFence(AtomicOrdering::Acquire, syncScope);
   } else if (m_shaderStage == ShaderStage::Geometry) {
-    // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
-    // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
-    StringRef scopeName = m_pipelineState->isGsOnChip() ? "workgroup" : "agent";
-    SyncScope::ID scope = m_context->getOrInsertSyncScopeID(scopeName);
-    builder.CreateFence(AtomicOrdering::Release, scope);
+    // Send GS_DONE message for legacy GS
+    if (!m_pipelineState->getNggControl()->enableNgg) {
+      // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
+      // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
+      SyncScope::ID syncScope =
+          m_context->getOrInsertSyncScopeID(m_pipelineState->isGsOnChip() ? "workgroup" : "agent");
+      builder.CreateFence(AtomicOrdering::Release, syncScope);
 
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
-    auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
-    Value *args[] = {builder.getInt32(GsDone), gsWaveId};
-
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_sendmsg, args);
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
+      auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
+      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_sendmsg, {builder.getInt32(GsDone), gsWaveId});
+    }
   } else if (m_shaderStage == ShaderStage::Fragment) {
     // Fragment shader export are handled in LowerFragColorExport.
     return;
@@ -1700,16 +1708,8 @@ Value *LowerInOut::performFsHalfInterpolation(BuilderBase &builder, Value *attr,
     Value *param =
         builder.CreateIntrinsic(builder.getFloatTy(), Intrinsic::amdgcn_lds_param_load, {channel, attr, primMask});
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 494282
-    // Old version of code
-    auto interpP10Intrinsic = Intrinsic::amdgcn_interp_inreg_p10_f16;
-    auto interpP2Intrinsic = Intrinsic::amdgcn_interp_inreg_p2_f16;
-#else
-    // New version of the code (also handles unknown version, which we treat as
-    // latest)
     auto interpP10Intrinsic = Intrinsic::amdgcn_interp_p10_rtz_f16;
     auto interpP2Intrinsic = Intrinsic::amdgcn_interp_p2_rtz_f16;
-#endif
     // tmp = interp.p10(p10, coordI, p0, highHalf)
     result = builder.CreateIntrinsic(builder.getFloatTy(), interpP10Intrinsic, {param, coordI, param, highHalf});
 
@@ -2183,9 +2183,13 @@ Value *LowerInOut::patchTcsBuiltInInputImport(Type *inputTy, unsigned builtInId,
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
-    else
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
+      if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+        input = builder.getInt32(m_pipelineState->getDeviceIndex());
+      } else {
+        input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+      }
+    } else
       input = builder.getInt32(0);
     break;
   }
@@ -2311,9 +2315,13 @@ Value *LowerInOut::patchTesBuiltInInputImport(Type *inputTy, unsigned builtInId,
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
-    else
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
+      if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+        input = builder.getInt32(m_pipelineState->getDeviceIndex());
+      } else {
+        input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+      }
+    } else
       input = builder.getInt32(0);
     break;
   }
@@ -2362,9 +2370,13 @@ Value *LowerInOut::patchGsBuiltInInputImport(Type *inputTy, unsigned builtInId, 
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
-    else
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
+      if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+        input = builder.getInt32(m_pipelineState->getDeviceIndex());
+      } else {
+        input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+      }
+    } else
       input = builder.getInt32(0);
     break;
   }
@@ -2580,9 +2592,13 @@ Value *LowerInOut::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, 
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
-    else
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
+      if (m_pipelineState->getShaderOptions(m_shaderStage.value()).viewIndexFromDeviceIndex) {
+        input = builder.getInt32(m_pipelineState->getDeviceIndex());
+      } else {
+        input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+      }
+    } else
       input = builder.getInt32(0);
     break;
   }
@@ -2805,7 +2821,7 @@ Value *LowerInOut::getSamplePosOffset(Type *inputTy, Value *sampleId, BuilderBas
   Value *desc = m_pipelineSysValues.get(m_entryPoint)->loadDescFromDriverTable(SiDrvTableSamplepos, builder);
   // Load the value using the descriptor.
   offset = builder.CreateShl(offset, builder.getInt32(4));
-  return builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, inputTy,
+  return builder.CreateIntrinsic(inputTy, Intrinsic::amdgcn_raw_buffer_load,
                                  {desc, offset, builder.getInt32(0), builder.getInt32(0)});
 }
 
@@ -2889,14 +2905,11 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
     assert(builtInId != BuiltInTessLevelInner || builtInUsage.tessLevelInner);
     (void(builtInUsage)); // Unused
 
-    const auto &calcFactor =
-        m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
-    uint32_t tessFactorStart = calcFactor.onChip.tessFactorStart;
+    // ldsOffset = relativeId * MaxTessFactorsPerPatch + elemIdx
+    uint32_t tessOffset = 0;
     if (builtInId == BuiltInTessLevelInner)
-      tessFactorStart += 4;
+      tessOffset += 4;
 
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
     Value *baseOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
@@ -2904,13 +2917,13 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
     if (outputTy->isArrayTy()) {
       // Import the whole tessLevel array
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart + i));
+        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset + i));
         auto elem = readValueFromLds(false, builder.getFloatTy(), ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
       // Import a single element of tessLevel array
-      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart));
+      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset));
       ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
       output = readValueFromLds(false, outputTy, ldsOffset, builder);
     }
@@ -3159,24 +3172,23 @@ void LowerInOut::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, 
     auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
     // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch + elemIdx
-    uint32_t tessFactorStart = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)
-                                   ->inOutUsage.tcs.calcFactor.onChip.tessFactorStart;
+    // ldsOffset = relativeId * MaxTessFactorsPerPatch + elemIdx
+    uint32_t tessOffset = 0;
     if (builtInId == BuiltInTessLevelInner)
-      tessFactorStart += 4;
+      tessOffset += 4;
 
     // Write tessellation factors to on-chip LDS for later TF buffer store
     Value *baseOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
     if (outputTy->isArrayTy()) {
       // Handle the whole tessLevelOuter array
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart + i));
+        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset + i));
         auto elem = builder.CreateExtractValue(output, {i});
         writeValueToLds(false, elem, ldsOffset, builder);
       }
     } else {
       // Handle a single element of tessLevelOuter array
-      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart));
+      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset));
       ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
       writeValueToLds(false, output, ldsOffset, builder);
     }
@@ -3847,7 +3859,7 @@ void LowerInOut::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuff
   coherent.bits.glc = true;
   coherent.bits.slc = true;
 
-  builder.CreateIntrinsic(Intrinsic::amdgcn_struct_tbuffer_store, storeTy,
+  builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_struct_tbuffer_store,
                           {storeValue, m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer),
                            writeIndex, builder.getInt32(xfbOffset), streamOffset, builder.getInt32(format),
                            builder.getInt32(coherent.u32All)});
@@ -4386,9 +4398,9 @@ Value *LowerInOut::calcLdsOffsetForVsOutput(Type *outputTy, unsigned location, u
 
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
   auto vertexStride = builder.getInt32(calcFactor.inVertexStride);
-
-  // dwordOffset = relVertexId * vertexStride + attribOffset
-  auto ldsOffset = builder.CreateMul(relVertexId, vertexStride);
+  // dwordOffset = inPatchStart + relVertexId * vertexStride + attribOffset
+  Value *ldsOffset = builder.getInt32(calcFactor.onChip.inPatchStart);
+  ldsOffset = builder.CreateAdd(ldsOffset, builder.CreateMul(relVertexId, vertexStride));
   ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
 
   return ldsOffset;
@@ -4430,19 +4442,16 @@ Value *LowerInOut::calcLdsOffsetForTcsInput(Type *inputTy, unsigned location, Va
     attribOffset = builder.CreateAdd(attribOffset, compIdx);
   }
 
-  // dwordOffset = (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
+  // dwordOffset = inPatchStart + (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
   auto inVertexCount = m_pipelineState->getNumPatchControlPoints();
-
   auto inVertexCountVal = builder.getInt32(inVertexCount);
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
-
   Value *ldsOffset = builder.CreateMul(relativeId, inVertexCountVal);
   ldsOffset = builder.CreateAdd(ldsOffset, vertexIdx);
-
   auto inVertexStride = builder.getInt32(calcFactor.inVertexStride);
   ldsOffset = builder.CreateMul(ldsOffset, inVertexStride);
-
-  ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
+  ldsOffset =
+      builder.CreateAdd(builder.getInt32(calcFactor.onChip.inPatchStart), builder.CreateAdd(ldsOffset, attribOffset));
 
   return ldsOffset;
 }

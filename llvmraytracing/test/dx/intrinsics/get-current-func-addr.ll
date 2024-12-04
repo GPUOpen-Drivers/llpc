@@ -4,8 +4,8 @@
 
 %struct.DispatchSystemData = type { i32 }
 
-declare void @Use(i64)
-declare i64 @_AmdGetCurrentFuncAddr()
+declare void @Use(i32)
+declare i32 @_AmdGetCurrentFuncAddr()
 
 declare !pointeetys !2 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !2 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
@@ -13,40 +13,38 @@ declare !pointeetys !2 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 define void @MyRayGen() {
 ; CHECK-LABEL: define void @MyRayGen() {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @MyRayGen)
-; CHECK-NEXT:    call void @Use(i64 [[TMP0]])
+; CHECK-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @MyRayGen)
+; CHECK-NEXT:    call void @Use(i32 [[TMP0]])
 ; CHECK-NEXT:    ret void
 ;
 ; CHECK-CPS-LABEL: define void @MyRayGen() {
 ; CHECK-CPS-NEXT:  AllocaSpillBB:
-; CHECK-CPS-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @MyRayGen)
-; CHECK-CPS-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
-; CHECK-CPS-NEXT:    call void @Use(i64 [[TMP1]])
+; CHECK-CPS-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @MyRayGen)
+; CHECK-CPS-NEXT:    call void @Use(i32 [[TMP0]])
 ; CHECK-CPS-NEXT:    ret void
 ;
 AllocaSpillBB:
-  %val = call i64 @_AmdGetCurrentFuncAddr()
-  call void @Use(i64 %val)
+  %val = call i32 @_AmdGetCurrentFuncAddr()
+  call void @Use(i32 %val)
   ret void
 }
 
 define void @MyRayGen.resume.0() {
 ; CHECK-LABEL: define void @MyRayGen.resume.0() {
 ; CHECK-NEXT:  entryresume.0:
-; CHECK-NEXT:    [[TMP0:%.*]] = call i64 (...) @lgc.cps.as.continuation.reference__i64(ptr @MyRayGen.resume.0)
-; CHECK-NEXT:    call void @Use(i64 [[TMP0]])
+; CHECK-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @MyRayGen.resume.0)
+; CHECK-NEXT:    call void @Use(i32 [[TMP0]])
 ; CHECK-NEXT:    ret void
 ;
 ; CHECK-CPS-LABEL: define void @MyRayGen.resume.0() {
 ; CHECK-CPS-NEXT:  entryresume.0:
-; CHECK-CPS-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference__i32(ptr @MyRayGen.resume.0)
-; CHECK-CPS-NEXT:    [[TMP1:%.*]] = zext i32 [[TMP0]] to i64
-; CHECK-CPS-NEXT:    call void @Use(i64 [[TMP1]])
+; CHECK-CPS-NEXT:    [[TMP0:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @MyRayGen.resume.0)
+; CHECK-CPS-NEXT:    call void @Use(i32 [[TMP0]])
 ; CHECK-CPS-NEXT:    ret void
 ;
 entryresume.0:
-  %val = call i64 @_AmdGetCurrentFuncAddr()
-  call void @Use(i64 %val)
+  %val = call i32 @_AmdGetCurrentFuncAddr()
+  call void @Use(i32 %val)
   ret void
 }
 

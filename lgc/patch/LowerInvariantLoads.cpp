@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerInvariantLoads.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicInst.h"

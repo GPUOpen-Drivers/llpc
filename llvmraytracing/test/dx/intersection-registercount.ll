@@ -1,4 +1,5 @@
-; RUN: opt --verify-each --report-payload-register-sizes=max -passes='dxil-cont-intrinsic-prepare,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,dxil-cleanup-continuations,continuations-stats-report,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
+; NOTE: Do not autogenerate
+; RUN: opt --verify-each --report-payload-register-sizes=max -passes='dxil-cont-prepare-gpurt-library,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,continuations-stats-report,lint,dxil-cont-post-process,lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: Incoming and max outgoing payload VGPR size of "Intersection" (intersection): 25 and 25 dwords
 
@@ -31,7 +32,7 @@ declare !pointeetys !19 i1 @_cont_IsEndSearch(%struct.TraversalData*) #0
 
 declare %struct.DispatchSystemData @_cont_Traversal(%struct.TraversalData) #0
 
-declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64, %struct.AnyHitTraversalData, float, i32) #0
+declare %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32, %struct.AnyHitTraversalData, float, i32) #0
 
 declare !pointeetys !21 %struct.HitData @_cont_GetCandidateState(%struct.AnyHitTraversalData*) #0
 
@@ -54,7 +55,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
 
 define i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind) #0 !pointeetys !27 {
   %trav_data = load %struct.AnyHitTraversalData, %struct.AnyHitTraversalData* %data, align 4
-  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i64 3, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
+  %newdata = call %struct.AnyHitTraversalData @_AmdAwaitAnyHit(i32 3, %struct.AnyHitTraversalData %trav_data, float %t, i32 %hitKind)
   store %struct.AnyHitTraversalData %newdata, %struct.AnyHitTraversalData* %data, align 4
   ret i1 true
 }

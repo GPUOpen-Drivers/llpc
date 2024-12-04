@@ -269,10 +269,12 @@ Value *LowerCooperativeMatrix::convCoopMatrixVecToFlatVec(BuilderCommon &builder
 // @param stride : The stride in bytes in memory between the first elements of consecutive rows (orcolumns) in the
 // source data. Guaranteed to be a multiple of the matrix element size.
 // @param isColMajor : Identify the order for the data stored in memory, col-major/row-major
+// @param isFromPackedVal : Whether the loaded value is in a packed 8-bit format
 // @param insertPos : Where to insert the instruction
 LowerCooperativeMatrix::ComputeAddressInfo
 LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, CooperativeMatrixElementType elemType,
-                                          int waveSize, Value *stride, bool isColMajor, Instruction *insertPos) {
+                                          int waveSize, Value *stride, bool isColMajor, bool isFromPackedVal,
+                                          Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
   Value *threadId = getLaneNumber(builder);
@@ -311,6 +313,33 @@ LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, Cooper
     addrInfo.base = builder.CreateAdd(builder.CreateMul(rowOffsetInFirstVgpr, stride), colOffsetPerLane);
     addrInfo.macroStep = builder.CreateMul(addrInfo.macroStep, stride);
     addrInfo.microStep = builder.CreateMul(addrInfo.microStep, stride);
+  }
+
+  // Update address info for a packed 8-bit format in row major in the view of VGPRs layout
+  if (!isColMajor) {
+    bool isToPackedVal = isa<CooperativeMatrixStoreOp>(insertPos) && (elemType == CooperativeMatrixElementType::Int4);
+    SmallVector<Value *> nextLaneRes;
+    if (isFromPackedVal || isToPackedVal) {
+      if (layout != CooperativeMatrixLayout::FactorMatrixLayout) {
+        llvm_unreachable("This layout is not supported now.");
+      }
+    }
+    if (isFromPackedVal) {
+      Value *baseOffset = builder.CreateMul(stride, builder.getInt32(8));
+      Value *isLessEight = builder.CreateICmpSLT(colOffsetPerLane, builder.getInt32(8));
+      addrInfo.base = builder.CreateSRem(threadId, builder.getInt32(8));
+      if (elemType == CooperativeMatrixElementType::Int4) {
+        addrInfo.base = builder.CreateSelect(isLessEight, addrInfo.base, builder.CreateAdd(addrInfo.base, baseOffset));
+      } else {
+        addrInfo.base = builder.CreateMul(addrInfo.base, builder.getInt32(2));
+        addrInfo.base = builder.CreateSelect(isLessEight, addrInfo.base, builder.CreateAdd(addrInfo.base, baseOffset));
+        addrInfo.packOffset = builder.getInt32(1);
+      }
+    } else if (isToPackedVal) {
+      addrInfo.base = builder.CreateUDiv(addrInfo.base, builder.getInt32(2));
+      addrInfo.macroStep = builder.CreateMul(addrInfo.macroStep, builder.getInt32(2));
+      addrInfo.packOffset = builder.CreateMul(builder.CreateSRem(threadId, builder.getInt32(2)), stride);
+    }
   }
 
   return addrInfo;
@@ -382,7 +411,8 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
 
   auto props = getTypeProperties(elemType, layout);
 
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &load);
+  bool isLoadingPackedVal = !isColMajor && elemType == CooperativeMatrixElementType::Int4;
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, isLoadingPackedVal, &load);
   Value *vecVal = PoisonValue::get(FixedVectorType::get(elemTy, props.numFlatElements));
   for (unsigned idx = 0; idx < props.numFlatElements; ++idx) {
     Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(idx / addrInfo.microCount));
@@ -411,6 +441,9 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
   Value *coMatrix = convFlatVecToCoopMatrixVec(builder, vecVal, elemType, layout);
   m_coopMatrixCalls.push_back(&load);
   load.replaceAllUsesWith(coMatrix);
+
+  if (!isColMajor && elemType == CooperativeMatrixElementType::Int4)
+    m_valPackedInMatrixes.insert(coMatrix);
 }
 
 // =====================================================================================================================
@@ -450,15 +483,45 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
   bool isTemporal = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
 
   auto props = getTypeProperties(elemType, layout);
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &store);
+  bool isFromPackedVal = m_valPackedInMatrixes.find(vecVal) != m_valPackedInMatrixes.end();
 
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, isFromPackedVal, &store);
+
+  bool isToPackedVal = !isColMajor && (elemType == CooperativeMatrixElementType::Int4);
+  bool isFromPackedToNormal = !isColMajor && isFromPackedVal && !isToPackedVal;
+  bool isFromNormalToPacked = !isColMajor && !isFromPackedVal && isToPackedVal;
+  SmallVector<Value *> nextLaneRes;
+  Value *threadId = isFromNormalToPacked ? getLaneNumber(builder) : nullptr;
+  if (isToPackedVal) {
+    // The being store value is packed from part of 8-bit values of the adjacent threads. We use permlane16 to get the
+    // value from the adjacent thread.
+    const unsigned lowSel = 0x67452301;
+    const unsigned highSel = 0xefcdab89;
+    for (unsigned idx = 0; idx < props.numMatrixWords; ++idx) {
+      Value *elem = isa<FixedVectorType>(vecVal->getType()) ? builder.CreateExtractElement(vecVal, idx) : vecVal;
+      Value *permLaneX16 = builder.CreateIntrinsic(
+          builder.getInt32Ty(), Intrinsic::amdgcn_permlane16,
+          {elem, elem, builder.getInt32(lowSel), builder.getInt32(highSel), builder.getFalse(), builder.getFalse()});
+      permLaneX16 = builder.CreateBitCast(permLaneX16, FixedVectorType::get(builder.getInt8Ty(), 4));
+      nextLaneRes.push_back(permLaneX16);
+    }
+  }
   vecVal = convCoopMatrixVecToFlatVec(builder, vecVal, elemType, layout);
 
   for (unsigned idx = 0; idx < props.numFlatElements; ++idx) {
-    Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(idx / addrInfo.microCount));
-    Value *microOffset = builder.CreateMul(addrInfo.microStep, builder.getInt32(idx % addrInfo.microCount));
+    unsigned index = idx;
+    if (isFromPackedToNormal)
+      index = idx / 2;
+
+    Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(index / addrInfo.microCount));
+    Value *microOffset = builder.CreateMul(addrInfo.microStep, builder.getInt32(index % addrInfo.microCount));
     Value *offsetInRowCol = builder.CreateAdd(macroOffset, microOffset);
     Value *offsetInMatrix = builder.CreateAdd(addrInfo.base, offsetInRowCol);
+
+    bool isOddIdx = (idx & 1) == 1;
+    if (isFromNormalToPacked || (isFromPackedToNormal && isOddIdx))
+      offsetInMatrix = builder.CreateAdd(offsetInMatrix, addrInfo.packOffset);
+
     Value *elePtr = builder.CreateGEP(elemTy, dataPtr, offsetInMatrix);
     Value *oneElement = builder.CreateExtractElement(vecVal, idx);
     StoreInst *st = nullptr;
@@ -468,6 +531,17 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
       Align compAlignment = commonAlignment(Align(alignment), constantOffsetInRowCol);
       st = builder.CreateAlignedStore(oneElement, elePtr, compAlignment, isVolatile);
     } else {
+      if (isFromNormalToPacked) {
+        Value *adjacentElem = builder.CreateExtractElement(nextLaneRes[idx / 4], idx % 4);
+        Value *evenTid = builder.CreateICmpEQ(builder.CreateAnd(threadId, builder.getInt32(1)), builder.getInt32(0));
+        Value *mask = builder.CreateSelect(evenTid, builder.getInt8(0xF), builder.getInt8(0xF0));
+        oneElement = builder.CreateAnd(oneElement, mask);
+        adjacentElem = builder.CreateAnd(adjacentElem, mask);
+        adjacentElem = builder.CreateSelect(evenTid, builder.CreateShl(adjacentElem, builder.getInt8(4)),
+                                            builder.CreateLShr(adjacentElem, builder.getInt8(4)));
+        oneElement = builder.CreateOr(oneElement, adjacentElem);
+      }
+
       st = builder.CreateStore(oneElement, elePtr, isVolatile);
     }
     if (isCoherent && !(addrSpace == ADDR_SPACE_LOCAL && dataBitwidth < 32))
@@ -633,6 +707,10 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
     for (unsigned i = 0; i < srcVecSize; ++i) {
       Value *elem = builder.CreateExtractElement(source, i);
       Value *elemLow = builder.CreateAnd(elem, builder.getInt8(0xF));
+      if (isSigned) {
+        elemLow = builder.CreateShl(elemLow, 4);
+        elemLow = builder.CreateAShr(elemLow, 4);
+      }
       Value *elemHigh = isSigned ? builder.CreateAShr(elem, 4) : builder.CreateLShr(elem, 4);
       elems.push_back(elemLow);
       elems.push_back(elemHigh);
@@ -741,6 +819,9 @@ void LowerCooperativeMatrix::visitCooperativeMatrixConvertOp(CooperativeMatrixCo
   }
   m_coopMatrixCalls.push_back(&convert);
   convert.replaceAllUsesWith(resultValue);
+
+  if (srcElemType == CooperativeMatrixElementType::Int4)
+    m_valPackedInMatrixes.insert(resultValue);
 }
 
 // =====================================================================================================================

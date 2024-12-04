@@ -6,7 +6,7 @@
 ; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
 ; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
 ; SHADERTEST: %{{[0-9]+}} = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0), !invariant.load !{{[0-9]+}}
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32(i32 %37, <4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0, i32 0)
+; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 %37, <4 x i32> %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

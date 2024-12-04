@@ -30,7 +30,7 @@
  */
 #include "NggPrimShader.h"
 #include "ShaderMerger.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/util/Debug.h"
 #include "llvm/IR/Constants.h"
@@ -3792,21 +3792,19 @@ void NggPrimShader::mutateGs() {
           continue; // Not belong to GS messages
 
         uint64_t message = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        if (message == GsEmitStreaM0 || message == GsEmitStreaM1 || message == GsEmitStreaM2 ||
-            message == GsEmitStreaM3) {
+        if (message == GsEmitStream0 || message == GsEmitStream1 || message == GsEmitStream2 ||
+            message == GsEmitStream3) {
           // Handle GS_EMIT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
           processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId],
                         totalEmitVertsPtr);
-        } else if (message == GsCutStreaM0 || message == GsCutStreaM1 || message == GsCutStreaM2 ||
-                   message == GsCutStreaM3) {
+        } else if (message == GsCutStream0 || message == GsCutStream1 || message == GsCutStream2 ||
+                   message == GsCutStream3) {
           // Handle GS_CUT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
           processGsCut(streamId, outVertsPtrs[streamId]);
-        } else if (message == GsDone) {
-          // Handle GS_DONE, do nothing (just remove this call)
         } else {
           // Unexpected GS message
           llvm_unreachable("Unexpected GS message!");
@@ -6186,7 +6184,7 @@ void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
           coherent.bits.glc = true;
         }
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
+        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
                                   {attribValue, attribRingBufDesc, vertexIndex, locationOffset, attribRingBaseOffset,
                                    m_builder.getInt32(coherent.u32All)});
 
@@ -6450,7 +6448,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
       if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
         // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
         // and 16scalar.
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, FixedVectorType::get(m_builder.getHalfTy(), 2),
+        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                                   {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
                                    m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
                                    xfbOutputOffset,                                                 // offset
@@ -6458,7 +6456,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
                                    m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
                                    m_builder.getInt32(coherent.u32All)});                           // auxiliary data
 
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, m_builder.getHalfTy(),
+        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                                   {m_builder.CreateExtractElement(outputValue, 2), // vdata
                                    m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
                                    m_builder.CreateAdd(xfbOutputOffset,
@@ -6467,7 +6465,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
                                    m_builder.getInt32(BUF_FORMAT_16_FLOAT),                       // format
                                    m_builder.getInt32(coherent.u32All)});                         // auxiliary data
       } else {
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
+        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                                   {outputValue,                                    // vdata
                                    m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
                                    xfbOutputOffset,                                // offset
@@ -6918,8 +6916,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
           if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
             // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
             // and 16scalar.
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store,
-                                      FixedVectorType::get(m_builder.getHalfTy(), 2),
+            m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                                       {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
                                        m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
                                        xfbOutputOffset,                                                 // offset
@@ -6928,7 +6925,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
                                        m_builder.getInt32(coherent.u32All)}); // auxiliary data
 
             m_builder.CreateIntrinsic(
-                Intrinsic::amdgcn_raw_tbuffer_store, m_builder.getHalfTy(),
+                m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                 {m_builder.CreateExtractElement(outputValue, 2),                                 // vdata
                  m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                                 // rsrc
                  m_builder.CreateAdd(xfbOutputOffset, m_builder.getInt32(2 * sizeof(uint16_t))), // offset
@@ -6936,7 +6933,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
                  m_builder.getInt32(BUF_FORMAT_16_FLOAT),                                        // format
                  m_builder.getInt32(coherent.u32All)});                                          // auxiliary data
           } else {
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outputValue->getType(),
+            m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
                                       {outputValue,                                    // vdata
                                        m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
                                        xfbOutputOffset,                                // offset

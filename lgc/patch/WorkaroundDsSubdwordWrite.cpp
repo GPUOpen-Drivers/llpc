@@ -69,12 +69,6 @@ PreservedAnalyses WorkaroundDsSubdwordWrite::run(Module &module, ModuleAnalysisM
   auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
   if (!workaroundSubdwordWrite || gfxIp.major != 11 || gfxIp.minor != 5)
     return PreservedAnalyses::all();
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
-  // Old version of the code
-  return PreservedAnalyses::all();
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
   bool isChanged = false;
   for (Function &func : module.getFunctionList()) {
     for (BasicBlock &block : func) {
@@ -96,6 +90,5 @@ PreservedAnalyses WorkaroundDsSubdwordWrite::run(Module &module, ModuleAnalysisM
     }
   }
   return isChanged ? PreservedAnalyses::none() : PreservedAnalyses::all();
-#endif
 }
 } // namespace lgc

@@ -323,6 +323,10 @@ union ShaderOptions {
     bool reserved;
     /// Let dmask bits be fully enabled when call 'image.sample.c', for depth compare mode swizzling workaround.
     bool imageSampleDrefReturnsRgba;
+
+    /// Specifies that any shader input variables decorated as ViewIndex
+    /// will be assigned values as if they were decorated as DeviceIndex.
+    bool viewIndexFromDeviceIndex;
   };
 };
 static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));
@@ -907,8 +911,7 @@ public:
   // Set a function's shader subtype. Only has an effect on a compute shader or non-shader export function,
   // where it causes the .shader_subtype PAL metadata item to be set to the arbitrary string given here.
   // The PAL metadata item has no semantic role, but is used by tools, which expect the value to be one of:
-  // "Traversal", "RayGeneration", "Intersection", "AnyHit", "ClosestHit", "Miss", "Callable", "LaunchKernel",
-  // "FixedExpansionNode", "DynamicExpansionNode", "AggregationNode", "ThreadLaunchNode", "DrawNode"
+  // "Traversal", "RayGeneration", "Intersection", "AnyHit", "ClosestHit", "Miss", "Callable", "LaunchKernel"
   static void setShaderSubtype(llvm::GlobalObject *func, llvm::StringRef subtype);
 
   // Find the shader entry-point from shader module, and set pipeline stage.

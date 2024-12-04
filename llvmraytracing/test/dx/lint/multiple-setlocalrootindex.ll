@@ -1,4 +1,5 @@
-; RUN: not opt --verify-each -passes='continuations-lint,continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
+; NOTE: Do not autogenerate
+; RUN: not opt --verify-each -passes='continuations-lint,remove-types-metadata' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
 
 ; CHECK: Found a function with more than one call to setLocalRootIndex
 ; CHECK-NEXT: ptr @RayGen
@@ -9,7 +10,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-p32:32:32-i1:32-i8:8-i16:
 
 declare void @amd.dx.setLocalRootIndex(i32)
 
-define void @RayGen(i64 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !0 !continuation.entry !1 !continuation !2 {
+define void @RayGen(i32 %dummyRetAddr, %struct.DispatchSystemData %0) !lgc.rt.shaderstage !0 !continuation.entry !1 !continuation !2 {
   call void @amd.dx.setLocalRootIndex(i32 0)
   call void @amd.dx.setLocalRootIndex(i32 5)
   ret void

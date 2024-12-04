@@ -47,6 +47,4 @@ attributes #0 = { nounwind }
 ; GFX11-NEXT:    v_lshrrev_b32_e32 v3, 20, v0
 ; GFX11-NEXT:    s_waitcnt lgkmcnt(0)
 ; GFX11-NEXT:    buffer_store_b96 v[1:3], off, s[0:3], 0
-; GFX11-NEXT:    s_nop 0
-; GFX11-NEXT:    s_sendmsg sendmsg(MSG_DEALLOC_VGPRS)
-; GFX11-NEXT:    s_endpgm
+; GFX11:         s_endpgm

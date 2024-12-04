@@ -33,13 +33,7 @@
 #include "lgc/patch/IncludeLlvmIr.h"
 #include "lgc/patch/SetupTargetFeatures.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
-// Old version of the code
-#include "llvm/IR/IRPrintingPasses.h"
-#else
-// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
-#endif
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
@@ -96,13 +90,7 @@ std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassMana
 
   // Add a few optimizations.
   FunctionPassManager fpm;
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
-  // Old version of the code
-  unsigned instCombineOpt = 5;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   auto instCombineOpt = InstCombineOptions().setMaxIterations(5);
-#endif
   fpm.addPass(InstCombinePass(instCombineOpt));
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(EarlyCSEPass(true));

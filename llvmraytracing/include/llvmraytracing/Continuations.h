@@ -124,7 +124,10 @@ uint64_t getInlineHitAttrsBytes(Module &M);
 /// Extract a function from a constant metadata node, ignoring any bitcasts.
 Function *extractFunctionOrNull(Metadata *N);
 
-/// Based on the metadata of a function, check if this is a start function of a shader.
+/// Based on the metadata of a function, get the start function of a continuation shader or resume function.
+/// For non-resume functions, returns Func, even if Func is not a continuation shader.
+Function *getStartFunc(Function *Func);
+/// Returns whether getStartFunc(Func) == Func, see getStartFunc above.
 bool isStartFunc(Function *Func);
 
 /// Recurse into the first member of the given SystemData to find an object of
@@ -134,13 +137,9 @@ Value *getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDataTy, 
 
 /// Replace call to intrinsic (lgc.rt.*) with a call to the driver
 /// implementation (_cont_*).
-CallInst *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData,
-                               lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
-                               CompilerUtils::CrossModuleInliner &Inliner);
-
-/// Terminate a shader by inserting a return instruction and taking care of
-/// basic block splitting and preventing early returns.
-void terminateShader(IRBuilder<> &Builder, CallInst *CompleteCall);
+Value *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData, lgc::rt::RayTracingShaderStage Kind,
+                            CallInst *Call, Module *GpurtLibrary, CompilerUtils::CrossModuleInliner &Inliner,
+                            bool KeepBuilderPos = false);
 
 /// Transformations that run early on the driver/gpurt module.
 ///
@@ -160,23 +159,10 @@ void copyBytes(IRBuilder<> &B, Value *Dst, Value *Src, uint64_t NumBytes);
 
 class CleanupContinuationsPass : public llvm::PassInfoMixin<CleanupContinuationsPass> {
 public:
-  CleanupContinuationsPass(bool Use64BitContinuationReferences = false)
-      : Use64BitContinuationReferences{Use64BitContinuationReferences} {}
+  CleanupContinuationsPass() {}
   llvm::PreservedAnalyses run(llvm::Module &Module, llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "continuation cleanup"; }
-
-private:
-  bool Use64BitContinuationReferences;
-};
-
-// Define a wrapper pass that is used for CleanupContinuationsPass creating
-// 64-bit lgc.cps.as.continuation.reference ops.
-class DXILCleanupContinuationsPass : public CleanupContinuationsPass {
-public:
-  DXILCleanupContinuationsPass() : CleanupContinuationsPass(true) {}
-
-  static llvm::StringRef name() { return "DXIL cleanup continuations pass wrapper"; }
 };
 
 // A pass that reports statistics from the continuations module.
@@ -204,9 +190,9 @@ public:
   static llvm::StringRef name() { return "lgc.cps jump inliner pass"; }
 };
 
-class DXILContIntrinsicPreparePass : public llvm::PassInfoMixin<DXILContIntrinsicPreparePass> {
+class DXILContPrepareGpurtLibraryPass : public llvm::PassInfoMixin<DXILContPrepareGpurtLibraryPass> {
 public:
-  DXILContIntrinsicPreparePass();
+  DXILContPrepareGpurtLibraryPass();
   llvm::PreservedAnalyses run(llvm::Module &Module, llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "DXIL continuation intrinsic preparation"; }

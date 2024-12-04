@@ -14,7 +14,7 @@ config.gfxip = "@AMDLLPC_DEFAULT_TARGET@"
 
 # Propagate CMake options used in lit feature tests.
 config.llvm_assertions = "@LLVM_ENABLE_ASSERTIONS@"
-config.xgl_sanitizers = "@XGL_USE_SANITIZER@"
+config.xgl_sanitizers = "@LLPC_USE_SANITIZER@"
 config.llpc_is_standalone = "@LLPC_IS_STANDALONE@"
 
 for d in "@LIT_DEFINITIONS@".split(";"):

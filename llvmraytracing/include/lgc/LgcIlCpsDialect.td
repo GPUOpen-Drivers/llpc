@@ -54,7 +54,7 @@ def GetReturnValueOp : LgcIlCpsOp<"getReturnValue", [NoUnwind, WillReturn]> {
 }
 
 def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
-  let arguments = (ins I64:$shaderAddr, I32:$csp, I64:$returnAddr, varargs:$tail);
+  let arguments = (ins I64:$shaderAddr, I32:$csp, I32:$returnAddr, varargs:$tail);
   let results = (outs);
 
   let summary =
@@ -73,7 +73,7 @@ def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
 }
 
 def WaitContinueOp : LgcIlCpsOp<"waitContinue", [NoReturn]> {
-  let arguments = (ins I64:$shaderAddr, I64:$waitMask, I32:$csp, I64:$returnAddr, varargs:$tail);
+  let arguments = (ins I64:$shaderAddr, I64:$waitMask, I32:$csp, I32:$returnAddr, varargs:$tail);
   let results = (outs);
 
   let summary =

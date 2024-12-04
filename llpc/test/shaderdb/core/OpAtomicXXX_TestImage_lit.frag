@@ -76,8 +76,8 @@ void main()
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.swap.1d.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.cmpswap.1d.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i32 28, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.add.cube.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 1, i16 1, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.atomic.umin.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 2, i32 0, i32 0
-; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.atomic.umax.i32(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 1, i32 0, i32 0
+; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.atomic.umin.i32{{(\.v4i32)?}}(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 2, i32 0, i32 0
+; SHADERTEST: call i32 @llvm.amdgcn.struct.buffer.atomic.umax.i32{{(\.v4i32)?}}(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 1, i32 0, i32 0
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.and.2darraymsaa.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 2, i16 2, i16 2, i16 5, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.or.cube.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 1, i16 1, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.xor.cube.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 2, i16 2, i16 2, <8 x i32> %{{.*}}, i32 0, i32 0)

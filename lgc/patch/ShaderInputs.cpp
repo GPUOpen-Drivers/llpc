@@ -395,7 +395,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
         }
       }
 
-      // The new ShaderInputs scheme means that InOutBuilder or PatchResourceCollect no longer needs to set
+      // The new ShaderInputs scheme means that InOutBuilder or CollectResourceUsage no longer needs to set
       // the builtInUsage field for an input that is generated using ShaderInputs::getInput() and/or
       // ShaderInputs::getSpecialUserData() (before MutateEntryPoint), and we can remove that
       // builtInUsage field.

@@ -63,16 +63,62 @@ if (NOT DISABLE_LLPC_VERSION_USES_LLVM)
   export(TARGETS llpc_version FILE llpc_version.cmake) # build-tree version
 endif()
 
-### Cached Config-related Options ######################################################################################
-#if VKI_BUILD_STRIX1
-option(LLPC_BUILD_STRIX1 "LLPC support for STRIX1?" ON)
-if (LLPC_BUILD_STRIX1)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_STRIX1)
-endif()
+### Chip-enabling options ##############################################################################################
+
+# Set defaults. This serves two purposes:
+# 1. On a driver build, this defines what settings we want to scrape from PAL's settings from branchdefs; the
+#    default value itself is overridden by PAL's setting.
+# 2. On a standalone build, this defines the actual default settings.
+set(DEFAULT_LLPC_BUILD
+#if LLPC_BUILD_GFX11
+    GFX11=ON
 #endif
-#if VKI_BUILD_GFX115
-option(LLPC_BUILD_GFX115 "LLPC support for GFX11.5?" ON)
-if (LLPC_BUILD_GFX115)
-  target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_GFX115)
-endif()
+#if LLPC_BUILD_STRIX1
+    STRIX1=ON
 #endif
+#if LLPC_BUILD_GFX115
+    GFX115=ON
+#endif
+)
+
+if (TARGET pal)
+    # On a driver build, adjust the default settings by scraping the PAL settings (from branchdefs) out of the
+    # pal target's INTERFACE_COMPILE_DEFINITIONS. (The PAL_* variables are not visible here.)
+    get_target_property(PALDEFS pal INTERFACE_COMPILE_DEFINITIONS)
+    list(REMOVE_DUPLICATES PALDEFS)
+    foreach(PALDEF IN LISTS PALDEFS)
+        if("${PALDEF}" MATCHES "PAL_BUILD_(.*)=(.*)")
+            set(DEF "${CMAKE_MATCH_1}")
+            set(VAL "${CMAKE_MATCH_2}")
+            # Handle the value being a $<bool:> generator expression.
+            # We rely on the input to the $<bool:> being a constant 0,1,OFF,ON,NO,YES
+            if ("${VAL}" MATCHES "0|OFF|NO|\\$<BOOL:>")
+                set(VAL OFF)
+            elseif("${VAL}" MATCHES "1|ON|YES")
+                set(VAL ON)
+            else()
+              message(FATAL_ERROR "Unexpected value in PAL_BUILD_${DEF}=${VAL}")
+            endif()
+            # Override the entry in DEFAULT_LLPC_BUILD.
+            list(TRANSFORM DEFAULT_LLPC_BUILD REPLACE "${DEF}=.*" "${DEF}=${VAL}")
+        endif()
+    endforeach()
+endif()
+
+# For each define in DEFAULT_LLPC_BUILD, provide a cached option for it (which makes it globally visible, so
+# GPURT can see it), and add it to llpc_version's target_compiler_definitions.
+set(LLPC_BUILD_SUMMARY "")
+foreach(DEFVAL IN LISTS DEFAULT_LLPC_BUILD)
+  if ("${DEFVAL}" MATCHES "(.*)=(.*)")
+        set(DEF "${CMAKE_MATCH_1}")
+        set(VAL "${CMAKE_MATCH_2}")
+        option("LLPC_BUILD_${DEF}" "LLPC support for this chip?" "${VAL}")
+        if ("${LLPC_BUILD_${DEF}}")
+            target_compile_definitions(llpc_version INTERFACE "LLPC_BUILD_${DEF}=1")
+            set(LLPC_BUILD_SUMMARY "${LLPC_BUILD_SUMMARY} LLPC_BUILD_${DEF}")
+        endif()
+    endif()
+endforeach()
+
+# Report the summary of what is enabled.
+message(STATUS "LLPC_BUILD_* summary: ${LLPC_BUILD_SUMMARY}")

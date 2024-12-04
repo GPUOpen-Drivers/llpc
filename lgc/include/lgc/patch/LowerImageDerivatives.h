@@ -24,7 +24,7 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  .h
+ * @file  LowerImageDerivatives.h
  * @brief LLPC header file: contains declaration of class lgc::LowerImageDerivatives.
  ***********************************************************************************************************************
  */
@@ -42,7 +42,7 @@ class LowerImageDerivatives : public llvm::PassInfoMixin<LowerImageDerivatives> 
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch attributes when image derivatives dependent on discard"; }
+  static llvm::StringRef name() { return "Lower image derivatives dependent on discard"; }
 };
 
 } // namespace lgc

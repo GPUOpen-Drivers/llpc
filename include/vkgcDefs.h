@@ -511,6 +511,7 @@ struct PipelineOptions {
   bool enableLineSmooth;                  ///< For OGL only, enable line smooth mode.
   bool emulateWideLineStipple;            ///< For OGL only, enable line AA stipple.
   bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
+  bool enableRemapLocation;               ///< For OGL only, enables location remapping.
   const auto &getGlState() const { return *this; }
 #else
   struct GLState {
@@ -529,6 +530,7 @@ struct PipelineOptions {
     bool enableLineSmooth;                  ///< For OGL only, enable line smooth mode.
     bool emulateWideLineStipple;            ///< For OGL only, enable line AA stipple.
     bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
+    bool enableRemapLocation;               ///< For OGL only, enables location remapping.
   } glState;
   const auto &getGlState() const { return glState; }
 #endif
@@ -930,6 +932,13 @@ struct PipelineShaderOptions {
 
   /// Application workaround: disable all fast math flags on gl_Position.
   bool disableGlPositionOpt;
+
+  /// Specifies that any shader input variables decorated as ViewIndex
+  /// will be assigned values as if they were decorated as DeviceIndex.
+  bool viewIndexFromDeviceIndex;
+
+  /// Indicate whether the vertex shader is used by transform pipeline
+  bool enableTransformShader;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1238,6 +1247,13 @@ struct UniformConstantMap {
   UniformConstantMapEntry *pUniforms; ///< Mapping of <location, offset> for uniform constant
 };
 
+/// Remaps output locations according to the location map.
+struct OutputLocationMap {
+  uint32_t *oldLocation; ///< Pointer to an array of old output locations.
+  uint32_t *newLocation; ///< Pointer to an array of new remapped output locations.
+  uint32_t count;        ///< Number of locations that have been remapped.
+};
+
 /// Represents transform feedback info for the captured output
 struct XfbOutInfo {
   bool isBuiltIn;     ///< Determine if it is a built-in output
@@ -1350,6 +1366,7 @@ struct GraphicsPipelineBuildInfo {
   bool enableEarlyCompile;                 ///< Whether enable early compile
   bool useSoftwareVertexBufferDescriptors; ///< Use software vertex buffer descriptors to structure SRD.
   bool dynamicTopology;                    ///< Whether primitive topology is dynamic.
+  OutputLocationMap *outLocationMaps;      ///< Array of location remapping pointers, sized by ShaderStageGfxCount.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif

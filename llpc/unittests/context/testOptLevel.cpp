@@ -48,15 +48,9 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
 
   LgcContext::initialize();
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-  // Old version of the code
-  for (auto optLevel : {Level::None, Level::Less, Level::Default, Level::Aggressive}) {
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   // Returns the optimization level for the context.
   for (auto optLevel :
        {CodeGenOptLevel::None, CodeGenOptLevel::Less, CodeGenOptLevel::Default, CodeGenOptLevel::Aggressive}) {
-#endif
 
     Context context(GfxIp);
 
@@ -67,14 +61,8 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
 
     context.attachPipelineContext(&graphicsContext);
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-    // Old version of the code
-    if (optLevel == Level::None) {
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     // Returns the optimization level for the context.
     if (optLevel == CodeGenOptLevel::None) {
-#endif
       // None might not be possible, so accept >= Level::None
       EXPECT_GE(context.getLgcContext()->getOptimizationLevel(), optLevel);
     } else {
@@ -82,15 +70,9 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
     }
   }
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-  // Old version of the code
-  for (auto optLevel : {Level::None, Level::Less, Level::Default, Level::Aggressive}) {
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   // Returns the optimization level for the context.
   for (auto optLevel :
        {CodeGenOptLevel::None, CodeGenOptLevel::Less, CodeGenOptLevel::Default, CodeGenOptLevel::Aggressive}) {
-#endif
 
     Context context(GfxIp);
 
@@ -101,14 +83,8 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
 
     context.attachPipelineContext(&computeContext);
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
-    // Old version of the code
-    if (optLevel == Level::None) {
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
     // Returns the optimization level for the context.
     if (optLevel == CodeGenOptLevel::None) {
-#endif
       // None might not be possible, so accept >= Level::None
       EXPECT_GE(context.getLgcContext()->getOptimizationLevel(), optLevel);
     } else {

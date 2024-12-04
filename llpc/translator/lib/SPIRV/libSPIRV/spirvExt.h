@@ -45,7 +45,7 @@
 #include "khronos/spirv/NonSemanticDebugPrintf.h"
 #include "khronos/spirv/NonSemanticShaderDebugInfo100.h"
 namespace spv {
-#include "GLSL.ext.AMD.h"
+#include "khronos/spirv/GLSL.ext.AMD.h"
 
 static const LinkageType LinkageTypeInternal = static_cast<LinkageType>(LinkageTypeImport + 1);
 

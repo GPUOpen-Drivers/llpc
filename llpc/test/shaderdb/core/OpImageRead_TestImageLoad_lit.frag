@@ -35,14 +35,14 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 0, i32 512, {{.*}}, i32 1)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 9, i32 512, {{.*}}, <2 x i32> <i32 2, i32 3>)
-; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 10, i32  640, {{.*}}, i32 4)
-; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 8, i32  640, {{.*}}, <4 x i32> <i32 5, i32 6, i32 1, i32 1>)
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 10, i32 640, {{.*}}, i32 4)
+; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 8, i32 640, {{.*}}, <4 x i32> <i32 5, i32 6, i32 1, i32 1>)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 6, i32 512, {{.*}}, <3 x i32> <i32 8, i32 9, i32 2>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i16{{(\.v8i32)?}}(i32 15, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i16{{(\.v8i32)?}}(i32 15, i16 2, i16 3, <8 x i32> %{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.struct.buffer.load.format.v4f32({{.*}}, i32 4, i32 0, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.struct.buffer.load.format.v4f32{{(\.v4i32)?}}({{.*}}, i32 4, i32 0, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.cube.v4f32.i16{{(\.v8i32)?}}(i32 15, i16 5, i16 6, i16 7, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i16{{(\.v8i32)?}}(i32 15, i16 8, i16 9, i16 2, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS

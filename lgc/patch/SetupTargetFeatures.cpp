@@ -29,7 +29,7 @@
 ***********************************************************************************************************************
 */
 #include "lgc/patch/SetupTargetFeatures.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Pass.h"
@@ -56,6 +56,21 @@ PreservedAnalyses PatchSetupTargetFeatures::run(Module &module, ModuleAnalysisMa
   m_pipelineState = pipelineState;
   setupTargetFeatures(&module);
 
+#ifndef NDEBUG
+  // On a debug build, check there are no leftover lgc*.* dialect ops.
+  bool err = false;
+  for (Function &decl : module) {
+    if (!decl.isDeclaration() || decl.getIntrinsicID() != Intrinsic::not_intrinsic || decl.use_empty())
+      continue;
+    if (decl.getName().starts_with("lgc") && decl.getName().find('.') != StringRef::npos) {
+      errs() << "Leftover dialect op " << decl.getName() << "\n";
+      err = true;
+    }
+  }
+  if (err)
+    report_fatal_error("Leftover dialect ops");
+#endif
+
   return PreservedAnalyses::none();
 }
 
@@ -79,16 +94,12 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     auto shaderStage = lgc::getShaderStage(&*func);
 
     // NOTE: AMDGPU_CS_ChainPreserve is expected to not have shader stage set.
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 465196
     if (func->getCallingConv() != CallingConv::AMDGPU_CS_ChainPreserve) {
-#endif
       if (!shaderStage.has_value()) {
         errs() << "Invalid shader stage for function " << func->getName() << "\n";
         report_fatal_error("Got invalid shader stage when setting up features for function");
       }
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 465196
     }
-#endif
 
     if (isShaderEntryPoint(&*func)) {
       bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage.value()).useSiScheduler;
@@ -114,11 +125,8 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       builder.addAttribute("amdgpu-flat-work-group-size", "128,128");
     }
 
-    if (callingConv == CallingConv::AMDGPU_CS || callingConv == CallingConv::AMDGPU_Gfx
-#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 465196
-        || callingConv == CallingConv::AMDGPU_CS_Chain
-#endif
-    ) {
+    if (callingConv == CallingConv::AMDGPU_CS || callingConv == CallingConv::AMDGPU_Gfx ||
+        callingConv == CallingConv::AMDGPU_CS_Chain) {
       // Set the work group size
       const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
       unsigned flatWorkGroupSize = computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;

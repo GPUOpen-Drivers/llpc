@@ -65,6 +65,7 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
   mode.noLocalInvocationIdInCalls = true;
   Pipeline::setComputeShaderMode(module, mode);
   module.getOrInsertNamedMetadata(ContHelper::MDLgcCpsModuleName);
+  ContHelper::setStackAddrspace(module, ContStackAddrspace::ScratchLLPC);
 
   if (module.getName().starts_with("main")) {
     m_shaderStage = ShaderStageRayTracingRayGen;

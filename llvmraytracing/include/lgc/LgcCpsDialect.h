@@ -76,8 +76,6 @@ void setCpsFunctionLevel(llvm::Function &fn, CpsLevel level);
 CpsLevel getCpsLevelFromFunction(const llvm::Function &fn);
 CpsLevel getCpsLevelForShaderStage(lgc::rt::RayTracingShaderStage stage);
 uint8_t getPotentialCpsReturnLevels(lgc::rt::RayTracingShaderStage stage);
-void pushStateToCpsStack(llvm_dialects::Builder &builder, lgc::cps::JumpOp &jumpOp);
-llvm::Value *popStateFromCpsStack(llvm_dialects::Builder &builder, const llvm::DataLayout &DL, llvm::Type *stateType);
 llvm::Value *lowerAsContinuationReference(llvm::IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCROp,
                                           llvm::Value *Relocation = nullptr);
 } // namespace lgc::cps

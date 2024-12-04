@@ -30,7 +30,7 @@
  */
 #include "ShaderMerger.h"
 #include "NggPrimShader.h"
-#include "lgc/patch/Patch.h"
+#include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/PreparePipelineAbi.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PalMetadata.h"
@@ -1113,7 +1113,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
     builder.SetInsertPoint(checkSpecilTfInWaveBlock);
 
     // Read back TFs from LDS
-    auto tessFactors = PatchPreparePipelineAbi::readTessFactors(m_pipelineState, threadIdInGroup, builder);
+    auto tessFactors = PreparePipelineAbi::readTessFactors(m_pipelineState, threadIdInGroup, builder);
     outerTf = tessFactors.first;
     innerTf = tessFactors.second;
 
@@ -1326,8 +1326,8 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
     Value *tfBufferBase = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
 
     // Store TFs to TF buffer
-    PatchPreparePipelineAbi::writeTessFactors(m_pipelineState, tfBufferDesc, tfBufferBase, threadIdInGroup, outerTf,
-                                              innerTf, builder);
+    PreparePipelineAbi::writeTessFactors(m_pipelineState, tfBufferDesc, tfBufferBase, threadIdInGroup, outerTf, innerTf,
+                                         builder);
     builder.CreateBr(endTryStoreTfBlock);
   }
 

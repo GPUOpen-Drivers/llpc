@@ -144,9 +144,7 @@ options.threadGroupSwizzleMode = Default
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    v_dual_mov_b32 v0, s4 :: v_dual_mov_b32 v1, s5
 ; CHECK-NEXT:    buffer_store_format_xy v[0:1], v2, s[0:3], 0 idxen
-; CHECK-NEXT:    s_nop 0
-; CHECK-NEXT:    s_sendmsg sendmsg(MSG_DEALLOC_VGPRS)
-; CHECK-NEXT:    s_endpgm
+; CHECK:         s_endpgm
 ;
 ; CHECK-LABEL: .amdgpu_pal_metadata
 ; CHECK-NEXT: ---
