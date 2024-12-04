@@ -73,7 +73,7 @@ COPY docker/update-llpc.sh /vulkandriver/
 WORKDIR /vulkandriver/builds/ci-build
 RUN EXTRA_COMPILER_FLAGS=() \
     && EXTRA_LINKER_FLAGS=() \
-    && EXTRA_FLAGS=("-DXGL_BUILD_CACHE_CREATOR=ON") \
+    && EXTRA_FLAGS=("") \
     && SANITIZERS=() \
     && if echo "$FEATURES" | grep -q "+gcc" ; then \
          EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=gcc"); \
@@ -99,14 +99,14 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && if [ ${#SANITIZERS[@]} -ne 0 ]; then  \
          SANITIZERS_SEPARATED_LIST="${SANITIZERS[@]}"; \
          SANITIZERS_SEPARATED_LIST="${SANITIZERS_SEPARATED_LIST// /;}"; \
-         EXTRA_FLAGS+=("-DXGL_USE_SANITIZER='${SANITIZERS_SEPARATED_LIST}'"); \
+         EXTRA_FLAGS+=("-DVKI_USE_SANITIZER='${SANITIZERS_SEPARATED_LIST}'"); \
        fi \
     && if echo "$FEATURES" | grep -q "+coverage" ; then \
          EXTRA_COMPILER_FLAGS+=("-fprofile-instr-generate=/vulkandriver/profile%2m.profraw" "-fcoverage-mapping"); \
          EXTRA_LINKER_FLAGS+=("-fprofile-instr-generate=/vulkandriver/profile%2m.profraw" "-fcoverage-mapping"); \
        fi \
     && if echo "$FEATURES" | grep -q "+assertions" ; then \
-         EXTRA_FLAGS+=("-DXGL_ENABLE_ASSERTIONS=ON"); \
+         EXTRA_FLAGS+=("-DVKI_ENABLE_ASSERTIONS=ON"); \
        fi \
     && if [ ${#EXTRA_COMPILER_FLAGS[@]} -ne 0 ]; then \
          EXTRA_FLAGS+=("-DCMAKE_C_FLAGS='${EXTRA_COMPILER_FLAGS[*]}'" "-DCMAKE_CXX_FLAGS='${EXTRA_COMPILER_FLAGS[*]}'"); \
@@ -121,9 +121,9 @@ RUN EXTRA_COMPILER_FLAGS=() \
     && cmake "/vulkandriver/drivers/xgl" \
           -G "$GENERATOR" \
           -DCMAKE_BUILD_TYPE="$CONFIG" \
-          -DXGL_BUILD_TESTS=ON \
-          -DXGL_BUILD_TOOLS=ON \
-          -DICD_ANALYSIS_WARNINGS_AS_ERRORS=OFF \
+          -DVKI_BUILD_TESTS=ON \
+          -DVKI_BUILD_TOOLS=ON \
+          -DVKI_ANALYSIS_WARNINGS_AS_ERRORS=OFF \
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           "${EXTRA_FLAGS[@]}" \
     && cmake --build . \

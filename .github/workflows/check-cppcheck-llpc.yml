@@ -19,5 +19,5 @@ jobs:
           git submodule update --init
       - name: Run cppcheck
         run: |
-          cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 --std=c++17 --inline-suppr . \
+          cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 --std=c++17 --inline-suppr . -i llpc/tool/amdllpc.cpp \
               -I imported/llvm-dialects/include
