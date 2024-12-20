@@ -2589,8 +2589,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   ElfPackage candidateElf;
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache miss for compute pipeline.\n");
-    ComputeContext *computeContext =
-        new ComputeContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
+    ComputeContext *computeContext = new ComputeContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
     result = buildComputePipelineInternal(computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
     delete computeContext;
