@@ -6,7 +6,7 @@ on:
 jobs:
   cppcheck:
     name: cppcheck
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-24.04"
     steps:
       - name: Setup environment
         run: |
@@ -19,5 +19,5 @@ jobs:
           git submodule update --init
       - name: Run cppcheck
         run: |
-          cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 --std=c++17 --inline-suppr . \
+          cppcheck -q -j$(( $(nproc) * 4 )) --error-exitcode=1 --std=c++20 --inline-suppr . \
               -I imported/llvm-dialects/include -i imported -i llpc/unittests -i llvmraytracing
