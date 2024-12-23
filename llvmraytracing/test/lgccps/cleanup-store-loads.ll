@@ -65,7 +65,7 @@ define void @loadAtOffsetF32(ptr %data, i32 %offset) #4 {
 
 %test.Frame = type { i32, float, [100 x i32] }
 
-define { ptr, ptr } @test({} %state, i32 %rcr, float %arg, ptr %0) !lgc.cps !0 !continuation !1 {
+define { ptr, ptr } @test(i32 %shaderIndex, i32 %rcr, float %arg, ptr %0) !lgc.cps !0 !continuation !1 {
 entry:
   %1 = call ptr @continuation.malloc(i32 408)
   store ptr %1, ptr %0, align 8
@@ -115,7 +115,7 @@ entry:
 
 bb1:                                              ; preds = %entry
   %2 = inttoptr i32 %cr to ptr
-  %3 = call ptr %2(i32 %cr, i32 2, float %arg), !continuation.returnedRegistercount !{i32 0}
+  %3 = call ptr %2(i32 %cr, i32 3, i32 2, float %arg), !continuation.returnedRegistercount !{i32 0}
   %4 = insertvalue { ptr, ptr } undef, ptr @test.resume.0, 0
   %5 = insertvalue { ptr, ptr } %4, ptr %3, 1
   ret { ptr, ptr } %5
@@ -159,21 +159,21 @@ bb2:                                              ; preds = %entry
   ; Multiple loads can be optimized away
   call void @loadAtOffsetI32(ptr %data, i32 48)
 
-  call void (...) @lgc.cps.jump(i32 %rcr.reload, i32 2,  i32 poison, i32 poison, float %returnvalue)
+  call void (...) @lgc.cps.jump(i32 %rcr.reload, i32 2, i32 poison, i32 poison, i32 poison, float %returnvalue)
   unreachable
 }
 
 define internal { ptr, ptr } @test.resume.0(ptr noalias noundef nonnull align 4 dereferenceable(8) %0, i1 %1) !lgc.cps !0 !continuation !1 {
 entryresume.0:
   %2 = load ptr, ptr %0, align 8
-  %3 = call { float } @lgc.ilcps.getReturnValue__f32()
-  %res = extractvalue { float } %3, 0
+  %3 = call { i32, float } @lgc.ilcps.getReturnValue__i32_f32()
+  %ret.arg = extractvalue { i32, float } %3, 1
   %arg.reload.addr = getelementptr inbounds %test.Frame, ptr %2, i32 0, i32 1
   %arg.reload = load float, ptr %arg.reload.addr, align 4
   %rcr.reload.addr = getelementptr inbounds %test.Frame, ptr %2, i32 0, i32 0
   %rcr.reload = load i32, ptr %rcr.reload.addr, align 4
-  %returnvalue = fmul float %res, %arg.reload
-  call void (...) @lgc.cps.jump(i32 %rcr.reload, i32 2,  i32 poison, i32 poison, float %returnvalue)
+  %returnvalue = fmul float %ret.arg, %arg.reload
+  call void (...) @lgc.cps.jump(i32 %rcr.reload, i32 2, i32 poison, i32 poison, i32 poison, float %returnvalue)
   unreachable
 }
 
@@ -198,7 +198,7 @@ declare ptr @llvm.coro.begin(token, ptr writeonly) #1
 declare i1 @llvm.coro.suspend.retcon.i1(...) #1
 
 ; Function Attrs: nounwind willreturn
-declare { float } @lgc.ilcps.getReturnValue__f32() #2
+declare { i32, float } @lgc.ilcps.getReturnValue__i32_f32() #2
 
 ; Function Attrs: noreturn
 declare void @continuation.return(...) #3
@@ -263,7 +263,7 @@ attributes #4 = { alwaysinline }
 ;
 ;
 ; CHECK-LABEL: define void @test(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]]) !lgc.cps [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] !continuation.stacksize [[META3:![0-9]+]] !continuation.state [[META3]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[SHADERINDEX:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]]) !lgc.cps [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] !continuation.stacksize [[META3:![0-9]+]] !continuation.state [[META3]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP51:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[TMP51]], align 4
@@ -355,7 +355,7 @@ attributes #4 = { alwaysinline }
 ; CHECK-NEXT:    [[TMP0:%.*]] = inttoptr i32 [[CR]] to ptr
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.0)
 ; CHECK-NEXT:    [[TMP52:%.*]] = load i32, ptr [[TMP51]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP52]], i32 [[TMP1]], float [[ARG]]), !continuation.returnedRegistercount [[META4:![0-9]+]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 3, i32 [[TMP52]], i32 2, i32 [[TMP1]], float [[ARG]]), !continuation.returnedRegistercount [[META4:![0-9]+]]
 ; CHECK-NEXT:    unreachable
 ; CHECK:       bb2:
 ; CHECK-NEXT:    [[T0_BB2:%.*]] = phi float [ [[T0]], [[ENTRY:%.*]] ]
@@ -403,19 +403,20 @@ attributes #4 = { alwaysinline }
 ; CHECK-NEXT:    [[TMP74:%.*]] = add i32 [[TMP76]], -408
 ; CHECK-NEXT:    store i32 [[TMP74]], ptr [[TMP51]], align 4
 ; CHECK-NEXT:    [[TMP77:%.*]] = load i32, ptr [[TMP51]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 2, i32 [[TMP77]], i32 poison, float [[RETURNVALUE]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 2, i32 [[TMP77]], i32 poison, i32 poison, float [[RETURNVALUE]])
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define dso_local void @test.resume.0(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], i32 [[TMP1:%.*]], float [[TMP2:%.*]]) !lgc.cps [[META1]] !continuation [[META2]] !continuation.registercount [[META4]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], float [[TMP1:%.*]]) !lgc.cps [[META1]] !continuation [[META2]] !continuation.registercount [[META4]] {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -408
-; CHECK-NEXT:    [[TMP13:%.*]] = insertvalue { float } poison, float [[TMP2]], 0
-; CHECK-NEXT:    [[RES:%.*]] = extractvalue { float } [[TMP13]], 0
+; CHECK-NEXT:    [[TMP13:%.*]] = insertvalue { i32, float } poison, i32 [[TMP0]], 0
+; CHECK-NEXT:    [[TMP14:%.*]] = insertvalue { i32, float } [[TMP13]], float [[TMP1]], 1
+; CHECK-NEXT:    [[RET_ARG1:%.*]] = extractvalue { i32, float } [[TMP14]], 1
 ; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[TMP4]], 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP6]], i32 0
@@ -423,11 +424,11 @@ attributes #4 = { alwaysinline }
 ; CHECK-NEXT:    [[TMP8:%.*]] = inttoptr i32 [[TMP4]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP8]], i32 0
 ; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(5) [[TMP9]], align 4
-; CHECK-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[RES]], [[ARG_RELOAD]]
+; CHECK-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[RET_ARG1]], [[ARG_RELOAD]]
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], -408
 ; CHECK-NEXT:    store i32 [[TMP11]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 2, i32 [[TMP12]], i32 poison, float [[RETURNVALUE]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 2, i32 [[TMP12]], i32 poison, i32 poison, float [[RETURNVALUE]])
 ; CHECK-NEXT:    unreachable
 ;

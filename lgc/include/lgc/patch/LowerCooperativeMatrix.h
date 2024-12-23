@@ -108,10 +108,11 @@ private:
     unsigned microCount;
   };
 
-  TypeProperties getTypeProperties(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout) const;
+  TypeProperties getTypeProperties(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                   unsigned kSize) const;
 
   ComputeAddressInfo computeAddressing(CooperativeMatrixLayout layout, CooperativeMatrixElementType elemType,
-                                       int waveSize, llvm::Value *stride, bool isColMajor, bool isFromPackedVal,
+                                       int waveSize, llvm::Value *stride, bool isColMajor,
                                        llvm::Instruction *insertPos);
 
   void visitCooperativeMatrixLengthOp(CooperativeMatrixLengthOp &matrixlength);
@@ -131,11 +132,13 @@ private:
   // Convert vector data to cooperativeMatrix vec data
   // eg. v16*data_In_Buffer-->v8*coopMatrix_data as two 16bits elements packed.
   llvm::Value *convFlatVecToCoopMatrixVec(BuilderCommon &builder, llvm::Value *vecValue,
-                                          CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
+                                          CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                          unsigned kSize = 16);
 
   // Convert cooperativeMatrix vec data to vec data.
   llvm::Value *convCoopMatrixVecToFlatVec(BuilderCommon &builder, llvm::Value *matrixValue,
-                                          CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
+                                          CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                          unsigned kSize = 16);
 
   // Create cooperative matrix convert operation without reshape operation
   llvm::Value *cooperativeMatrixConvertInternal(llvm::CastInst::CastOps castOp, llvm::Value *source,

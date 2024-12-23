@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  FragmentColorExport.h
- * @brief LLPC header file: contains declaration of class lgc::FragColorExport.
+ * @brief LLPC header file: contains declaration of class lgc::FragmentColorExport.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -57,7 +57,7 @@ enum class CompSetting : unsigned {
 
 // =====================================================================================================================
 // Represents the manager of fragment color export operations.
-class FragColorExport {
+class FragmentColorExport {
 public:
   // Color export Info
   struct Key {
@@ -69,7 +69,7 @@ public:
     ExportFormat dummyExpFmt;                   // Export format used for dummy "export" instruction.
   };
 
-  FragColorExport(LgcContext *context);
+  FragmentColorExport(LgcContext *context);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
                                   bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
@@ -84,9 +84,9 @@ public:
   static Key computeKey(llvm::ArrayRef<ColorExportInfo> info, PipelineState *pipelineState);
 
 private:
-  FragColorExport() = delete;
-  FragColorExport(const FragColorExport &) = delete;
-  FragColorExport &operator=(const FragColorExport &) = delete;
+  FragmentColorExport() = delete;
+  FragmentColorExport(const FragmentColorExport &) = delete;
+  FragmentColorExport &operator=(const FragmentColorExport &) = delete;
   void updateColorExportInfoWithBroadCastInfo(const Key &key, llvm::ArrayRef<ColorExportInfo> originExpinfo,
                                               bool needMrt0a, llvm::SmallVector<ColorExportInfo> &outExpinfo,
                                               unsigned *pCbShaderMask);
@@ -114,9 +114,9 @@ struct ColorOutputValueInfo {
 
 // =====================================================================================================================
 // Pass to lower color export calls
-class LowerFragColorExport : public llvm::PassInfoMixin<LowerFragColorExport> {
+class LowerFragmentColorExport : public llvm::PassInfoMixin<LowerFragmentColorExport> {
 public:
-  LowerFragColorExport();
+  LowerFragmentColorExport();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Lower fragment color export calls"; }

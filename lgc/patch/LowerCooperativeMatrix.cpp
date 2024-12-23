@@ -51,7 +51,8 @@ namespace lgc {
 static const Intrinsic::AMDGCNIntrinsics InvalidInstricID = Intrinsic::AMDGCNIntrinsics(0xFFFFFFFF);
 static const Intrinsic::AMDGCNIntrinsics GetWmmaIntrinsic(GfxIpVersion gfxIp, CooperativeMatrixElementType typeA,
                                                           CooperativeMatrixElementType typeB,
-                                                          CooperativeMatrixElementType typeC, bool isTiled = false) {
+                                                          CooperativeMatrixElementType typeC, unsigned kMultiplier,
+                                                          bool isTiled = false) {
   assert(gfxIp.major >= 11);
   switch (typeA) {
   case CooperativeMatrixElementType::Float16: {
@@ -77,8 +78,11 @@ static const Intrinsic::AMDGCNIntrinsics GetWmmaIntrinsic(GfxIpVersion gfxIp, Co
   }
   case CooperativeMatrixElementType::Int4: {
     assert(typeA == typeB);
-    if (typeC == CooperativeMatrixElementType::Int32)
-      return Intrinsic::amdgcn_wmma_i32_16x16x16_iu4;
+    if (typeC == CooperativeMatrixElementType::Int32) {
+      if (kMultiplier == 1)
+        return Intrinsic::amdgcn_wmma_i32_16x16x16_iu4;
+    }
+
     break;
   }
   default:
@@ -149,9 +153,11 @@ void LowerCooperativeMatrix::processCoopMatrixFunction(Module &module) {
 //
 // @param elemType : the matrix element type
 // @param layout : the matrix layout
+// @param kSize : the matrix K size
 // @returns : the type properties
 LowerCooperativeMatrix::TypeProperties LowerCooperativeMatrix::getTypeProperties(CooperativeMatrixElementType elemType,
-                                                                                 CooperativeMatrixLayout layout) const {
+                                                                                 CooperativeMatrixLayout layout,
+                                                                                 unsigned kSize) const {
   TypeProperties props;
 
   props.matrixElementStride = 1;
@@ -214,10 +220,11 @@ LowerCooperativeMatrix::TypeProperties LowerCooperativeMatrix::getTypeProperties
 // @param vecValue : Vector Value which maybe V16.
 // @param elemType : Element type for the matrix.
 // @param layout : Identify whether this matrix is A/B or C/D
+// @param kSize : the matrix K size
 Value *LowerCooperativeMatrix::convFlatVecToCoopMatrixVec(BuilderCommon &builder, Value *vecValue,
                                                           CooperativeMatrixElementType elemType,
-                                                          CooperativeMatrixLayout layout) {
-  auto props = getTypeProperties(elemType, layout);
+                                                          CooperativeMatrixLayout layout, unsigned kSize) {
+  auto props = getTypeProperties(elemType, layout, kSize);
 
   if (props.numMatrixElements > props.numFlatElements) {
     SmallVector<int, 16> mask;
@@ -241,10 +248,11 @@ Value *LowerCooperativeMatrix::convFlatVecToCoopMatrixVec(BuilderCommon &builder
 // @param matrixValue : Vector Value which maybe V16.
 // @param elemType : Element type for the matrix.
 // @param layout : Identify whether this matrix is A/B or C/D
+// @param kSize : the matrix K size
 Value *LowerCooperativeMatrix::convCoopMatrixVecToFlatVec(BuilderCommon &builder, Value *matrixValue,
                                                           CooperativeMatrixElementType elemType,
-                                                          CooperativeMatrixLayout layout) {
-  auto props = getTypeProperties(elemType, layout);
+                                                          CooperativeMatrixLayout layout, unsigned kSize) {
+  auto props = getTypeProperties(elemType, layout, kSize);
   Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
   if (elemTy->getScalarSizeInBits() < 8)
     elemTy = builder.getInt8Ty();
@@ -269,12 +277,10 @@ Value *LowerCooperativeMatrix::convCoopMatrixVecToFlatVec(BuilderCommon &builder
 // @param stride : The stride in bytes in memory between the first elements of consecutive rows (orcolumns) in the
 // source data. Guaranteed to be a multiple of the matrix element size.
 // @param isColMajor : Identify the order for the data stored in memory, col-major/row-major
-// @param isFromPackedVal : Whether the loaded value is in a packed 8-bit format
 // @param insertPos : Where to insert the instruction
 LowerCooperativeMatrix::ComputeAddressInfo
 LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, CooperativeMatrixElementType elemType,
-                                          int waveSize, Value *stride, bool isColMajor, bool isFromPackedVal,
-                                          Instruction *insertPos) {
+                                          int waveSize, Value *stride, bool isColMajor, Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
   Value *threadId = getLaneNumber(builder);
@@ -310,6 +316,8 @@ LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, Cooper
   if (isColMajor) {
     addrInfo.base = builder.CreateAdd(rowOffsetInFirstVgpr, builder.CreateMul(colOffsetPerLane, stride));
   } else {
+    if (elemType == CooperativeMatrixElementType::Int4)
+      colOffsetPerLane = builder.CreateLShr(colOffsetPerLane, builder.getInt32(1)); // threadId%16 / 2
     addrInfo.base = builder.CreateAdd(builder.CreateMul(rowOffsetInFirstVgpr, stride), colOffsetPerLane);
     addrInfo.macroStep = builder.CreateMul(addrInfo.macroStep, stride);
     addrInfo.microStep = builder.CreateMul(addrInfo.microStep, stride);
@@ -317,28 +325,15 @@ LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, Cooper
 
   // Update address info for a packed 8-bit format in row major in the view of VGPRs layout
   if (!isColMajor) {
-    bool isToPackedVal = isa<CooperativeMatrixStoreOp>(insertPos) && (elemType == CooperativeMatrixElementType::Int4);
-    SmallVector<Value *> nextLaneRes;
-    if (isFromPackedVal || isToPackedVal) {
-      if (layout != CooperativeMatrixLayout::FactorMatrixLayout) {
-        llvm_unreachable("This layout is not supported now.");
-      }
-    }
-    if (isFromPackedVal) {
-      Value *baseOffset = builder.CreateMul(stride, builder.getInt32(8));
-      Value *isLessEight = builder.CreateICmpSLT(colOffsetPerLane, builder.getInt32(8));
-      addrInfo.base = builder.CreateSRem(threadId, builder.getInt32(8));
-      if (elemType == CooperativeMatrixElementType::Int4) {
-        addrInfo.base = builder.CreateSelect(isLessEight, addrInfo.base, builder.CreateAdd(addrInfo.base, baseOffset));
-      } else {
-        addrInfo.base = builder.CreateMul(addrInfo.base, builder.getInt32(2));
-        addrInfo.base = builder.CreateSelect(isLessEight, addrInfo.base, builder.CreateAdd(addrInfo.base, baseOffset));
-        addrInfo.packOffset = builder.getInt32(1);
-      }
-    } else if (isToPackedVal) {
-      addrInfo.base = builder.CreateUDiv(addrInfo.base, builder.getInt32(2));
+    bool isStoringPackedVal =
+        isa<CooperativeMatrixStoreOp>(insertPos) && (elemType == CooperativeMatrixElementType::Int4);
+    if (isStoringPackedVal) {
+      // The i4 value from two threads are merged into two i4vec2. The first i4vec2 is stored by the current thread and
+      // the second is stored by the next thread.
+      Value *offset = builder.CreateMul(builder.CreateSRem(threadId, builder.getInt32(2)), stride);
+      addrInfo.base = builder.CreateAdd(addrInfo.base, offset);
+      // The step is doubled since the next row will be written by the next thread
       addrInfo.macroStep = builder.CreateMul(addrInfo.macroStep, builder.getInt32(2));
-      addrInfo.packOffset = builder.CreateMul(builder.CreateSRem(threadId, builder.getInt32(2)), stride);
     }
   }
 
@@ -354,6 +349,8 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLengthOp(CooperativeMatrixLen
   builder.SetInsertPoint(&matrixlength);
   auto waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage.value());
   auto layout = matrixlength.getLayout();
+  unsigned kSize = matrixlength.getKSize();
+  (void)kSize;
   unsigned length = 0;
   switch (layout) {
   case CooperativeMatrixLayout::FactorMatrixLayout:
@@ -393,6 +390,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
   auto layout = load.getLayout();
   auto isColMajor = load.getColMajor();
   auto alignment = load.getAlignment();
+  unsigned kSize = load.getKSize();
 
   // Calc element offset in memory
   Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
@@ -409,12 +407,17 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
   bool isCoherent = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessCoherentMask);
   bool isTemporal = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
 
-  auto props = getTypeProperties(elemType, layout);
+  auto props = getTypeProperties(elemType, layout, kSize);
 
   bool isLoadingPackedVal = !isColMajor && elemType == CooperativeMatrixElementType::Int4;
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, isLoadingPackedVal, &load);
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &load);
   Value *vecVal = PoisonValue::get(FixedVectorType::get(elemTy, props.numFlatElements));
-  for (unsigned idx = 0; idx < props.numFlatElements; ++idx) {
+  unsigned numFlatElements = props.numFlatElements;
+
+  SmallVector<Value *> packedVals;
+  if (isLoadingPackedVal)
+    numFlatElements *= 2;
+  for (unsigned idx = 0; idx < numFlatElements; ++idx) {
     Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(idx / addrInfo.microCount));
     Value *microOffset = builder.CreateMul(addrInfo.microStep, builder.getInt32(idx % addrInfo.microCount));
     Value *offsetInRowCol = builder.CreateAdd(macroOffset, microOffset);
@@ -430,15 +433,39 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
     } else {
       // For rowMajor@B/C and colMajor@A, as the elements of one lane aren't continuous, no alignments needed.
       eleVal = builder.CreateLoad(elemTy, elePtr, isVolatile);
+      packedVals.push_back(eleVal);
     }
     if (isCoherent && !(addrSpace == ADDR_SPACE_LOCAL && dataBitwidth < 32))
       cast<LoadInst>(eleVal)->setAtomic(AtomicOrdering::Unordered);
     if (isTemporal)
       cast<LoadInst>(eleVal)->setMetadata(LLVMContext::MD_nontemporal, MDNode::get(builder.getContext(), {}));
-    vecVal = builder.CreateInsertElement(vecVal, eleVal, idx);
+    if (!isLoadingPackedVal)
+      vecVal = builder.CreateInsertElement(vecVal, eleVal, idx);
+  }
+  if (isLoadingPackedVal) {
+    // The low 4-bits in the loaded elements write into a VGPR in the current even thread and the high 4-bits in the
+    // loaded elements written into the odd thread
+    Value *threadId = getLaneNumber(builder);
+    Value *isEvenTid = builder.CreateICmpEQ(builder.CreateAnd(threadId, builder.getInt32(1)), builder.getInt32(0));
+    for (unsigned idx = 0; idx < numFlatElements; idx += 2) {
+      Value *lowBits = builder.CreateAnd(packedVals[idx], builder.getInt8(0xf));
+      Value *nextLowBits = builder.CreateAnd(packedVals[idx + 1], builder.getInt8(0xf));
+      nextLowBits = builder.CreateShl(nextLowBits, builder.getInt8(4));
+      Value *evenVal = builder.CreateOr(lowBits, nextLowBits);
+
+      Value *highBits = builder.CreateAnd(packedVals[idx], builder.getInt8(0xf0));
+      highBits = builder.CreateLShr(packedVals[idx], builder.getInt8(4));
+      Value *nextHighBits = builder.CreateAnd(packedVals[idx + 1], builder.getInt8(0xf0));
+      Value *oddVal = builder.CreateOr(highBits, nextHighBits);
+
+      const unsigned elemIdx = idx / 2;
+      Value *evenVec = builder.CreateInsertElement(vecVal, evenVal, elemIdx);
+      Value *oddVec = builder.CreateInsertElement(vecVal, oddVal, elemIdx);
+      vecVal = builder.CreateSelect(isEvenTid, evenVec, oddVec);
+    }
   }
 
-  Value *coMatrix = convFlatVecToCoopMatrixVec(builder, vecVal, elemType, layout);
+  Value *coMatrix = convFlatVecToCoopMatrixVec(builder, vecVal, elemType, layout, kSize);
   m_coopMatrixCalls.push_back(&load);
   load.replaceAllUsesWith(coMatrix);
 
@@ -462,6 +489,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
   auto isColMajor = store.getColMajor();
   auto alignment = store.getAlignment();
   Value *vecVal = store.getStoreValue();
+  unsigned kSize = store.getKSize();
   auto shaderStage = getShaderStage(builder.GetInsertBlock()->getParent());
   auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage.value());
   assert(waveSize == 32 || waveSize == 64);
@@ -482,17 +510,14 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
   bool isCoherent = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessCoherentMask);
   bool isTemporal = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
 
-  auto props = getTypeProperties(elemType, layout);
-  bool isFromPackedVal = m_valPackedInMatrixes.find(vecVal) != m_valPackedInMatrixes.end();
+  auto props = getTypeProperties(elemType, layout, kSize);
 
-  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, isFromPackedVal, &store);
+  auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &store);
 
-  bool isToPackedVal = !isColMajor && (elemType == CooperativeMatrixElementType::Int4);
-  bool isFromPackedToNormal = !isColMajor && isFromPackedVal && !isToPackedVal;
-  bool isFromNormalToPacked = !isColMajor && !isFromPackedVal && isToPackedVal;
+  bool isStoringPackedVal = !isColMajor && (elemType == CooperativeMatrixElementType::Int4);
   SmallVector<Value *> nextLaneRes;
-  Value *threadId = isFromNormalToPacked ? getLaneNumber(builder) : nullptr;
-  if (isToPackedVal) {
+  Value *threadId = isStoringPackedVal ? getLaneNumber(builder) : nullptr;
+  if (isStoringPackedVal) {
     // The being store value is packed from part of 8-bit values of the adjacent threads. We use permlane16 to get the
     // value from the adjacent thread.
     const unsigned lowSel = 0x67452301;
@@ -506,21 +531,13 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
       nextLaneRes.push_back(permLaneX16);
     }
   }
-  vecVal = convCoopMatrixVecToFlatVec(builder, vecVal, elemType, layout);
+  vecVal = convCoopMatrixVecToFlatVec(builder, vecVal, elemType, layout, kSize);
 
   for (unsigned idx = 0; idx < props.numFlatElements; ++idx) {
-    unsigned index = idx;
-    if (isFromPackedToNormal)
-      index = idx / 2;
-
-    Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(index / addrInfo.microCount));
-    Value *microOffset = builder.CreateMul(addrInfo.microStep, builder.getInt32(index % addrInfo.microCount));
+    Value *macroOffset = builder.CreateMul(addrInfo.macroStep, builder.getInt32(idx / addrInfo.microCount));
+    Value *microOffset = builder.CreateMul(addrInfo.microStep, builder.getInt32(idx % addrInfo.microCount));
     Value *offsetInRowCol = builder.CreateAdd(macroOffset, microOffset);
     Value *offsetInMatrix = builder.CreateAdd(addrInfo.base, offsetInRowCol);
-
-    bool isOddIdx = (idx & 1) == 1;
-    if (isFromNormalToPacked || (isFromPackedToNormal && isOddIdx))
-      offsetInMatrix = builder.CreateAdd(offsetInMatrix, addrInfo.packOffset);
 
     Value *elePtr = builder.CreateGEP(elemTy, dataPtr, offsetInMatrix);
     Value *oneElement = builder.CreateExtractElement(vecVal, idx);
@@ -531,14 +548,15 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
       Align compAlignment = commonAlignment(Align(alignment), constantOffsetInRowCol);
       st = builder.CreateAlignedStore(oneElement, elePtr, compAlignment, isVolatile);
     } else {
-      if (isFromNormalToPacked) {
+      if (isStoringPackedVal) {
         Value *adjacentElem = builder.CreateExtractElement(nextLaneRes[idx / 4], idx % 4);
         Value *evenTid = builder.CreateICmpEQ(builder.CreateAnd(threadId, builder.getInt32(1)), builder.getInt32(0));
         Value *mask = builder.CreateSelect(evenTid, builder.getInt8(0xF), builder.getInt8(0xF0));
         oneElement = builder.CreateAnd(oneElement, mask);
         adjacentElem = builder.CreateAnd(adjacentElem, mask);
-        adjacentElem = builder.CreateSelect(evenTid, builder.CreateShl(adjacentElem, builder.getInt8(4)),
-                                            builder.CreateLShr(adjacentElem, builder.getInt8(4)));
+        Value *evenElem = builder.CreateShl(adjacentElem, builder.getInt8(4));
+        Value *oddElem = builder.CreateLShr(adjacentElem, builder.getInt8(4));
+        adjacentElem = builder.CreateSelect(evenTid, evenElem, oddElem);
         oneElement = builder.CreateOr(oneElement, adjacentElem);
       }
 
@@ -564,14 +582,15 @@ void LowerCooperativeMatrix::visitCooperativeMatrixFillOp(CooperativeMatrixFillO
   auto elemType = fill.getElemType();
   auto layout = fill.getLayout();
   Value *value = fill.getScalar();
-  auto props = getTypeProperties(elemType, layout);
+  unsigned kSize = fill.getKSize();
+  auto props = getTypeProperties(elemType, layout, kSize);
   Type *flatType = FixedVectorType::get(builder.transCooperativeMatrixElementType(elemType), props.numMatrixElements);
 
   Value *vec = PoisonValue::get(flatType);
   for (unsigned idx = 0; idx < props.numMatrixElements; idx++)
     vec = builder.CreateInsertElement(vec, value, idx);
 
-  Value *fillValue = convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
+  Value *fillValue = convFlatVecToCoopMatrixVec(builder, vec, elemType, layout, kSize);
 
   m_coopMatrixCalls.push_back(&fill);
   fill.replaceAllUsesWith(fillValue);
@@ -1587,10 +1606,12 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
   auto matrixAType = muladd.getMatrixAElemType();
   auto matrixBType = muladd.getMatrixBElemType();
   auto matrixCType = muladd.getMatrixCElemType();
+  [[maybe_unused]] auto matrixDType = muladd.getMatrixDElemType();
   bool isSignedA = muladd.getIsSignedA();
   bool isSignedB = muladd.getIsSignedB();
   bool isSatOrOpsel = muladd.getIsSatOrOpsel();
   StringRef instName = muladd.getName();
+  unsigned kMultiplier = muladd.getKMultiplier();
 
   // Gfx11:
   // wave64:
@@ -1618,7 +1639,8 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
 
     if (BuilderCommon::isTypeNCooperativeMatrix(matrixAType, 16)) {
       assert(matrixAType == matrixBType);
-      { factorFlatElemNum = 16; }
+      if (m_gfxIp.major <= 11)
+        factorFlatElemNum = 16;
       Type *factorType =
           FixedVectorType::get(builder.transCooperativeMatrixElementType(matrixAType), factorFlatElemNum);
       matrixA = builder.CreateBitCast(matrixA, factorType);
@@ -1633,15 +1655,13 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
         matrixC = waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector")
                                  : matrixC;
     } else if (BuilderCommon::isTypeNCooperativeMatrix(matrixCType, 16)) {
-      {
-        if (m_gfxIp.major == 12) {
-          // When gfxIp.major > 12, waveSize will always be 32 then matrixC size is solid without any necessary swizzle.
-          matrixC =
-              waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1}), "shuffleVector") : matrixC;
-        } else { // m_gfxIp.major <= 11
-          matrixC = waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector")
-                                   : matrixC;
-        }
+      if (m_gfxIp.major == 12) {
+        // When gfxIp.major > 12, waveSize will always be 32 then matrixC size is solid without any necessary swizzle.
+        matrixC =
+            waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1}), "shuffleVector") : matrixC;
+      } else if (m_gfxIp.major < 12) { // m_gfxIp.major <= 11
+        matrixC = waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector")
+                                 : matrixC;
       }
 
       Type *castType = nullptr;
@@ -1658,7 +1678,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
     }
 
     Intrinsic::AMDGCNIntrinsics intrinsic = InvalidInstricID;
-    intrinsic = GetWmmaIntrinsic(m_gfxIp, matrixAType, matrixBType, matrixCType, muladd.getIsTied());
+    intrinsic = GetWmmaIntrinsic(m_gfxIp, matrixAType, matrixBType, matrixCType, kMultiplier, muladd.getIsTied());
 
     if (intrinsic == InvalidInstricID)
       llvm_unreachable("HW intrinsics not supported!");
@@ -1700,7 +1720,13 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
       llvm_unreachable("Should never be called!");
       break;
     }
-    matrixD = builder.CreateIntrinsic(matrixC->getType(), intrinsic, args, nullptr, instName);
+    auto retTy = matrixC->getType();
+    if (matrixCType != matrixDType) {
+      assert(matrixDType == CooperativeMatrixElementType::Float32 &&
+             matrixCType == CooperativeMatrixElementType::Int32);
+      retTy = muladd.getResult()->getType();
+    }
+    matrixD = builder.CreateIntrinsic(retTy, intrinsic, args, nullptr, instName);
 
     if (BuilderCommon::isTypeNCooperativeMatrix(matrixCType, 16)) {
       unsigned coopVeclength = cast<FixedVectorType>(matrixD->getType())->getNumElements();
@@ -2276,7 +2302,7 @@ void LowerCooperativeMatrix::visitCooperativeRowAccExpandOp(CooperativeRowAccExp
     assert(rowAccElemType == matrixElemType);
 
   assert(matrixLayout == CooperativeMatrixLayout::AccumulatorMatrixLayout);
-  auto props = getTypeProperties(matrixElemType, matrixLayout);
+  auto props = getTypeProperties(matrixElemType, matrixLayout, 16);
   Type *flatType =
       FixedVectorType::get(builder.transCooperativeMatrixElementType(matrixElemType), props.numFlatElements);
   Value *flatVec = PoisonValue::get(flatType);

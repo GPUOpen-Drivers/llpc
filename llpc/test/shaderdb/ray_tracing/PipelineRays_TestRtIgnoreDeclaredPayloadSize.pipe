@@ -1,0 +1,280 @@
+; Test that only payloadSizeMaxInLib would be honored when rtIgnoreDeclaredPayloadSize is enable.
+; BEGIN_SHADERTEST
+; RUN: amdllpc %gfxip -emit-lgc %s -o - | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: @_rgen_1(
+; SHADERTEST:    %{{.*}} = call spir_func [{{[0-9]}} x i32] %{{.*}}([3 x i32] [i32 0, i32 undef, i32 undef], {{.*}}) #[[ATTR0:[0-9]+]], !continufy.stage !18
+; END_SHADERTEST
+
+[Version]
+version = 75
+
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+struct _43
+{
+    uint _m0[17];
+};
+
+layout(set = 1, binding = 0, std430) restrict readonly buffer RTASHeap
+{
+    uvec2 _m0[];
+} _29;
+
+layout(push_constant, std430) uniform RootConstants
+{
+    uint _m0;
+    uint _m1;
+} registers;
+
+layout(set = 1, binding = 1) uniform texture2D _15[];
+layout(set = 1, binding = 1) uniform writeonly image2D _33[];
+layout(location = 0) rayPayloadEXT _43 _45;
+
+void main()
+{
+    _45._m0[0] = 0u;
+    _45._m0[4] = 4u;
+
+    traceRayEXT(accelerationStructureEXT(_29._m0[registers._m0 + 9u]), 28u, 1u, 1u, 2u, 0u, vec3(0.0), 0.0, vec3(1.0), 1000.0, 0);
+    imageStore(_33[registers._m1 + 1u], ivec2(gl_LaunchIDEXT.xy), vec4(_45._m0[0]));
+}
+
+[rgenInfo]
+entryPoint = main
+options.clientHash = 0x0, 0x0
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 120
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.subgroupSize = 0
+options.waveSize = 32
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.enableLoadScalarizer = 0
+options.allowVaryWaveSize = 1
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.adjustDepthImportVrs = 0
+options.fp32DenormalMode = Auto
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.noContractOpDot = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.overrideForceThreadIdSwizzling = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.forceLateZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+options.workaroundStorageImageFormats = 0
+options.workaroundInitializeOutputsToZero = 0
+options.disableFMA = 0
+options.disableReadFirstLaneWorkaround = 0
+options.backwardPropagateNoContract = 0
+options.forwardPropagateNoContract = 1
+options.workgroupRoundRobin = 0
+options.constantBufferBindingOffset = 0
+options.imageSampleDrefReturnsRgba = 0
+options.disableGlPositionOpt = 0
+options.viewIndexFromDeviceIndex = 0
+options.resourceCount = 0
+options.forceUnderflowPrevention = 0
+options.forceMemoryBarrierScope = 0
+
+[ResourceMapping]
+userDataNode[0].visibility = 16128
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 43
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBufferCompact
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 2
+userDataNode[0].next[0].set = 0x0000005D
+userDataNode[0].next[0].binding = 17
+userDataNode[0].next[0].strideInDwords = 0
+userDataNode[0].next[1].type = DescriptorConstBuffer
+userDataNode[0].next[1].offsetInDwords = 2
+userDataNode[0].next[1].sizeInDwords = 8
+userDataNode[0].next[1].set = 0x0000005D
+userDataNode[0].next[1].binding = 0
+userDataNode[0].next[1].strideInDwords = 0
+userDataNode[0].next[2].type = DescriptorBuffer
+userDataNode[0].next[2].offsetInDwords = 10
+userDataNode[0].next[2].sizeInDwords = 8
+userDataNode[0].next[2].set = 0x0000005D
+userDataNode[0].next[2].binding = 1
+userDataNode[0].next[2].strideInDwords = 0
+userDataNode[1].visibility = 2
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 2
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 16128
+userDataNode[2].type = PushConst
+userDataNode[2].offsetInDwords = 3
+userDataNode[2].sizeInDwords = 38
+userDataNode[2].set = 0xFFFFFFFF
+userDataNode[2].binding = 0
+userDataNode[2].strideInDwords = 0
+userDataNode[3].visibility = 16128
+userDataNode[3].type = DescriptorTableVaPtr
+userDataNode[3].offsetInDwords = 45
+userDataNode[3].sizeInDwords = 1
+userDataNode[3].next[0].type = DescriptorBuffer
+userDataNode[3].next[0].offsetInDwords = 0
+userDataNode[3].next[0].sizeInDwords = 16
+userDataNode[3].next[0].set = 0x00000001
+userDataNode[3].next[0].binding = 0
+userDataNode[3].next[0].strideInDwords = 0
+userDataNode[3].next[1].type = DescriptorMutable
+userDataNode[3].next[1].offsetInDwords = 16
+userDataNode[3].next[1].sizeInDwords = 8000000
+userDataNode[3].next[1].set = 0x00000001
+userDataNode[3].next[1].binding = 1
+userDataNode[3].next[1].strideInDwords = 8
+
+[RayTracingPipelineState]
+deviceIndex = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.includeIr = 0
+options.robustBufferAccess = 1
+options.enableRelocatableShaderElf = 0
+options.disableImageResourceCheck = 0
+options.enableScratchAccessBoundsChecks = 0
+options.enableImplicitInvariantExports = 1
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 0
+options.extendedRobustness.robustBufferAccess = 1
+options.extendedRobustness.robustImageAccess = 1
+options.extendedRobustness.nullDescriptor = 1
+options.enableRayQuery = 0
+options.optimizeTessFactor = 1
+options.enableInterpModePatch = 0
+options.pageMigrationEnabled = 0
+options.optimizationLevel = 2
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.resourceLayoutScheme = Compact
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.internalRtShaders = 0
+options.forceNonUniformResourceIndexStageMask = 0
+options.expertSchedulingMode = 0
+options.glState.replaceSetWithResourceType = 0
+options.glState.disableSampleMask = 0
+options.glState.buildResourcesDataForShaderModule = 0
+options.glState.disableTruncCoordForGather = 1
+options.glState.enableCombinedTexture = 0
+options.glState.vertex64BitsAttribSingleLoc = 0
+options.glState.enableFragColor = 0
+options.glState.disableBaseVertex = 0
+options.glState.enablePolygonStipple = 0
+options.glState.enableLineSmooth = 0
+options.glState.emulateWideLineStipple = 0
+options.glState.enablePointSmooth = 0
+options.glState.enableRemapLocation = 0
+options.cacheScopePolicyControl = 0
+options.temporalHintControl = 0x777777
+options.enablePrimGeneratedQuery = 0
+options.disablePerCompFetch = 0
+options.optimizePointSizeWrite = 1
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+maxRecursionDepth = 2
+indirectStageMask = 4294967295
+libraryMode = 2
+mode = 1
+cpsFlags = 0
+disableDynamicVgpr = 0
+dynamicVgprBlockSize =0
+rtState.nodeStrideShift = 7
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2172650495
+rtState.staticPipelineFlags = 0
+rtState.triCompressMode = 3
+rtState.boxSortHeuristicMode = 5
+rtState.pipelineFlags = 536872960
+rtState.counterMode = 0
+rtState.counterMask = 0
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.outerTileSize = 4
+rtState.dispatchDimSwizzleMode = 0
+rtState.exportConfig.indirectCallingConvention = 1
+rtState.exportConfig.indirectCalleeSavedRegs.raygen = 2
+rtState.exportConfig.indirectCalleeSavedRegs.miss = 40
+rtState.exportConfig.indirectCalleeSavedRegs.closestHit = 50
+rtState.exportConfig.indirectCalleeSavedRegs.anyHit = 75
+rtState.exportConfig.indirectCalleeSavedRegs.intersection = 75
+rtState.exportConfig.indirectCalleeSavedRegs.callable = 28
+rtState.exportConfig.indirectCalleeSavedRegs.traceRays = 28
+rtState.exportConfig.enableUniformNoReturn = 1
+rtState.exportConfig.enableTraceRayArgsInLds = 0
+rtState.exportConfig.enableReducedLinkageOpt = 0
+rtState.exportConfig.readsDispatchRaysIndex = 0
+rtState.exportConfig.enableDynamicLaunch = 0
+rtState.exportConfig.emitRaytracingShaderDataToken = 0
+rtState.enableRayQueryCsSwizzle = 0
+rtState.enableDispatchRaysInnerSwizzle = 1
+rtState.enableDispatchRaysOuterSwizzle = 1
+rtState.forceInvalidAccelStruct = 0
+rtState.enableRayTracingCounters = 0
+rtState.enableRayTracingHwTraversalStack = 1
+rtState.enableOptimalLdsStackSizeForIndirect = 1
+rtState.enableOptimalLdsStackSizeForUnified = 1
+rtState.maxRayLength = 0
+rtState.enablePickClosestLaneResultForAbortRays = 0
+rtState.traceRayWaveDensityThreshold[8] = 1
+rtState.gpurtFeatureFlags = 0
+rtState.gpurtFuncTable.pFunc[0] = TraceRay2_0
+rtState.gpurtFuncTable.pFunc[1] = TraceRayInline2_0
+rtState.gpurtFuncTable.pFunc[2] = TraceRayUsingHitToken2_0
+rtState.gpurtFuncTable.pFunc[3] = RayQueryProceed2_0
+rtState.gpurtFuncTable.pFunc[4] = GetInstanceIndex
+rtState.gpurtFuncTable.pFunc[5] = GetInstanceID
+rtState.gpurtFuncTable.pFunc[6] = GetObjectToWorldTransform
+rtState.gpurtFuncTable.pFunc[7] = GetWorldToObjectTransform
+rtState.gpurtFuncTable.pFunc[8] = GetRayQuery64BitInstanceNodePtr
+rtState.gpurtFuncTable.pFunc[9] = TraceLongRayAMD2_0
+rtState.gpurtFuncTable.pFunc[10] = LongRayQueryProceedAMD2_0
+rtState.gpurtFuncTable.pFunc[11] = FetchTrianglePositionFromNodePointer
+rtState.gpurtFuncTable.pFunc[12] = FetchTrianglePositionFromRayQuery
+rtState.rtIpVersion = 2.0
+rtState.gpurtOverride = 0
+rtState.rtIpOverride = 0
+payloadSizeMaxInLib = 12
+attributeSizeMaxInLib = 8
+hasPipelineLibrary = 0
+pipelineLibStageMask = 0
+rtIgnoreDeclaredPayloadSize = 1
+

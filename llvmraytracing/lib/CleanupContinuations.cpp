@@ -123,7 +123,6 @@ private:
   Function *ContMalloc = nullptr;
   Function *ContFree = nullptr;
   MapVector<Function *, ContinuationData> ToProcess;
-  uint32_t MaxContStateBytes;
   llvm::Module *GpurtLibrary = nullptr;
   std::optional<CpsStackLowering> StackLowering;
   Function *GetGlobalMemBase = nullptr;
@@ -237,8 +236,6 @@ void CleanupContinuationsPassImpl::analyzeContinuation(Function &F, MDNode *MD) 
   if (Data.MallocCall) {
     Data.ContStateBytes = cast<ConstantInt>(Data.MallocCall->getArgOperand(0))->getSExtValue();
   }
-  if (Data.ContStateBytes > MaxContStateBytes)
-    MaxContStateBytes = Data.ContStateBytes;
 }
 
 void CleanupContinuationsPassImpl::updateCpsStack(Function *F, Function *NewFunc, bool IsStart,
@@ -258,7 +255,7 @@ void CleanupContinuationsPassImpl::updateCpsStack(Function *F, Function *NewFunc
   Value *ContFrame = getContinuationFramePtr(F, IsStart, CpsInfo, &ToBeRemoved);
 
   if (CpsInfo.ContStateBytes != 0) {
-    CompilerUtils::replaceAllPointerUses(&Builder, ContFrame, CpsStack, ToBeRemoved);
+    CompilerUtils::replaceAllPointerUses(ContFrame, CpsStack, ToBeRemoved);
   } else {
     // If there is no continuation state, replace it with a poison
     // value instead of a zero-sized stack allocation.
@@ -284,7 +281,6 @@ static void buildArgInfos(Function *F, bool IsStart, SmallVector<Type *> &AllArg
                           SmallVector<Value *> &AllArgValues, uint32_t &StartReturnArg,
                           SmallVector<AttributeSet> &ParamAttrs, SmallVector<Instruction *> &InstsToRemove,
                           SmallVector<lgc::ilcps::GetReturnValueOp *> &ReturnValueOps) {
-  auto &Context = F->getContext();
   AttributeList FAttrs = F->getAttributes();
   if (IsStart) {
     unsigned ArgNo = 0;
@@ -298,16 +294,6 @@ static void buildArgInfos(Function *F, bool IsStart, SmallVector<Type *> &AllArg
       ArgNo++;
     }
   } else {
-    // Add i32 %rcr here
-    Type *I32 = Type::getInt32Ty(Context);
-    AllArgTypes.push_back(I32);
-    AllArgValues.push_back(nullptr);
-    if (lgc::cps::isCpsFunction(*F)) {
-      //  Add i32 %shader-index for resume part.
-      AllArgTypes.push_back(I32);
-      AllArgValues.push_back(nullptr);
-    }
-
     // Find arguments from lgc.ilcps.getreturnvalue calls
     for (auto &I : F->getEntryBlock()) {
       if (auto *Intr = dyn_cast<lgc::ilcps::GetReturnValueOp>(&I)) {
@@ -447,7 +433,8 @@ void CleanupContinuationsPassImpl::processContinuations() {
   //    b.) change the address space for cps stack to 32.
   // 2. prepare arguments passed to cps.jump and insert the call at the exit of
   //    start part.
-  // 3. Edit resume signature to add the state/rcr/shader-index/returnvalues.
+  // 3. Edit resume signature to add the state and the return values. This adds the shader record index and the return
+  //    address to the function signature.
   SmallVector<Function *> ToErase;
   for (auto &FuncData : ToProcess) {
     LLVM_DEBUG(dbgs() << "Processing function: " << FuncData.first->getName() << "\n");
@@ -632,11 +619,6 @@ void CleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &Data, 
   SmallVector<Value *> TailArgs;
   Value *ResumeAddr = nullptr;
   Value *CR = nullptr;
-  unsigned LevelImm = -1;
-
-  uint32_t SkipCount = 2;
-  if (ContHelper::isLgcCpsModule(*Call->getModule()))
-    SkipCount = ContHelper::isWaitAwaitCall(*Call) ? 3 : 2;
 
   if (lgc::rt::getLgcRtShaderStage(Call->getFunction()) != lgc::rt::RayTracingShaderStage::KernelEntry) {
     ResumeAddr = Builder.create<cps::AsContinuationReferenceOp>(ResumeFun);
@@ -646,15 +628,14 @@ void CleanupContinuationsPassImpl::handleSingleContinue(ContinuationData &Data, 
   }
 
   CR = Call->getArgOperand(0);
-  TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), SkipCount)));
+  TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), 3)));
 
-  if (lgc::cps::isCpsFunction(*Call->getFunction())) {
-    Value *Level = Call->getArgOperand(SkipCount - 1);
-    LevelImm = cast<ConstantInt>(Level)->getZExtValue();
-  }
+  Value *ShaderIndex = Call->getArgOperand(2);
+  Value *Level = Call->getArgOperand(1);
+  uint32_t LevelImm = cast<ConstantInt>(Level)->getZExtValue();
 
   auto *Csp = PoisonValue::get(Builder.getInt32Ty());
-  auto *JumpCall = Builder.create<cps::JumpOp>(CR, LevelImm, Csp, ResumeAddr, TailArgs);
+  auto *JumpCall = Builder.create<cps::JumpOp>(CR, LevelImm, Csp, ShaderIndex, ResumeAddr, TailArgs);
   // Replace this instruction with a call to cps.jump.
   JumpCall->copyMetadata(*Call);
 
@@ -678,10 +659,7 @@ void CleanupContinuationsPassImpl::lowerIntrinsicCall(Function *F, ContinuationD
     return;
 
   CompilerUtils::CrossModuleInliner CrossInliner;
-  // Signature of cps function: { rcr, shader-index, system-data}
-  const uint32_t SystemDataArgIdx = lgc::cps::isCpsFunction(*F) ? CpsArgIdx::SystemData : 1;
-
-  Value *SystemDataArg = F->getArg(SystemDataArgIdx);
+  Value *SystemDataArg = F->getArg(CpsArgIdx::SystemData);
   Type *SystemDataTy = SystemDataArg->getType();
 
   Builder.SetInsertPointPastAllocas(F);
@@ -807,7 +785,7 @@ void CleanupContinuationsPassImpl::handleContStackIntrinsic(FunctionAnalysisMana
       Replacement = Builder.create<lgc::cps::GetVspOp>();
     } else if (FuncName.starts_with("Load")) {
       Value *Addr = ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
-      Value *Ptr = Builder.CreateIntToPtr(Addr, CInst.getType()->getPointerTo(lgc::cps::stackAddrSpace));
+      Value *Ptr = Builder.CreateIntToPtr(Addr, Builder.getPtrTy(lgc::cps::stackAddrSpace));
       Replacement = Builder.CreateAlignedLoad(DestTy, Ptr, Align(CpsStackLowering::getContinuationStackAlignment()));
 
       if (FuncName.starts_with("LoadLastUse"))
@@ -820,7 +798,7 @@ void CleanupContinuationsPassImpl::handleContStackIntrinsic(FunctionAnalysisMana
 
       Value *Addr = ConstantFoldInstruction(CInst.getFunction(), CInst.getArgOperand(0));
       Value *Val = CInst.getArgOperand(1);
-      Value *Ptr = Builder.CreateIntToPtr(Addr, Val->getType()->getPointerTo(lgc::cps::stackAddrSpace));
+      Value *Ptr = Builder.CreateIntToPtr(Addr, Builder.getPtrTy(lgc::cps::stackAddrSpace));
       Builder.CreateAlignedStore(Val, Ptr, Align(CpsStackLowering::getContinuationStackAlignment()));
 
       IsMemoryAccess = true;
@@ -862,19 +840,17 @@ void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
 
       // Re-create the lgc.cps.jump call without the return address
       // argument, since the calling code handles it manually.
-      if (!lgc::cps::isCpsFunction(*Jump->getFunction())) {
-        SmallVector<Value *> Args;
-        for (unsigned I = 0; I < Jump->arg_size(); I++) {
-          if (I != 3) // Return address argument
-            Args.push_back(Jump->getArgOperand(I));
-        }
-
-        Builder.SetInsertPoint(Jump);
-        auto *NewCall = Builder.CreateCall(Jump->getCalledFunction(), Args);
-        NewCall->copyMetadata(*Jump);
-
-        Jump->eraseFromParent();
+      SmallVector<Value *> Args;
+      for (unsigned I = 0; I < Jump->arg_size(); I++) {
+        if (I != 4) // Return address argument
+          Args.push_back(Jump->getArgOperand(I));
       }
+
+      Builder.SetInsertPoint(Jump);
+      auto *NewCall = Builder.CreateCall(Jump->getCalledFunction(), Args);
+      NewCall->copyMetadata(*Jump);
+
+      Jump->eraseFromParent();
     }
   }
 }
@@ -912,11 +888,8 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
           ContFrame = F->getArg(F->arg_size() - 1);
         else
           ContFrame = F->getArg(0);
-        if (!ContFrame->user_empty()) {
+        if (!ContFrame->user_empty())
           FuncData.second.ContStateBytes = MinimumContinuationStateBytes;
-          if (MinimumContinuationStateBytes > MaxContStateBytes)
-            MaxContStateBytes = MinimumContinuationStateBytes;
-        }
       }
     }
   }

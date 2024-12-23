@@ -68,6 +68,8 @@ static const char RsStateMetadataName[] = "lgc.rasterizer.state";
 static const char ColorExportFormatsMetadataName[] = "lgc.color.export.formats";
 static const char ColorExportStateMetadataName[] = "lgc.color.export.state";
 static const char TessLevelMetadataName[] = "lgc.tessellation.level.state";
+static const char WaveSizeMetadataName[] = "lgc.wave.size";
+static const char SubgroupSizeMetadataName[] = "lgc.subgroup.size";
 
 namespace {
 
@@ -428,6 +430,8 @@ void PipelineState::clear(Module *module) {
   m_colorExportState = {};
   m_inputAssemblyState = {};
   m_rasterizerState = {};
+  memset(m_waveSize, 0, sizeof(m_waveSize));
+  memset(m_subgroupSize, 0, sizeof(m_subgroupSize));
   record(module);
 }
 
@@ -455,6 +459,7 @@ void PipelineState::recordExceptPalMetadata(Module *module) {
   recordVertexInputDescriptions(module);
   recordColorExportState(module);
   recordGraphicsState(module);
+  recordWaveSize(module);
 }
 
 // =====================================================================================================================
@@ -472,6 +477,7 @@ void PipelineState::readState(Module *module) {
   readGraphicsState(module);
   if (!m_palMetadata)
     m_palMetadata = new PalMetadata(this, module);
+  readWaveSize(module);
   setXfbStateMetadata(module);
 }
 
@@ -1303,6 +1309,54 @@ void PipelineState::readGraphicsState(Module *module) {
 }
 
 // =====================================================================================================================
+// Record wave size for each shader stage into the IR metadata
+//
+// @param [in/out] module : IR module to record into
+void PipelineState::recordWaveSize(Module *module) {
+  // Wave size is not determined yet, do it first.
+  // NOTE: m_waveSize is set up in one go, so checking [0] is enough.
+  if (m_waveSize[0] == 0)
+    determineShaderWaveSize(module);
+
+  setNamedMetadataToArrayOfInt32(module, m_waveSize, WaveSizeMetadataName);
+  setNamedMetadataToArrayOfInt32(module, m_subgroupSize, SubgroupSizeMetadataName);
+}
+
+// =====================================================================================================================
+// Read wave size for each shader stage from the IR metadata
+//
+// @param [in/out] module : IR module to read from
+void PipelineState::readWaveSize(Module *module) {
+  readNamedMetadataArrayOfInt32(module, WaveSizeMetadataName, m_waveSize);
+  readNamedMetadataArrayOfInt32(module, SubgroupSizeMetadataName, m_subgroupSize);
+}
+
+// =====================================================================================================================
+// Determine shader wave size for each shader stage
+//
+// @param module : IR module
+void PipelineState::determineShaderWaveSize(Module *module) {
+  // Wave size determination depends on shader modes.
+  getShaderModes()->readModesFromPipeline(module);
+  setAllShadersDefaultWaveSize();
+  unsigned defaultWaveSize[ShaderStage::Count] = {};
+  for (unsigned stage = 0; stage < ShaderStage::Count; ++stage) {
+    defaultWaveSize[stage] = m_waveSize[stage];
+  }
+
+  for (unsigned stage = 0; stage < ShaderStage::Count; ++stage) {
+    unsigned waveSize = hasShaderStage(static_cast<ShaderStageEnum>(stage)) ? defaultWaveSize[stage] : 0;
+    auto mergingStage = getMergingShaderStage(static_cast<ShaderStageEnum>(stage));
+    unsigned mergingWaveSize = hasShaderStage(mergingStage) ? defaultWaveSize[mergingStage] : 0;
+    // Just use default wave size when neither stage is present.
+    if (waveSize == 0 && mergingWaveSize == 0)
+      continue;
+
+    m_waveSize[stage] = std::max(waveSize, mergingWaveSize);
+  }
+}
+
+// =====================================================================================================================
 // Get number of patch control points. The front-end supplies this as TessellationMode::inputVertices.
 unsigned PipelineState::getNumPatchControlPoints() const {
   return getShaderModes()->getTessellationMode().inputVertices;
@@ -1313,9 +1367,10 @@ unsigned PipelineState::getNumPatchControlPoints() const {
 //
 // @param stage : Shader stage
 unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
-  if (m_waveSize.empty()) {
+  // Wave size is not read from metadata, this may happen for cases that we don't have this info available (e.g. null
+  // fragment), or lit test where people don't explicitly write these metadata. In such cases, use default values.
+  if (m_waveSize[0] == 0)
     setAllShadersDefaultWaveSize();
-  }
 
   if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
@@ -1323,17 +1378,16 @@ unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
   }
 
   assert(ShaderStageMask(ShaderStagesNative).contains(stage));
-  return getMergedShaderWaveSize(stage);
+  assert(m_waveSize[stage] == 32 || m_waveSize[stage] == 64);
+  return m_waveSize[stage];
 }
 
 // =====================================================================================================================
-// Gets wave size for the merged shader stage
-//
-// NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one.
+//  Gets merging shader stage for the specified shader stage
 //
 // @param stage : Shader stage
-unsigned PipelineState::getMergedShaderWaveSize(ShaderStageEnum stage) {
-  unsigned waveSize = m_waveSize[stage];
+ShaderStageEnum PipelineState::getMergingShaderStage(ShaderStageEnum stage) {
+  ShaderStageEnum mergingStage = stage;
 
   // NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one. That is
   // to say:
@@ -1344,36 +1398,34 @@ unsigned PipelineState::getMergedShaderWaveSize(ShaderStageEnum stage) {
   switch (stage) {
   case ShaderStage::Vertex:
     if (hasShaderStage(ShaderStage::TessControl)) {
-      return std::max(waveSize, m_waveSize[ShaderStage::TessControl]);
+      mergingStage = ShaderStage::TessControl;
+    } else if (hasShaderStage(ShaderStage::Geometry)) {
+      mergingStage = ShaderStage::Geometry;
     }
-    if (hasShaderStage(ShaderStage::Geometry)) {
-      return std::max(waveSize, m_waveSize[ShaderStage::Geometry]);
-    }
-    return waveSize;
-
+    break;
   case ShaderStage::TessControl:
-    return std::max(waveSize, m_waveSize[ShaderStage::Vertex]);
-
+    mergingStage = ShaderStage::Vertex;
+    break;
   case ShaderStage::TessEval:
     if (hasShaderStage(ShaderStage::Geometry)) {
-      return std::max(waveSize, m_waveSize[ShaderStage::Geometry]);
+      mergingStage = ShaderStage::Geometry;
     }
-    return waveSize;
-
+    break;
   case ShaderStage::Geometry:
-    if (!hasShaderStage(ShaderStage::Geometry)) {
-      // NGG, no geometry
-      return std::max(waveSize,
-                      m_waveSize[hasShaderStage(ShaderStage::TessEval) ? ShaderStage::TessEval : ShaderStage::Vertex]);
-    }
     if (hasShaderStage(ShaderStage::TessEval)) {
-      return std::max(waveSize, m_waveSize[ShaderStage::TessEval]);
+      mergingStage = ShaderStage::TessEval;
+    } else {
+      mergingStage = ShaderStage::Vertex;
     }
-    return std::max(waveSize, m_waveSize[ShaderStage::Vertex]);
-
+    break;
+  case ShaderStage::CopyShader:
+    mergingStage = ShaderStage::Geometry;
+    break;
   default:
-    return waveSize;
+    break;
   }
+
+  return mergingStage;
 }
 
 // =====================================================================================================================
@@ -1490,9 +1542,10 @@ unsigned PipelineState::getShaderHwStageMask(ShaderStageEnum stage) {
 // @param stage : Shader stage
 // @returns : Subgroup size of the specified shader stage
 unsigned PipelineState::getShaderSubgroupSize(ShaderStageEnum stage) {
-  if (m_subgroupSize.empty()) {
+  // Subgroup size is not read from metadata, this may happen for cases that we don't have this info available (e.g.
+  // null fragment), or lit test where people don't explicitly write these metadata. In such cases, use default values.
+  if (m_subgroupSize[0] == 0)
     setAllShadersDefaultWaveSize();
-  }
 
   if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
@@ -1516,12 +1569,6 @@ void PipelineState::setAllShadersDefaultWaveSize() {
 //
 // @param stage : Shader stage
 void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
-  if (stage == ShaderStage::Geometry && !hasShaderStage(ShaderStage::Geometry)) {
-    // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
-    // In such cases, we check the property of VS or TES, and this will be handled in getMergedShaderWaveSize.
-    return;
-  }
-
   if (stage == ShaderStage::Compute) {
     const unsigned subgroupSize = m_shaderModes.getComputeShaderMode().subgroupSize;
     m_waveSize[stage] = subgroupSize;
@@ -1743,15 +1790,15 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStageEnum shaderStage
 // @param rtStack : Get size of LDS RayQuery stack for this stage
 // @return LDS size in dwords
 unsigned PipelineState::getShaderStaticLdsUsage(ShaderStageEnum shaderStage, bool rtStack) {
-  const ResourceUsage *RU = getShaderResourceUsage(shaderStage);
+  const ResourceUsage *resUsage = getShaderResourceUsage(shaderStage);
   switch (shaderStage) {
   case ShaderStage::TessControl: {
-    const auto &calcFactor = RU->inOutUsage.tcs.calcFactor;
-    return rtStack ? calcFactor.rayQueryLdsStackSize : calcFactor.tessOnChipLdsSize;
+    const auto &hwConfig = resUsage->inOutUsage.tcs.hwConfig;
+    return rtStack ? hwConfig.rayQueryLdsStackSize : hwConfig.tessOnChipLdsSize;
   }
   case ShaderStage::Geometry: {
-    const auto &calcFactor = RU->inOutUsage.gs.calcFactor;
-    return rtStack ? calcFactor.rayQueryLdsStackSize : calcFactor.gsOnChipLdsSize;
+    const auto &hwConfig = resUsage->inOutUsage.gs.hwConfig;
+    return rtStack ? hwConfig.rayQueryLdsStackSize : hwConfig.gsOnChipLdsSize;
   }
   default:
     return 0;

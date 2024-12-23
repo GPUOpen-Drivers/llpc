@@ -179,7 +179,8 @@ public:
     BufferFlagSampler = 32,          // Flag to find Descriptor Sampler
     BufferFlagAddress = 64,          // Flag to return an i64 address of the descriptor
     BufferFlagAttachedCounter = 128, // Flag to return the counter buffer descriptor attached to the main buffer.
-    BufferFlagForceRawView = 256     // Flag to convert the buffer descriptor to raw view.
+    BufferFlagForceRawView = 256,    // Flag to convert the buffer descriptor to raw view.
+    BufferFlagCoherent = 512,        // Coherent memory access
   };
 
   // Get the type of a built-in -- static edition of the method below, so you can use it without a BuilderDefs object.
@@ -323,6 +324,7 @@ public:
     ImageFlagNotAliased = 0x200,                  // Whether the image is known not to alias any other memory object
     ImageFlagInvariant = 0x400,                   // Invariant load
     ImageFlagSamplePatternOffset = 0x800,         // Retrieving sample pattern offset in dwords for specified image
+    ImageFlagNoAlloc = 0x1000,                    //
   };
 
   // Address array indices for image sample and gather methods. Where an optional entry is missing (either
@@ -509,6 +511,15 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy, llvm::RoundingMode roundingMode,
                                          const llvm::Twine &instName = "");
+
+  // The conversion between float8 and float32.
+  //
+  // @param value : Input value
+  // @param destTy : Type to convert to
+  // @param isBfloat : Whether dest type is bfloat8
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFp8Convert(llvm::Value *value, llvm::Type *destTy, bool isBfloat = false,
+                                const llvm::Twine &instName = "");
 
   // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
   //

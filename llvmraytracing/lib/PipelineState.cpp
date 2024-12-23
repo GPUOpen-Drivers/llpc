@@ -127,4 +127,16 @@ void PipelineState::merge(const PipelineState &Other) {
   SDSState.merge(Other.SDSState);
 }
 
+void PipelineState::print(llvm::raw_ostream &OS) const {
+  OS << "PipelineState { MaxUsedPayloadRegisterCount=" << MaxUsedPayloadRegisterCount << ", SDSState=";
+  SDSState.print(OS);
+  OS << " }\n";
+}
+
+#ifndef NDEBUG
+void PipelineState::dump() const {
+  print(dbgs());
+}
+#endif
+
 } // namespace llvmraytracing

@@ -93,7 +93,7 @@ private:
   void visitStore(llvm::StoreInst &);
   void visitContinue(lgc::ilcps::ContinueOp &);
   void visitWaitContinue(lgc::ilcps::WaitContinueOp &);
-  llvm::Value *getRealMemoryAddress(llvm::IRBuilder<> &, llvm::Value *);
+  llvm::Value *getRealMemoryAddress(llvm::Value *);
   llvm::Function *addOrInitCsp(llvm::Function *F, llvm::Function *GetGlobalMemBase, bool RequiresIncomingCsp);
 
   // Register a base pointer in the CpsStackLowering.
@@ -106,7 +106,7 @@ private:
   // offset.
   void setRealBasePointer(llvm::Value *BasePointer) { this->BasePointer = BasePointer; }
 
-  llvm::Value *loadCsp(llvm::IRBuilder<> &Builder);
+  llvm::Value *loadCsp();
 
   llvm::Module *Mod;
   llvm::AllocaInst *CpsStackAlloca = nullptr;

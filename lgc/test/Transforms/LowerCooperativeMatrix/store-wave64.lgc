@@ -74,7 +74,7 @@ define void @test_f16_ab_layout(ptr addrspace(7) %ptr, <8 x float> %a) !spirv.Ex
 ; CHECK-NEXT:    store half [[TMP53]], ptr addrspace(7) [[TMP52]], align 2
 ; CHECK-NEXT:    ret void
 ;
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 0, i32 0, i32 16, <8 x float> %a)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 0, i32 0, i32 16, <8 x float> %a, i32 16)
   ret void
 }
 
@@ -106,7 +106,7 @@ define void @test_f16_cd_layout(ptr addrspace(7) %ptr, <8 x float> %a) !spirv.Ex
 ; CHECK-NEXT:    store half [[TMP20]], ptr addrspace(7) [[TMP19]], align 2
 ; CHECK-NEXT:    ret void
 ;
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 1, i32 0, i32 16, <8 x float> %a)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 1, i32 0, i32 16, <8 x float> %a, i32 16)
   ret void
 }
 
@@ -183,7 +183,7 @@ define void @test_i16_ab_layout(ptr addrspace(7) %ptr, <8 x i32> %a) !spirv.Exec
 ; CHECK-NEXT:    store i16 [[TMP53]], ptr addrspace(7) [[TMP52]], align 2
 ; CHECK-NEXT:    ret void
 ;
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 0, i32 0, i32 16, <8 x i32> %a)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 0, i32 0, i32 16, <8 x i32> %a, i32 16)
   ret void
 }
 
@@ -215,7 +215,7 @@ define void @test_i16_cd_layout(ptr addrspace(7) %ptr, <8 x i32> %a) !spirv.Exec
 ; CHECK-NEXT:    store i16 [[TMP20]], ptr addrspace(7) [[TMP19]], align 2
 ; CHECK-NEXT:    ret void
 ;
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 1, i32 0, i32 16, <8 x i32> %a)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 1, i32 0, i32 16, <8 x i32> %a, i32 16)
   ret void
 }
 
@@ -246,7 +246,7 @@ define void @test_f32_cd_layout(ptr addrspace(7) %ptr, <8 x float> %a) !spirv.Ex
 ; CHECK-NEXT:    store float [[TMP19]], ptr addrspace(7) [[TMP18]], align 4
 ; CHECK-NEXT:    ret void
 ;
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 640, i1 false, i32 2, i32 1, i32 0, i32 16, <8 x float> %a)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 640, i1 false, i32 2, i32 1, i32 0, i32 16, <8 x float> %a, i32 16)
   ret void
 }
 
@@ -277,7 +277,7 @@ define void @test_i32_cd_layout(ptr addrspace(7) %ptr, <8 x i32> %a) !spirv.Exec
 ; CHECK-NEXT:    store i32 [[TMP19]], ptr addrspace(7) [[TMP18]], align 4
 ; CHECK-NEXT:    ret void
 ;
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 640, i1 false, i32 5, i32 1, i32 0, i32 16, <8 x i32> %a)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(7) %ptr, i32 640, i1 false, i32 5, i32 1, i32 0, i32 16, <8 x i32> %a, i32 16)
   ret void
 }
 

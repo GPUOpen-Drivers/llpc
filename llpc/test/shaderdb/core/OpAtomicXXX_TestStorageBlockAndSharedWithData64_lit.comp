@@ -81,30 +81,30 @@ void main ()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: atomicrmw umin ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umax ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw min ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw max ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw add ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: cmpxchg ptr addrspace({{.*}}) %{{[0-9]*}}, i64 78187493520, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umin ptr addrspace(3) @{{.*}}, i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umax ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 8), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 16), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 24), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 32), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw min ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 40), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw max ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 48), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 56), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 64), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 72), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 80), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: cmpxchg ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 96), i64 78187493520, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umin ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw umax ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw and ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw or ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw xor ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw min ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw max ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw and ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw or ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw xor ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw add ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: cmpxchg ptr addrspace({{.*}}) %{{[0-9]*}}, i64 78187493520, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw umin ptr addrspace(3) @{{.*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw umax ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 8), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 16), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 24), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 32), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw min ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 40), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw max ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 48), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 56), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 64), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 72), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 80), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: cmpxchg ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 96), i64 78187493520, i64 %{{[0-9]*}} syncscope("agent") monotonic
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.umin.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
@@ -118,18 +118,18 @@ void main ()
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.or.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 64, i32 0, i32 0)
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.xor.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 72, i32 0, i32 0)
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.add.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 80, i32 0, i32 0)
-; SHADERTEST: atomicrmw umin ptr addrspace(3) @{{.*}} i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw umax ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 8), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 16), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 24), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 32), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw min ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 40), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw max ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 48), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 56), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 64), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 72), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 80), i64 %{{[0-9]*}} monotonic
-; SHADERTEST: cmpxchg ptr addrspace(3) getelementptr inbounds (i8, ptr addrspace(3) @{{.*}}, i32 96), i64 78187493520, i64 %{{[0-9]*}} monotonic
+; SHADERTEST: atomicrmw umin ptr addrspace(3) @{{.*}} i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw umax ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 8), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 16), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 24), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 32), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw min ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 40), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw max ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 48), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw and ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 56), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw or ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 64), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw xor ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 72), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 80), i64 %{{[0-9]*}} syncscope("agent") monotonic
+; SHADERTEST: cmpxchg ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 96), i64 78187493520, i64 %{{[0-9]*}} syncscope("agent") monotonic
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

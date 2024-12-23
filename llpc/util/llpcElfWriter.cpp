@@ -358,6 +358,7 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
         PalAbi::GraphicsRegisterMetadataKey::CbShaderMask,
         PalAbi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect,
         PalAbi::GraphicsRegisterMetadataKey::PsLoadProvokingVtx,
+        PalAbi::GraphicsRegisterMetadataKey::PsExtraLdsSize,
     };
     auto destRegisters = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
     auto srcRegisters = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::GraphicsRegisters].getMap(true);

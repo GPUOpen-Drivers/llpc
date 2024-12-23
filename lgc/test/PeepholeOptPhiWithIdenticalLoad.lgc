@@ -3,6 +3,7 @@
 ; RUN: lgc -mcpu=gfx1010 -print-after=lgc-peephole-optimization -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK %s
 
 ; CHECK: [[LOAD:%[0-9a-z]*]] = load i32, ptr addrspace(3) @lds, align 16
+; CHECK: [[GEP:%[0-9a-z]*]] = getelementptr <{ [0 x [3 x i32]] }>, ptr addrspace(1)
 ; CHECK: [[PHI:%[0-9a-z]*]] = phi i32 [ [[LOAD]], %.entry ], [ [[INC:%[0-9a-z]*]], %.block2 ]
 ; CHECK: .block2:
 ; CHECK-NEXT: [[INC]] = add i32 [[PHI]], 1
@@ -13,9 +14,18 @@ target triple = "amdgcn--amdpal"
 @lds = addrspace(3) global i32 undef, align 16
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
+define dllexport spir_func void @lgc.shader.CS.main(i32 inreg noundef %userdata9, i32 inreg noundef %userdata10) local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
   %load0 = load i32, ptr addrspace(3) @lds, align 16
+  %27 = insertelement <2 x i32> poison, i32 %userdata9, i64 0
+  %28 = insertelement <2 x i32> %27, i32 %userdata10, i64 1
+  %29 = bitcast <2 x i32> %28 to i64
+  %30 = add i64 %29, 2621456
+  %31 = inttoptr i64 %30 to ptr addrspace(1)
+  %32 = insertelement <3 x i32> <i32 poison, i32 1, i32 1>, i32 0, i64 0
+  %33 = zext i32 %load0 to i64
+  %34 = getelementptr <{ [0 x [3 x i32]] }>, ptr addrspace(1) %31, i64 0, i32 0, i64 %33
+  store <3 x i32> %32, ptr addrspace(1) %34, align 4
   br label %.block0
 
 .block0:                                          ; preds = %.entry
@@ -40,4 +50,13 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
   ret void
 }
 
+attributes #3 = { nodivergencesource nounwind willreturn memory(read) }
+!lgc.user.data.nodes = !{!4, !5, !6, !7, !8, !9}
+
 !0 = !{i32 7}
+!4 = !{!"DescriptorTableVaPtr", i32 7, i32 128, i32 15, i32 1, i32 3}
+!5 = !{!"DescriptorBufferCompact", i32 10, i32 128, i32 0, i32 2, i64 93, i32 17, i32 2}
+!6 = !{!"DescriptorBuffer", i32 6, i32 128, i32 2, i32 8, i64 93, i32 0, i32 4}
+!7 = !{!"DescriptorBuffer", i32 6, i32 128, i32 10, i32 8, i64 93, i32 1, i32 4}
+!8 = !{!"StreamOutTableVaPtr", i32 11, i32 2, i32 2, i32 1, i32 0}
+!9 = !{!"PushConst", i32 9, i32 128, i32 3, i32 10, i64 4294967295, i32 0, i32 4}

@@ -648,9 +648,10 @@ attribute[2].location = 2
 attribute[2].binding = 0
 attribute[2].format = VK_FORMAT_R32G32_SFLOAT
 attribute[2].offset = 0
+
 ;.
 ; SHADERTEST: @[[LDS_GS:[a-zA-Z0-9_$"\\.-]+]] = external addrspace(3) global [1250 x i32], align 4
-; SHADERTEST: @[[LDS_HS:[a-zA-Z0-9_$"\\.-]+]] = external addrspace(3) global [1152 x i32], align 4
+; SHADERTEST: @[[LDS_HS:[a-zA-Z0-9_$"\\.-]+]] = external addrspace(3) global [2240 x i32], align 4
 ;.
 ; SHADERTEST-LABEL: @_amdgpu_hs_main(
 ; SHADERTEST-NEXT:  .entry:
@@ -666,7 +667,7 @@ attribute[2].offset = 0
 ; SHADERTEST-NEXT:    [[TMP14:%.*]] = extractelement <4 x i32> [[TMP5]], i64 1
 ; SHADERTEST-NEXT:    [[TMP15:%.*]] = extractelement <4 x i32> [[TMP5]], i64 2
 ; SHADERTEST-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP5]], i64 3
-; SHADERTEST-NEXT:    call amdgpu_ls void @_amdgpu_ls_main(i32 [[TMP13]], i32 [[TMP14]], i32 [[TMP15]], i32 [[TMP16]], i32 [[TMP8:%.*]], i32 [[TMP9:%.*]], i32 poison, i32 [[TMP11:%.*]]), !dbg [[DBG100:![0-9]+]]
+; SHADERTEST-NEXT:    call amdgpu_ls void @_amdgpu_ls_main(i32 [[TMP13]], i32 [[TMP14]], i32 [[TMP15]], i32 [[TMP16]], i32 [[TMP8:%.*]], i32 [[TMP9:%.*]], i32 poison, i32 [[TMP11:%.*]]), !dbg [[DBG101:![0-9]+]]
 ; SHADERTEST-NEXT:    br label [[DOTENDLS]]
 ; SHADERTEST:       .endLs:
 ; SHADERTEST-NEXT:    fence syncscope("workgroup") release
@@ -679,7 +680,7 @@ attribute[2].offset = 0
 ; SHADERTEST-NEXT:    [[TMP18:%.*]] = extractelement <4 x i32> [[TMP5]], i64 1
 ; SHADERTEST-NEXT:    [[TMP19:%.*]] = extractelement <4 x i32> [[TMP5]], i64 2
 ; SHADERTEST-NEXT:    [[TMP20:%.*]] = extractelement <4 x i32> [[TMP5]], i64 3
-; SHADERTEST-NEXT:    call amdgpu_hs void @_amdgpu_hs_main.1(i32 [[TMP17]], i32 [[TMP18]], i32 [[TMP19]], i32 [[TMP20]], i32 [[OFFCHIPLDSBASE:%.*]], i32 [[TFBUFFERBASE:%.*]], i32 [[TMP6:%.*]], i32 [[TMP7:%.*]]), !dbg [[DBG100]]
+; SHADERTEST-NEXT:    call amdgpu_hs void @_amdgpu_hs_main.1(i32 [[TMP17]], i32 [[TMP18]], i32 [[TMP19]], i32 [[TMP20]], i32 [[OFFCHIPLDSBASE:%.*]], i32 [[TFBUFFERBASE:%.*]], i32 [[TMP6:%.*]], i32 [[TMP7:%.*]]), !dbg [[DBG101]]
 ; SHADERTEST-NEXT:    br label [[DOTENDHS]]
 ; SHADERTEST:       .endHs:
 ; SHADERTEST-NEXT:    ret void
@@ -699,7 +700,7 @@ attribute[2].offset = 0
 ; SHADERTEST-NEXT:    br i1 [[VALIDESVERT]], label [[DOTBEGINES:%.*]], label [[DOTENDES:%.*]]
 ; SHADERTEST:       .beginEs:
 ; SHADERTEST-NEXT:    [[TMP17:%.*]] = extractelement <1 x i32> [[TMP5:%.*]], i64 0
-; SHADERTEST-NEXT:    call amdgpu_es void @_amdgpu_es_main(i32 [[TMP17]], i32 [[OFFCHIPLDSBASE:%.*]], i32 [[TMP16]], float [[TMP11:%.*]], float [[TMP12:%.*]], i32 [[TMP13:%.*]], i32 [[TMP14:%.*]]), !dbg [[DBG103:![0-9]+]]
+; SHADERTEST-NEXT:    call amdgpu_es void @_amdgpu_es_main(i32 [[TMP17]], i32 [[OFFCHIPLDSBASE:%.*]], i32 [[TMP16]], float [[TMP11:%.*]], float [[TMP12:%.*]], i32 [[TMP13:%.*]], i32 [[TMP14:%.*]]), !dbg [[DBG104:![0-9]+]]
 ; SHADERTEST-NEXT:    br label [[DOTENDES]]
 ; SHADERTEST:       .endEs:
 ; SHADERTEST-NEXT:    fence syncscope("workgroup") release
@@ -715,7 +716,7 @@ attribute[2].offset = 0
 ; SHADERTEST-NEXT:    [[TMP22:%.*]] = call i32 @llvm.amdgcn.ubfe.i32(i32 poison, i32 0, i32 16)
 ; SHADERTEST-NEXT:    [[TMP23:%.*]] = call i32 @llvm.amdgcn.ubfe.i32(i32 poison, i32 16, i32 16)
 ; SHADERTEST-NEXT:    [[TMP24:%.*]] = extractelement <1 x i32> [[TMP5]], i64 0
-; SHADERTEST-NEXT:    call amdgpu_gs void @_amdgpu_gs_main.2(i32 [[TMP24]], i32 [[GSVSOFFSET:%.*]], i32 [[GSWAVEID]], i32 [[TMP18]], i32 [[TMP19]], i32 [[TMP8:%.*]], i32 [[TMP20]], i32 [[TMP21]], i32 [[TMP22]], i32 [[TMP23]], i32 [[TMP9:%.*]]), !dbg [[DBG103]]
+; SHADERTEST-NEXT:    call amdgpu_gs void @_amdgpu_gs_main.2(i32 [[TMP24]], i32 [[GSVSOFFSET:%.*]], i32 [[GSWAVEID]], i32 [[TMP18]], i32 [[TMP19]], i32 [[TMP8:%.*]], i32 [[TMP20]], i32 [[TMP21]], i32 [[TMP22]], i32 [[TMP23]], i32 [[TMP9:%.*]]), !dbg [[DBG104]]
 ; SHADERTEST-NEXT:    br label [[DOTENDGS]]
 ; SHADERTEST:       .endGs:
 ; SHADERTEST-NEXT:    ret void
@@ -723,83 +724,107 @@ attribute[2].offset = 0
 ;
 ; SHADERTEST-LABEL: @_amdgpu_ls_main(
 ; SHADERTEST-NEXT:  .entry:
-; SHADERTEST-NEXT:    ret void, !dbg [[DBG108:![0-9]+]]
+; SHADERTEST-NEXT:    ret void, !dbg [[DBG109:![0-9]+]]
 ;
 ;
 ; SHADERTEST-LABEL: @_amdgpu_hs_main.1(
 ; SHADERTEST-NEXT:  .entry:
-; SHADERTEST-NEXT:    [[TMP0:%.*]] = and i32 [[RELPATCHID:%.*]], 255
-; SHADERTEST-NEXT:    [[TMP1:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR7:[0-9]+]]
-; SHADERTEST-NEXT:    [[TMP2:%.*]] = bitcast i64 [[TMP1]] to <2 x i32>
-; SHADERTEST-NEXT:    [[TMP3:%.*]] = insertelement <2 x i32> [[TMP2]], i32 [[GLOBALTABLE:%.*]], i32 0
-; SHADERTEST-NEXT:    [[TMP4:%.*]] = bitcast <2 x i32> [[TMP3]] to i64
-; SHADERTEST-NEXT:    [[TMP5:%.*]] = inttoptr i64 [[TMP4]] to ptr addrspace(4)
-; SHADERTEST-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP5]], i32 144
-; SHADERTEST-NEXT:    [[TMP7:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP6]], align 16
-; SHADERTEST-NEXT:    [[TMP8:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR7]]
-; SHADERTEST-NEXT:    [[TMP9:%.*]] = and i64 [[TMP8]], -4294967296
-; SHADERTEST-NEXT:    [[TMP10:%.*]] = zext i32 [[GLOBALTABLE]] to i64
-; SHADERTEST-NEXT:    [[TMP11:%.*]] = or disjoint i64 [[TMP9]], [[TMP10]]
-; SHADERTEST-NEXT:    [[TMP12:%.*]] = inttoptr i64 [[TMP11]] to ptr addrspace(4)
-; SHADERTEST-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP12]], i64 160
-; SHADERTEST-NEXT:    [[TMP14:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP13]], align 16
-; SHADERTEST-NEXT:    [[TMP15:%.*]] = and i32 [[RELPATCHID]], 255
-; SHADERTEST-NEXT:    [[TMP16:%.*]] = lshr i32 [[RELPATCHID]], 8
-; SHADERTEST-NEXT:    [[TMP17:%.*]] = and i32 [[TMP16]], 31
-; SHADERTEST-NEXT:    [[DOTIDX:%.*]] = mul nuw nsw i32 [[TMP15]], 24, !dbg [[DBG111:![0-9]+]]
-; SHADERTEST-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.HS, i32 [[DOTIDX]], !dbg [[DBG111]]
-; SHADERTEST-NEXT:    store i32 1073741824, ptr addrspace(3) [[TMP18]], align 4, !dbg [[DBG111]]
-; SHADERTEST-NEXT:    [[TMP19:%.*]] = mul nuw nsw i32 [[TMP15]], 6, !dbg [[DBG112:![0-9]+]]
-; SHADERTEST-NEXT:    [[TMP20:%.*]] = or disjoint i32 [[TMP19]], 1, !dbg [[DBG112]]
-; SHADERTEST-NEXT:    [[TMP21:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.HS, i32 [[TMP20]], !dbg [[DBG112]]
-; SHADERTEST-NEXT:    store i32 1073741824, ptr addrspace(3) [[TMP21]], align 4, !dbg [[DBG112]]
-; SHADERTEST-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 8, !dbg [[DBG113:![0-9]+]]
-; SHADERTEST-NEXT:    store i32 1073741824, ptr addrspace(3) [[TMP22]], align 4, !dbg [[DBG113]]
-; SHADERTEST-NEXT:    [[TMP23:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 16, !dbg [[DBG114:![0-9]+]]
-; SHADERTEST-NEXT:    store i32 1082130432, ptr addrspace(3) [[TMP23]], align 4, !dbg [[DBG114]]
-; SHADERTEST-NEXT:    [[TMP24:%.*]] = mul nuw nsw i32 [[TMP15]], 3, !dbg [[DBG115:![0-9]+]]
-; SHADERTEST-NEXT:    [[TMP25:%.*]] = add nuw nsw i32 [[TMP24]], [[TMP17]], !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[DOTIDX3:%.*]] = shl nuw nsw i32 [[TMP25]], 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.HS, i32 [[DOTIDX3]], !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP26]], i32 1536, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP28:%.*]] = load i32, ptr addrspace(3) [[TMP27]], align 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP26]], i32 1540, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP30:%.*]] = load i32, ptr addrspace(3) [[TMP29]], align 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP26]], i32 1544, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(3) [[TMP31]], align 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP26]], i32 1548, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP34:%.*]] = load i32, ptr addrspace(3) [[TMP33]], align 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP35:%.*]] = shl nuw nsw i32 [[TMP17]], 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP36:%.*]] = mul nuw nsw i32 [[TMP15]], 48, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP37:%.*]] = add nuw nsw i32 [[TMP35]], [[TMP36]], !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[DOTUPTO010:%.*]] = insertelement <4 x i32> poison, i32 [[TMP28]], i64 0, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[DOTUPTO111:%.*]] = insertelement <4 x i32> [[DOTUPTO010]], i32 [[TMP30]], i64 1, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[DOTUPTO212:%.*]] = insertelement <4 x i32> [[DOTUPTO111]], i32 [[TMP32]], i64 2, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP38:%.*]] = insertelement <4 x i32> [[DOTUPTO212]], i32 [[TMP34]], i64 3, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.v4i32{{(\.v4i32)?}}(<4 x i32> [[TMP38]], <4 x i32> [[TMP14]], i32 [[TMP37]], i32 [[OFFCHIPLDSBASE:%.*]], i32 immarg 77, i32 immarg 1) #[[ATTR12:[0-9]+]], !dbg [[DBG115]]
-; SHADERTEST-NEXT:    fence syncscope("workgroup") release, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.barrier(), !dbg [[DBG115]]
-; SHADERTEST-NEXT:    fence syncscope("workgroup") acquire, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP39:%.*]] = mul i32 [[TMP0]], 6, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP40:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.HS, i32 [[TMP39]], !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP41:%.*]] = load <3 x float>, ptr addrspace(3) [[TMP40]], align 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP42:%.*]] = mul i32 [[TMP0]], 6, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP43:%.*]] = add i32 [[TMP42]], 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP44:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.HS, i32 [[TMP43]], !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP45:%.*]] = load <1 x float>, ptr addrspace(3) [[TMP44]], align 4, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP46:%.*]] = mul i32 [[TMP0]], 16, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP47:%.*]] = shufflevector <3 x float> [[TMP41]], <3 x float> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 3>, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP48:%.*]] = extractelement <1 x float> [[TMP45]], i64 0, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    [[TMP49:%.*]] = insertelement <4 x float> [[TMP47]], float [[TMP48]], i64 3, !dbg [[DBG115]]
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.v4f32{{(\.v4i32)?}}(<4 x float> [[TMP49]], <4 x i32> [[TMP7]], i32 [[TMP46]], i32 [[TFBUFFERBASE:%.*]], i32 77, i32 1), !dbg [[DBG115]]
-; SHADERTEST-NEXT:    ret void, !dbg [[DBG115]]
+; SHADERTEST-NEXT:    [[TMP0:%.*]] = call i32 @llvm.amdgcn.ubfe.i32(i32 [[RELPATCHID:%.*]], i32 8, i32 5) #[[ATTR8:[0-9]+]]
+; SHADERTEST-NEXT:    [[TMP1:%.*]] = and i32 [[RELPATCHID]], 255
+; SHADERTEST-NEXT:    [[TMP2:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR8]]
+; SHADERTEST-NEXT:    [[TMP3:%.*]] = bitcast i64 [[TMP2]] to <2 x i32>
+; SHADERTEST-NEXT:    [[TMP4:%.*]] = insertelement <2 x i32> [[TMP3]], i32 [[GLOBALTABLE:%.*]], i32 0
+; SHADERTEST-NEXT:    [[TMP5:%.*]] = bitcast <2 x i32> [[TMP4]] to i64
+; SHADERTEST-NEXT:    [[TMP6:%.*]] = inttoptr i64 [[TMP5]] to ptr addrspace(4)
+; SHADERTEST-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP6]], i32 160
+; SHADERTEST-NEXT:    [[TMP8:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP7]], align 16
+; SHADERTEST-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP6]], i32 144
+; SHADERTEST-NEXT:    [[TMP10:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP9]], align 16
+; SHADERTEST-NEXT:    [[TMP11:%.*]] = and i32 [[RELPATCHID]], 255
+; SHADERTEST-NEXT:    [[TMP12:%.*]] = lshr i32 [[RELPATCHID]], 8
+; SHADERTEST-NEXT:    [[TMP13:%.*]] = and i32 [[TMP12]], 31
+; SHADERTEST-NEXT:    [[DOTIDX:%.*]] = mul nuw nsw i32 [[TMP11]], 20, !dbg [[DBG112:![0-9]+]]
+; SHADERTEST-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.HS, i32 [[DOTIDX]], !dbg [[DBG112]]
+; SHADERTEST-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP14]], i32 3840, !dbg [[DBG112]]
+; SHADERTEST-NEXT:    store i32 1073741824, ptr addrspace(3) [[TMP15]], align 4, !dbg [[DBG112]]
+; SHADERTEST-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP14]], i32 3844, !dbg [[DBG113:![0-9]+]]
+; SHADERTEST-NEXT:    store i32 1073741824, ptr addrspace(3) [[TMP16]], align 4, !dbg [[DBG113]]
+; SHADERTEST-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP14]], i32 3848, !dbg [[DBG114:![0-9]+]]
+; SHADERTEST-NEXT:    store i32 1073741824, ptr addrspace(3) [[TMP17]], align 4, !dbg [[DBG114]]
+; SHADERTEST-NEXT:    [[TMP18:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP14]], i32 3852, !dbg [[DBG115:![0-9]+]]
+; SHADERTEST-NEXT:    store i32 1082130432, ptr addrspace(3) [[TMP18]], align 4, !dbg [[DBG115]]
+; SHADERTEST-NEXT:    [[TMP19:%.*]] = mul nuw nsw i32 [[TMP11]], 3, !dbg [[DBG116:![0-9]+]]
+; SHADERTEST-NEXT:    [[TMP20:%.*]] = add nuw nsw i32 [[TMP19]], [[TMP13]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[DOTIDX4:%.*]] = mul nuw nsw i32 [[TMP20]], 20, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.HS, i32 [[DOTIDX4]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP22:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP21]], i32 5120, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(3) [[TMP22]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP24:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP21]], i32 5124, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(3) [[TMP24]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP21]], i32 5128, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP27:%.*]] = load i32, ptr addrspace(3) [[TMP26]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP21]], i32 5132, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP29:%.*]] = load i32, ptr addrspace(3) [[TMP28]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[DOTIDX5:%.*]] = mul nuw nsw i32 [[TMP11]], 60, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP30:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.HS, i32 [[DOTIDX5]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[DOTIDX6:%.*]] = mul nuw nsw i32 [[TMP13]], 20, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP31:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP30]], i32 [[DOTIDX6]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    store i32 [[TMP23]], ptr addrspace(3) [[TMP31]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP32:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP31]], i32 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    store i32 [[TMP25]], ptr addrspace(3) [[TMP32]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP33:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP31]], i32 8, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    store i32 [[TMP27]], ptr addrspace(3) [[TMP33]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP34:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP31]], i32 12, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    store i32 [[TMP29]], ptr addrspace(3) [[TMP34]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    fence syncscope("workgroup") release, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.barrier(), !dbg [[DBG116]]
+; SHADERTEST-NEXT:    fence syncscope("workgroup") acquire, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP35:%.*]] = mul i32 [[TMP1]], 5, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP36:%.*]] = add i32 [[TMP35]], 960, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP37:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.HS, i32 [[TMP36]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP38:%.*]] = load <3 x float>, ptr addrspace(3) [[TMP37]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP39:%.*]] = mul i32 [[TMP1]], 5, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP40:%.*]] = add i32 [[TMP39]], 960, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP41:%.*]] = add i32 [[TMP40]], 3, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP42:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.HS, i32 [[TMP41]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP43:%.*]] = load <1 x float>, ptr addrspace(3) [[TMP42]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP44:%.*]] = mul i32 [[TMP1]], 16, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP45:%.*]] = shufflevector <3 x float> [[TMP38]], <3 x float> poison, <4 x i32> <i32 0, i32 1, i32 2, i32 3>, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP46:%.*]] = extractelement <1 x float> [[TMP43]], i64 0, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP47:%.*]] = insertelement <4 x float> [[TMP45]], float [[TMP46]], i64 3, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.buffer.store.v4f32{{(.v4i32)?}}(<4 x float> [[TMP47]], <4 x i32> [[TMP10]], i32 [[TMP44]], i32 [[TFBUFFERBASE:%.*]], i32 1), !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP48:%.*]] = extractelement <3 x float> [[TMP38]], i64 0, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP49:%.*]] = extractelement <3 x float> [[TMP38]], i64 1, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP50:%.*]] = call float @llvm.minnum.f32(float [[TMP48]], float [[TMP49]]), !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP51:%.*]] = extractelement <3 x float> [[TMP38]], i64 2, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP52:%.*]] = call float @llvm.minnum.f32(float [[TMP50]], float [[TMP51]]), !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP53:%.*]] = fcmp ogt float [[TMP52]], 0.000000e+00, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    br i1 [[TMP53]], label [[DOTWRITEHSOUTPUTS_THEN:%.*]], label [[DOTWRITEHSOUTPUTS_ENDIF:%.*]], !dbg [[DBG116]]
+; SHADERTEST:       .writeHsOutputs.then:
+; SHADERTEST-NEXT:    [[TMP54:%.*]] = mul i32 [[TMP1]], 15, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP55:%.*]] = mul i32 [[TMP0]], 5, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP56:%.*]] = add i32 [[TMP54]], [[TMP55]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP57:%.*]] = add i32 [[TMP56]], 0, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP58:%.*]] = mul i32 [[TMP1]], 12, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP59:%.*]] = mul i32 [[TMP0]], 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP60:%.*]] = add i32 [[TMP58]], [[TMP59]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP61:%.*]] = add i32 [[TMP60]], 0, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP62:%.*]] = add i32 [[TMP57]], 0, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP63:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.HS, i32 [[TMP62]], !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP64:%.*]] = load <4 x float>, ptr addrspace(3) [[TMP63]], align 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP65:%.*]] = add i32 [[TMP61]], 0, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    [[TMP66:%.*]] = mul i32 [[TMP65]], 4, !dbg [[DBG116]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.v4f32{{(.v4i32)?}}(<4 x float> [[TMP64]], <4 x i32> [[TMP8]], i32 [[TMP66]], i32 [[OFFCHIPLDSBASE:%.*]], i32 77, i32 1), !dbg [[DBG116]]
+; SHADERTEST-NEXT:    br label [[DOTWRITEHSOUTPUTS_ENDIF]], !dbg [[DBG116]]
+; SHADERTEST:       .writeHsOutputs.endif:
+; SHADERTEST-NEXT:    ret void, !dbg [[DBG116]]
 ;
 ;
 ; SHADERTEST-LABEL: @_amdgpu_es_main(
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = fadd float [[TESSCOORDX:%.*]], [[TESSCOORDY:%.*]]
-; SHADERTEST-NEXT:    [[TMP1:%.*]] = fsub float 1.000000e+00, [[TMP0]], !dbg [[DBG121:![0-9]+]]
-; SHADERTEST-NEXT:    [[TMP2:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR7]]
+; SHADERTEST-NEXT:    [[TMP1:%.*]] = fsub float 1.000000e+00, [[TMP0]], !dbg [[DBG122:![0-9]+]]
+; SHADERTEST-NEXT:    [[TMP2:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR8]]
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = and i64 [[TMP2]], -4294967296
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = zext i32 [[GLOBALTABLE:%.*]] to i64
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = or disjoint i64 [[TMP3]], [[TMP4]]
@@ -808,100 +833,100 @@ attribute[2].offset = 0
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP7]], align 16
 ; SHADERTEST-NEXT:    [[TMP9:%.*]] = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)
 ; SHADERTEST-NEXT:    [[TMP10:%.*]] = call i32 @llvm.amdgcn.mbcnt.hi(i32 -1, i32 [[TMP9]])
-; SHADERTEST-NEXT:    #dbg_value(float [[TESSCOORDX]], !118, !DIExpression(), !122)
-; SHADERTEST-NEXT:    #dbg_value(float [[TESSCOORDY]], !119, !DIExpression(), !122)
-; SHADERTEST-NEXT:    #dbg_value(float [[TMP1]], !120, !DIExpression(), !122)
-; SHADERTEST-NEXT:    [[TMP11:%.*]] = mul i32 [[RELPATCHID:%.*]], 48, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP12:%.*]] = call <4 x i32> @llvm.amdgcn.raw.tbuffer.load.v4i32{{(\.v4i32)?}}(<4 x i32> [[TMP8]], i32 [[TMP11]], i32 [[OFFCHIPLDSBASE:%.*]], i32 immarg 77, i32 immarg 5) #[[ATTR8:[0-9]+]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI07:%.*]] = extractelement <4 x float> [[BC]], i64 0, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC56:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI18:%.*]] = extractelement <4 x float> [[BC56]], i64 1, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC57:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI29:%.*]] = extractelement <4 x float> [[BC57]], i64 2, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC58:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI310:%.*]] = extractelement <4 x float> [[BC58]], i64 3, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE_I0:%.*]] = fmul nnan nsz afn float [[TESSCOORDX]], [[DOTI07]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE_I1:%.*]] = fmul nnan nsz afn float [[TESSCOORDX]], [[DOTI18]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE_I2:%.*]] = fmul nnan nsz afn float [[TESSCOORDX]], [[DOTI29]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE_I3:%.*]] = fmul nnan nsz afn float [[TESSCOORDX]], [[DOTI310]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP13:%.*]] = add i32 [[TMP11]], 16, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP14:%.*]] = call <4 x i32> @llvm.amdgcn.raw.tbuffer.load.v4i32{{(\.v4i32)?}}(<4 x i32> [[TMP8]], i32 [[TMP13]], i32 [[OFFCHIPLDSBASE]], i32 immarg 77, i32 immarg 5) #[[ATTR8]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC59:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI012:%.*]] = extractelement <4 x float> [[BC59]], i64 0, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC60:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI114:%.*]] = extractelement <4 x float> [[BC60]], i64 1, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC61:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI216:%.*]] = extractelement <4 x float> [[BC61]], i64 2, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC62:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI318:%.*]] = extractelement <4 x float> [[BC62]], i64 3, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE2_I0:%.*]] = fmul nnan nsz afn float [[TESSCOORDY]], [[DOTI012]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE2_I1:%.*]] = fmul nnan nsz afn float [[TESSCOORDY]], [[DOTI114]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE2_I2:%.*]] = fmul nnan nsz afn float [[TESSCOORDY]], [[DOTI216]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE2_I3:%.*]] = fmul nnan nsz afn float [[TESSCOORDY]], [[DOTI318]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI019:%.*]] = fadd nnan nsz afn float [[SCALE_I0]], [[SCALE2_I0]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI120:%.*]] = fadd nnan nsz afn float [[SCALE_I1]], [[SCALE2_I1]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI221:%.*]] = fadd nnan nsz afn float [[SCALE_I2]], [[SCALE2_I2]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI322:%.*]] = fadd nnan nsz afn float [[SCALE_I3]], [[SCALE2_I3]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP15:%.*]] = add i32 [[TMP11]], 32, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP16:%.*]] = call <4 x i32> @llvm.amdgcn.raw.tbuffer.load.v4i32{{(\.v4i32)?}}(<4 x i32> [[TMP8]], i32 [[TMP15]], i32 [[OFFCHIPLDSBASE]], i32 immarg 77, i32 immarg 5) #[[ATTR8]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC63:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI024:%.*]] = extractelement <4 x float> [[BC63]], i64 0, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC64:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI126:%.*]] = extractelement <4 x float> [[BC64]], i64 1, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC65:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI228:%.*]] = extractelement <4 x float> [[BC65]], i64 2, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[BC66:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI330:%.*]] = extractelement <4 x float> [[BC66]], i64 3, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE4_I0:%.*]] = fmul nnan nsz afn float [[TMP1]], [[DOTI024]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE4_I1:%.*]] = fmul nnan nsz afn float [[TMP1]], [[DOTI126]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE4_I2:%.*]] = fmul nnan nsz afn float [[TMP1]], [[DOTI228]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[SCALE4_I3:%.*]] = fmul nnan nsz afn float [[TMP1]], [[DOTI330]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI031:%.*]] = fadd nnan nsz afn float [[DOTI019]], [[SCALE4_I0]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI132:%.*]] = fadd nnan nsz afn float [[DOTI120]], [[SCALE4_I1]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI233:%.*]] = fadd nnan nsz afn float [[DOTI221]], [[SCALE4_I2]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTI334:%.*]] = fadd nnan nsz afn float [[DOTI322]], [[SCALE4_I3]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[DOTIDX:%.*]] = mul i32 [[TMP10]], 20, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.GS, i32 [[DOTIDX]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP18:%.*]] = getelementptr i32, ptr addrspace(3) [[TMP17]], i32 [[ESGSOFFSET:%.*]], !dbg [[DBG121]]
-; SHADERTEST-NEXT:    store float [[DOTI031]], ptr addrspace(3) [[TMP18]], align 4, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 4, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    store float [[DOTI132]], ptr addrspace(3) [[TMP19]], align 4, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP20:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 8, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    store float [[DOTI233]], ptr addrspace(3) [[TMP20]], align 4, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 12, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    store float [[DOTI334]], ptr addrspace(3) [[TMP21]], align 4, !dbg [[DBG121]]
-; SHADERTEST-NEXT:    ret void, !dbg [[DBG121]]
+; SHADERTEST-NEXT:    #dbg_value(float [[TESSCOORDX]], !119, !DIExpression(), !123)
+; SHADERTEST-NEXT:    #dbg_value(float [[TESSCOORDY]], !120, !DIExpression(), !123)
+; SHADERTEST-NEXT:    #dbg_value(float [[TMP1]], !121, !DIExpression(), !123)
+; SHADERTEST-NEXT:    [[TMP11:%.*]] = mul i32 [[RELPATCHID:%.*]], 48, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP12:%.*]] = call <4 x i32> @llvm.amdgcn.raw.tbuffer.load.v4i32(<4 x i32> [[TMP8]], i32 [[TMP11]], i32 [[OFFCHIPLDSBASE:%.*]], i32 immarg 77, i32 immarg 5) #[[ATTR9:[0-9]+]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI07:%.*]] = extractelement <4 x float> [[BC]], i64 0, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC56:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI18:%.*]] = extractelement <4 x float> [[BC56]], i64 1, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC57:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI29:%.*]] = extractelement <4 x float> [[BC57]], i64 2, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC58:%.*]] = bitcast <4 x i32> [[TMP12]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI310:%.*]] = extractelement <4 x float> [[BC58]], i64 3, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE_I0:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDX]], [[DOTI07]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE_I1:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDX]], [[DOTI18]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE_I2:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDX]], [[DOTI29]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE_I3:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDX]], [[DOTI310]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP13:%.*]] = add i32 [[TMP11]], 16, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP14:%.*]] = call <4 x i32> @llvm.amdgcn.raw.tbuffer.load.v4i32(<4 x i32> [[TMP8]], i32 [[TMP13]], i32 [[OFFCHIPLDSBASE]], i32 immarg 77, i32 immarg 5) #[[ATTR9]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC59:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI012:%.*]] = extractelement <4 x float> [[BC59]], i64 0, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC60:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI114:%.*]] = extractelement <4 x float> [[BC60]], i64 1, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC61:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI216:%.*]] = extractelement <4 x float> [[BC61]], i64 2, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC62:%.*]] = bitcast <4 x i32> [[TMP14]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI318:%.*]] = extractelement <4 x float> [[BC62]], i64 3, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE2_I0:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDY]], [[DOTI012]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE2_I1:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDY]], [[DOTI114]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE2_I2:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDY]], [[DOTI216]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE2_I3:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TESSCOORDY]], [[DOTI318]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI019:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[SCALE2_I0]], [[SCALE_I0]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI120:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[SCALE2_I1]], [[SCALE_I1]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI221:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[SCALE2_I2]], [[SCALE_I2]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI322:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[SCALE2_I3]], [[SCALE_I3]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP15:%.*]] = add i32 [[TMP11]], 32, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP16:%.*]] = call <4 x i32> @llvm.amdgcn.raw.tbuffer.load.v4i32(<4 x i32> [[TMP8]], i32 [[TMP15]], i32 [[OFFCHIPLDSBASE]], i32 immarg 77, i32 immarg 5) #[[ATTR9]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC63:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI024:%.*]] = extractelement <4 x float> [[BC63]], i64 0, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC64:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI126:%.*]] = extractelement <4 x float> [[BC64]], i64 1, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC65:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI228:%.*]] = extractelement <4 x float> [[BC65]], i64 2, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[BC66:%.*]] = bitcast <4 x i32> [[TMP16]] to <4 x float>, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI330:%.*]] = extractelement <4 x float> [[BC66]], i64 3, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE4_I0:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TMP1]], [[DOTI024]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE4_I1:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TMP1]], [[DOTI126]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE4_I2:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TMP1]], [[DOTI228]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[SCALE4_I3:%.*]] = fmul reassoc nnan nsz arcp contract afn float [[TMP1]], [[DOTI330]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI031:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[DOTI019]], [[SCALE4_I0]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI132:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[DOTI120]], [[SCALE4_I1]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI233:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[DOTI221]], [[SCALE4_I2]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTI334:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[DOTI322]], [[SCALE4_I3]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[DOTIDX:%.*]] = mul i32 [[TMP10]], 20, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(3) @Lds.GS, i32 [[DOTIDX]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP18:%.*]] = getelementptr i32, ptr addrspace(3) [[TMP17]], i32 [[ESGSOFFSET:%.*]], !dbg [[DBG122]]
+; SHADERTEST-NEXT:    store float [[DOTI031]], ptr addrspace(3) [[TMP18]], align 4, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 4, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    store float [[DOTI132]], ptr addrspace(3) [[TMP19]], align 4, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP20:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 8, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    store float [[DOTI233]], ptr addrspace(3) [[TMP20]], align 4, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP18]], i32 12, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    store float [[DOTI334]], ptr addrspace(3) [[TMP21]], align 4, !dbg [[DBG122]]
+; SHADERTEST-NEXT:    ret void, !dbg [[DBG122]]
 ;
 ;
 ; SHADERTEST-LABEL: @_amdgpu_gs_main.2(
 ; SHADERTEST-NEXT:  .entry:
-; SHADERTEST-NEXT:    #dbg_value(i32 0, !125, !DIExpression(), !128)
-; SHADERTEST-NEXT:    [[TMP0:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 [[ESGSOFFSET2:%.*]], !dbg [[DBG129:![0-9]+]]
-; SHADERTEST-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP0]], i32 12, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(3) [[TMP1]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP0]], i32 8, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(3) [[TMP3]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP0]], i32 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(3) [[TMP5]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(3) [[TMP0]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 [[ESGSOFFSET1:%.*]], !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP8]], i32 12, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(3) [[TMP9]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP8]], i32 8, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(3) [[TMP11]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP8]], i32 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(3) [[TMP13]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(3) [[TMP8]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP16:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 [[ESGSOFFSET0:%.*]], !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP16]], i32 12, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(3) [[TMP17]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP16]], i32 8, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(3) [[TMP19]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP16]], i32 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(3) [[TMP21]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(3) [[TMP16]], align 4, !dbg [[DBG129]]
-; SHADERTEST-NEXT:    [[TMP24:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR7]]
+; SHADERTEST-NEXT:    #dbg_value(i32 0, !126, !DIExpression(), !129)
+; SHADERTEST-NEXT:    [[TMP0:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 [[ESGSOFFSET2:%.*]], !dbg [[DBG130:![0-9]+]]
+; SHADERTEST-NEXT:    [[TMP1:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP0]], i32 12, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(3) [[TMP1]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP0]], i32 8, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(3) [[TMP3]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP0]], i32 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(3) [[TMP5]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(3) [[TMP0]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 [[ESGSOFFSET1:%.*]], !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP8]], i32 12, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(3) [[TMP9]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP8]], i32 8, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(3) [[TMP11]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP8]], i32 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP14:%.*]] = load i32, ptr addrspace(3) [[TMP13]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(3) [[TMP8]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP16:%.*]] = getelementptr i32, ptr addrspace(3) @Lds.GS, i32 [[ESGSOFFSET0:%.*]], !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP16]], i32 12, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(3) [[TMP17]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP16]], i32 8, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP20:%.*]] = load i32, ptr addrspace(3) [[TMP19]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(3) [[TMP16]], i32 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(3) [[TMP21]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(3) [[TMP16]], align 4, !dbg [[DBG130]]
+; SHADERTEST-NEXT:    [[TMP24:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR8]]
 ; SHADERTEST-NEXT:    [[TMP25:%.*]] = and i64 [[TMP24]], -4294967296
 ; SHADERTEST-NEXT:    [[TMP26:%.*]] = zext i32 [[GLOBALTABLE:%.*]] to i64
 ; SHADERTEST-NEXT:    [[TMP27:%.*]] = or disjoint i64 [[TMP25]], [[TMP26]]
@@ -918,47 +943,47 @@ attribute[2].offset = 0
 ; SHADERTEST-NEXT:    [[TMP33:%.*]] = and i32 [[DOTI3]], -491521
 ; SHADERTEST-NEXT:    [[TMP34:%.*]] = or disjoint i32 [[TMP33]], 131072
 ; SHADERTEST-NEXT:    [[TMP35:%.*]] = insertelement <4 x i32> [[DOTUPTO210]], i32 [[TMP34]], i64 3
-; SHADERTEST-NEXT:    #dbg_value(i32 0, !125, !DIExpression(), !128)
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP23]], <4 x i32> [[TMP35]], i32 0, i32 [[GSVSOFFSET:%.*]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP22]], <4 x i32> [[TMP35]], i32 12, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP20]], <4 x i32> [[TMP35]], i32 24, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP18]], <4 x i32> [[TMP35]], i32 36, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 [[GSWAVEID:%.*]]), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    #dbg_value(i32 1, !125, !DIExpression(), !128)
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP15]], <4 x i32> [[TMP35]], i32 4, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP14]], <4 x i32> [[TMP35]], i32 16, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP12]], <4 x i32> [[TMP35]], i32 28, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP10]], <4 x i32> [[TMP35]], i32 40, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 [[GSWAVEID]]), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    #dbg_value(i32 2, !125, !DIExpression(), !128)
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP7]], <4 x i32> [[TMP35]], i32 8, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP6]], <4 x i32> [[TMP35]], i32 20, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP4]], <4 x i32> [[TMP35]], i32 32, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(\.v4i32)?}}(i32 [[TMP2]], <4 x i32> [[TMP35]], i32 44, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 [[GSWAVEID]]), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    #dbg_value(i32 3, !125, !DIExpression(), !128)
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 18, i32 [[GSWAVEID]]), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    fence syncscope("agent") release, !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 3, i32 [[GSWAVEID]]), !dbg !{{[0-9]+}}
-; SHADERTEST-NEXT:    ret void, !dbg !{{[0-9]+}}
+; SHADERTEST-NEXT:    #dbg_value(i32 0, !126, !DIExpression(), !129)
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP23]], <4 x i32> [[TMP35]], i32 0, i32 [[GSVSOFFSET:%.*]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP22]], <4 x i32> [[TMP35]], i32 12, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP20]], <4 x i32> [[TMP35]], i32 24, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP18]], <4 x i32> [[TMP35]], i32 36, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 [[GSWAVEID:%.*]]), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    #dbg_value(i32 1, !126, !DIExpression(), !129)
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP15]], <4 x i32> [[TMP35]], i32 4, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP14]], <4 x i32> [[TMP35]], i32 16, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP12]], <4 x i32> [[TMP35]], i32 28, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP10]], <4 x i32> [[TMP35]], i32 40, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 [[GSWAVEID]]), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    #dbg_value(i32 2, !126, !DIExpression(), !129)
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP7]], <4 x i32> [[TMP35]], i32 8, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP6]], <4 x i32> [[TMP35]], i32 20, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP4]], <4 x i32> [[TMP35]], i32 32, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.raw.tbuffer.store.i32{{(.v4i32)?}}(i32 [[TMP2]], <4 x i32> [[TMP35]], i32 44, i32 [[GSVSOFFSET]], i32 20, i32 11), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 34, i32 [[GSWAVEID]]), !dbg [[DBG130]]
+; SHADERTEST-NEXT:    #dbg_value(i32 3, !126, !DIExpression(), !129)
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 18, i32 [[GSWAVEID]]), !dbg [[DBG131:![0-9]+]]
+; SHADERTEST-NEXT:    fence syncscope("agent") release, !dbg [[DBG131]]
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.sendmsg(i32 3, i32 [[GSWAVEID]]), !dbg [[DBG131]]
+; SHADERTEST-NEXT:    ret void, !dbg [[DBG131]]
 ;
 ;
 ; SHADERTEST-LABEL: @_amdgpu_vs_main(
-; SHADERTEST-NEXT:    [[TMP1:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR7]]
+; SHADERTEST-NEXT:    [[TMP1:%.*]] = call noundef i64 @llvm.amdgcn.s.getpc() #[[ATTR8]]
 ; SHADERTEST-NEXT:    [[TMP2:%.*]] = and i64 [[TMP1]], -4294967296
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = zext i32 [[GLOBALTABLE:%.*]] to i64
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = or disjoint i64 [[TMP2]], [[TMP3]]
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = inttoptr i64 [[TMP4]] to ptr addrspace(4)
 ; SHADERTEST-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP5]], i64 128
-; SHADERTEST-NEXT:    [[TMP7:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP6]], align 16, !invariant.load !98
+; SHADERTEST-NEXT:    [[TMP7:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP6]], align 16, !invariant.load !99
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = shl i32 [[VERTEXOFFSET:%.*]], 2
-; SHADERTEST-NEXT:    [[TMP9:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(\.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP8]], i32 0, i32 3), !invariant.load !98
+; SHADERTEST-NEXT:    [[TMP9:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP8]], i32 0, i32 3), !invariant.load !99
 ; SHADERTEST-NEXT:    [[TMP10:%.*]] = add i32 [[TMP8]], 192
-; SHADERTEST-NEXT:    [[TMP11:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(\.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP10]], i32 0, i32 3), !invariant.load !98
+; SHADERTEST-NEXT:    [[TMP11:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP10]], i32 0, i32 3), !invariant.load !99
 ; SHADERTEST-NEXT:    [[TMP12:%.*]] = add i32 [[TMP8]], 384
-; SHADERTEST-NEXT:    [[TMP13:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(\.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP12]], i32 0, i32 3), !invariant.load !98
+; SHADERTEST-NEXT:    [[TMP13:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP12]], i32 0, i32 3), !invariant.load !99
 ; SHADERTEST-NEXT:    [[TMP14:%.*]] = add i32 [[TMP8]], 576
-; SHADERTEST-NEXT:    [[TMP15:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(\.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP14]], i32 0, i32 3), !invariant.load !98
+; SHADERTEST-NEXT:    [[TMP15:%.*]] = call float @llvm.amdgcn.raw.buffer.load.f32{{(.v4i32)?}}(<4 x i32> [[TMP7]], i32 [[TMP14]], i32 0, i32 3), !invariant.load !99
 ; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.f32(i32 12, i32 15, float [[TMP9]], float [[TMP11]], float [[TMP13]], float [[TMP15]], i1 true, i1 false)
 ; SHADERTEST-NEXT:    ret void
 ;
@@ -972,15 +997,16 @@ attribute[2].offset = 0
 ; SHADERTEST: attributes #[[ATTR2:[0-9]+]] = { nounwind willreturn memory(none) }
 ; SHADERTEST: attributes #[[ATTR3:[0-9]+]] = { nounwind }
 ; SHADERTEST: attributes #[[ATTR4:[0-9]+]] = { nounwind willreturn memory(read) }
-; SHADERTEST: attributes #[[ATTR5:[0-9]+]] = { "target-features"=",+wavefrontsize64" }
-; SHADERTEST: attributes #[[ATTR6:[0-9]+]] = { memory(readwrite) "InitialPSInputAddr"="0" "amdgpu-color-export"="0" "amdgpu-depth-export"="0" "amdgpu-memory-bound"="false" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" "target-features"=",+wavefrontsize64" }
-; SHADERTEST: attributes #[[ATTR7]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
-; SHADERTEST: attributes #[[ATTR8]] = { nocallback nofree nosync nounwind willreturn memory(read) }
-; SHADERTEST: attributes #[[ATTR9:[0-9]+]] = { nounwind memory(none) }
-; SHADERTEST: attributes #[[ATTR10:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(none) }
-; SHADERTEST: attributes #[[ATTR11:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(inaccessiblemem: write) }
-; SHADERTEST: attributes #[[ATTR12]] = { nocallback nofree nosync nounwind willreturn memory(write) }
-; SHADERTEST: attributes #[[ATTR13:[0-9]+]] = { convergent nocallback nofree nounwind willreturn }
+; SHADERTEST: attributes #[[ATTR5:[0-9]+]] = { nounwind memory(write) }
+; SHADERTEST: attributes #[[ATTR6:[0-9]+]] = { "target-features"=",+wavefrontsize64" }
+; SHADERTEST: attributes #[[ATTR7:[0-9]+]] = { memory(readwrite) "InitialPSInputAddr"="0" "amdgpu-color-export"="0" "amdgpu-depth-export"="0" "amdgpu-memory-bound"="false" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" "target-features"=",+wavefrontsize64" }
+; SHADERTEST: attributes #[[ATTR8]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+; SHADERTEST: attributes #[[ATTR9]] = { nocallback nofree nosync nounwind willreturn memory(read) }
+; SHADERTEST: attributes #[[ATTR10:[0-9]+]] = { nounwind memory(none) }
+; SHADERTEST: attributes #[[ATTR11:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(none) }
+; SHADERTEST: attributes #[[ATTR12:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(inaccessiblemem: write) }
+; SHADERTEST: attributes #[[ATTR13:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(write) }
+; SHADERTEST: attributes #[[ATTR14:[0-9]+]] = { convergent nocallback nofree nounwind willreturn }
 ;.
 ; SHADERTEST: [[META0:![0-9]+]] = distinct !DICompileUnit(language: DW_LANG_C, file: !1, producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, globals: !2)
 ; SHADERTEST: [[META1:![0-9]+]] = !DIFile(filename: "test.vert", directory: ".", source: "// OpModuleProcessed client vulkan100\0A// OpModuleProcessed target-env vulkan1.0\0A// OpModuleProcessed entry-point main\0A#line 1\0A#version 450\0Alayout(location = 0) in vec4 position
@@ -1072,47 +1098,48 @@ attribute[2].offset = 0
 ; SHADERTEST: [[META87:![0-9]+]] = !{i32 1, i32 0, i32 0, i32 16, i32 11, i32 7}
 ; SHADERTEST: [[META88:![0-9]+]] = !{i32 2, i32 0, i32 0, i32 16, i32 11, i32 7}
 ; SHADERTEST: [[META89:![0-9]+]] = !{i32 10}
-; SHADERTEST: [[META90:![0-9]+]] = !{!"\82\B0amdpal.pipelines{{.*}}AEamdpal.version\92\03\00"}
-; SHADERTEST: [[META91:![0-9]+]] = !{i32 7, !"Dwarf Version", i32 4}
-; SHADERTEST: [[META92:![0-9]+]] = !{i32 2, !"Debug Info Version", i32 3}
-; SHADERTEST: [[META93:![0-9]+]] = !{i32 0, i32 0, i32 0, i32 0, i32 3, i32 3}
-; SHADERTEST: [[META94:![0-9]+]] = !{i32 2, i32 1, i32 1}
-; SHADERTEST: [[META95:![0-9]+]] = !{i32 3, i32 4, i32 1, i32 3}
-; SHADERTEST: [[META96:![0-9]+]] = distinct !DISubprogram(name: "lgc.shader.LSHS.main", scope: !78, file: !78, type: !97, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, unit: !79)
-; SHADERTEST: [[META97:![0-9]+]] = !DISubroutineType(types: !98)
-; SHADERTEST: [[META98:![0-9]+]] = !{}
-; SHADERTEST: [[META99:![0-9]+]] = !{i32 2}
-; SHADERTEST: [[DBG100]] = !DILocation(line: 0, scope: !96)
-; SHADERTEST: [[META101:![0-9]+]] = distinct !DISubprogram(name: "lgc.shader.ESGS.main", scope: !78, file: !78, type: !97, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, unit: !77)
-; SHADERTEST: [[META102:![0-9]+]] = !{i32 4}
-; SHADERTEST: [[DBG103]] = !DILocation(line: 0, scope: !101)
-; SHADERTEST: [[META104:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !1, type: !105, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !0, templateParams: !98)
-; SHADERTEST: [[META105:![0-9]+]] = !DISubroutineType(flags: DIFlagPublic, types: !106)
-; SHADERTEST: [[META106:![0-9]+]] = !{null}
-; SHADERTEST: [[META107:![0-9]+]] = !{i32 0}
-; SHADERTEST: [[DBG108]] = !DILocation(line: 7, scope: !104)
-; SHADERTEST: [[META109:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !12, type: !105, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !11, templateParams: !98)
-; SHADERTEST: [[META110:![0-9]+]] = !{i32 1}
-; SHADERTEST: [[DBG111]] = !DILocation(line: 6, scope: !109)
-; SHADERTEST: [[DBG112]] = !DILocation(line: 7, scope: !109)
-; SHADERTEST: [[DBG113]] = !DILocation(line: 8, scope: !109)
-; SHADERTEST: [[DBG114]] = !DILocation(line: 9, scope: !109)
-; SHADERTEST: [[DBG115]] = !DILocation(line: 11, scope: !109)
-; SHADERTEST: [[META116:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !45, type: !105, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !44, templateParams: !98, retainedNodes: !117)
-; SHADERTEST: [[META117:![0-9]+]] = !{!118, !119, !120}
-; SHADERTEST: [[META118:![0-9]+]] = !DILocalVariable(name: "u", scope: !116, file: !45, line: 6, type: !6)
-; SHADERTEST: [[META119:![0-9]+]] = !DILocalVariable(name: "v", scope: !116, file: !45, line: 7, type: !6)
-; SHADERTEST: [[META120:![0-9]+]] = !DILocalVariable(name: "w", scope: !116, file: !45, line: 8, type: !6)
-; SHADERTEST: [[DBG121]] = !DILocation(line: 9, scope: !116)
-; SHADERTEST: [[META122:![0-9]+]] = !DILocation(line: 0, scope: !116)
-; SHADERTEST: [[META123:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !62, type: !105, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !61, templateParams: !98, retainedNodes: !124)
-; SHADERTEST: [[META124:![0-9]+]] = !{!125}
-; SHADERTEST: [[META125:![0-9]+]] = !DILocalVariable(name: "i", scope: !123, file: !62, line: 7, type: !126)
-; SHADERTEST: [[META126:![0-9]+]] = !DIBasicType(name: "uint", size: 32, encoding: DW_ATE_unsigned)
-; SHADERTEST: [[META127:![0-9]+]] = !{i32 3}
-; SHADERTEST: [[META128:![0-9]+]] = !DILocation(line: 0, scope: !123)
-; SHADERTEST: !{{[0-9]+}} = !DILocation(line: 10, scope: !123)
-; SHADERTEST: !{{[0-9]+}} = !DILocation(line: 12, scope: !123)
-; SHADERTEST: [[META131:![0-9]+]] = !{i32 8}
-; SHADERTEST: [[META132:![0-9]+]] = !{i32 6}
+; SHADERTEST: [[META90:![0-9]+]] = !{i32 32, i32 64, i32 64, i32 64, i32 64, i32 32, i32 64, i32 32}
+; SHADERTEST: [[META91:![0-9]+]] = !{!"\82\B0amdpal.pipelines{{.*}}AEamdpal.version\92\03\00"}
+; SHADERTEST: [[META92:![0-9]+]] = !{i32 7, !"Dwarf Version", i32 4}
+; SHADERTEST: [[META93:![0-9]+]] = !{i32 2, !"Debug Info Version", i32 3}
+; SHADERTEST: [[META94:![0-9]+]] = !{i32 0, i32 0, i32 0, i32 0, i32 3, i32 3}
+; SHADERTEST: [[META95:![0-9]+]] = !{i32 2, i32 1, i32 1}
+; SHADERTEST: [[META96:![0-9]+]] = !{i32 3, i32 4, i32 1, i32 3}
+; SHADERTEST: [[META97:![0-9]+]] = distinct !DISubprogram(name: "lgc.shader.LSHS.main", scope: !78, file: !78, type: !98, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, unit: !79)
+; SHADERTEST: [[META98:![0-9]+]] = !DISubroutineType(types: !99)
+; SHADERTEST: [[META99:![0-9]+]] = !{}
+; SHADERTEST: [[META100:![0-9]+]] = !{i32 2}
+; SHADERTEST: [[DBG101]] = !DILocation(line: 0, scope: !97)
+; SHADERTEST: [[META102:![0-9]+]] = distinct !DISubprogram(name: "lgc.shader.ESGS.main", scope: !78, file: !78, type: !98, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, unit: !77)
+; SHADERTEST: [[META103:![0-9]+]] = !{i32 4}
+; SHADERTEST: [[DBG104]] = !DILocation(line: 0, scope: !102)
+; SHADERTEST: [[META105:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !1, type: !106, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !0, templateParams: !99)
+; SHADERTEST: [[META106:![0-9]+]] = !DISubroutineType(flags: DIFlagPublic, types: !107)
+; SHADERTEST: [[META107:![0-9]+]] = !{null}
+; SHADERTEST: [[META108:![0-9]+]] = !{i32 0}
+; SHADERTEST: [[DBG109]] = !DILocation(line: 7, scope: !105)
+; SHADERTEST: [[META110:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !12, type: !106, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !11, templateParams: !99)
+; SHADERTEST: [[META111:![0-9]+]] = !{i32 1}
+; SHADERTEST: [[DBG112]] = !DILocation(line: 6, scope: !110)
+; SHADERTEST: [[DBG113]] = !DILocation(line: 7, scope: !110)
+; SHADERTEST: [[DBG114]] = !DILocation(line: 8, scope: !110)
+; SHADERTEST: [[DBG115]] = !DILocation(line: 9, scope: !110)
+; SHADERTEST: [[DBG116]] = !DILocation(line: 11, scope: !110)
+; SHADERTEST: [[META117:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !45, type: !106, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !44, templateParams: !99, retainedNodes: !118)
+; SHADERTEST: [[META118:![0-9]+]] = !{!119, !120, !121}
+; SHADERTEST: [[META119:![0-9]+]] = !DILocalVariable(name: "u", scope: !117, file: !45, line: 6, type: !6)
+; SHADERTEST: [[META120:![0-9]+]] = !DILocalVariable(name: "v", scope: !117, file: !45, line: 7, type: !6)
+; SHADERTEST: [[META121:![0-9]+]] = !DILocalVariable(name: "w", scope: !117, file: !45, line: 8, type: !6)
+; SHADERTEST: [[DBG122]] = !DILocation(line: 9, scope: !117)
+; SHADERTEST: [[META123:![0-9]+]] = !DILocation(line: 0, scope: !117)
+; SHADERTEST: [[META124:![0-9]+]] = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !62, type: !106, flags: DIFlagPublic, spFlags: DISPFlagDefinition, unit: !61, templateParams: !99, retainedNodes: !125)
+; SHADERTEST: [[META125:![0-9]+]] = !{!126}
+; SHADERTEST: [[META126:![0-9]+]] = !DILocalVariable(name: "i", scope: !124, file: !62, line: 7, type: !127)
+; SHADERTEST: [[META127:![0-9]+]] = !DIBasicType(name: "uint", size: 32, encoding: DW_ATE_unsigned)
+; SHADERTEST: [[META128:![0-9]+]] = !{i32 3}
+; SHADERTEST: [[META129:![0-9]+]] = !DILocation(line: 0, scope: !124)
+; SHADERTEST: [[DBG130]] = !DILocation(line: 10, scope: !124)
+; SHADERTEST: [[DBG131]] = !DILocation(line: 12, scope: !124)
+; SHADERTEST: [[META132:![0-9]+]] = !{i32 8}
+; SHADERTEST: [[META133:![0-9]+]] = !{i32 6}
 ;.

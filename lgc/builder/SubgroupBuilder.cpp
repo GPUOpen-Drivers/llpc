@@ -374,6 +374,13 @@ Value *BuilderImpl::CreateSubgroupBallotFindMsb(Value *const value, const Twine 
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::createSubgroupShuffle(const SubgroupHelperLaneState &state, Value *const value, Value *const index,
                                           ShaderStageEnum shaderStage, const Twine &instName) {
+  // TODO: Opportunity for uniformity analysis: We can also use readlane when the index is uniform.
+  if (isa<ConstantInt>(index)) {
+    auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mapped, ArrayRef<Value *> passthrough) -> Value * {
+      return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mapped[0], passthrough[0]});
+    };
+    return CreateMapToSimpleType(mapFunc, value, index);
+  }
 
   if (supportWaveWideBPermute(shaderStage)) {
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
@@ -425,14 +432,7 @@ Value *BuilderImpl::createSubgroupShuffle(const SubgroupHelperLaneState &state, 
     return result;
   }
 
-  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
-                        ArrayRef<Value *> passthroughArgs) -> Value * {
-    Value *const readlane =
-        builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
-    return createWaterfallLoop(cast<Instruction>(readlane), 1);
-  };
-
-  return CreateMapToSimpleType(mapFunc, value, index);
+  return createShuffleLoop(state, value, index);
 }
 
 // =====================================================================================================================
@@ -1463,11 +1463,8 @@ Value *BuilderImpl::createGroupBallot(const SubgroupHelperLaneState &state, Valu
 llvm::Value *BuilderImpl::createShuffleLoop(const SubgroupHelperLaneState &state, llvm::Value *const value,
                                             llvm::Value *const index, const llvm::Twine &instName) {
   assert(value != nullptr && index != nullptr);
-  // Return readlane directly, if the index is a constant value.
-  if (isa<Constant>(index))
-    return CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readlane, {value, index});
 
-  // Creat workList out of loop
+  // Create workList out of loop
   // By implementation, the Insert point has been set to the callInst when call processCall
   auto *loopPoint = &*(GetInsertPoint());
   auto *originalBlock = loopPoint->getParent();

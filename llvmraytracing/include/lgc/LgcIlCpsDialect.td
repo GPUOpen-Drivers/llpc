@@ -53,8 +53,24 @@ def GetReturnValueOp : LgcIlCpsOp<"getReturnValue", [NoUnwind, WillReturn]> {
   }];
 }
 
+def SetLocalRootIndexOp : LgcIlCpsOp<"setLocalRootIndex", [WillReturn]> {
+  let arguments = (ins I32:$localRootIndex);
+  let results = (outs);
+
+  let summary =
+    "Sets the local root signature for the current shader";
+
+  let description = [{
+    This op accepts an i32, which is the local root signature index. This is
+    used to ensure that the local root index gets properly set before any operations
+    that depend on it. The arguments are:
+
+      - localRootIndex: the local root signature index
+  }];
+}
+
 def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
-  let arguments = (ins I64:$shaderAddr, I32:$csp, I32:$returnAddr, varargs:$tail);
+  let arguments = (ins I64:$shaderAddr, I32:$csp, I32:$shaderIndex, I32:$returnAddr, varargs:$tail);
   let results = (outs);
 
   let summary =
@@ -66,6 +82,8 @@ def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
       - shaderAddr, the shader the current shader should jump to
       - csp, the continuation stack pointer. Whatever is passed here, is going to be
         overridden by the compiler.
+      - shader index, the shader binding table index. This index was used to lookup the
+        target shader, if it is the entry function of an app shader and poison otherwise.
       - returnAddr, the return address the called shader should jump back to, e. g. the
         resume function.
       - tail, a set of arguments like the system data or hit attributes.
@@ -73,7 +91,7 @@ def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
 }
 
 def WaitContinueOp : LgcIlCpsOp<"waitContinue", [NoReturn]> {
-  let arguments = (ins I64:$shaderAddr, I64:$waitMask, I32:$csp, I32:$returnAddr, varargs:$tail);
+  let arguments = (ins I64:$shaderAddr, I64:$waitMask, I32:$csp, I32:$shaderIndex, I32:$returnAddr, varargs:$tail);
   let results = (outs);
 
   let summary =
@@ -86,6 +104,8 @@ def WaitContinueOp : LgcIlCpsOp<"waitContinue", [NoReturn]> {
       - waitMask, the bitmask all lanes have to wait for.
       - csp, the continuation stack pointer. Whatever is passed here, is going to be
         overridden by the compiler.
+      - shader index, the shader binding table index. This index was used to lookup the
+        target shader, if it is the entry function of an app shader and poison otherwise.
       - returnAddr, the return address the called shader should jump back to, e. g. the
         resume function.
       - tail, a set of arguments like the system data or hit attributes.

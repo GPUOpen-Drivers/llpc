@@ -72,21 +72,17 @@ void LowerAwaitPassImpl::processContinuations() {
   // If this is the first time we've done this for this function
   //   Insert the required calls at the start of the function:
   //       id     = llvm.coro.id.retcon
-  //       handle = llvm.coro.begin id
+  //
+  //       handle = llvm.coro.begin.custom.abi id, ptr, i32 custom_index
   //   Change the return type of the function to the await token
   // Replace the call with
   //    co.flag = llvm.coro.suspend.retcon
   //       unreachable
   auto &Context = Mod.getContext();
-  auto *I8Ptr = Type::getInt8Ty(Context)->getPointerTo();
+  auto *PtrTy = PointerType::get(Context, 0);
   auto *I32 = Type::getInt32Ty(Context);
 
-  Type *TokenTy = StructType::create(Context, "continuation.token")->getPointerTo();
-
-  SmallVector<Type *> ReturnTypes;
-  ReturnTypes.push_back(I8Ptr);   // Continue function pointer
-  ReturnTypes.push_back(TokenTy); // Token to connect the function call with the resume point
-  StructType *NewRetTy = StructType::get(Context, ReturnTypes);
+  StructType *NewRetTy = StructType::get(Context, {PtrTy, PtrTy});
 
   for (auto &FuncData : ToProcess) {
     Function *F = FuncData.first;
@@ -103,7 +99,7 @@ void LowerAwaitPassImpl::processContinuations() {
 
     // Add new storage pointer for the coroutine passes to new function type at
     // the end
-    AllArgTypes.push_back(I8Ptr);
+    AllArgTypes.push_back(PtrTy);
 
     // Create new empty function
     auto *NewFuncTy = FunctionType::get(NewRetTy, AllArgTypes, false);
@@ -135,7 +131,7 @@ void LowerAwaitPassImpl::processContinuations() {
     SmallVector<char> StrBuf;
     auto *ContProtoFunc = cast<Function>(
         Mod.getOrInsertFunction((Twine("continuation.prototype.") + NewFunc->getName()).toStringRef(StrBuf),
-                                FunctionType::get(NewRetTy, {I8Ptr, Type::getInt1Ty(Context)}, false))
+                                FunctionType::get(NewRetTy, {PtrTy, Type::getInt1Ty(Context)}, false))
             .getCallee());
 
     // Add metadata, marking it as a continuation function
@@ -143,16 +139,16 @@ void LowerAwaitPassImpl::processContinuations() {
     NewFunc->setMetadata(ContHelper::MDContinuationName, ContMDTuple);
     ContProtoFunc->setMetadata(ContHelper::MDContinuationName, ContMDTuple);
 
-    auto *ContProtoFuncPtr = ConstantExpr::getBitCast(ContProtoFunc, I8Ptr);
+    auto *ContProtoFuncPtr = ConstantExpr::getBitCast(ContProtoFunc, PtrTy);
 
     // Alloc and free prototypes too
-    auto *ContMallocTy = FunctionType::get(I8Ptr, {I32}, false);
+    auto *ContMallocTy = FunctionType::get(PtrTy, {I32}, false);
     auto *ContMalloc = dyn_cast<Function>(Mod.getOrInsertFunction("continuation.malloc", ContMallocTy).getCallee());
-    auto *ContMallocPtr = ConstantExpr::getBitCast(ContMalloc, I8Ptr);
+    auto *ContMallocPtr = ConstantExpr::getBitCast(ContMalloc, PtrTy);
 
-    auto *ContDeallocTy = FunctionType::get(Type::getVoidTy(Context), {I8Ptr}, false);
+    auto *ContDeallocTy = FunctionType::get(Type::getVoidTy(Context), {PtrTy}, false);
     auto *ContDealloc = dyn_cast<Function>(Mod.getOrInsertFunction("continuation.free", ContDeallocTy).getCallee());
-    auto *ContDeallocPtr = ConstantExpr::getBitCast(ContDealloc, I8Ptr);
+    auto *ContDeallocPtr = ConstantExpr::getBitCast(ContDealloc, PtrTy);
 
     llvm_dialects::Builder B(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
     // Claim that the buffer has the minimum required size of a pointer
@@ -162,8 +158,14 @@ void LowerAwaitPassImpl::processContinuations() {
     Value *const CoroId =
         B.CreateIntrinsic(Intrinsic::coro_id_retcon, {},
                           {BufSize, BufAlign, StorageArg, ContProtoFuncPtr, ContMallocPtr, ContDeallocPtr});
-    auto *CPN = ConstantPointerNull::get(I8Ptr);
-    B.CreateIntrinsic(Intrinsic::coro_begin, {}, {CoroId, CPN});
+    auto *CPN = ConstantPointerNull::get(PtrTy);
+
+    // Only one custom ABI is provided to CoroSplitPass' constructor right
+    // now. In the future custom ABIs may be provided to CoroSplitPass and
+    // their indices specified here to control the coroutine's splitting,
+    // spilling, reloading, frame allocation, rematting, etc.
+    auto *CustomABIIndex = ConstantInt::get(I32, 0);
+    B.CreateIntrinsic(Intrinsic::coro_begin_custom_abi, {}, {CoroId, CPN, CustomABIIndex});
 
     // Replace await calls with suspend points
     for (auto *CI : FuncData.second) {
@@ -177,8 +179,8 @@ void LowerAwaitPassImpl::processContinuations() {
       }
 
       // Insert a dummy call to remember the arguments to lgc.cps.await.
-      auto *ShaderTy = FunctionType::get(TokenTy, ArgTys, false);
-      auto *ShaderFun = B.CreateIntToPtr(CI->getArgOperand(0), ShaderTy->getPointerTo());
+      auto *ShaderTy = FunctionType::get(PtrTy, ArgTys, false);
+      auto *ShaderFun = B.CreateIntToPtr(CI->getArgOperand(0), PointerType::get(Context, 0));
       SuspendRetconArg = B.CreateCall(ShaderTy, ShaderFun, Args);
       cast<CallInst>(SuspendRetconArg)->copyMetadata(*CI);
 

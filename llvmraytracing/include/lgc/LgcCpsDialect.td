@@ -43,7 +43,7 @@ def ContinuationReference : TgConstant<(I32)>, Type;
 
 // =====================================================================================================================
 def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
-    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, I32:$csp, ContinuationReference:$rcr, varargs:$tail);
+    let arguments = (ins ContinuationReference:$target, AttrI32:$levels, I32:$csp, I32:$shaderIndex, ContinuationReference:$rcr,varargs:$tail);
     let results = (outs);
 
     let summary = "Jump to a CPS function.";
@@ -52,6 +52,8 @@ def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
             * target, the continuation reference
             * levels, a bitmask of levels in which target may run
             * csp, continuation stack pointer,
+            * shader index, the shader binding table index. This index was used to lookup the
+              target shader, if it is the entry function of an app shader and poison otherwise.
             * rcr, a continuation reference the called function can potentially return to
             * an arbitrary set of arguments appended to the tail of the argument list.
     }];

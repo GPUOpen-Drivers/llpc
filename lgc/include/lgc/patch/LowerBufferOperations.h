@@ -25,18 +25,18 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerBufferOperations.h
- * @brief LLPC header file: contains declaration of class lgc::PatchBufferOp.
+ * @brief LLPC header file: contains declaration of class lgc::LowerBufferOperations.
  ***********************************************************************************************************************
  */
 #pragma once
 
 #include "compilerutils/TypeLowering.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/LgcLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Analysis/UniformityAnalysis.h"
 #include "llvm/IR/Constants.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 #include <utility>
@@ -76,6 +76,7 @@ class BufferOpLowering {
   struct DescriptorInfo {
     optional_bool invariant;
     optional_bool divergent;
+    optional_bool globallyCoherent;
   };
 
 public:
@@ -129,11 +130,10 @@ private:
                                          llvm::Value *const strideIndex, llvm::Type *const type,
                                          llvm::Instruction &inst,
                                          const llvm::function_ref<llvm::Value *(llvm::Value *)> callback);
-  llvm::Value *createCompactDesc(llvm::Value *const buffAddress, llvm::Value *const stride);
   llvm::Value *createLoadDesc(llvm::Value *buffAddress, bool forceRawView, bool isCompact);
 
   CompilerUtils::TypeLowering &m_typeLowering;
-  llvm::IRBuilder<> m_builder;
+  BuilderImpl m_builder;
 
   PipelineState &m_pipelineState;
   llvm::UniformityInfo &m_uniformityInfo;
@@ -155,7 +155,8 @@ private:
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for buffer operations
-class PatchBufferOp : public llvm::InstVisitor<PatchBufferOp>, public llvm::PassInfoMixin<PatchBufferOp> {
+class LowerBufferOperations : public llvm::InstVisitor<LowerBufferOperations>,
+                              public llvm::PassInfoMixin<LowerBufferOperations> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 

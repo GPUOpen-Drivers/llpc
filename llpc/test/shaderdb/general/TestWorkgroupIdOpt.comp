@@ -15,8 +15,9 @@ void main()
 {
     test = gl_WorkGroupID.x;
 }
+
 // CHECK-LABEL: define {{[^@]+}}@_amdgpu_cs_main
-// CHECK-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[USERDATA0:%.*]], i32 inreg noundef [[WORKGROUPID1:%.*]], i32 inreg noundef [[MULTIDISPATCHINFO:%.*]], <3 x i32> noundef [[LOCALINVOCATIONID:%.*]]) #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !5 !lgc.shaderstage !6 {
+// CHECK-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[USERDATA0:%.*]], i32 inreg noundef [[WORKGROUPID1:%.*]], i32 inreg noundef [[MULTIDISPATCHINFO:%.*]], <3 x i32> noundef [[LOCALINVOCATIONID:%.*]]) #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !6 !lgc.shaderstage !7 {
 // CHECK-NEXT:  .entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 // CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], -4294967296
@@ -32,7 +33,7 @@ void main()
 // CHECK: attributes #[[ATTR0]] = { alwaysinline nounwind memory(readwrite) "amdgpu-flat-work-group-size"="256,256" "amdgpu-memory-bound"="false" "amdgpu-no-workgroup-id-y" "amdgpu-no-workgroup-id-z" "amdgpu-prealloc-sgpr-spill-vgprs" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" "amdgpu-work-group-info-arg-no"="3" "denormal-fp-math-f32"="preserve-sign" "target-features"=",+wavefrontsize64,+cumode,+enable-flat-scratch" }
 // CHECK: attributes #[[ATTR1:[0-9]+]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 // CHECK: attributes #[[ATTR2:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(inaccessiblemem: write) }
-// CHECK: attributes #[[ATTR3:[0-9]+]] = {{{.*}} nounwind willreturn memory(none) }
+// CHECK: attributes #[[ATTR3:[0-9]+]] = { nodivergencesource nounwind willreturn memory(none) }
 // CHECK: attributes #[[ATTR4:[0-9]+]] = { nocallback nofree nosync nounwind willreturn memory(write) }
 //.
 // CHECK: [[META0:![0-9]+]] = !{i32 16, i32 16, i32 1}

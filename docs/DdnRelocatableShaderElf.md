@@ -121,8 +121,8 @@ state are used to generate all of the color export instructions and they are
 appended to the end of the unlinked shader. See the `ColorExportShader` class in
 [GlueShader.cpp](../lgc/elfLinker/GlueShader.cpp) for the generation of the
 epilogue. To see how the unlinked shader handles color export see the
-`LowerFragColorExport` pass in
-[FragColorExport.cpp](../lgc/patch/FragColorExport.cpp).
+`LowerFragmentColorExport` pass in
+[FragmentColorExport.cpp](../lgc/patch/FragmentColorExport.cpp).
 
 These epilogues and prologues mean that unlinked shaders do not have to depend
 on the format of the vertex input attributes and color exports.

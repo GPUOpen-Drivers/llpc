@@ -37,6 +37,21 @@ import subprocess
 import sys
 import tempfile
 
+def print_dump(dump_dir, file):
+  """Print a pipeline dump to stdout"""
+  print("Dump " + file)
+  with open(os.path.join(dump_dir, file)) as f:
+    print(f.read())
+
+def print_dump_dir(dir):
+  """Print all pipeline dumps from a directory to stdout"""
+  for f in os.listdir(dir):
+    if f.endswith(".pipe"):
+      print_dump(dir, f)
+    elif os.path.isdir(os.path.join(dir, f)):
+      # Search recursively, new drivers create a directory per app
+      print_dump_dir(os.path.join(dir, f))
+
 def main():
   parser = argparse.ArgumentParser(description='Run an amber test and print generated pipelines to stdout')
   parser.add_argument('--icd',
@@ -72,17 +87,14 @@ def main():
       os.environ["AMD_DEBUG_DIR"] = tmp_dir
       os.environ["HOME"] = tmp_dir
       dump_dir = os.path.join(tmp_dir, "spvPipeline")
+      os.makedirs(dump_dir)
 
       # Run amber
       cmd = ["amber"] + [args.file]
       res = subprocess.run(cmd)
 
       # Print pipeline dumps
-      for f in os.listdir(dump_dir):
-        if f.endswith(".pipe"):
-          print("Dump " + f)
-          with open(os.path.join(dump_dir, f)) as f:
-            print(f.read())
+      print_dump_dir(dump_dir)
 
       print("Dump End")
 

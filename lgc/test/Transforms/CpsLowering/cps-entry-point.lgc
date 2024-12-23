@@ -24,7 +24,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
 ; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <4 x i32> [[TMP7]], i32 [[USERDATA1]], i64 1
 ; CHECK-NEXT:    [[TMP9:%.*]] = insertelement <4 x i32> [[TMP8]], i32 [[USERDATA2]], i64 2
 ; CHECK-NEXT:    [[TMP10:%.*]] = insertelement <4 x i32> [[TMP9]], i32 [[USERDATA3]], i64 3
-; CHECK-NEXT:    [[PTR:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP10]])
+; CHECK-NEXT:    [[PTR:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP10]], i1 false)
 ; CHECK-NEXT:    [[P0:%.*]] = getelementptr i32, ptr addrspace(7) [[PTR]], i32 0
 ; CHECK-NEXT:    [[I_VSP:%.*]] = load i32, ptr addrspace(7) [[P0]], align 4
 ; CHECK-NEXT:    store i32 [[I_VSP]], ptr [[CSP]], align 4
@@ -84,7 +84,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
 .entry:
   %csp = alloca i32, align 4
   %desc = call <4 x i32> @lgc.load.user.data__v4i32(i32 0)
-  %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
+  %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc, i1 false)
   %p0 = getelementptr i32, ptr addrspace(7) %ptr, i32 0
   %i_vsp = load i32, ptr addrspace(7) %p0, align 4
   store i32 %i_vsp, ptr %csp, align 4
@@ -99,7 +99,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
 
 declare <4 x i32> @lgc.load.user.data__v4i32(i32) #3
 
-declare ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>) #4
+declare ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>, i1) #4
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind willreturn memory(inaccessiblemem: write) }

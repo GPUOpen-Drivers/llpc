@@ -39,7 +39,7 @@ namespace Llpc {
 class ComputeContext : public PipelineContext {
 public:
   ComputeContext(GfxIpVersion gfxIp, const char *apiName, const ComputePipelineBuildInfo *pipelineInfo,
-                 MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
+                 const llvm::StringRef vertexShaderStream, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~ComputeContext() = default;
 
   virtual PipelineType getPipelineType() const override { return PipelineType::Compute; }
@@ -67,12 +67,16 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 
+  // Get transform vertex shader module bit-code
+  const llvm::StringRef getVtxShaderStream() const { return m_vertexShaderStream; }
+
 private:
   ComputeContext() = delete;
   ComputeContext(const ComputeContext &) = delete;
   ComputeContext &operator=(const ComputeContext &) = delete;
 
   const ComputePipelineBuildInfo *m_pipelineInfo; // Info to build a compute pipeline
+  llvm::StringRef m_vertexShaderStream;           // llvm bitcode for vertex shader module
 };
 
 } // namespace Llpc

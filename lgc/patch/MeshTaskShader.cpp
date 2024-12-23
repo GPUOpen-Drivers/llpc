@@ -30,9 +30,9 @@
  */
 #include "MeshTaskShader.h"
 #include "ShaderMerger.h"
+#include "lgc/Debug.h"
 #include "lgc/patch/LgcLowering.h"
 #include "lgc/patch/MutateEntryPoint.h"
-#include "lgc/util/Debug.h"
 #include "lgc/util/WorkgroupLayout.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
@@ -722,7 +722,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   // Force s_barrier to be present if necessary (ignore optimization)
   const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
   auto primAmpFactor =
-      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.primAmpFactor;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.primAmpFactor;
   // If we enable row export, the actual thread group size is determined by work group size provided from API mesh
   // shader.
   const unsigned flatWorkgroupSize =
@@ -1253,7 +1253,7 @@ void MeshTaskShader::lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp) {
   payloadRingBufDesc = m_builder.CreateInsertElement(payloadRingBufDesc, descWord1, 1);
 
   // Convert to fat pointer.
-  auto taskPayloadPtr = m_builder.create<BufferDescToPtrOp>(payloadRingBufDesc);
+  auto taskPayloadPtr = m_builder.create<BufferDescToPtrOp>(payloadRingBufDesc, true);
   taskPayloadPtrOp.replaceAllUsesWith(taskPayloadPtr);
 
   if (getShaderStage(entryPoint) == ShaderStage::Task)
@@ -3139,7 +3139,7 @@ bool MeshTaskShader::checkNeedBarrierFlag(Function *entryPoint) {
   const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
   const unsigned numThreads =
-      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.primAmpFactor;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.primAmpFactor;
   assert(numThreads >= numMeshThreads);
 
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Mesh);

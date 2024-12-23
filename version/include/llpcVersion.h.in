@@ -37,6 +37,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.9 | Add rtIgnoreDeclaredPayloadSize to RayTracingPipelineBuildInfo.                                       |
+//  |     75.8 | Add forceMemoryBarrierScope to PipelineShaderOptions.                                                 |
 //  |     75.6 | Add enableRemapLocation to PipelineOptions. Add outLocationMaps to GraphicsPipelineBuildInfo.         |
 //  |     75.5 | Add optimizePointSizeWrite to PipelineShaderOptions in order to optimize the case PointSize = 1.0.    |
 //  |     75.4 | Add disableGlPositionOpt to PipelineShaderOptions.                                                    |
@@ -198,7 +200,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 6
+#define LLPC_INTERFACE_MINOR_VERSION 9
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

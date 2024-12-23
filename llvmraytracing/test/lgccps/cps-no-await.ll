@@ -5,7 +5,7 @@ define void @_cont_Traversal() !lgc.cps !{i32 2} !continuation !{ptr @_cont_Trav
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 32)
   %fn = load ptr, ptr addrspace(4) %pushconst
   %cr = ptrtoint ptr %fn to i32
-  call void (...) @lgc.cps.jump(i32 %cr, i32 2,  i32 poison)
+  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison)
   unreachable
 }
 
@@ -16,7 +16,7 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-LABEL: define { ptr, ptr } @_cont_Traversal(
 ; LOWER-AWAIT-SAME: ptr [[TMP0:%.*]]) !lgc.cps [[META0:![0-9]+]] !continuation [[META1:![0-9]+]] {
 ; LOWER-AWAIT-NEXT:    [[TMP2:%.*]] = call token @llvm.coro.id.retcon(i32 8, i32 4, ptr [[TMP0]], ptr @continuation.prototype._cont_Traversal, ptr @continuation.malloc, ptr @continuation.free)
-; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin(token [[TMP2]], ptr null)
+; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin.custom.abi(token [[TMP2]], ptr null, i32 0)
 ; LOWER-AWAIT-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 32)
 ; LOWER-AWAIT-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; LOWER-AWAIT-NEXT:    [[CR:%.*]] = ptrtoint ptr [[FN]] to i32

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  SetupTargetFeatures.h
- * @brief LLPC header file: contains declaration of class lgc::PatchSetupTargetFeatures.
+ * @brief LLPC header file: contains declaration of class lgc::SetUpTargetFeatures.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -39,7 +39,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to set up target features on shader entry-points
-class PatchSetupTargetFeatures : public Patch, public llvm::PassInfoMixin<PatchSetupTargetFeatures> {
+class SetUpTargetFeatures : public Patch, public llvm::PassInfoMixin<SetUpTargetFeatures> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

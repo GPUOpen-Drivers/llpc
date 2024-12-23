@@ -30,13 +30,13 @@
  */
 #include "lgc/LgcContext.h"
 #include "lgc/Builder.h"
+#include "lgc/Debug.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "lgc/util/Debug.h"
 #include "lgc/util/Internal.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
@@ -147,6 +147,8 @@ void LgcContext::initialize() {
   setOptionDefault("enable-phi-of-ops", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
   setOptionDefault("amdgpu-atomic-optimizer-strategy", "DPP");
+  // Relax occupancy target for amdgpu-memory-bound function.
+  setOptionDefault("amdgpu-schedule-relaxed-occupancy", "true");
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
   setOptionDefault("spec-exec-max-speculation-cost", "10");
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
@@ -168,12 +170,14 @@ std::string LgcContext::getGpuNameString(unsigned major, unsigned minor, unsigne
   // converts that to an LLVM target name, with is "gfx" followed by the three decimal numbers with
   // no separators, e.g. "gfx1010" for 10.1.0. A high stepping number 0xFFFA..0xFFFF denotes an
   // experimental target, and that is represented by the final hexadecimal digit, e.g. "gfx101A"
-  // for 10.1.0xFFFA. In gfx9, stepping numbers 10..35 are represented by lower case letter 'a'..'z'.
+  // for 10.1.0xFFFA.
   std::string gpuName;
   raw_string_ostream gpuNameStream(gpuName);
   gpuNameStream << "gfx" << major << minor;
   if (stepping >= 0xFFFA)
     gpuNameStream << char(stepping - 0xFFFA + 'A');
+  else if (stepping >= 0xA)
+    gpuNameStream << char(stepping - 0xA + 'A');
   else
     gpuNameStream << stepping;
 

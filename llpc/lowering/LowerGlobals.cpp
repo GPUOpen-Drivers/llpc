@@ -563,14 +563,15 @@ void LowerGlobals::lowerInOut(llvm::GlobalVariable *globalVar) {
         indices.emplace_back(idx);
       // NOTE: FoldGEP (all zero-index) will be removed, causing `replaceAllPointerUses` crash. Please don't use builder
       // interface, or fix the issue.
-      auto *gep = GetElementPtrInst::Create(sGep->getBaseType(), sGep->getBasePointer(), indices, "", sGep);
+      auto *gep =
+          GetElementPtrInst::Create(sGep->getBaseType(), sGep->getBasePointer(), indices, "", sGep->getIterator());
       sGep->replaceAllUsesWith(gep);
       sGep->eraseFromParent();
       indices.clear();
     }
 
     SmallVector<Instruction *> toErase;
-    CompilerUtils::replaceAllPointerUses(m_builder, globalVar, proxy, toErase);
+    CompilerUtils::replaceAllPointerUses(globalVar, proxy, toErase);
     for (auto inst : toErase)
       inst->eraseFromParent();
   } else {
@@ -1950,7 +1951,7 @@ void LowerGlobals::lowerPushConsts() {
       Value *pushConstants = m_builder->CreateLoadPushConstantsPtr();
 
       auto addrSpace = pushConstants->getType()->getPointerAddressSpace();
-      Type *const castType = global.getValueType()->getPointerTo(addrSpace);
+      Type *const castType = m_builder->getPtrTy(addrSpace);
       pushConstants = m_builder->CreateBitCast(pushConstants, castType);
 
       SmallVector<Instruction *, 8> usesToReplace;

@@ -105,8 +105,11 @@ void RayTracingContext::collectBuiltIn(unsigned builtIn) {
 // @param type : Payload type
 // @param dataLayout : Payload module data layout
 void RayTracingContext::collectPayloadSize(llvm::Type *type, const DataLayout &dataLayout) {
-  unsigned payloadTypeSize = alignTo(dataLayout.getTypeAllocSize(type), 4);
-  m_rtLibSummary.maxRayPayloadSize = std::max(m_rtLibSummary.maxRayPayloadSize, payloadTypeSize);
+  // Workaround for Proton games that use a dynamically determined payload size instead of the declared payload size.
+  if (getRayTracingPipelineBuildInfo()->rtIgnoreDeclaredPayloadSize == false) {
+    unsigned payloadTypeSize = alignTo(dataLayout.getTypeAllocSize(type), 4);
+    m_rtLibSummary.maxRayPayloadSize = std::max(m_rtLibSummary.maxRayPayloadSize, payloadTypeSize);
+  }
 }
 
 // =====================================================================================================================

@@ -398,44 +398,45 @@ struct ResourceUsage {
 
     struct {
       struct {
-        unsigned inVertexStride;           // Stride of vertices of input patch (in dword, correspond to
-                                           // "lsStride")
-        unsigned outVertexStride;          // Stride of vertices of output patch (in dword, correspond to
-                                           // "hsCpStride")
-        unsigned patchCountPerThreadGroup; // Count of patches per thread group (in dword, correspond to
-                                           // "hsNumPatch")
-        // On-chip calculation factors
+        // On-chip configurations (in dwords)
         struct {
-          unsigned outPatchStart;       // Offset into LDS where vertices of output patches start
-                                        // (in dword, correspond to "hsOutputBase")
-          unsigned patchConstStart;     // Offset into LDS where patch constants start (in dword,
-                                        // correspond to "patchConstBase")
-          unsigned hsPatchCountStart;   // Offset into LDS where count of HS patches start (in dword)
-          unsigned specialTfValueStart; // Offset into LDS where special TF value start (in dword)
-          unsigned inPatchStart;        // Offset into LDS where vertices of input patches start (in dword)
+          unsigned hsPatchCountStart; // Offset into LDS where HS patch count starts
+
+          unsigned specialTfValueStart; // Offset into LDS where special TF values start
+          unsigned specialTfValueSize;  // Size of special TF value (in dword)
+
+          unsigned tessFactorStart;  // Offset into LDS where TFs start
+          unsigned tessFactorStride; // Size of tess factor stride (in dword)
+
+          unsigned outputPatchStart;   // Offset into LDS where vertices of output patches start
+          unsigned outputVertexStride; // Stride of vertices of output patch (in dwords)
+          unsigned outputPatchSize;    // Size of an output patch output (in dwords)
+
+          unsigned patchConstStart; // Offset into LDS where patch constants start
+          unsigned patchConstSize;  // Size of an output patch constant (in dwords)
+
+          unsigned inputPatchStart;   // Offset into LDS where vertices of input patches start
+          unsigned inputVertexStride; // Stride of vertices of input patch (in dwords)
+          unsigned inputPatchSize;    // Size of an input patch size (in dwords)
         } onChip;
 
-        // Off-chip calculation factors
+        // Off-chip configurations (in dwords)
         struct {
-          unsigned outPatchStart;   // Offset into LDS where vertices of output patches start
-                                    // (in dword, correspond to "hsOutputBase")
-          unsigned patchConstStart; // Offset into LDS where patch constants start (in dword,
-                                    // correspond to "patchConstBase")
+          unsigned outputPatchStart;   // Offset into LDS where vertices of output patches start
+          unsigned outputVertexStride; // Stride of vertices of output patch (in dwords)
+          unsigned outputPatchSize;    // Size of an output patch output (in dwords)
+
+          unsigned patchConstStart; // Offset into LDS where patch constants start
+          unsigned patchConstSize;  // Size of an output patch constant (in dwords)
         } offChip;
 
-        unsigned inPatchSize; // size of an input patch size (in dword)
+        unsigned maxNumPatchesPerGroup; // Maximum number of patches per thread group
 
-        unsigned outPatchSize; // Size of an output patch output (in dword, correspond to
-                               // "patchOutputSize")
-
-        unsigned patchConstSize;       // Size of an output patch constants (in dword)
-        unsigned tessFactorStride;     // Size of tess factor stride (in dword)
-        unsigned specialTfValueSize;   // Size of special TF value (in dword)
         unsigned tessOnChipLdsSize;    // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size
 
-        bool initialized; // Whether calcFactor has been initialized
-      } calcFactor;
+        bool initialized; // Whether hwConfig has been initialized
+      } hwConfig;
     } tcs = {};
 
     struct {
@@ -460,7 +461,7 @@ struct ResourceUsage {
         unsigned primAmpFactor;                    // GS primitive amplification factor
         bool enableMaxVertOut;                     // Whether to allow each GS instance to emit maximum vertices (NGG)
         unsigned rayQueryLdsStackSize;             // Ray query LDS stack size
-      } calcFactor = {};
+      } hwConfig = {};
 
       unsigned outLocCount[MaxGsStreams] = {};
     } gs;

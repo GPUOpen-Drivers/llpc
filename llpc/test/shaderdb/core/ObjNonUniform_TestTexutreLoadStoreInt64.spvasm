@@ -106,7 +106,7 @@
 ; SHADERTEST-NEXT:    [[TMP12:%.*]] = load i64, ptr addrspace(5) [[_12]], align 8
 ; SHADERTEST-NEXT:    call void @spirv.NonUniform.i64(i64 [[TMP12]])
 ; SHADERTEST-NEXT:    [[TMP13:%.*]] = trunc i64 [[TMP12]] to i32
-; SHADERTEST-NEXT:    [[TMP14:%.*]] = getelementptr [4294967295 x i8], ptr null, i32 0, i32 [[TMP13]]
+; SHADERTEST-NEXT:    [[TMP14:%.*]] = getelementptr [0 x i8], ptr null, i32 0, i32 [[TMP13]]
 ; SHADERTEST-NEXT:    [[TMP15:%.*]] = ptrtoint ptr [[TMP14]] to i32
 ; SHADERTEST-NEXT:    [[TMP16:%.*]] = extractvalue { ptr addrspace(4), i32, i32, ptr addrspace(4), i32, i32 } [[_11]], 0
 ; SHADERTEST-NEXT:    [[TMP17:%.*]] = extractvalue { ptr addrspace(4), i32, i32, ptr addrspace(4), i32, i32 } [[_11]], 1

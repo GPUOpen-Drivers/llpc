@@ -46,8 +46,10 @@ namespace Llpc {
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
 ComputeContext::ComputeContext(GfxIpVersion gfxIp, const char *apiName, const ComputePipelineBuildInfo *pipelineInfo,
-                               MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, apiName, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
+                               const StringRef vertexShaderStream, MetroHash::Hash *pipelineHash,
+                               MetroHash::Hash *cacheHash)
+    : PipelineContext(gfxIp, apiName, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo),
+      m_vertexShaderStream(vertexShaderStream) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
@@ -82,6 +84,20 @@ void ComputeContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64
 
   if (pipeline)
     pipeline->setShaderOptions(lgc::ShaderStage::Compute, computeShaderOptions(m_pipelineInfo->cs));
+  if (m_pipelineInfo->transformGraphicsPipeline != nullptr) {
+    auto gfxBuildInfo =
+        static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->transformGraphicsPipeline;
+    setVertexInputDescriptions(pipeline, gfxBuildInfo, hasher);
+
+    lgc::InputAssemblyState iaState = {};
+    lgc::RasterizerState rsState = {};
+
+    auto iaStateBuildInfo = m_pipelineInfo->transformGraphicsPipeline->iaState;
+    iaState.disableVertexReuse = iaStateBuildInfo.disableVertexReuse;
+    iaState.useVertexBufferDescArray = iaStateBuildInfo.useVertexBufferDescArray;
+
+    pipeline->setGraphicsState(iaState, rsState);
+  }
 }
 
 // =====================================================================================================================

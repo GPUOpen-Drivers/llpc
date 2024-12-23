@@ -216,6 +216,9 @@ uint64_t getConstantValue(SPIRVValue *BV, uint32_t I = 0) {
     ConstVal = static_cast<SPIRVConstantTrue *>(BV)->getBoolValue();
   else if (BV->getOpCode() == OpConstantComposite || BV->getOpCode() == OpSpecConstantComposite)
     ConstVal = getConstantValue(static_cast<SPIRVConstantComposite *>(BV)->getElements()[I]);
+  else if (BV->getOpCode() == OpCompositeConstructReplicateEXT ||
+           BV->getOpCode() == OpSpecConstantCompositeReplicateEXT)
+    ConstVal = getConstantValue(static_cast<SPIRVConstantCompositeReplicateEXT *>(BV)->getElements()[0]);
   else if (BV->getOpCode() == OpConstantNull || BV->getOpCode() == OpUndef)
     ConstVal = 0;
   else if (BV->getOpCode() == OpSpecConstantOp)
@@ -232,8 +235,13 @@ SPIRVValue *constantCompositeExtract(SPIRVValue *Composite, SPIRVType *ObjectTy,
   for (auto I : Indices) {
     if (Composite->getOpCode() == OpUndef || Composite->getOpCode() == OpConstantNull)
       return BM->addNullConstant(ObjectTy);
-    assert(Composite->getOpCode() == OpConstantComposite || Composite->getOpCode() == OpSpecConstantComposite);
-    Composite = static_cast<SPIRVConstantComposite *>(Composite)->getElements()[I];
+    if (Composite->getOpCode() == OpConstantComposite || Composite->getOpCode() == OpSpecConstantComposite) {
+      assert(Composite->getOpCode() == OpConstantComposite || Composite->getOpCode() == OpSpecConstantComposite);
+      Composite = static_cast<SPIRVConstantComposite *>(Composite)->getElements()[I];
+    } else if (Composite->getOpCode() == OpConstantCompositeReplicateEXT ||
+               Composite->getOpCode() == OpSpecConstantCompositeReplicateEXT) {
+      Composite = static_cast<SPIRVConstantComposite *>(Composite)->getElements()[0];
+    }
   }
 
   return Composite;

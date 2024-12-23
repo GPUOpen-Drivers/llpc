@@ -61,7 +61,10 @@ public:
                                                                  llvm::IRBuilder<> &builder);
   static void writeTessFactors(PipelineState *pipelineState, llvm::Value *tfBufferDesc, llvm::Value *tfBufferBase,
                                llvm::Value *relPatchId, llvm::Value *outerTf, llvm::Value *innerTf,
-                               llvm::IRBuilder<> &builder);
+                               BuilderBase &builder);
+  static void writeHsOutputs(PipelineState *pipelineState, llvm::Value *offChipLdsDesc, llvm::Value *offChipLdsBase,
+                             llvm::Value *relPatchId, llvm::Value *vertexIdx, llvm::Value *outerTf,
+                             BuilderBase &builder);
 
 private:
   void mergeShader(llvm::Module &module);
@@ -70,7 +73,7 @@ private:
 
   void addAbiMetadata(llvm::Module &module);
 
-  void storeTessFactors(llvm::Function *entryPoint);
+  void storeTessFactorsAndHsOutputs(llvm::Function *entryPoint);
 
   PipelineState *m_pipelineState;           // Pipeline state
   PipelineShadersResult *m_pipelineShaders; // API shaders in the pipeline

@@ -1,142 +1,60 @@
 #!/usr/bin/env python3
-# Map PCI device ids to a gfxip number
-# The list of PCI ids is taken from https://pci-ids.ucw.cz/read/PC/1002 under the terms of the 3-clause BSD License
+##
+ #######################################################################################################################
+ #
+ #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #
+ #  Permission is hereby granted, free of charge, to any person obtaining a copy
+ #  of this software and associated documentation files (the "Software"), to
+ #  deal in the Software without restriction, including without limitation the
+ #  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ #  sell copies of the Software, and to permit persons to whom the Software is
+ #  furnished to do so, subject to the following conditions:
+ #
+ #  The above copyright notice and this permission notice shall be included in all
+ #  copies or substantial portions of the Software.
+ #
+ #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ #  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ #  IN THE SOFTWARE.
+ #
+ #######################################################################################################################
 
-# Copyright (c) <2021> <Martin Mares and Albert Pool>. All rights reserved.
-# Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-# 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-# 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-# 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Map PCI device ids to a gfxip number
 
 import glob
 import sys
 
 VENDOR_AMD = "1002"
 
-device_to_gfxip = {
-    "13e9": "10.1",
-    "1478": "10.1",
-    "15d8": "9",
-    "15dd": "9",
-    "15e7": "9",
-    "1607": "10.3",
-    "1636": "9",
-    "1638": "9",
-    "163f": "10.3",
-    "164c": "9",
-    "164d": "10.3",
-    "1681": "10.3",
-
-    "66a0": "9",
-    "66a1": "9",
-    "66a2": "9",
-    "66a3": "9",
-    "66a7": "9",
-    "66af": "9",
-
-    "67c0": "8",
-    "67c2": "8",
-    "67c4": "8",
-    "67c7": "8",
-    "67ca": "8",
-    "67cc": "8",
-    "67cf": "8",
-    "67d0": "8",
-    "67d4": "8",
-    "67d7": "8",
-    "67df": "8",
-    "67e0": "8",
-    "67e1": "8",
-    "67e3": "8",
-    "67e8": "8",
-    "67e9": "8",
-    "67eb": "8",
-    "67ef": "8",
-    "67ff": "8",
-
-    "6860": "9",
-    "6861": "9",
-    "6862": "9",
-    "6863": "9",
-    "6864": "9",
-    "6867": "9",
-    "6868": "9",
-    "6869": "9",
-    "686a": "9",
-    "686b": "9",
-    "686c": "9",
-    "686d": "9",
-    "686e": "9",
-    "687f": "9",
-
-    "694c": "8",
-    "694e": "8",
-    "694f": "8",
-    "6980": "8",
-    "6986": "8",
-
-    "69a0": "9",
-    "69a1": "9",
-    "69a2": "9",
-    "69a3": "9",
-    "69af": "9",
-
-    "6fdf": "8",
-
-    "7310": "10.1",
-    "7312": "10.1",
-    "7314": "10.1",
-    "731f": "10.1",
-    "7340": "10.1",
-    "7341": "10.1",
-    "7347": "10.1",
-    "734f": "10.1",
-    "7360": "10.1",
-    "7362": "10.1",
-
-    "73a2": "10.3",
-    "73a3": "10.3",
-    "73a4": "10.3",
-    "73ab": "10.3",
-    "73af": "10.3",
-    "73bf": "10.3",
-    "73c3": "10.3",
-    "73c4": "10.3",
-    "73df": "10.3",
-    "73e0": "10.3",
-    "73e1": "10.3",
-    "73e3": "10.3",
-    "73e4": "10.3",
-    "73ff": "10.3",
-
-    "7408": "9",
-    "740c": "9",
-    "740f": "9",
-}
-
-def parse_gfxip(s):
-    """Returns [major, minor, patch]"""
-    arr = [int(i) for i in s.split(".")]
-    while len(arr) < 3:
-        arr.append(0)
-    return arr
+def get_gfxip(device):
+    # Get version of the GC (Graphics and Compute) block as exposed by the kernel
+    with open(f"/sys/class/drm/card{device}/device/ip_discovery/die/0/GC/0/major") as f:
+        major = int(f.read())
+    with open(f"/sys/class/drm/card{device}/device/ip_discovery/die/0/GC/0/minor") as f:
+        minor = int(f.read())
+    return [major, minor]
 
 def gfxip_to_str(ip):
     return ".".join([str(i) for i in ip])
 
-def find_gfxips(device_id):
-    """Find the gxfips of the given PCI device id"""
-    ip = parse_gfxip(device_to_gfxip[device_id])
-    [maj, min, pat] = ip
+def find_gfxips(device):
+    """Find the gfxips of the given PCI device id"""
+    ip = get_gfxip(device)
+    [maj, min] = get_gfxip(device)
 
-    gfxips = [[maj, min], [maj, min, pat]]
+    gfxips = [ip]
     for maj_i in range(9, maj + 1):
         gfxips.append([maj_i])
     return ["gfx" + gfxip_to_str(ip)] + ["gfx" + gfxip_to_str(i) + "+" for i in gfxips]
 
 def query_gfxips(device = None):
-    """Find all gxfips of device or of the first AMD GPU on the system"""
+    """Find all gfxips of device or of the first AMD GPU on the system"""
     if device is None:
         amd_cards = []
         for card in glob.glob("/sys/class/drm/card*"):
@@ -159,9 +77,12 @@ def query_gfxips(device = None):
         if vendor_id != f"0x{VENDOR_AMD}":
             raise Exception(f"Vendor {vendor_id} is not AMD (0x{VENDOR_AMD})")
 
-    with open("/sys/class/drm/card0/device/device") as f:
+    with open(f"/sys/class/drm/card{device}/device/device") as f:
         device_id = f.read().strip().replace("0x", "")
-    return find_gfxips(device_id)
+
+    gfxips = find_gfxips(device)
+    print(f"Chosen device: gfx{gfxip_to_str(get_gfxip(device))} (card{device}, pci id 0x{device_id})")
+    return gfxips
 
 if __name__ == '__main__':
     print(query_gfxips(None if len(sys.argv) < 2 else sys.argv[1]))

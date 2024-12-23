@@ -578,6 +578,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityFragmentShaderSampleInterlockEXT:
   case CapabilityFragmentShaderShadingRateInterlockEXT:
   case CapabilityFragmentShaderPixelInterlockEXT:
+  case CapabilityReplicatedCompositesEXT:
     return true;
   default:
     return false;
@@ -622,11 +623,13 @@ inline bool isValid(spv::Op V) {
   case OpConstantFalse:
   case OpConstant:
   case OpConstantComposite:
+  case OpConstantCompositeReplicateEXT:
   case OpConstantNull:
   case OpSpecConstantTrue:
   case OpSpecConstantFalse:
   case OpSpecConstant:
   case OpSpecConstantComposite:
+  case OpSpecConstantCompositeReplicateEXT:
   case OpSpecConstantOp:
   case OpFunction:
   case OpFunctionParameter:
@@ -652,6 +655,7 @@ inline bool isValid(spv::Op V) {
   case OpVectorInsertDynamic:
   case OpVectorShuffle:
   case OpCompositeConstruct:
+  case OpCompositeConstructReplicateEXT:
   case OpCompositeExtract:
   case OpCompositeInsert:
   case OpCopyObject:
@@ -966,6 +970,13 @@ inline bool isValidPackedVectorFormat(spv::PackedVectorFormat V) {
   default:
     return false;
   }
+}
+
+inline bool isValidFPEncoding(spv::FPEncoding V) {
+  switch (V) {
+  default:
+    return false;
+  };
 }
 
 inline bool isValidImageOperandsMask(SPIRVWord Mask) {

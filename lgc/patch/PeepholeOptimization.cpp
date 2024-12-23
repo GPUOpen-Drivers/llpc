@@ -31,7 +31,10 @@
 #include "lgc/patch/PeepholeOptimization.h"
 #include "lgc/Builder.h"
 #include "lgc/patch/LgcLowering.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/CommandLine.h"
@@ -44,7 +47,25 @@ using namespace lgc;
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
-namespace lgc {
+namespace {
+
+class PeepholeOptimizer : public llvm::InstVisitor<PeepholeOptimizer> {
+
+public:
+  PeepholeOptimizer(const ShaderOptions *shaderOptions) : m_changed(false), m_shaderOptions(shaderOptions) {}
+
+  bool run(Function &function);
+
+  void visitIntToPtr(IntToPtrInst &intToPtr);
+  void visitCallInst(CallInst &callInst);
+
+private:
+  bool m_changed;
+  const ShaderOptions *m_shaderOptions;
+  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
+};
+
+} // anonymous namespace
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
@@ -55,8 +76,25 @@ namespace lgc {
 PreservedAnalyses PeepholeOptimization::run(Function &function, FunctionAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Peephole optimization\n");
 
-  m_changed = false;
+  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
+  PipelineState *pipelineState =
+      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+  auto shaderStage = getShaderStage(&function);
+  const ShaderOptions *shaderOptions = nullptr;
+  if (shaderStage)
+    shaderOptions = &pipelineState->getShaderOptions(shaderStage.value());
 
+  PeepholeOptimizer pho(shaderOptions);
+  bool changed = pho.run(function);
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Apply peephole optimizations to the function
+//
+// @param [in/out] function : Function that we will peephole optimize.
+// @returns : true if any change was made
+bool PeepholeOptimizer::run(Function &function) {
   visit(function);
 
   const bool changed = m_changed || !m_instsToErase.empty();
@@ -67,7 +105,7 @@ PreservedAnalyses PeepholeOptimization::run(Function &function, FunctionAnalysis
   }
   m_instsToErase.clear();
 
-  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+  return changed;
 }
 
 // =====================================================================================================================
@@ -85,7 +123,7 @@ PreservedAnalyses PeepholeOptimization::run(Function &function, FunctionAnalysis
 // Reference: https://groups.google.com/g/llvm-dev/c/x4K7ppGLbg8/m/f_3NySRhjlcJ
 
 // @param intToPtr: The "inttoptr" instruction to visit.
-void PeepholeOptimization::visitIntToPtr(IntToPtrInst &intToPtr) {
+void PeepholeOptimizer::visitIntToPtr(IntToPtrInst &intToPtr) {
   // Check if we are using add to do pointer arithmetic.
   auto *const binaryOperator = dyn_cast<BinaryOperator>(intToPtr.getOperand(0));
   if (!binaryOperator || binaryOperator->getOpcode() != Instruction::Add)
@@ -117,6 +155,8 @@ void PeepholeOptimization::visitIntToPtr(IntToPtrInst &intToPtr) {
   // Create a getelementptr instruction (using offset / size).
   const DataLayout &dataLayout = intToPtr.getModule()->getDataLayout();
   const uint64_t size = dataLayout.getTypeAllocSize(elementType);
+  if (size == 0)
+    return;
   APInt index = constOffset->getValue().udiv(size);
   if (constOffset->getValue().urem(size) != 0)
     return;
@@ -140,13 +180,25 @@ void PeepholeOptimization::visitIntToPtr(IntToPtrInst &intToPtr) {
 // =====================================================================================================================
 // Visit a call instruction.
 //
-// Peephole log2(const +/- x) -> log2(max(0.0, const +/- x)).
-// This addresses a potential precision underflow in applications intolerant to in-spec math reordering.
+// Peephole relevant argument to call such that const +/- x -> max(0.0, const +/- x)
+// where the argument is X for log2(X) or pow(X, Y).
+// This addresses a potential precision underflow in applications intolerant to
+// in-spec math reordering.
+// This has to be enabled per app or shader based on forceUnderflowPrevention option.
 //
 // @param callInst: The call instruction to visit.
-void PeepholeOptimization::visitCallInst(CallInst &callInst) {
-  if (callInst.getIntrinsicID() != Intrinsic::log2)
+void PeepholeOptimizer::visitCallInst(CallInst &callInst) {
+  // Only apply this peephole when explicitly requested via option
+  if (!(m_shaderOptions && m_shaderOptions->forceUnderflowPrevention))
     return;
+
+  switch (callInst.getIntrinsicID()) {
+  case Intrinsic::log2:
+  case Intrinsic::pow:
+    break;
+  default:
+    return;
+  }
 
   Value *V = callInst.getOperand(0);
 
@@ -167,5 +219,3 @@ void PeepholeOptimization::visitCallInst(CallInst &callInst) {
 
   m_changed = true;
 }
-
-} // namespace lgc

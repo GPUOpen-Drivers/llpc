@@ -74,7 +74,7 @@ define <8 x float> @test_f16_ab_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMo
 ; CHECK-NEXT:    [[TMP69:%.*]] = bitcast <16 x half> [[TMP68]] to <8 x float>
 ; CHECK-NEXT:    ret <8 x float> [[TMP69]]
 ;
-  %a = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 0, i32 0, i32 16)
+  %a = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 0, i32 0, i32 16, i32 16)
   ret <8 x float> %a
 }
 
@@ -106,7 +106,7 @@ define <8 x float> @test_f16_cd_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMo
 ; CHECK-NEXT:    [[TMP24:%.*]] = bitcast <16 x half> [[TMP23]] to <8 x float>
 ; CHECK-NEXT:    ret <8 x float> [[TMP24]]
 ;
-  %a = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 1, i32 0, i32 16)
+  %a = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 1, i32 1, i32 0, i32 16, i32 16)
   ret <8 x float> %a
 }
 
@@ -183,7 +183,7 @@ define <8 x i32> @test_i16_ab_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMode
 ; CHECK-NEXT:    [[TMP69:%.*]] = bitcast <16 x i16> [[TMP68]] to <8 x i32>
 ; CHECK-NEXT:    ret <8 x i32> [[TMP69]]
 ;
-  %a = call <8 x i32> (...) @lgc.cooperative.matrix.load__v8i32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 0, i32 0, i32 16)
+  %a = call <8 x i32> (...) @lgc.cooperative.matrix.load__v8i32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 0, i32 0, i32 16, i32 16)
   ret <8 x i32> %a
 }
 
@@ -215,7 +215,7 @@ define <8 x i32> @test_i16_cd_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMode
 ; CHECK-NEXT:    [[TMP24:%.*]] = bitcast <16 x i16> [[TMP23]] to <8 x i32>
 ; CHECK-NEXT:    ret <8 x i32> [[TMP24]]
 ;
-  %a = call <8 x i32> (...) @lgc.cooperative.matrix.load__v8i32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 1, i32 0, i32 16)
+  %a = call <8 x i32> (...) @lgc.cooperative.matrix.load__v8i32(ptr addrspace(7) %ptr, i32 320, i1 false, i32 4, i32 1, i32 0, i32 16, i32 16)
   ret <8 x i32> %a
 }
 
@@ -246,7 +246,7 @@ define <8 x float> @test_f32_cd_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMo
 ; CHECK-NEXT:    [[TMP23:%.*]] = shufflevector <4 x float> [[TMP22]], <4 x float> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
 ; CHECK-NEXT:    ret <8 x float> [[TMP23]]
 ;
-  %a = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) %ptr, i32 640, i1 false, i32 2, i32 1, i32 0, i32 16)
+  %a = call <8 x float> (...) @lgc.cooperative.matrix.load__v8f32(ptr addrspace(7) %ptr, i32 640, i1 false, i32 2, i32 1, i32 0, i32 16, i32 16)
   ret <8 x float> %a
 }
 
@@ -277,7 +277,7 @@ define <8 x i32> @test_i32_cd_layout(ptr addrspace(7) %ptr) !spirv.ExecutionMode
 ; CHECK-NEXT:    [[TMP23:%.*]] = shufflevector <4 x i32> [[TMP22]], <4 x i32> poison, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
 ; CHECK-NEXT:    ret <8 x i32> [[TMP23]]
 ;
-  %a = call <8 x i32> (...) @lgc.cooperative.matrix.load__v8i32(ptr addrspace(7) %ptr, i32 640, i1 false, i32 5, i32 1, i32 0, i32 16)
+  %a = call <8 x i32> (...) @lgc.cooperative.matrix.load__v8i32(ptr addrspace(7) %ptr, i32 640, i1 false, i32 5, i32 1, i32 0, i32 16, i32 16)
   ret <8 x i32> %a
 }
 
@@ -323,9 +323,10 @@ define <2 x i32> @test_i4_ab_layout(ptr addrspace(7) %ptr) !spirv.ExecutionModel
 ; CHECK-NEXT:    [[TMP38:%.*]] = bitcast <8 x i8> [[TMP37]] to <2 x i32>
 ; CHECK-NEXT:    ret <2 x i32> [[TMP38]]
 ;
-  %a = call <2 x i32> (...) @lgc.cooperative.matrix.load__v2i32(ptr addrspace(7) %ptr, i32 128, i1 true, i32 10, i32 0, i32 2, i32 16)
+  %a = call <2 x i32> (...) @lgc.cooperative.matrix.load__v2i32(ptr addrspace(7) %ptr, i32 128, i1 true, i32 10, i32 0, i32 2, i32 16, i32 16)
   ret <2 x i32> %a
 }
+
 declare <8 x float> @lgc.cooperative.matrix.load__v8f32(...)
 declare <8 x i32> @lgc.cooperative.matrix.load__v8i32(...)
 declare <2 x i32> @lgc.cooperative.matrix.load__v2i32(...)

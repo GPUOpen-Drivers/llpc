@@ -30,17 +30,23 @@
  */
 #include "llpcCompiler.h"
 #include "LLVMSPIRVLib.h"
+#include "LinkTransformShaders.h"
+#include "LowerAccessChain.h"
 #include "LowerAdvancedBlend.h"
 #include "LowerCfgMerges.h"
+#include "LowerGlCompatibility.h"
+#include "LowerGlobals.h"
 #include "LowerRayTracing.h"
 #include "LowerTranslator.h"
 #include "Lowering.h"
 #include "LoweringUtil.h"
 #include "PrepareContinuations.h"
+#include "PrepareTransformVertexShader.h"
 #include "SPIRVEntry.h"
 #include "SPIRVFunction.h"
 #include "SPIRVInstruction.h"
 #include "SPIRVInternal.h"
+#include "ScalarReplacementOfBuiltins.h"
 #include "llpcCacheAccessor.h"
 #include "llpcComputeContext.h"
 #include "llpcContext.h"
@@ -58,6 +64,7 @@
 #include "vkgcDefs.h"
 #include "vkgcElfReader.h"
 #include "vkgcPipelineDumper.h"
+#include "compilerutils/ModuleBunch.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
@@ -90,6 +97,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
 #include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <cassert>
@@ -227,21 +235,7 @@ static MetroHash::Hash SOptionHash = {};
 unsigned Compiler::m_instanceCount = 0;
 unsigned Compiler::m_outRedirectCount = 0;
 
-// Represents the payload used by helper thread to build ray tracing Elf
-struct HelperThreadBuildRayTracingPipelineElfPayload {
-  ArrayRef<Module *> modules;                         // Modules to generate ELF packages
-  std::vector<ElfPackage> &pipelineElfs;              // Output ELF packages
-  std::vector<RayTracingShaderProperty> &shaderProps; // Output RayTracingShaderProperty
-  std::vector<bool> &moduleCallsTraceRay;             // Whether each module calls OpTraceRay
-  std::vector<Result> &results;                       // Build result of each module
-  RayTracingContext *rayTracingContext;               // The ray tracing context across the pipeline
-  Compiler *compiler;                                 // The compiler instance
-  std::atomic<bool> helperThreadJoined;               // Whether helper thread has joined
-  std::atomic<bool> mainThreadSwitchedContext;        // Whether main thread has finished switching context
-};
-
 sys::Mutex Compiler::m_helperThreadMutex;
-std::condition_variable_any Compiler::m_helperThreadConditionVariable;
 
 // =====================================================================================================================
 // Handler for LLVM fatal error.
@@ -1879,6 +1873,12 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     if (enableAdvancedBlend)
       context->ensureGfxRuntimeLibrary();
 
+    bool isTransformPipeline = false;
+    auto computePipelineInfo =
+        static_cast<const ComputePipelineBuildInfo *>(context->getPipelineContext()->getPipelineBuildInfo());
+    if (computePipelineInfo != nullptr && computePipelineInfo->transformGraphicsPipeline != nullptr)
+      isTransformPipeline = true;
+
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData)
@@ -1931,6 +1931,9 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                                     "===============================================================================\n"
                                     "// LLPC SPIRV-to-LLVM translation results\n"));
       }
+
+      if (isTransformPipeline)
+        lowerPassMgr->addPass(LinkTransformShaders());
 
       if (moduleData->usage.enableRayQuery) {
         assert(!moduleData->usage.rayQueryLibrary);
@@ -2063,6 +2066,75 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   if (result == Result::Success && hasError)
     result = Result::ErrorInvalidShader;
+
+  return result;
+}
+
+// =====================================================================================================================
+// Build the transform vertex shader, convert the main function to TransformVertexEntry
+//
+// @param context : LLPC context
+// @param shaderInfo : Vertex shader to be processed
+// @param outStream : Bitcode of transform verte shader module
+// @returns : Returns Success if the vertex shader is compiled successfully
+Result Compiler::buildTransformVertexShader(Context *context, const PipelineShaderInfo *shaderInfo,
+                                            raw_pwrite_stream &outStream) {
+  Result result = Result::Success;
+
+  bool hasError = false;
+  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+
+  // Set up middle-end objects.
+  LgcContext *builderContext = context->getLgcContext();
+  std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
+  context->setBuilder(builderContext->createBuilder(&*pipeline));
+
+  // Get transform vertex shader library, bitcode will be returned
+  auto moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+  const_cast<ShaderModuleData *>(moduleData)->usage.keepUnusedFunctions = true;
+
+  auto gfxRuntime = std::make_unique<Module>("transformruntime", *context);
+  context->setModuleTargetMachine(gfxRuntime.get());
+
+  TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC GfxRuntime",
+                              TimerProfiler::PipelineTimerEnableMask);
+  std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
+  SpirvLower::registerTranslationPasses(*lowerPassMgr);
+
+  timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
+
+  lowerPassMgr->addPass(LowerTranslator(ShaderStageVertex, shaderInfo));
+  if (EnableOuts()) {
+    lowerPassMgr->addPass(
+        PrintModulePass(outs(), "\n"
+                                "===============================================================================\n"
+                                "// LLPC SPIRV-to-LLVM translation results for transform vertex shader\n"));
+  }
+
+  // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
+  // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
+  lowerPassMgr->addPass(AlwaysInlinerPass());
+  lowerPassMgr->addPass(GlobalDCEPass());
+
+  // Lower SPIR-V access chain
+  lowerPassMgr->addPass(LowerAccessChain());
+
+  // Split up and replace global variables that are structs of builtins.
+  lowerPassMgr->addPass(ScalarReplacementOfBuiltins());
+
+  // Lower Glsl compatibility variables and operations
+  lowerPassMgr->addPass(LowerGlCompatibility());
+
+  lowerPassMgr->addPass(PrepareTransformVertexShader());
+
+  // Lower SPIR-V global variables, inputs, and outputs
+  lowerPassMgr->addPass(LowerGlobals());
+
+  lowerPassMgr->addPass(BitcodeWriterPass(outStream));
+  timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
+
+  lowerPassMgr->run(*gfxRuntime);
 
   return result;
 }
@@ -2549,12 +2621,36 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
 // @param pipelineDumpFile : Handle of pipeline dump file
 Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineInfo,
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
+  Result result = Result::Success;
   BinaryData elfBin = {};
+  SmallString<16> outBuffer;
+  raw_svector_ostream outStream(outBuffer);
+
+  // Compile transform vertex shader if it is a transform pipeline
+  auto gfxPipelineInfo = pipelineInfo->transformGraphicsPipeline;
+  if (gfxPipelineInfo != nullptr) {
+    result = validatePipelineShaderInfo(&gfxPipelineInfo->vs);
+    if (result != Result::Success)
+      return result;
+
+    MetroHash::Hash vtxCacheHash = PipelineDumper::generateHashForGraphicsPipeline(gfxPipelineInfo, true);
+    MetroHash::Hash vtxPipelineHash = PipelineDumper::generateHashForGraphicsPipeline(gfxPipelineInfo, false);
+
+    GraphicsContext graphicsContext(m_gfxIp, m_apiName, gfxPipelineInfo, &vtxPipelineHash, &vtxCacheHash);
+    Context *context = acquireContext();
+    context->attachPipelineContext(&graphicsContext);
+
+    result = buildTransformVertexShader(context, &gfxPipelineInfo->vs, outStream);
+    releaseContext(context);
+
+    if (result != Result::Success)
+      return result;
+  }
 
   const bool relocatableElfRequested = pipelineInfo->options.enableRelocatableShaderElf || cl::UseRelocatableShaderElf;
   const bool buildUsingRelocatableElf = relocatableElfRequested && canUseRelocatableComputeShaderElf(pipelineInfo);
 
-  Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
+  result = validatePipelineShaderInfo(&pipelineInfo->cs);
   if (result != Result::Success)
     return result;
 
@@ -2589,7 +2685,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   ElfPackage candidateElf;
   if (!cacheAccessor || !cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache miss for compute pipeline.\n");
-    ComputeContext *computeContext = new ComputeContext(m_gfxIp, m_apiName, pipelineInfo, &pipelineHash, &cacheHash);
+    ComputeContext *computeContext =
+        new ComputeContext(m_gfxIp, m_apiName, pipelineInfo, outStream.str(), &pipelineHash, &cacheHash);
     result = buildComputePipelineInternal(computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
     delete computeContext;
@@ -2711,7 +2808,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
   }
 
   std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
-  rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
+  rayTracingShaderInfo.reserve(pipelineInfo->shaderCount);
   for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
     rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
     auto &shaderInfo = rayTracingShaderInfo[i];
@@ -2732,12 +2829,6 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     rayTracingContext.updateRayFlagsKnownBits(knownBits);
   }
 
-  // Add entry module
-  PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
-  raygenMainShaderInfo.entryStage = ShaderStageRayTracingRayGen;
-  raygenMainShaderInfo.pModuleData = nullptr;
-  rayTracingShaderInfo.push_back(&raygenMainShaderInfo);
-
   result = buildRayTracingPipelineInternal(rayTracingContext, rayTracingShaderInfo, false, elfBinarys, shaderProps,
                                            helperThreadProvider);
 
@@ -2756,10 +2847,21 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     size_t elfSize = 0;
 
     for (auto &elf : elfBinarys) {
-      if (elf.size() % 8 != 0) {
-        elf.resize(alignTo(elf.size(), alignof(BinaryData)));
+      // Align each individual elf to a multiple of 8, iff it is actually an ELF; otherwise it comes from -emit-lgc,
+      // -emit-llvm or -filetype=asm, and alignment will add extra nul bytes to textual output.
+      if (elf.size() >= 4 && elf.starts_with("\177ELF")) {
+        if (elf.size() % 8 != 0) {
+          elf.resize(alignTo(elf.size(), alignof(BinaryData)));
+        }
       }
       elfSize += elf.size();
+    }
+
+    // Make sure Vkgc::BinaryData address alignment, which requires 8 byte alignment
+    size_t elfSizeGap = 0;
+    if (elfSize % 8 != 0) {
+      elfSizeGap = alignTo(elfSize, alignof(BinaryData)) - elfSize;
+      elfSize += elfSizeGap;
     }
 
     size_t allocSize = elfSize;
@@ -2792,7 +2894,8 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     }
     pipelineOut->pipelineBins = pipelineBins;
 
-    allocBuf = voidPtrInc(allocBuf, binaryDataSize);
+    // Plus gap to make sure address alignment
+    allocBuf = voidPtrInc(allocBuf, binaryDataSize + elfSizeGap);
     pipelineOut->shaderPropSet.shaderCount = shaderProps.size();
     pipelineOut->shaderPropSet.traceRayIndex = shaderProps.size() - 1;
     if (!shaderProps.empty()) {
@@ -2854,7 +2957,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
 Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Module> module, ElfPackage &pipelineElf,
                                             std::vector<RayTracingShaderProperty> &shaderProps,
                                             std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
-                                            std::unique_ptr<Pipeline> &pipeline, TimerProfiler &timerProfiler) {
+                                            Pipeline &pipeline, TimerProfiler &timerProfiler) {
   auto rtContext = static_cast<RayTracingContext *>(context->getPipelineContext());
   if (moduleIndex > 0) {
     auto &shaderProp = shaderProps[moduleIndex - 1];
@@ -2875,7 +2978,7 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     shaderProp.shaderIdExtraBits = shaderIdExtraBits;
   }
 
-  auto options = pipeline->getOptions();
+  auto options = pipeline.getOptions();
   MetroHash64 hasher;
   MetroHash::Hash hash = {};
   hasher.Update(options.hash[1]);
@@ -2913,9 +3016,9 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     }
   }
 
-  pipeline->setOptions(options);
+  pipeline.setOptions(options);
 
-  generatePipeline(context, moduleIndex, std::move(module), pipelineElf, pipeline.get(), timerProfiler);
+  generatePipeline(context, moduleIndex, std::move(module), pipelineElf, &pipeline, timerProfiler);
 
   if (moduleIndex > 0)
     adjustRayTracingElf(&pipelineElf, rtContext, shaderProps[moduleIndex - 1]);
@@ -2967,134 +3070,6 @@ void Compiler::setUseGpurt(lgc::Pipeline *pipeline) {
 }
 
 // =====================================================================================================================
-// Build single ray tracing pipeline ELF package.
-//
-// @param IHelperThreadProvider : The helper thread provider
-// @param payload : Payload to build ray tracing pipeline Elf package
-void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadProvider, void *payload) {
-  HelperThreadBuildRayTracingPipelineElfPayload *helperThreadPayload =
-      static_cast<HelperThreadBuildRayTracingPipelineElfPayload *>(payload);
-
-  helperThreadPayload->helperThreadJoined = true;
-
-  unsigned moduleIndex = 0;
-
-  // No remaining tasks, do not proceed
-  if (helperThreadProvider->GetNextTask(&moduleIndex) == false)
-    return;
-
-  // Set up context for each helper thread
-  Context *context = helperThreadPayload->compiler->acquireContext();
-
-  bool hasError = false;
-  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
-
-  context->attachPipelineContext(helperThreadPayload->rayTracingContext);
-
-  LgcContext *builderContext = context->getLgcContext();
-  std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
-  context->setBuilder(builderContext->createBuilder(&*pipeline));
-
-  context->ensureGpurtLibrary();
-  helperThreadPayload->compiler->setUseGpurt(&*pipeline);
-
-  TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
-
-  {
-    // Block the helper thread until main thread has switched context, see comment in
-    // Compiler::buildRayTracingPipelineInternal for why we need this.
-    std::unique_lock<sys::Mutex> lock(helperThreadPayload->compiler->getHelperThreadMutex());
-    helperThreadPayload->compiler->getHelperThreadConditionVariable().wait(
-        lock, [helperThreadPayload]() { return helperThreadPayload->mainThreadSwitchedContext.load(); });
-  }
-
-  do {
-    // NOTE: All modules were in the same context, which is not thread safe. We need to 'clone' the module into separate
-    // context here to ensure we can do the work simultaneously. We achieve this by outputting the module as bitcode and
-    // read it back in another context.
-    Module *originalModule = helperThreadPayload->modules[moduleIndex];
-
-    // FIXME: There will be out of sync assertion when the main thread is doing something related to context (probably
-    // in PipelineState::generate), and the helper thread is using bitcode writer, we need to find a decent solution for
-    // such situation.
-    SmallVector<char, 0> bcBuffer;
-    BitcodeWriter bcWriter(bcBuffer);
-    bcWriter.writeModule(*originalModule);
-    bcWriter.writeSymtab();
-    bcWriter.writeStrtab();
-
-    SmallVectorMemoryBuffer bcMemBuf(std::move(bcBuffer), originalModule->getName());
-    auto moduleOrErr = getLazyBitcodeModule(std::move(bcMemBuf), *context);
-    std::unique_ptr<Module> module = nullptr;
-
-    if (!moduleOrErr) {
-      LLPC_ERRS("Failed to load bit code\n");
-      helperThreadPayload->results[moduleIndex] = Result::ErrorInvalidShader;
-      helperThreadProvider->TaskCompleted();
-      continue;
-    }
-
-    module = std::move(*moduleOrErr);
-    if (Error errCode = module->materializeAll()) {
-      LLPC_ERRS("Failed to materialize module\n");
-      module = nullptr;
-      helperThreadPayload->results[moduleIndex] = Result::ErrorInvalidShader;
-      helperThreadProvider->TaskCompleted();
-      continue;
-    }
-    auto result = helperThreadPayload->compiler->buildRayTracingPipelineElf(
-        context, std::move(module), helperThreadPayload->pipelineElfs[moduleIndex], helperThreadPayload->shaderProps,
-        helperThreadPayload->moduleCallsTraceRay, moduleIndex, pipeline, timerProfiler);
-
-    helperThreadPayload->results[moduleIndex] = hasError ? Result::ErrorInvalidShader : result;
-
-    helperThreadProvider->TaskCompleted();
-  } while (helperThreadProvider->GetNextTask(&moduleIndex));
-
-  context->setDiagnosticHandler(nullptr);
-  helperThreadPayload->compiler->releaseContext(context);
-}
-
-// =====================================================================================================================
-// Limited implementation of Llpc::IHelperThreadProvider to support -add-rt-helpers.
-//
-// If no deferred work helper thread providers is available when additional threads are requested via -add-rt-helpers
-// then use an instances of this class to coordinate helper threads.
-class InternalHelperThreadProvider : public Llpc::IHelperThreadProvider {
-public:
-  virtual void SetTasks(ThreadFunction *pFunction, uint32_t numTasks, void *pPayload) override {
-    assert(!m_totalInstances && "InternalHelperThreadProvider is single use");
-    m_totalInstances = numTasks;
-  }
-
-  virtual bool GetNextTask(uint32_t *pTaskIndex) override {
-    assert(pTaskIndex != nullptr);
-    *pTaskIndex = m_nextInstance.fetch_add(1);
-    return (*pTaskIndex < m_totalInstances);
-  }
-
-  virtual void TaskCompleted() override {
-    uint32_t completedInstances = m_completedInstances.fetch_add(1) + 1;
-    if (completedInstances == m_totalInstances)
-      m_event.notify_all();
-  }
-
-  virtual void WaitForTasks() override {
-    std::unique_lock<std::mutex> lock(m_lock);
-    while (m_completedInstances < m_totalInstances)
-      m_event.wait(lock);
-  }
-
-private:
-  uint32_t m_totalInstances = 0;
-  std::atomic<uint32_t> m_nextInstance = 0;
-  std::atomic<uint32_t> m_completedInstances = 0;
-  std::condition_variable m_event;
-  std::mutex m_lock;
-};
-
-// =====================================================================================================================
 // Build raytracing pipeline internally
 //
 // @param rtContext : Ray tracing context
@@ -3126,28 +3101,29 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   rtContext.setPipelineState(&*pipeline, /*hasher=*/nullptr, unlinked);
 
-  std::vector<std::unique_ptr<Module>> modules(shaderInfo.size());
   mainContext->setBuilder(builderContext->createBuilder(&*pipeline));
-
   mainContext->ensureGpurtLibrary();
+
+  ModuleBunch bunch;
+
+  {
+    auto leadModule = std::make_unique<Module>("main", *mainContext);
+    mainContext->setModuleTargetMachine(leadModule.get());
+    bunch.addModule(std::move(leadModule));
+  }
 
   // Create empty modules and set target machine in each.
   for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size(); ++shaderIndex) {
     const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
+    assert(shaderInfoEntry->pModuleData);
     std::string moduleName;
-    if (shaderInfoEntry->pModuleData) {
-      moduleName = (Twine("_") + getShaderStageAbbreviation(shaderInfoEntry->entryStage) + "_" +
-                    Twine(getModuleIdByIndex(shaderIndex)))
-                       .str();
-      moduleName[1] = std::tolower(moduleName[1]);
-    } else {
-      moduleName = "main";
-    }
-    modules[shaderIndex] = std::make_unique<Module>(moduleName, *mainContext);
-    mainContext->setModuleTargetMachine(modules[shaderIndex].get());
+    moduleName = (Twine("_") + getShaderStageAbbreviation(shaderInfoEntry->entryStage) + "_" +
+                  Twine(getModuleIdByIndex(shaderIndex)))
+                     .str();
+    moduleName[1] = std::tolower(moduleName[1]);
 
-    if (!shaderInfoEntry->pModuleData)
-      continue;
+    auto module = std::make_unique<Module>(moduleName, *mainContext);
+    mainContext->setModuleTargetMachine(module.get());
 
     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
     lowerPassMgr->setPassIndex(&passIndex);
@@ -3159,11 +3135,12 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     lowerPassMgr->addPass(AlwaysInlinerPass());
 
     // Run the passes.
-    lowerPassMgr->run(*modules[shaderIndex]);
+    lowerPassMgr->run(*module);
+
+    bunch.addModule(std::move(module));
   }
 
   // Step 2: Set up traversal module and kernel entry
-  std::vector<std::unique_ptr<Module>> newModules;
   // Record which module calls TraceRay(), except the first one (For indirect mode, it is the entry function which will
   // never call TraceRay(). For inlined mode, we don't need to care).
   std::vector<bool> moduleCallsTraceRay;
@@ -3178,18 +3155,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
   const bool isContinuationsMode = rtContext.isContinuationsMode();
 
-  std::unique_ptr<Module> entry = std::move(modules.back());
-  modules.pop_back();
-  shaderInfo = shaderInfo.drop_back();
-
-  newModules.push_back(std::move(entry));
-
   for (unsigned shaderIndex = 0; shaderIndex < pipelineInfo->shaderCount; ++shaderIndex) {
     const auto *shaderInfoEntry = shaderInfo[shaderIndex];
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
-    auto shaderModule = std::move(modules[shaderIndex]);
-
-    newModules.push_back(std::move(shaderModule));
     moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
   }
 
@@ -3226,47 +3194,58 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       }
     }
 
-    newModules.push_back(std::move(traversal));
+    bunch.addModule(std::move(traversal));
     moduleCallsTraceRay.push_back(false);
   }
 
-  assert(moduleCallsTraceRay.size() == (newModules.size() - 1));
+  assert(moduleCallsTraceRay.size() == bunch.size() - 1);
 
-  // Step 3: Run lower passes on all modules
-  for (unsigned i = 0; i < newModules.size(); i++) {
-    auto module = (newModules[i].get());
-    std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
+  // Steps 3 & 4:
+  // - Run lower passes on all modules
+  // - Merge all modules and inline if necessary
+  {
+    Timer *lowerTimer = timerProfiler.getTimer(TimerLower);
+    auto passMgr = lgc::MbPassManager::Create(builderContext->getTargetMachine());
+    passMgr->setPassIndex(&passIndex);
     SpirvLower::registerLoweringPasses(*passMgr);
-    LowerFlag flag = {};
-    flag.isRayTracing = true;
-    flag.isInternalRtShader = false;
-    SpirvLower::addPasses(mainContext, ShaderStageCompute, *passMgr, timerProfiler.getTimer(TimerLower), flag);
-    if (isContinuationsMode) {
-      passMgr->addPass(PrepareContinuations());
+
+    passMgr->addPass(ModuleBunchToModulePassAdaptor([mainContext, isContinuationsMode, lowerTimer]() {
+      ModulePassManager mpm;
+      LowerFlag flag = {};
+      flag.isRayTracing = true;
+      flag.isInternalRtShader = false;
+      SpirvLower::addPasses(mainContext, ShaderStageCompute, mpm, lowerTimer, flag);
+      if (isContinuationsMode) {
+        mpm.addPass(PrepareContinuations());
+      }
+      return createForModuleBunchToModulePassAdaptor(std::move(mpm));
+    }));
+
+    if (indirectStageMask == 0) {
+      passMgr->addPass(MergeModulesPass());
+
+      passMgr->addPass(ModuleBunchToModulePassAdaptor([]() {
+        ModulePassManager mpm;
+        mpm.addPass(AlwaysInlinerPass());
+        mpm.addPass(ClearNonEntryFunctionsPass("main"));
+        return createForModuleBunchToModulePassAdaptor(std::move(mpm));
+      }));
     }
-    passMgr->run(*module);
+
+    passMgr->run(bunch);
   }
 
-  // Step 4: Link module if necessary
-  if (indirectStageMask == 0) {
-    auto &mainModule = newModules[0];
-    Linker linker(*mainModule);
-    for (unsigned i = 1; i < newModules.size(); ++i) {
-      linker.linkInModule(std::move(newModules[i]));
-    }
-    std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
-    passMgr->addPass(AlwaysInlinerPass());
-    passMgr->run(*mainModule);
-    clearNonEntryFunctions(mainModule.get(), "main");
-    newModules.erase(newModules.begin() + 1, newModules.end());
-  }
+  // Step 5: Generate ELFs
+  std::vector<std::unique_ptr<Module>> newModules;
+  for (auto &module : bunch.getMutableModules())
+    newModules.push_back(std::move(module));
 
   rtContext.setLinked(true);
   pipelineElfs.resize(newModules.size());
   shaderProps.resize(newModules.size() - 1);
 
   // Take entry module, it will be handled at last.
-  entry = std::move(newModules[0]);
+  std::unique_ptr<Module> entry = std::move(newModules[0]);
 
   std::unique_ptr<Module> traversalModule;
   if (indirectStageMask != 0 && needTraversal) {
@@ -3275,74 +3254,95 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     rtContext.getRayTracingLibrarySummary().hasTraceRayModule = true;
   }
 
-  InternalHelperThreadProvider ourHelperThreadProvider;
-  if (cl::AddRtHelpers && !helperThreadProvider)
-    helperThreadProvider = &ourHelperThreadProvider;
+  struct HelperContext {
+    Context *context = nullptr;
+    LgcContext *builderContext = nullptr;
+    std::unique_ptr<Pipeline> pipeline;
+    TimerProfiler timerProfiler;
+    bool hasError = false;
 
-  // Step 5: Generate ELFs
-  if (helperThreadProvider) {
-    std::vector<Result> results(newModules.size(), Result::Success);
-    std::vector<Module *> modulePointers;
-    for (const auto &module : newModules)
-      modulePointers.push_back(module.get());
-    HelperThreadBuildRayTracingPipelineElfPayload helperThreadPayload = {
-        modulePointers, pipelineElfs, shaderProps, moduleCallsTraceRay, results, &rtContext, this, false, false};
-    helperThreadProvider->SetTasks(&helperThreadBuildRayTracingPipelineElf, newModules.size(),
-                                   static_cast<void *>(&helperThreadPayload));
+    HelperContext(Context *context, LgcContext *builderContext, std::unique_ptr<Pipeline> pipeline)
+        : context(context), builderContext(builderContext), pipeline(std::move(pipeline)),
+          timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask) {}
+  };
 
-    unsigned moduleIndex = 0;
-    // Initial increase to skip entry module, it will be handled later.
-    helperThreadProvider->GetNextTask(&moduleIndex);
-    helperThreadProvider->TaskCompleted();
+  if (Error err = parallelForWithContext<HelperContext>(
+          cl::AddRtHelpers, helperThreadProvider, newModules.size(), HelperThreadExclusion::Task,
+          [this, &rtContext]() -> std::unique_ptr<HelperContext> {
+            Context *context = acquireContext();
+            context->attachPipelineContext(&rtContext);
 
-    std::vector<std::thread> workers(cl::AddRtHelpers);
-    for (std::thread &worker : workers) {
-      worker = std::thread([&helperThreadProvider, &helperThreadPayload] {
-        helperThreadBuildRayTracingPipelineElf(helperThreadProvider, &helperThreadPayload);
-      });
-    }
+            LgcContext *builderContext = context->getLgcContext();
+            std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
+            rtContext.setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
+            context->setBuilder(builderContext->createBuilder(&*pipeline));
 
-    while (!helperThreadPayload.helperThreadJoined && helperThreadProvider->GetNextTask(&moduleIndex)) {
-      // NOTE: When a helper thread joins, it will move modules from the original context into a new one. However,
-      // main thread may be processing on the original context at the same time, results in out of sync situation.
-      // Here we keep main thread working on the original context until helper thread joins, to reduce the cost of
-      // initializing new context and copying modules. Once helper thread has joined, main thread must switch to a new
-      // context.
-      results[moduleIndex] =
-          buildRayTracingPipelineElf(mainContext, std::move(newModules[moduleIndex]), pipelineElfs[moduleIndex],
-                                     shaderProps, moduleCallsTraceRay, moduleIndex, pipeline, timerProfiler);
-      helperThreadProvider->TaskCompleted();
-    }
+            auto ctx = std::make_unique<HelperContext>(context, builderContext, std::move(pipeline));
+            ctx->context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&ctx->hasError));
 
-    if (helperThreadPayload.helperThreadJoined) {
-      // Tasks may not finished but helper thread joined, need to switch to new context and notify helper thread to
-      // proceed.
-      helperThreadPayload.mainThreadSwitchedContext = true;
-      m_helperThreadConditionVariable.notify_all();
-      helperThreadBuildRayTracingPipelineElf(helperThreadProvider, &helperThreadPayload);
-    }
-    helperThreadProvider->WaitForTasks();
+            ctx->context->ensureGpurtLibrary();
+            setUseGpurt(&*ctx->pipeline);
 
-    for (std::thread &worker : workers)
-      worker.join();
+            return ctx;
+          },
+          [this, &newModules, &pipelineElfs, &shaderProps, &moduleCallsTraceRay, &mainContext, &pipeline,
+           &timerProfiler, &hasError](size_t moduleIndex, HelperContext *ctx) -> Error {
+            // Skip entry module here, it will be handled later.
+            if (moduleIndex == 0)
+              return Error::success();
 
-    for (auto res : results) {
-      if (res != Result::Success)
-        return Result::ErrorInvalidShader;
-    }
+            std::unique_ptr<Module> module;
 
-  } else {
-    for (auto [moduleIndex, module] : llvm::enumerate(newModules)) {
-      // Skip entry module here, it will be handled later.
-      if (moduleIndex == 0)
-        continue;
+            if (!ctx) {
+              module = std::move(newModules[moduleIndex]);
+            } else {
+              // NOTE: All modules were in the same LLVMContext, which is not thread safe. We need to 'clone' the module
+              // into a separate context here to ensure we can do the work simultaneously. We achieve this by outputting
+              // the module as bitcode and read it back in another context.
 
-      Result result = buildRayTracingPipelineElf(mainContext, std::move(module), pipelineElfs[moduleIndex], shaderProps,
-                                                 moduleCallsTraceRay, moduleIndex, pipeline, timerProfiler);
-      if (result != Result::Success)
-        return result;
-    }
-  }
+              // FIXME: There will be out of sync assertion when non-trivial work happens on the main context (probably
+              // in PipelineState::generate) while the helper thread is using the bitcode writer. It would be great to
+              // find a decent solution for such a situation.
+              //
+              // We must not destroy the original module here, as that can cause mutation of cross-module structures
+              // associated to the LLVMContext. It will be destroyed on the main thread when it goes out of scope.
+              SmallVector<char, 0> bcBuffer;
+              BitcodeWriter bcWriter(bcBuffer);
+              bcWriter.writeModule(*newModules[moduleIndex]);
+              bcWriter.writeSymtab();
+              bcWriter.writeStrtab();
+
+              SmallVectorMemoryBuffer bcMemBuf(std::move(bcBuffer), newModules[moduleIndex]->getName());
+              auto moduleOrErr = getLazyBitcodeModule(std::move(bcMemBuf), *ctx->context);
+              if (Error err = moduleOrErr.takeError()) {
+                LLPC_ERRS("Failed to load bit code\n");
+                return err;
+              }
+
+              module = std::move(*moduleOrErr);
+              if (Error err = module->materializeAll()) {
+                LLPC_ERRS("Failed to materialize module\n");
+                return err;
+              }
+            }
+
+            Context *context = ctx ? ctx->context : mainContext;
+            Pipeline *ourPipeline = ctx ? &*ctx->pipeline : &*pipeline;
+            TimerProfiler *ourTimerProfiler = ctx ? &ctx->timerProfiler : &timerProfiler;
+
+            Result result =
+                buildRayTracingPipelineElf(context, std::move(module), pipelineElfs[moduleIndex], shaderProps,
+                                           moduleCallsTraceRay, moduleIndex, *ourPipeline, *ourTimerProfiler);
+            if (result == Result::Success && (ctx ? ctx->hasError : hasError))
+              result = Result::ErrorInvalidShader;
+
+            return resultToError(result, "building raytracing pipeline ELF");
+          },
+          [this](std::unique_ptr<HelperContext> ctx) {
+            ctx->context->setDiagnosticHandler(nullptr);
+            releaseContext(ctx->context);
+          }))
+    return reportError(std::move(err), Result::ErrorInvalidShader);
 
   // Build traversal at last after we gather all needed information.
   if (traversalModule) {
@@ -3355,7 +3355,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     Result result =
         buildRayTracingPipelineElf(mainContext, std::move(traversalModule), pipelineElfs[newModules.size()],
-                                   shaderProps, moduleCallsTraceRay, newModules.size(), pipeline, timerProfiler);
+                                   shaderProps, moduleCallsTraceRay, newModules.size(), *pipeline, timerProfiler);
     if (result != Result::Success)
       return result;
   }
@@ -3368,7 +3368,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 #endif
   if (needEntry) {
     Result result = buildRayTracingPipelineElf(mainContext, std::move(entry), pipelineElfs[0], shaderProps,
-                                               moduleCallsTraceRay, 0, pipeline, timerProfiler);
+                                               moduleCallsTraceRay, 0, *pipeline, timerProfiler);
     if (result != Result::Success)
       return result;
 

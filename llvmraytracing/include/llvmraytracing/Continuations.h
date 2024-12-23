@@ -106,9 +106,6 @@ std::optional<PAQShaderStage> rtShaderStageToPAQShaderStage(lgc::rt::RayTracingS
 /// Returns true if something changed.
 bool fixupDxilMetadata(Module &M);
 
-/// Get intrinsic to set the local root signature index.
-Function *getSetLocalRootIndex(Module &M);
-
 /// Get intrinsic to convert a dx handle to an acceleration struct address.
 Function *getAccelStructAddr(Module &M, Type *HandleTy);
 
@@ -250,7 +247,7 @@ bool DXILMaterializable(Instruction &I);
 // coro-split)
 class DXILCoroSplitPass : public CoroSplitPass {
 public:
-  DXILCoroSplitPass() : CoroSplitPass(std::function<bool(Instruction &)>(&DXILMaterializable), true) {}
+  DXILCoroSplitPass();
 
   static llvm::StringRef name() { return "DXIL continuations coro split pass wrapper"; }
 };
@@ -267,7 +264,7 @@ bool LgcMaterializable(Instruction &I);
 // coro-split)
 class LgcCoroSplitPass : public CoroSplitPass {
 public:
-  LgcCoroSplitPass() : CoroSplitPass(std::function<bool(Instruction &)>(&LgcMaterializable), true) {}
+  LgcCoroSplitPass();
 
   static llvm::StringRef name() { return "Lgc continuations coro split pass wrapper"; }
 };

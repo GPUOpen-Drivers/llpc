@@ -12,24 +12,17 @@ void main()
     frag_color.x = interpolateAtSample(interp[component], gl_SampleID);
     frag_color.y = interpolateAtSample(interp2[component][0], gl_SampleID);
 }
+
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-COUNT-2: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @interpolateAtSample.f32.p64.i32(ptr addrspace(64) %{{.*}}, i32 %{{.*}})
+
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
-; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.input.import.interpolated__v2f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0,
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
-; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 0, <2 x float>
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <2 x float> @lgc.input.import.builtin.SamplePosOffset.v2f32.i32.i32(
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn <3 x float> @lgc.input.import.builtin.InterpPullMode.v3f32.i32(
-; SHADERTEST-COUNT-12: = call i32 @llvm.amdgcn.mov.dpp.i32(i32
-; SHADERTEST-DAG: = call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(i1 false, i32 2, i32 0, i32 0, i32 poison, i32 0, <2 x float>
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.input.import.interpolated__v2f32(i1 false, i32 0
+; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(i1 false, i32 1
+: SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(i1 false, i32 2
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

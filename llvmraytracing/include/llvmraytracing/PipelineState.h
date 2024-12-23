@@ -58,6 +58,7 @@
 
 namespace llvm {
 class Module;
+class raw_ostream;
 namespace msgpack {
 class DocNode;
 } // namespace msgpack
@@ -81,6 +82,11 @@ public:
   void exportModuleMetadata(llvm::Module &M) const;
 
   void merge(const PipelineState &Other);
+
+  void print(llvm::raw_ostream &OS) const;
+#ifndef NDEBUG
+  void dump() const;
+#endif
 
 private:
   // Actual state is intentionally private, as this interface is intended to be used like opaque state.

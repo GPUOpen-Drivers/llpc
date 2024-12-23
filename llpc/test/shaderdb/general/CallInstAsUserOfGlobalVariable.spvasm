@@ -1,6 +1,6 @@
 ; This test checks if lowerGlobal is handling properly case with removed zero-index GEPs.
 
-; @_ug_input23 = external addrspace(7) global [2 x <{ [4294967295 x float] }>], !spirv.Resource !2, !spirv.Block !1
+; @_ug_input23 = external addrspace(7) global [2 x <{ [0 x float] }>], !spirv.Resource !2, !spirv.Block !1
 ; %2 = call i32 @lgc.buffer.length(ptr addrspace(7) @_ug_input23, i32 0)
 
 
@@ -8,7 +8,7 @@
 ; RUN: amdllpc -v -gfxip=11.0 %s | FileCheck %s
 
 ; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; CHECK: @_ug_input23 = external addrspace(7) global [2 x <{ [4294967295 x float] }>], !spirv.Resource !2, !spirv.Block !1
+; CHECK: @_ug_input23 = external addrspace(7) global [2 x <{ [0 x float] }>], !spirv.Resource !2, !spirv.Block !1
 ; CHECK: call i32 @lgc.buffer.length(ptr addrspace(7) @_ug_input23, i32 0)
 
 ; CHECK-LABEL: {{^// LLPC}}  SPIR-V lowering results

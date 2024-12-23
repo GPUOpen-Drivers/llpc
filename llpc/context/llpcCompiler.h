@@ -134,6 +134,9 @@ public:
                                          RayTracingPipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr,
                                          IHelperThreadProvider *pHelperThreadProvider = nullptr);
 
+  Result buildTransformVertexShader(Context *context, const PipelineShaderInfo *shaderInfo,
+                                    llvm::raw_pwrite_stream &outStream);
+
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                        bool buildingRelocatableElf, ElfPackage *pipelineElf,
@@ -175,9 +178,8 @@ public:
   Result buildRayTracingPipelineElf(Context *context, std::unique_ptr<llvm::Module> module, ElfPackage &pipelineElf,
                                     std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
                                     std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
-                                    std::unique_ptr<lgc::Pipeline> &pipeline, TimerProfiler &timerProfiler);
+                                    lgc::Pipeline &pipeline, TimerProfiler &timerProfiler);
   llvm::sys::Mutex &getHelperThreadMutex() { return m_helperThreadMutex; }
-  std::condition_variable_any &getHelperThreadConditionVariable() { return m_helperThreadConditionVariable; }
 
   void setUseGpurt(lgc::Pipeline *pipeline);
 
@@ -217,8 +219,6 @@ private:
   static std::vector<Context *> *m_contextPool; // Context pool
   unsigned m_relocatablePipelineCompilations;   // The number of pipelines compiled using relocatable shader elf
   static llvm::sys::Mutex m_helperThreadMutex;  // Mutex for helper thread
-  static std::condition_variable_any m_helperThreadConditionVariable; // Condition variable used by helper thread to
-                                                                      // wait for main thread switching context
 
   void buildShaderModuleResourceUsage(
       const ShaderModuleBuildInfo *shaderInfo, SPIRV::SPIRVModule *module, Vkgc::ResourcesNodes &resourcesNodes,

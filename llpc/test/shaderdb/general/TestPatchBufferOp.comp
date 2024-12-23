@@ -1,4 +1,4 @@
-// This test case checks whether a phi is well-handed in PatchBufferOp pass. This shader will result in a phi in IR that
+// This test case checks whether a phi is well-handed in LowerBufferOperations pass. This shader will result in a phi in IR that
 // one of the incoming value comes from downstream of the control flow.
 // BEGIN_SHADERTEST
 /*

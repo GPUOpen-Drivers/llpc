@@ -126,7 +126,6 @@ void ContinuationsStatsReportPassImpl::collectProcessableFunctions() {
     if (!Stage || Stage == RayTracingShaderStage::KernelEntry)
       continue;
 
-    const uint32_t SystemDataArgumentIndex = lgc::cps::isCpsFunction(F) ? CpsArgIdx::SystemData : 2;
     switch (Stage.value()) {
     case RayTracingShaderStage::RayGeneration:
     case RayTracingShaderStage::Intersection:
@@ -137,7 +136,7 @@ void ContinuationsStatsReportPassImpl::collectProcessableFunctions() {
     case RayTracingShaderStage::Traversal: {
       FunctionData Data;
       Data.Stage = Stage;
-      Data.SystemDataTy = F.getFunctionType()->getParamType(SystemDataArgumentIndex);
+      Data.SystemDataTy = F.getFunctionType()->getParamType(CpsArgIdxWithStackPtr::SystemData);
       assert(Data.SystemDataTy->isStructTy() && "SystemData should be of struct type!");
 
       [[maybe_unused]] bool DidInsert = ToProcess.insert({&F, std::move(Data)}).second;

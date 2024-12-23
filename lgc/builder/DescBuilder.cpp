@@ -119,14 +119,18 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     if (return64Address)
       return desc;
     assert(convertFatPointer);
+    bool globallyCoherent = flags & BufferFlagCoherent;
     if (isCompact) {
       desc = CreateBitCast(desc, getInt64Ty());
       if (stride == 0)
-        desc = create<BufferAddrToPtrOp>(desc);
+        desc = create<BufferAddrToPtrOp>(desc, globallyCoherent);
       else
-        desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride));
+        desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride), globallyCoherent);
     } else {
-      desc = create<BufferDescToPtrOp>(desc);
+      if (stride == 0)
+        desc = create<BufferDescToPtrOp>(desc, globallyCoherent);
+      else
+        desc = create<StridedBufferDescToPtrOp>(desc, globallyCoherent);
     }
   } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
     // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
@@ -136,9 +140,9 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     assert(convertFatPointer);
     desc = CreatePtrToInt(descPtr, getInt64Ty());
     if (stride == 0)
-      desc = create<BufferAddrToPtrOp>(desc);
+      desc = create<BufferAddrToPtrOp>(desc, false);
     else
-      desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride));
+      desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride), false);
   } else {
     ResourceNodeType resType = node->concreteType;
     ResourceNodeType abstractType = node->abstractType;
@@ -167,10 +171,12 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     descPtr = CreateBitCast(descPtr, getDescPtrTy());
     if (convertFatPointer) {
       bool forceRawView = flags & BufferFlagForceRawView;
+      bool globallyCoherent = flags & BufferFlagCoherent;
       if (stride == 0)
-        desc = create<BufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact);
+        desc = create<BufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact, globallyCoherent);
       else
-        desc = create<StridedBufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact, getInt32(stride));
+        desc =
+            create<StridedBufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact, globallyCoherent, getInt32(stride));
     } else {
       // Load the descriptor.
       desc = CreateLoad(getDescTy(resType), descPtr);
@@ -379,10 +385,7 @@ Value *BuilderImpl::scalarizeIfUniform(Value *value, bool isNonUniform) {
 //
 // @param desc : The buffer descriptor base to build for the buffer compact descriptor
 // @param stride :  stride for the buffer descriptor to access in index mode
-Value *BuilderImpl::buildBufferCompactDesc(Value *desc, unsigned stride) {
-  // Bitcast the pointer to v2i32
-  desc = CreatePtrToInt(desc, getInt64Ty());
-  desc = CreateBitCast(desc, FixedVectorType::get(getInt32Ty(), 2));
+Value *BuilderImpl::buildBufferCompactDesc(Value *desc, Value *stride) {
   const GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   // Extract compact buffer descriptor
@@ -396,14 +399,8 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc, unsigned stride) {
     bufDesc = CreateInsertElement(bufDesc, addrLo, uint64_t(0));
 
     // Dword 1
-    SqBufRsrcWord1 sqBufRsrcWord1 = {};
-    sqBufRsrcWord1.bits.baseAddressHi = UINT16_MAX;
-    addrHi = CreateAnd(addrHi, getInt32(sqBufRsrcWord1.u32All));
-    if (stride) {
-      SqBufRsrcWord1 sqBufRsrcWord1Stride = {};
-      sqBufRsrcWord1Stride.bits.stride = stride;
-      addrHi = CreateOr(addrHi, getInt32(sqBufRsrcWord1Stride.u32All));
-    }
+    if (stride)
+      addrHi = CreateOr(addrHi, CreateShl(stride, SqBufRsrcTWord1StrideShift));
     bufDesc = CreateInsertElement(bufDesc, addrHi, 1);
 
     // Dword 2
@@ -422,7 +419,7 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc, unsigned stride) {
       sqBufRsrcWord3.gfx10.resourceLevel = 1;
       sqBufRsrcWord3.gfx10.oobSelect = stride ? 3 : 2;
       assert(sqBufRsrcWord3.u32All == 0x21014FAC || sqBufRsrcWord3.u32All == 0x31014FAC);
-    } else if (gfxIp.major >= 11) {
+    } else if (gfxIp.major == 11) {
       sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
       sqBufRsrcWord3.gfx11.oobSelect = stride ? 3 : 2;
       assert(sqBufRsrcWord3.u32All == 0x20014FAC || sqBufRsrcWord3.u32All == 0x30014FAC);

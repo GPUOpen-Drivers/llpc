@@ -46,6 +46,7 @@
 #include "lgc/patch/FragmentColorExport.h"
 #include "lgc/patch/GenerateCopyShader.h"
 #include "lgc/patch/IncludeLlvmIr.h"
+#include "lgc/patch/InitializeWorkgroupMemory.h"
 #include "lgc/patch/LowerBufferOperations.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/LowerDesc.h"
@@ -58,7 +59,6 @@
 #include "lgc/patch/LowerSubgroupOps.h"
 #include "lgc/patch/MutateEntryPoint.h"
 #include "lgc/patch/PassthroughHullShader.h"
-#include "lgc/patch/PatchInitializeWorkgroupMemory.h"
 #include "lgc/patch/PeepholeOptimization.h"
 #include "lgc/patch/PreparePipelineAbi.h"
 #include "lgc/patch/ScalarizeLoads.h"
@@ -69,12 +69,12 @@
 #if LLPC_BUILD_STRIX1
 #include "lgc/patch/WorkaroundDsSubdwordWrite.h"
 #endif
+#include "lgc/Debug.h"
 #include "lgc/patch/CombineCooperativeMatrix.h"
 #include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "lgc/util/Debug.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRPrinter/IRPrintingPasses.h"
@@ -187,7 +187,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   if (pipelineState->hasShaderStage(ShaderStage::Vertex) && !pipelineState->hasShaderStage(ShaderStage::TessControl) &&
       pipelineState->hasShaderStage(ShaderStage::TessEval))
-    passMgr.addPass(TcsPassthroughShader());
+    passMgr.addPass(PassthroughHullShader());
 
   passMgr.addPass(GenerateNullFragmentShader());
   passMgr.addPass(CollectResourceUsage()); // also removes inactive/unused resources
@@ -199,12 +199,12 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(ApplyWorkarounds());
   passMgr.addPass(GenerateCopyShader());
   passMgr.addPass(LowerVertexFetch());
-  passMgr.addPass(LowerFragColorExport());
+  passMgr.addPass(LowerFragmentColorExport());
   passMgr.addPass(LowerDebugPrintf());
   passMgr.addPass(LowerDesc());
   passMgr.addPass(MutateEntryPoint());
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerPopsInterlock()));
-  passMgr.addPass(PatchInitializeWorkgroupMemory());
+  passMgr.addPass(InitializeWorkgroupMemory());
   passMgr.addPass(LowerInOut());
 
   // Patch invariant load and loop metadata.
@@ -253,7 +253,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     fpm.addPass(PromotePass());
     fpm.addPass(ADCEPass());
     fpm.addPass(StructurizeBuffers());
-    fpm.addPass(PatchBufferOp());
+    fpm.addPass(LowerBufferOperations());
     fpm.addPass(InstCombinePass());
     fpm.addPass(SimplifyCFGPass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
@@ -265,7 +265,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   } else {
     FunctionPassManager fpm;
     fpm.addPass(StructurizeBuffers());
-    fpm.addPass(PatchBufferOp());
+    fpm.addPass(LowerBufferOperations());
     fpm.addPass(InstCombinePass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
@@ -274,9 +274,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   // Set up target features in shader entry-points.
   // NOTE: Needs to be done after post-NGG function inlining, because LLVM refuses to inline something
-  // with conflicting attributes. Attributes could conflict on GFX10 because PatchSetupTargetFeatures
+  // with conflicting attributes. Attributes could conflict on GFX10 because SetUpTargetFeatures
   // adds a target feature to determine wave32 or wave64.
-  passMgr.addPass(PatchSetupTargetFeatures());
+  passMgr.addPass(SetUpTargetFeatures());
 
   // Include LLVM IR as a separate section in the ELF binary
   if (pipelineState->getOptions().includeIr)

@@ -167,7 +167,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:       .ps:
 ; CHECK-NEXT:         .checksum_value: 0
 ; CHECK-NEXT:         .debug_mode:     false
-; CHECK-NEXT:         .entry_point:    _amdgpu_ps_main
+; CHECK-NEXT:         .entry_point{{(_symbol)?}}:    _amdgpu_ps_main
 ; CHECK-NEXT:         .float_mode:     0xc0
 ; CHECK-NEXT:         .ieee_mode:      false
 ; CHECK:         .mem_ordered:    true

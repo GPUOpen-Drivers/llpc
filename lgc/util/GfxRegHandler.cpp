@@ -274,6 +274,7 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     case 11:
       return m_builder->CreateAdd(
           getRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi)), m_one);
+      return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(SqRsrcRegs::Width)), m_one);
     default:
       llvm_unreachable("GFX IP is not supported!");
       break;
@@ -328,6 +329,8 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
     case 11:
       setRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi),
                     m_builder->CreateSub(regValue, m_one));
+      break;
+      setRegCommon(static_cast<unsigned>(SqRsrcRegs::Width), m_builder->CreateSub(regValue, m_one));
       break;
     default:
       llvm_unreachable("GFX IP is not supported!");

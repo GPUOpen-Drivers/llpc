@@ -50,7 +50,7 @@ attributes #0 = { nounwind }
 ; CHECK-NEXT:       .cs:
 ; CHECK-NEXT:         .checksum_value: 0
 ; CHECK-NEXT:         .debug_mode:     false
-; CHECK-NEXT:         .entry_point:    _amdgpu_cs_main
+; CHECK-NEXT:         .entry_point{{(_symbol)?}}:    _amdgpu_cs_main
 ; CHECK-NEXT:         .excp_en:        0
 ; CHECK-NEXT:         .float_mode:     0xc0
 ; CHECK-NEXT:         .ieee_mode:      false

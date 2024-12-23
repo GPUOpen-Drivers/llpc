@@ -43,7 +43,6 @@ const static char OutputCallPrefix[] = "lgc.output.";
 const static char OutputImportBuiltIn[] = "lgc.output.import.builtin.";
 const static char OutputExportGeneric[] = "lgc.output.export.generic.";
 const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";
-const static char OutputExportXfb[] = "lgc.output.export.xfb.";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
@@ -61,11 +60,6 @@ const static char ImmutableConvertingSamplerGlobal[] = "lgc.immutable.converting
 // Names of entry-points for merged shader
 const static char EsGsEntryPoint[] = "lgc.shader.ESGS.main";
 const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
-
-const static char NggAttributeThroughMemory[] = "lgc.ngg.attribute.through.memory";
-const static char NggXfbExport[] = "lgc.ngg.xfb.export.";
-const static char NggWriteGsOutput[] = "lgc.ngg.write.GS.output.";
-const static char NggReadGsOutput[] = "lgc.ngg.read.GS.output.";
 const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
 
 const static char EntryPointPrefix[] = "lgc.shader.";
@@ -93,9 +87,6 @@ static const unsigned MaxTransformFeedbackBuffers = 4;
 // Maximum GS output vertex streams
 static const unsigned MaxGsStreams = 4;
 static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
-
-// Maximum tess factors per patch
-static const unsigned MaxTessFactorsPerPatch = 6; // 4 outer factors + 2 inner factors
 
 static const char RayQueryLdsStackName[] = "LdsStack";
 // NOTE: Currently, we restrict the max thread count of ray query to be 64 and make sure the wave size is 64. This is

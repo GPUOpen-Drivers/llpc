@@ -165,6 +165,7 @@ static const char *const VkgcSupportedCapabilities[] = {
     "CapabilityExpectAssumeKHR",
     "CapabilityQuadControl",
     "CapabilityGroupNonUniformRotateKHR",
+    "CapabilityReplicatedCompositesEXT",
 };
 
 }; // namespace Vkgc

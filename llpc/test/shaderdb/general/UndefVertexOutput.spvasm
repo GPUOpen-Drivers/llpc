@@ -93,8 +93,8 @@
 ; CHECK-NEXT:    tbuffer_load_format_xyzw v[0:3], v0, s[0:3], 0 format:[BUF_FMT_32_32_32_32_FLOAT] idxen
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    exp pos0 v0, v1, v2, v3 done
-; CHECK-NEXT:    exp param2 v5, v4, v4, v5
-; CHECK-NEXT:    exp param1 v4, v4, v5, v5
 ; CHECK-NEXT:    exp param3 off, v4, off, off
+; CHECK-NEXT:    exp param1 v4, v4, v5, v5
+; CHECK-NEXT:    exp param2 v5, v4, v4, v5
 ; CHECK-NEXT:  .LBB0_6:
 ; CHECK-NEXT:    s_endpgm

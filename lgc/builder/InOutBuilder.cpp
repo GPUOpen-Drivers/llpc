@@ -708,7 +708,10 @@ std::tuple<unsigned, llvm::Value *> BuilderImpl::getInterpModeAndValue(InOutInfo
   if (inputInfo.getInterpMode() == InOutInfo::InterpModeSmooth) {
     if (auxInterpValue) {
       assert(interpLoc == InOutInfo::InterpLocCenter);
-      return {InOutInfo::InterpModeSmooth, evalIjOffsetSmooth(auxInterpValue)};
+      BuiltInKind builtIn = lgc::BuiltInInterpPullMode;
+      markBuiltInInputUsage(builtIn, 0, {});
+      return {InOutInfo::InterpModeSmooth,
+              create<lgc::EvalIjOffsetSmoothOp>(FixedVectorType::get(getFloatTy(), 2), auxInterpValue)};
     }
 
     BuiltInKind builtInId;
@@ -758,49 +761,10 @@ std::tuple<unsigned, llvm::Value *> BuilderImpl::getInterpModeAndValue(InOutInfo
   resUsage->builtInUsage.fs.noperspective = true;
 
   Value *interpValue = readBuiltIn(false, builtInId, {}, nullptr, nullptr, "");
-  if (auxInterpValue)
-    interpValue = adjustIj(interpValue, auxInterpValue);
-  return {InOutInfo::InterpModeSmooth, interpValue};
-}
-
-// =====================================================================================================================
-// Evaluate I,J for interpolation: center offset, smooth (perspective) version
-//
-// @param offset : Offset value, <2 x float> or <2 x half>
-Value *BuilderImpl::evalIjOffsetSmooth(Value *offset) {
-  // Get <I/W, J/W, 1/W>
-  Value *pullModel = readBuiltIn(false, BuiltInInterpPullMode, {}, nullptr, nullptr, "");
-  // Adjust each coefficient by offset.
-  Value *adjusted = adjustIj(pullModel, offset);
-  // Extract <I/W, J/W, 1/W> part of that
-  Value *ijDivW = CreateShuffleVector(adjusted, adjusted, ArrayRef<int>{0, 1});
-  Value *rcpW = CreateExtractElement(adjusted, 2);
-  // Get W by making a reciprocal of 1/W
-  Value *w = CreateFDiv(ConstantFP::get(getFloatTy(), 1.0), rcpW);
-  w = CreateVectorSplat(2, w);
-  return CreateFMul(ijDivW, w);
-}
-
-// =====================================================================================================================
-// Adjust I,J values by offset.
-// This adjusts value by its X and Y derivatives times the X and Y components of offset.
-// If value is a vector, this is done component-wise.
-//
-// @param value : Value to adjust, float or vector of float
-// @param offset : Offset to adjust by, <2 x float> or <2 x half>
-Value *BuilderImpl::adjustIj(Value *value, Value *offset) {
-  offset = CreateFPExt(offset, FixedVectorType::get(getFloatTy(), 2));
-  Value *offsetX = CreateExtractElement(offset, uint64_t(0));
-  Value *offsetY = CreateExtractElement(offset, 1);
-  if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
-    offsetX = CreateVectorSplat(vecTy->getNumElements(), offsetX);
-    offsetY = CreateVectorSplat(vecTy->getNumElements(), offsetY);
+  if (auxInterpValue) {
+    interpValue = create<AdjustIjOp>(interpValue->getType(), interpValue, auxInterpValue);
   }
-  Value *derivX = CreateDerivative(value, /*isY=*/false, /*isFine=*/true);
-  Value *derivY = CreateDerivative(value, /*isY=*/true, /*isFine=*/true);
-  Value *adjustX = CreateFAdd(value, CreateFMul(derivX, offsetX));
-  Value *adjustY = CreateFAdd(adjustX, CreateFMul(derivY, offsetY));
-  return adjustY;
+  return {InOutInfo::InterpModeSmooth, interpValue};
 }
 
 // =====================================================================================================================
@@ -904,15 +868,7 @@ Instruction *BuilderImpl::CreateWriteXfbOutput(Value *valueToWrite, bool isBuilt
     }
   }
 
-  // XFB: @lgc.output.export.xfb.%Type%(i32 xfbBuffer, i32 xfbOffset, i32 streamId, %Type% outputValue)
-  SmallVector<Value *, 4> args;
-  std::string instName = lgcName::OutputExportXfb;
-  args.push_back(getInt32(xfbBuffer));
-  args.push_back(xfbOffset);
-  args.push_back(getInt32(streamId));
-  args.push_back(valueToWrite);
-  addTypeMangling(nullptr, args, instName);
-  return CreateNamedCall(instName, getVoidTy(), args, {});
+  return create<WriteXfbOutputOp>(xfbBuffer, cast<ConstantInt>(xfbOffset)->getZExtValue(), streamId, valueToWrite);
 }
 
 // =====================================================================================================================
@@ -2120,7 +2076,6 @@ namespace StageValidMask {
 constexpr const ShaderStageMask C(ShaderStage::Compute);
 constexpr const ShaderStageMask D(ShaderStage::TessEval);
 constexpr const ShaderStageMask H(ShaderStage::TessControl);
-constexpr const ShaderStageMask G(ShaderStage::Geometry);
 constexpr const ShaderStageMask HD({ShaderStage::TessControl, ShaderStage::TessEval});
 constexpr const ShaderStageMask HDG({ShaderStage::TessControl, ShaderStage::TessEval, ShaderStage::Geometry});
 constexpr const ShaderStageMask HDGP({ShaderStage::TessControl, ShaderStage::TessEval, ShaderStage::Geometry,

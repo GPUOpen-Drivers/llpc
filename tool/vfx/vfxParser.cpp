@@ -58,6 +58,7 @@ bool parseUint(char *str, unsigned lineNum, IUFValue *output);
 bool parseFloat(char *str, unsigned lineNum, IUFValue *output);
 bool parseFloat16(char *str, unsigned lineNum, IUFValue *output);
 bool parseDouble(char *str, unsigned lineNum, IUFValue *output);
+bool parseInt64(char *str, unsigned lineNum, IUFValue *output);
 
 bool parseBool(char *str, unsigned lineNum, IUFValue *output, std::string *errorMsg);
 
@@ -459,6 +460,13 @@ bool Document::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Sectio
           result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.dVec2[0]));
         break;
       }
+      case MemberTypeInt64:
+      case MemberTypeUint64: {
+        result = parseInt64(valueStr, lineNum, &value);
+        if (result)
+          result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &(value.i64Vec2[0]));
+        break;
+      }
       case MemberTypeBool: {
         result = parseBool(valueStr, lineNum, &value, &m_errorMsg);
         if (result) {
@@ -822,6 +830,34 @@ bool parseBool(char *str, unsigned lineNum, IUFValue *output, std::string *error
     output->iVec4[0] = strtol(str, nullptr, 0);
 
   output->props.isInt64 = false;
+  output->props.isFloat = false;
+  output->props.isDouble = false;
+  output->props.length = 1;
+
+  return result;
+}
+
+// =====================================================================================================================
+// Parses a int64 number from a string.
+//
+// @param str : Input string
+// @param lineNum : Current line number
+// @param [out] output : Stores parsed value
+bool parseInt64(char *str, unsigned lineNum, IUFValue *output) {
+  VFX_ASSERT(output);
+  bool result = true;
+
+  bool isHex = false;
+  char *p0x = strstr(str, "0x");
+  if (p0x)
+    isHex = true;
+
+  if (isHex)
+    output->i64Vec2[0] = strtoull(str, nullptr, 0);
+  else
+    output->i64Vec2[0] = strtoll(str, nullptr, 0);
+
+  output->props.isInt64 = true;
   output->props.isFloat = false;
   output->props.isDouble = false;
   output->props.length = 1;

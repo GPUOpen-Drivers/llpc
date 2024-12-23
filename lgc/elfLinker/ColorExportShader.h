@@ -83,7 +83,7 @@ private:
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
   bool m_killEnabled; // True if this fragment shader has kill enabled.
-  FragColorExport::Key m_key;
+  FragmentColorExport::Key m_key;
 };
 
 } // namespace lgc

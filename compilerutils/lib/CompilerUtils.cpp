@@ -276,7 +276,7 @@ Value *CrossModuleInliner::CrossModuleValueMaterializer::materialize(Value *v) {
     auto InsertToMappedTypes = [&mappedTypes](Type *sourceType, Type *copiedType) {
       assert((sourceType != nullptr) && (copiedType != nullptr));
       if (sourceType != copiedType) {
-        auto found = mappedTypes.insert(std::make_pair(sourceType, copiedType));
+        [[maybe_unused]] auto found = mappedTypes.insert(std::make_pair(sourceType, copiedType));
         assert((found.second || copiedType == found.first->second) && "Inconsistent type mapping");
       }
     };
@@ -527,10 +527,6 @@ std::string CrossModuleInliner::getCrossModuleName(GlobalValue &gv) {
   return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
 }
 
-PointerType *llvm::getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace) {
-  return PointerType::get(ptrTy->getContext(), addressSpace);
-}
-
 void CrossModuleInliner::checkTargetModule(llvm::Module &targetModule) {
   if (impl->targetMod == nullptr)
     impl->targetMod = &targetModule;
@@ -538,7 +534,7 @@ void CrossModuleInliner::checkTargetModule(llvm::Module &targetModule) {
     assert(impl->targetMod == &targetModule);
 }
 
-void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointerValue, Value *newPointerValue,
+void CompilerUtils::replaceAllPointerUses(Value *oldPointerValue, Value *newPointerValue,
                                           SmallVectorImpl<Instruction *> &toBeRemoved) {
   // Note: The implementation explicitly supports typed pointers, which
   //       complicates some of the code below.
@@ -548,22 +544,19 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
   (void)oldPtrTy;
   PointerType *newPtrTy = cast<PointerType>(newPointerValue->getType());
   unsigned newAS = newPtrTy->getAddressSpace();
-  assert(newAS != oldPtrTy->getAddressSpace());
-  assert(getWithSamePointeeType(oldPtrTy, newAS) == newPtrTy);
+
+  // If a change of address space is not necessary then simply replace uses.
+  if (newAS == oldPtrTy->getAddressSpace()) {
+    oldPointerValue->replaceAllUsesWith(newPointerValue);
+    return;
+  }
+
+  // Propagate a change of address space by traversing through the users and setup the addrspace.
 
   oldPointerValue->mutateType(newPtrTy);
 
-  // Traverse through the users and setup the addrspace
   SmallVector<Use *> worklist(make_pointer_range(oldPointerValue->uses()));
   oldPointerValue->replaceAllUsesWith(newPointerValue);
-
-  // Given a pointer type, get a pointer with the same pointee type (possibly
-  // opaque) as the given type that uses the newAS address space.
-  auto getMutatedPtrTy = [newAS](Type *ty) {
-    PointerType *ptrTy = cast<PointerType>(ty);
-    // Support typed pointers:
-    return getWithSamePointeeType(ptrTy, newAS);
-  };
 
 #ifndef NDEBUG
   DenseSet<Value *> PhiElems;
@@ -620,7 +613,7 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
       // This can happen with typed pointers
       assert(cast<BitCastOperator>(inst)->getSrcTy()->isPointerTy() &&
              cast<BitCastOperator>(inst)->getDestTy()->isPointerTy());
-      inst->mutateType(getMutatedPtrTy(inst->getType()));
+      inst->mutateType(newPtrTy);
       break;
     }
     case Instruction::AddrSpaceCast:
@@ -628,7 +621,7 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
       assert(inst->getOperand(0)->getType()->getPointerAddressSpace() == newAS);
       // Push the correct users before RAUW.
       worklist.append(usesRange.begin(), usesRange.end());
-      inst->mutateType(getMutatedPtrTy(inst->getType()));
+      inst->mutateType(newPtrTy);
       // Since we are mutating the address spaces of users as well,
       // we can just use the (already mutated) cast operand.
       inst->replaceAllUsesWith(inst->getOperand(0));
@@ -636,13 +629,13 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
       continue;
     case Instruction::IntToPtr:
     case Instruction::GetElementPtr: {
-      inst->mutateType(getMutatedPtrTy(inst->getType()));
+      inst->mutateType(newPtrTy);
       break;
     }
     case Instruction::Select: {
       auto *oldType = inst->getType();
       if (oldType->isPointerTy()) {
-        Type *newType = getMutatedPtrTy(oldType);
+        Type *newType = newPtrTy;
         // No further processing if the type has the correct pointer type
         if (newType == oldType)
           continue;
@@ -666,7 +659,7 @@ void CompilerUtils::replaceAllPointerUses(IRBuilder<> *builder, Value *oldPointe
         }
 #endif
 
-        Type *newType = getMutatedPtrTy(oldType);
+        Type *newType = newPtrTy;
         // No further processing if the type has the correct pointer type
         if (newType == oldType)
           continue;

@@ -62,7 +62,8 @@
 #endif
 #endif
 
-#define PASS_32_BIT_CR 1
+#define PASS_DUMMY_RET_ADDR 1
+#define PASS_SHADER_INDEX_ARG 1
 
 //=====================================================================================================================
 // Continuation intrinsics
@@ -212,9 +213,6 @@ GPURT_DECL uint32_t _AmdContStackGetPtr() DUMMY_GENERIC_FUNC(0)
 //
 //=====================================================================================================================
 // State (system data / hit attributes) modifier intrinsics
-// void _AmdRestoreSystemData*(in SystemData data)
-#define DECLARE_RESTORE_SYSTEM_DATA(Suffix, ...) GPURT_DECL \
-  void _AmdRestoreSystemData##Suffix(__VA_ARGS__) DUMMY_VOID_FUNC
 // void _AmdAcceptHitAttributes*(inout SystemData data)
 #define DECLARE_ACCEPT_HIT_ATTRIBUTES(Suffix, ...) GPURT_DECL \
   void _AmdAcceptHitAttributes##Suffix(__VA_ARGS__) DUMMY_VOID_FUNC

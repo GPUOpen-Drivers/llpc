@@ -31,6 +31,7 @@
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include <float.h>
 
@@ -194,6 +195,87 @@ Value *BuilderImpl::CreateFpTruncWithRounding(Value *value, Type *destTy, Roundi
   // Return as (vector of) half.
   return CreateBitCast(CreateTrunc(combined16, BuilderBase::getConditionallyVectorizedTy(getInt16Ty(), destTy)), destTy,
                        instName);
+}
+
+// =====================================================================================================================
+// The conversion between float8 and float32.
+//
+// @param value : Input value
+// @param destTy : Type to convert to
+// @param isBfloat : Whether float8 type is bfloat8
+// @param instName : Name to give instruction(s)
+llvm::Value *BuilderImpl::CreateFp8Convert(llvm::Value *value, llvm::Type *destTy, bool isBfloat,
+                                           const llvm::Twine &instName) {
+  bool isToFloat32 = false;
+  auto srcType = value->getType();
+  if (srcType->isIntOrIntVectorTy(8)) {
+    // must be float8 -> float32
+    assert(destTy->getScalarType()->isFloatTy());
+    isToFloat32 = true;
+  } else {
+    // must be float32 -> float8
+    assert(destTy->isIntOrIntVectorTy(8) && srcType->getScalarType()->isFloatTy());
+  }
+
+  unsigned eleCount = 1;
+  const auto vectorTy = dyn_cast<FixedVectorType>(srcType);
+  if (vectorTy)
+    eleCount = vectorTy->getNumElements();
+
+  Intrinsic::AMDGCNIntrinsics inst;
+  if (isToFloat32) {
+    if (eleCount == 1) {
+      value = CreateZExt(value, getInt32Ty());
+      inst = isBfloat ? Intrinsic::amdgcn_cvt_f32_bf8 : Intrinsic::amdgcn_cvt_f32_fp8;
+      return CreateIntrinsic(getFloatTy(), inst, {value, getInt32(0)});
+    }
+
+    // i8vec4 -> int32
+    value = CreateShuffleVector(value, {0, 1, 2, 3});
+    value = CreateBitCast(value, getInt32Ty());
+
+    Value *ret0 = PoisonValue::get(FixedVectorType::get(getFloatTy(), 2));
+    if (eleCount >= 2) {
+      inst = isBfloat ? Intrinsic::amdgcn_cvt_pk_f32_bf8 : Intrinsic::amdgcn_cvt_pk_f32_fp8;
+      ret0 = CreateIntrinsic(FixedVectorType::get(getFloatTy(), 2), inst, {value, getFalse()});
+    }
+
+    Value *ret1 = PoisonValue::get(FixedVectorType::get(getFloatTy(), 2));
+    if (eleCount >= 3) {
+      inst = isBfloat ? Intrinsic::amdgcn_cvt_pk_f32_bf8 : Intrinsic::amdgcn_cvt_pk_f32_fp8;
+      ret1 = CreateIntrinsic(FixedVectorType::get(getFloatTy(), 2), inst, {value, getTrue()});
+    }
+
+    SmallVector<int> shuffleMask = createSequentialMask(0, eleCount, 0);
+
+    return CreateShuffleVector(ret0, ret1, shuffleMask);
+  }
+
+  // float32 -> float8
+  inst = isBfloat ? Intrinsic::amdgcn_cvt_pk_bf8_f32 : Intrinsic::amdgcn_cvt_pk_fp8_f32;
+  if (eleCount == 1) {
+    value = CreateIntrinsic(getInt32Ty(), inst, {value, value, getFalse()});
+    return CreateTrunc(value, destTy);
+  }
+
+  Value *ret = getInt32(0);
+  if (eleCount >= 2) {
+    Value *elem0 = CreateExtractElement(value, uint64_t(0));
+    Value *elem1 = CreateExtractElement(value, 1);
+    ret = CreateIntrinsic(getInt32Ty(), inst, {elem0, elem1, ret, getFalse()});
+  }
+
+  if (eleCount >= 3) {
+    Value *elem0 = CreateExtractElement(value, 2);
+    Value *elem1 = (eleCount > 3) ? CreateExtractElement(value, 3) : ConstantFP::get(getFloatTy(), 0.0);
+    ret = CreateIntrinsic(getInt32Ty(), inst, {elem0, elem1, ret, getTrue()});
+  }
+
+  ret = CreateBitCast(ret, FixedVectorType::get(getInt8Ty(), 4));
+
+  SmallVector<int> shuffleMask = createSequentialMask(0, eleCount, 0);
+
+  return CreateShuffleVector(ret, shuffleMask);
 }
 
 // =====================================================================================================================

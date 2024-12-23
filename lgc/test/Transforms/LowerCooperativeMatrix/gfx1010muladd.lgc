@@ -2,20 +2,20 @@
 ; RUN: lgc -march=amdgcn -o - --mcpu=gfx1010 -filetype=asm %s | FileCheck -check-prefixes=CHECK %s
 
 define void @matmul_f16f32_emulator(ptr addrspace(3) %out0, <8 x float> %a, <8 x float> %b, <8 x float> %c0) !lgc.shaderstage !0 {
-  %value = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f8(<8 x float> %a, <8 x float> %b, <8 x float> %c0, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 2)
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> %value)
+  %value = call <8 x float> (...) @lgc.cooperative.matrix.muladd__v8f8(<8 x float> %a, <8 x float> %b, <8 x float> %c0, i1 true, i1 true, i1 false, i1 false, i32 1, i32 1, i32 2, i32 2, i32 1)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x float> %value, i32 16)
   ret void
 }
 
 define void @matmul_i16i32_emulator(ptr addrspace(3) %out0, <8 x i32> %a, <8 x i32> %b, <8 x i32> %c0) !lgc.shaderstage !0 {
-  %value = call <8 x i32> (...) @lgc.cooperative.matrix.muladd__v8i32(<8 x i32> %a, <8 x i32> %b, <8 x i32> %c0, i1 true, i1 true, i1 false, i1 false, i32 4, i32 4, i32 5)
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x i32> %value)
+  %value = call <8 x i32> (...) @lgc.cooperative.matrix.muladd__v8i32(<8 x i32> %a, <8 x i32> %b, <8 x i32> %c0, i1 true, i1 true, i1 false, i1 false, i32 4, i32 4, i32 5, i32 5, i32 1)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x i32> %value, i32 16)
   ret void
 }
 
 define void @matmul_i8i32_emulator(ptr addrspace(3) %out0, <8 x i32> %a, <8 x i32> %b, <8 x i32> %c0) !lgc.shaderstage !0 {
-  %value = call <8 x i32> (...) @lgc.cooperative.matrix.muladd__v8i32(<8 x i32> %a, <8 x i32> %b, <8 x i32> %c0, i1 true, i1 true, i1 false, i1 false, i32 3, i32 3, i32 5)
-  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x i32> %value)
+  %value = call <8 x i32> (...) @lgc.cooperative.matrix.muladd__v8i32(<8 x i32> %a, <8 x i32> %b, <8 x i32> %c0, i1 true, i1 true, i1 false, i1 false, i32 3, i32 3, i32 5, i32 5, i32 1)
+  call void (...) @lgc.cooperative.matrix.store(ptr addrspace(3) %out0, i32 4, i1 true, i32 1, i32 0, i32 0, i32 16, <8 x i32> %value, i32 16)
   ret void
 }
 

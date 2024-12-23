@@ -441,7 +441,7 @@ static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap
         gfxipStr = gfxipStr.slice(1, StringRef::npos);
         if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.starts_with(".")) {
           gfxipStr = gfxipStr.slice(1, StringRef::npos);
-          gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
+          gfxipStr.consumeInteger(16, ParsedGfxIp.stepping);
         }
       }
     }

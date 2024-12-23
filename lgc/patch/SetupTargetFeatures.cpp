@@ -25,7 +25,7 @@
 /**
 ***********************************************************************************************************************
 * @file  SetupTargetFeatures.cpp
-* @brief LLPC source file: contains declaration and implementation of class lgc::PatchSetupTargetFeatures.
+* @brief LLPC source file: contains declaration and implementation of class lgc::SetUpTargetFeatures.
 ***********************************************************************************************************************
 */
 #include "lgc/patch/SetupTargetFeatures.h"
@@ -35,7 +35,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "lgc-patch-setup-target-features"
+#define DEBUG_TYPE "lgc-set-up-target-features"
 
 using namespace llvm;
 using namespace lgc;
@@ -46,7 +46,7 @@ using namespace lgc;
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchSetupTargetFeatures::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses SetUpTargetFeatures::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
 
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
@@ -78,7 +78,7 @@ PreservedAnalyses PatchSetupTargetFeatures::run(Module &module, ModuleAnalysisMa
 // Setup LLVM target features, target features are set per entry point function.
 //
 // @param [in/out] module : LLVM module
-void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
+void SetUpTargetFeatures::setupTargetFeatures(Module *module) {
   std::string globalFeatures = "";
 
   if (m_pipelineState->getOptions().includeDisassembly)

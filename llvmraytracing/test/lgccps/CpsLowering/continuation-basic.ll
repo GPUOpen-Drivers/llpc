@@ -13,14 +13,14 @@ define void @test(i32 %arg, ptr %table) !lgc.cps !0 !lgc.shaderstage !{i32 7} !c
 ; CHECK-NEXT:    [[CR_THEN:%.*]] = load i32, ptr [[TABLE_0]], align 4
 ; CHECK-NEXT:    [[THEN_ARG:%.*]] = add i32 [[ARG]], 1
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_THEN]], i32 2, i32 [[TMP0]], i32 [[THEN_ARG]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_THEN]], i32 2, i32 [[TMP0]], i32 poison, i32 poison, i32 [[THEN_ARG]])
 ; CHECK-NEXT:    unreachable
 ;
 entry:
   %table.0 = getelementptr i32, ptr %table, i32 0
   %cr.then = load i32, ptr %table.0
   %then.arg = add i32 %arg, 1
-  call void (...) @lgc.cps.jump(i32 %cr.then, i32 2, i32 poison, i32 %then.arg)
+  call void (...) @lgc.cps.jump(i32 %cr.then, i32 2, i32 poison, i32 poison, i32 poison, i32 %then.arg)
   unreachable
 }
 !continuation.stackAddrspace = !{!1}

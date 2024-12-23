@@ -191,9 +191,9 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMaxTessLevel] = maxTessFactor;
 
   // VGT_LS_HS_CONFIG
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
+  const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
   auto vgtLsHsConfig = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtLsHsConfig].getMap(true);
-  vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::NumPatches] = calcFactor.patchCountPerThreadGroup;
+  vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::NumPatches] = hwConfig.maxNumPatchesPerGroup;
   vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumInputCp] = m_pipelineState->getNumPatchControlPoints();
   vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumOutputCp] =
       m_pipelineState->getShaderModes()->getTessellationMode().outputVertices;
@@ -215,8 +215,8 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::LsVgprCompCnt] = lsVgprCompCnt;
 
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_HS
-  unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
-  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+  unsigned ldsSizeInDwords = hwConfig.tessOnChipLdsSize;
+  ldsSizeInDwords += hwConfig.rayQueryLdsStackSize;
 
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Hs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
@@ -238,19 +238,19 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   const auto &gsBuiltInUsage = gsResUsage->builtInUsage.gs;
   const auto &gsInOutUsage = gsResUsage->inOutUsage;
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-  const auto &calcFactor = gsInOutUsage.gs.calcFactor;
+  const auto &hwConfig = gsInOutUsage.gs.hwConfig;
   const auto tesResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   const auto &tesBuiltInUsage = tesResUsage->builtInUsage.tes;
   const bool hasTs = m_hasTcs || m_hasTes;
 
   // ES_VGPR_COMP_CNT in SPI_SHADER_PGM_RSRC2_GS
   unsigned gsVgprCompCnt = 0;
-  if ((calcFactor.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) ||
+  if ((hwConfig.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) ||
       gsBuiltInUsage.invocationId)
     gsVgprCompCnt = 3; // Enable vtx4/vtx5 offset (GS VGPR3) or GS instance ID (GS VGPR4)
   else if (gsBuiltInUsage.primitiveIdIn)
     gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
-  else if (calcFactor.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch)
+  else if (hwConfig.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch)
     gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::GsVgprCompCnt] = gsVgprCompCnt;
 
@@ -295,12 +295,12 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
 
   // VGT_GS_ONCHIP_CNTL
   auto vgtGsOnChipCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOnchipCntl].getMap(true);
-  vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::EsVertsPerSubgroup] = calcFactor.esVertsPerSubgroup;
-  vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsPrimsPerSubgroup] = calcFactor.gsPrimsPerSubgroup;
+  vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::EsVertsPerSubgroup] = hwConfig.esVertsPerSubgroup;
+  vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsPrimsPerSubgroup] = hwConfig.gsPrimsPerSubgroup;
   // NOTE: The value of field "GS_INST_PRIMS_IN_SUBGRP" should be strictly equal to the product of
   // VGT_GS_ONCHIP_CNTL.GS_PRIMS_PER_SUBGRP * VGT_GS_INSTANCE_CNT.CNT.
   const unsigned gsInstPrimsInSubgrp =
-      geometryMode.invocations > 1 ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations) : 0;
+      geometryMode.invocations > 1 ? (hwConfig.gsPrimsPerSubgroup * geometryMode.invocations) : 0;
   vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsInstPrimsPerSubgrp] = gsInstPrimsInSubgrp;
 
   // VGT_GS_VERT_ITEMSIZE and VGT_GSVS_RING_OFFSET
@@ -311,7 +311,7 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   const unsigned itemCount = 4;
   unsigned gsVsRingOffset = 0;
   for (unsigned i = 0; i < itemCount; ++i) {
-    unsigned itemSize = gsInOutUsage.gs.calcFactor.gsVsVertexItemSize[i];
+    unsigned itemSize = gsInOutUsage.gs.hwConfig.gsVsVertexItemSize[i];
     itemSizeArrayNode[i] = itemSize;
     if (i < itemCount - 1) {
       gsVsRingOffset += itemSize * maxVertOut;
@@ -352,10 +352,10 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   }
 
   // VGT_GSVS_RING_ITEMSIZE
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsvsRingItemsize] = calcFactor.gsVsRingItemSize;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsvsRingItemsize] = hwConfig.gsVsRingItemSize;
 
   // VGT_ESGS_RING_ITEMSIZE
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtEsgsRingItemsize] = calcFactor.esGsRingItemSize;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtEsgsRingItemsize] = hwConfig.esGsRingItemSize;
 
   // VGT_LS_HS_CONFIG
   if (geometryMode.inputPrimitive == InputPrimitives::Patch) {
@@ -369,8 +369,8 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MaxVertsPerSubgroup] = maxPrimsPerSubgroup;
 
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
-  unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
-  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+  unsigned ldsSizeInDwords = hwConfig.gsOnChipLdsSize;
+  ldsSizeInDwords += hwConfig.rayQueryLdsStackSize;
 
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
@@ -388,7 +388,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   const auto &gsBuiltInUsage = gsResUsage->builtInUsage.gs;
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   const auto &gsInOutUsage = gsResUsage->inOutUsage;
-  const auto &calcFactor = gsInOutUsage.gs.calcFactor;
+  const auto &hwConfig = gsInOutUsage.gs.hwConfig;
   const auto meshResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
   const auto &meshBuiltInUsage = meshResUsage->builtInUsage.mesh;
   const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
@@ -399,12 +399,12 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   unsigned gsVgprCompCnt = 0;
   if (m_gfxIp.major <= 11) {
     if (m_hasGs) {
-      if ((calcFactor.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) ||
+      if ((hwConfig.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) ||
           gsBuiltInUsage.invocationId)
         gsVgprCompCnt = 3; // Enable vtx4/vtx5 offset (GS VGPR3) or GS instance ID (GS VGPR4)
       else if (gsBuiltInUsage.primitiveIdIn)
         gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
-      else if (calcFactor.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch)
+      else if (hwConfig.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch)
         gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
     } else if (m_hasVs) {
       // NOTE: When GS is absent, only those VGPRs are required: vtx0/vtx1 offset, vtx2/vtx3 offset,
@@ -452,13 +452,13 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
 
   // VGT_GS_ONCHIP_CNTL
   auto vgtGsOnchipCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOnchipCntl].getMap(true);
-  vgtGsOnchipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::EsVertsPerSubgroup] = calcFactor.esVertsPerSubgroup;
-  vgtGsOnchipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsPrimsPerSubgroup] = calcFactor.gsPrimsPerSubgroup;
+  vgtGsOnchipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::EsVertsPerSubgroup] = hwConfig.esVertsPerSubgroup;
+  vgtGsOnchipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsPrimsPerSubgroup] = hwConfig.gsPrimsPerSubgroup;
 
   unsigned gsInstPrimsInSubgrp = 1;
   if (!m_hasMesh) {
-    gsInstPrimsInSubgrp = geometryMode.invocations > 1 ? (calcFactor.gsPrimsPerSubgroup * geometryMode.invocations)
-                                                       : calcFactor.gsPrimsPerSubgroup;
+    gsInstPrimsInSubgrp = geometryMode.invocations > 1 ? (hwConfig.gsPrimsPerSubgroup * geometryMode.invocations)
+                                                       : hwConfig.gsPrimsPerSubgroup;
   }
   vgtGsOnchipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsInstPrimsPerSubgrp] = gsInstPrimsInSubgrp;
 
@@ -533,13 +533,13 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] =
       m_pipelineState->getPalMetadata()->serializeEnum(Util::Abi::GsOutPrimType(gsOutputPrimitiveType));
 
-  assert(calcFactor.primAmpFactor >= 1);
+  assert(hwConfig.primAmpFactor >= 1);
   unsigned maxVertsPerSubgroup = NggMaxThreadsPerSubgroup;
   unsigned threadsPerSubgroup = NggMaxThreadsPerSubgroup;
   unsigned spiShaderIdsFormat = SPI_SHADER_1COMP;
   if (m_hasMesh) {
     maxVertsPerSubgroup = std::min(meshMode.outputVertices, NggMaxThreadsPerSubgroup);
-    threadsPerSubgroup = calcFactor.primAmpFactor;
+    threadsPerSubgroup = hwConfig.primAmpFactor;
     const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     bool hasPrimitivePayload = meshBuiltInUsage.layer || meshBuiltInUsage.viewportIndex ||
                                meshBuiltInUsage.primitiveShadingRate || enableMultiView;
@@ -578,7 +578,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       // group. Otherwise, it is set according to actual primitive amplification factor.
       const unsigned threadGroupSize = m_pipelineState->enableMeshRowExport()
                                            ? meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ
-                                           : calcFactor.primAmpFactor;
+                                           : hwConfig.primAmpFactor;
       spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::ThreadgroupSize] = threadGroupSize - 1;
 
       // SPI_SHADER_GS_MESHLET_EXP_ALLOC
@@ -599,14 +599,13 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       vgtGsInstanceCnt[Util::Abi::VgtGsInstanceCntMetadataKey::Enable] = true;
       vgtGsInstanceCnt[Util::Abi::VgtGsInstanceCntMetadataKey::Count] = geometryMode.invocations;
       if (m_gfxIp >= GfxIpVersion{10, 1})
-        vgtGsInstanceCnt[Util::Abi::VgtGsInstanceCntMetadataKey::EnMaxVertOutPerGsInstance] =
-            calcFactor.enableMaxVertOut;
+        vgtGsInstanceCnt[Util::Abi::VgtGsInstanceCntMetadataKey::EnMaxVertOutPerGsInstance] = hwConfig.enableMaxVertOut;
     }
 
     if (m_gfxIp.major <= 11) {
       // VGT_ESGS_RING_ITEMSIZE
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtEsgsRingItemsize] =
-          (m_hasGs ? calcFactor.esGsRingItemSize : 1);
+          (m_hasGs ? hwConfig.esGsRingItemSize : 1);
     }
 
     // VGT_LS_HS_CONFIG
@@ -630,7 +629,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
 
   // GE_NGG_SUBGRP_CNTL
   auto geNggSubgrpCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::GeNggSubgrpCntl].getMap(true);
-  geNggSubgrpCntl[Util::Abi::GeNggSubgrpCntlMetadataKey::PrimAmpFactor] = calcFactor.primAmpFactor;
+  geNggSubgrpCntl[Util::Abi::GeNggSubgrpCntlMetadataKey::PrimAmpFactor] = hwConfig.primAmpFactor;
   geNggSubgrpCntl[Util::Abi::GeNggSubgrpCntlMetadataKey::ThreadsPerSubgroup] = threadsPerSubgroup;
 
   // TODO: Support PIPELINE_PRIM_ID.
@@ -638,7 +637,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderIdxFormat] = spiShaderIdsFormat;
 
   // Pipeline metadata
-  setNggSubgroupSize(m_hasMesh ? 1 : std::max(calcFactor.esVertsPerSubgroup, calcFactor.gsPrimsPerSubgroup));
+  setNggSubgroupSize(m_hasMesh ? 1 : std::max(hwConfig.esVertsPerSubgroup, hwConfig.gsPrimsPerSubgroup));
 
   //
   // Build SW stream-out configuration (GFX11+)
@@ -655,8 +654,8 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   }
 
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
-  unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
-  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+  unsigned ldsSizeInDwords = hwConfig.gsOnChipLdsSize;
+  ldsSizeInDwords += hwConfig.rayQueryLdsStackSize;
 
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
@@ -689,7 +688,7 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = enablePrimStats || streamXfbBuffers[3] > 0;
   if (shaderStage == ShaderStage::CopyShader) {
     unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
-    if (m_pipelineState->getRasterizerState().rasterStream == InvalidValue) {
+    if (rasterStream == InvalidValue) {
       // NOTE: According to HW register spec, rasterization stream has 3 bits, the lower 2 bits are programmed to stream
       // ID (0~3). If rasterization is not enabled for any stream, set the highest 1 bit to 1.
       static const unsigned NoRasterStream = 0x4;

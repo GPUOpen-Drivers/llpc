@@ -26,7 +26,6 @@
 //===- SpecializeDriverShaders.cpp - Specialize driver shaders based on full-pipeline knowledge -------------------===//
 
 #include "llvmraytracing/SpecializeDriverShaders.h"
-#include "compilerutils/CompilerUtils.h"
 #include "compilerutils/ValueOriginTracking.h"
 #include "compilerutils/ValueSpecialization.h"
 #include "llvmraytracing/ContinuationsUtil.h"
@@ -36,6 +35,7 @@
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 
 using namespace llvm;
@@ -100,6 +100,31 @@ Metadata *getI32MDConstant(LLVMContext &Context, uint32_t Value) {
 }
 
 } // namespace MDHelper
+
+namespace FirstRelevantArgIdx {
+// Ignore: shaderRecIdx, returnAddr
+constexpr static unsigned Incoming = 2;
+
+// Ignore: shaderAddr, levels, csp, shaderRecIdx, returnAddr
+constexpr static unsigned JumpArg = 5;
+
+// Ignore: shaderAddr, levels, shaderRecIdx, returnAddr
+constexpr static unsigned AwaitArg = 4;
+
+// Ignore: shaderRecIdx, returnAddr
+constexpr static unsigned AwaitResult = 2;
+
+static unsigned getForJumpOrAwait(CallInst *JumpOrAwait) {
+  if (isa<lgc::cps::JumpOp>(JumpOrAwait))
+    return JumpArg;
+
+  if (isa<lgc::cps::AwaitOp>(JumpOrAwait))
+    return AwaitArg;
+
+  report_fatal_error("getForJumpOrAwait: Should not be called on a CallInst "
+                     "that is not a lgc.cps.jump or lgc.cps.await!");
+}
+} // namespace FirstRelevantArgIdx
 
 // Utilities to keep track of the "status" of individual arg slots.
 // There is some similarity between these pairs of types:
@@ -461,24 +486,17 @@ private:
   }
 };
 
-// Stores an outgoing jump, together with the first outgoing argument that should be considered.
-struct JumpInfo {
-  CallInst *Outgoing = nullptr;
-  unsigned FirstRelevantOutgoingArgIdx = 0;
-};
-
-struct AwaitInfo : public JumpInfo {
-  // Handle lgc.cps.await.
-  // lgc.cps uses a single await call, like:
-  //   %result = call @lgc.cps.await(i32 %target, i32 %levels, args...)
-  CallInst *AwaitedResult = nullptr;
-};
-
 struct FunctionData {
   lgc::rt::RayTracingShaderStage Stage = lgc::rt::RayTracingShaderStage::Count;
   bool IsDuringTraversal = false;
-  SmallVector<JumpInfo> Jumps;
-  SmallVector<AwaitInfo> Awaits;
+
+  // Stores an outgoing jump.
+  SmallVector<lgc::cps::JumpOp *> Jumps;
+
+  // Handle lgc.cps.await.
+  // lgc.cps uses a single await call, like:
+  //   %result = call @lgc.cps.await(i32 %target, i32 %levels, args...)
+  SmallVector<lgc::cps::AwaitOp *> Awaits;
 };
 
 struct SpecializeDriverShadersPassImpl {
@@ -499,8 +517,7 @@ public:
   SmallVector<Function *> TraversalFunctions;
   Type *I32 = nullptr;
   // When considering incoming function args to be preserved/specialized, ignore this many arguments.
-  unsigned FirstRelevantIncomingArgIdx = -1;
-  unsigned FirstRelevantOutgoingJumpArgIdx = -1;
+
   // Cache for per-type ArgumentLayoutInfos. unique_ptr for stable storage as DenseMap may invalidate iterators.
   DenseMap<Type *, std::unique_ptr<ArgumentLayoutInfo>> ArgLayoutInfos;
 
@@ -509,17 +526,6 @@ public:
       : M{M}, DL{M.getDataLayout()}, Opts{Opts}, TraversalArgsInfo{TraversalArgsInfo}, I32{Type::getInt32Ty(
                                                                                            M.getContext())} {
     HadNonTrivialIncomingTraversalArgsInfo = !TraversalArgsInfo.ArgSlots.empty();
-    if (ContHelper::isLgcCpsModule(M)) {
-      // Ignore return addr, shaderRecIdx
-      FirstRelevantIncomingArgIdx = 2;
-      // Ignore: shaderAddr, levels, csp, returnAddr, shaderRecIdx
-      FirstRelevantOutgoingJumpArgIdx = 5;
-    } else {
-      // Ignore returnAddr
-      FirstRelevantIncomingArgIdx = 1;
-      // Ignore: shaderAddr, levels, csp, returnAddr
-      FirstRelevantOutgoingJumpArgIdx = 4;
-    }
   }
 
   PreservedAnalyses run(ModuleAnalysisManager &AnalysisManager) {
@@ -604,18 +610,16 @@ public:
 
     static const auto HandleJumpOrAwait = [](State &State, Instruction &Op) {
       Function *F = Op.getFunction();
-      auto *CI = cast<CallInst>(&Op);
       auto *It = State.Self.ToProcess.find(F);
       if (It == State.Self.ToProcess.end())
         return;
 
       FunctionData &Data = It->second;
-      if (isa<lgc::cps::JumpOp>(Op)) {
-        Data.Jumps.push_back({CI, State.Self.FirstRelevantOutgoingJumpArgIdx});
+      if (auto *Jump = dyn_cast<lgc::cps::JumpOp>(&Op)) {
+        Data.Jumps.push_back(Jump);
       } else {
         assert(isa<lgc::cps::AwaitOp>(Op));
-        // ignore: shaderAddr, levels, shaderRecIdx
-        Data.Awaits.push_back({{CI, 3}, CI});
+        Data.Awaits.push_back(cast<lgc::cps::AwaitOp>(&Op));
       }
     };
 
@@ -644,7 +648,7 @@ public:
     IncomingArgSlotValuesWithOffsets Result{};
 
     // Collect incoming args
-    for (unsigned ArgIdx = FirstRelevantIncomingArgIdx; ArgIdx < F->arg_size(); ++ArgIdx) {
+    for (unsigned ArgIdx = FirstRelevantArgIdx::Incoming; ArgIdx < F->arg_size(); ++ArgIdx) {
       Value *Arg = F->getArg(ArgIdx);
       const ArgumentLayoutInfo &ArgLayoutInfo = getOrComputeArgumentLayoutInfo(Arg->getType());
 
@@ -676,8 +680,7 @@ public:
     // but that doesn't make a difference as the outgoing await is separately analyzed,
     // and non-preserved args are detected when doing that.
     Result.AwaitOriginAssumptions.emplace();
-    for (const auto &AwaitInfo : Data.Awaits) {
-      auto *AwaitResult = AwaitInfo.AwaitedResult;
+    for (const auto &AwaitResult : Data.Awaits) {
       // Await results are expected to be a struct type that wraps the actual args
       // We treat the struct members like incoming function arguments,
       // because await lowering will turn the part after the await into a function that takes exactly
@@ -696,7 +699,7 @@ public:
 
       unsigned AccumArgSlot = 0;
       bool Stop = false;
-      for (unsigned ElemIdx = 0; ElemIdx < STy->getNumElements() && !Stop; ++ElemIdx) {
+      for (unsigned ElemIdx = FirstRelevantArgIdx::AwaitResult; ElemIdx < STy->getNumElements() && !Stop; ++ElemIdx) {
         auto *ElemTy = STy->getElementType(ElemIdx);
         unsigned ElementByteOffset = SL->getElementOffset(ElemIdx);
         if (ElementByteOffset % 4 != 0) {
@@ -828,49 +831,51 @@ public:
   }
 
 #ifndef NDEBUG
-  // Sort JumpInfos by instruction order in the containing function.
+  // Sort JumpsAndAwaits by instruction order in the containing function.
   // This ensures processing order (and thereby debug output order) matches input IR order for lit tests.
-  void sortByInstructionOrder(SmallVectorImpl<JumpInfo> &JumpInfos) const {
-    if (JumpInfos.empty())
+  void sortByInstructionOrder(SmallVectorImpl<CallInst *> &JumpsAndAwaits) const {
+    if (JumpsAndAwaits.empty())
       return;
-    Function *F = JumpInfos[0].Outgoing->getFunction();
+    Function *F = JumpsAndAwaits[0]->getFunction();
 
-    // Maps instructions to entry indices in JumpInfos
-    SmallDenseMap<const Instruction *, unsigned> JumpToIndex;
-    for (const auto &[Index, JumpInfo] : enumerate(JumpInfos)) {
-      assert(JumpInfo.Outgoing->getFunction() == F);
-      [[maybe_unused]] auto Inserted = JumpToIndex.insert({JumpInfo.Outgoing, Index}).second;
+    // Maps instructions to entry indices in JumpsAndAwaits
+    SmallDenseMap<const Instruction *, unsigned> JumpOrAwaitToIndex;
+    for (const auto &[Index, JumpOrAwait] : enumerate(JumpsAndAwaits)) {
+      assert(JumpOrAwait->getFunction() == F);
+      [[maybe_unused]] auto Inserted = JumpOrAwaitToIndex.insert({JumpOrAwait, Index}).second;
       assert(Inserted);
     }
 
-    SmallVector<JumpInfo> Result;
-    Result.reserve(JumpInfos.size());
+    SmallVector<CallInst *> Result;
+    Result.reserve(JumpsAndAwaits.size());
     for (const auto &BB : *F) {
       for (const auto &Inst : BB) {
-        auto It = JumpToIndex.find(&Inst);
-        if (It != JumpToIndex.end()) {
-          Result.push_back(JumpInfos[It->second]);
-          JumpToIndex.erase(It);
+        auto It = JumpOrAwaitToIndex.find(&Inst);
+        if (It != JumpOrAwaitToIndex.end()) {
+          Result.push_back(JumpsAndAwaits[It->second]);
+          JumpOrAwaitToIndex.erase(It);
         }
       }
     }
-    assert(Result.size() == JumpInfos.size());
+    assert(Result.size() == JumpsAndAwaits.size());
 
-    JumpInfos = std::move(Result);
+    JumpsAndAwaits = std::move(Result);
   }
 #endif
 
-  // Collect and return the set of outgoing jumps/awaits that may be during Traversal.
-  SmallVector<JumpInfo> getRelevantOutgoingJumpsAndAwaits(const FunctionData &Data) const {
-    SmallVector<JumpInfo> JumpsAndAwaits;
+  // Collect and return the set of outgoing jumps/awaits that may be relevant during Traversal.
+  SmallVector<CallInst *> getRelevantOutgoingJumpsAndAwaits(const FunctionData &Data) const {
+    SmallVector<CallInst *> JumpsAndAwaits;
     JumpsAndAwaits.reserve(Data.Jumps.size() + Data.Awaits.size());
-    for (const auto &AwaitInfo : Data.Awaits)
-      JumpsAndAwaits.push_back(AwaitInfo);
+    for (const auto &AwaitOp : Data.Awaits)
+      JumpsAndAwaits.push_back(AwaitOp);
 
     // Ignore jumps in shaders outside of Traversal:
     // These are shader returns, and thus are neither during Traversal, nor entering Traversal.
-    if (Data.IsDuringTraversal)
-      JumpsAndAwaits.append(Data.Jumps);
+    if (Data.IsDuringTraversal) {
+      for (const auto &JumpOp : Data.Jumps)
+        JumpsAndAwaits.push_back(JumpOp);
+    }
 
 #ifndef NDEBUG
     if (M.getNamedMetadata("lgc.rt.specialize.driver.shaders.process.in.instruction.order"))
@@ -884,12 +889,12 @@ public:
   // We know that we are going to query the ValueOriginTracker about all arguments passed to all of these
   // jumps and awaits. The value origin analysis is more efficient when done in bulk, so do that here.
   // The later queries will then return cached results.
-  void runValueTrackingAnalysisOnAllOutgoingArgs(ValueOriginTracker &VOT, ArrayRef<JumpInfo> JumpsAndAwaits) {
+  void runValueTrackingAnalysisOnAllOutgoingArgs(ValueOriginTracker &VOT, ArrayRef<CallInst *> JumpsAndAwaits) {
     SmallVector<Value *> OutgoingArgs;
     for (const auto &JumpOrAwait : JumpsAndAwaits) {
-      for (unsigned OutgoingArgIdx = JumpOrAwait.FirstRelevantOutgoingArgIdx;
-           OutgoingArgIdx < JumpOrAwait.Outgoing->arg_size(); ++OutgoingArgIdx) {
-        Value *OutgoingArg = JumpOrAwait.Outgoing->getArgOperand(OutgoingArgIdx);
+      const unsigned StartIdx = FirstRelevantArgIdx::getForJumpOrAwait(JumpOrAwait);
+      for (unsigned OutgoingArgIdx = StartIdx; OutgoingArgIdx < JumpOrAwait->arg_size(); ++OutgoingArgIdx) {
+        Value *OutgoingArg = JumpOrAwait->getArgOperand(OutgoingArgIdx);
         // This might add duplicates, but that's fine.
         OutgoingArgs.push_back(OutgoingArg);
       }
@@ -940,7 +945,8 @@ public:
 
     // The summary of preserved/constant outgoing argument infos for this function
     ArgSlotsInfo FuncArgsInfo;
-    for (auto [JumpOrAwait, FirstRelevantArgIdx] : JumpsAndAwaits) {
+    for (auto *JumpOrAwait : JumpsAndAwaits) {
+      const unsigned FirstRelevantArgIdx = FirstRelevantArgIdx::getForJumpOrAwait(JumpOrAwait);
       // The different jump or continue intrinsics have a different amount of "system" arguments that are not
       // actually passed as argument to the jumped-to function, e.g. the function itself, or possibly a wait mask.
       // These system arguments come before the actual arguments, and need to be ignored for the argument
@@ -1068,7 +1074,7 @@ public:
     unsigned AccumArgSlotIdx = 0;
     ValueSpecializer VS{*Func->getParent()};
 
-    for (unsigned ArgIdx = FirstRelevantIncomingArgIdx; ArgIdx < Func->arg_size(); ++ArgIdx) {
+    for (unsigned ArgIdx = FirstRelevantArgIdx::Incoming; ArgIdx < Func->arg_size(); ++ArgIdx) {
       Argument *Arg = Func->getArg(ArgIdx);
       const auto &ArgumentLayoutInfo = getOrComputeArgumentLayoutInfo(Arg->getType());
       auto Result = specializeArgument(SpecializationInfo, VS, Arg, ArgumentLayoutInfo, AccumArgSlotIdx);
@@ -1154,6 +1160,8 @@ struct SpecializeDriverShadersState::Impl {
   void merge(const Self &Other) {
     TraversalArgsInfo = ArgSlotsInfo::combine(TraversalArgsInfo, Other.TraversalArgsInfo);
   }
+
+  void print(llvm::raw_ostream &OS) const { TraversalArgsInfo.print(OS, true); }
 
   bool operator==(const Impl &Other) const { return TraversalArgsInfo == Other.TraversalArgsInfo; }
 };
@@ -1266,6 +1274,10 @@ void SpecializeDriverShadersState::exportModuleMetadata(llvm::Module &M) const {
 void SpecializeDriverShadersState::merge(SpecializeDriverShadersState const &Other) {
   assert(Pimpl && Other.Pimpl && "Using invalid moved-from object");
   Pimpl->merge(*Other.Pimpl);
+}
+
+void SpecializeDriverShadersState::print(llvm::raw_ostream &OS) const {
+  Pimpl->print(OS);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

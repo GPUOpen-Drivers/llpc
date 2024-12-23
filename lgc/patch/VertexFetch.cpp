@@ -732,8 +732,7 @@ Value *VertexFetchImpl::fetchVertex(LoadVertexInputOp *inst, Value *descPtr, Val
   if (!m_vertexBufTablePtr) {
     IRBuilderBase::InsertPointGuard ipg(builder);
     builder.SetInsertPointPastAllocas(inst->getFunction());
-    m_vertexBufTablePtr =
-        ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
+    m_vertexBufTablePtr = ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, builder);
   }
 
   // Helper to create basic block
@@ -1482,7 +1481,9 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
         auto descPtr = builderImpl.CreateBufferDesc(InternalDescriptorSetId, CurrentAttributeBufferBinding,
                                                     builderImpl.getInt32(0), lgc::Builder::BufferFlagAddress, false);
         // Create descriptor by a 64-bits pointer
-        m_curAttribBufferDescr = builderImpl.buildBufferCompactDesc(descPtr, 0);
+        descPtr = builderImpl.CreatePtrToInt(descPtr, builderImpl.getInt64Ty());
+        descPtr = builderImpl.CreateBitCast(descPtr, FixedVectorType::get(builderImpl.getInt32Ty(), 2));
+        m_curAttribBufferDescr = builderImpl.buildBufferCompactDesc(descPtr, nullptr);
       }
       vtxDesc = m_curAttribBufferDescr;
     } else {
@@ -1495,14 +1496,13 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
   }
 
   // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
-  Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
     IRBuilder<>::InsertPointGuard guard(builder);
     builder.SetInsertPointPastAllocas(builder.GetInsertPoint()->getFunction());
-    m_vertexBufTablePtr =
-        ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
+    m_vertexBufTablePtr = ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, builder);
   }
 
+  Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   Value *vbDescPtr = builder.CreateGEP(vbDescTy, m_vertexBufTablePtr, builder.getInt64(binding));
   LoadInst *vbDesc = builder.CreateLoad(vbDescTy, vbDescPtr);
   vbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(vbDesc->getContext(), {}));

@@ -94,7 +94,7 @@ CallInst *ShaderInputs::getSpecialUserData(UserDataMapping kind, BuilderBase &bu
   else if (kind == UserDataMapping::MeshTaskDispatchDims)
     ty = FixedVectorType::get(builder.getInt32Ty(), 3);
   else if (kind == UserDataMapping::Workgroup)
-    ty = FixedVectorType::get(builder.getInt32Ty(), 3)->getPointerTo(ADDR_SPACE_CONST);
+    ty = builder.getPtrTy(ADDR_SPACE_CONST);
   return builder.CreateNamedCall((Twine(lgcName::SpecialUserData) + getSpecialUserDataName(kind)).str(), ty,
                                  builder.getInt32(static_cast<unsigned>(kind)), Attribute::ReadNone);
 }
@@ -103,10 +103,9 @@ CallInst *ShaderInputs::getSpecialUserData(UserDataMapping kind, BuilderBase &bu
 // Get a special user data value as a pointer by inserting a call to lgc.special.user.data then extending it
 //
 // @param kind : The kind of special user data, a UserDataMapping enum value
-// @param pointeeTy : Type that the pointer will point to
 // @param builder : Builder to insert the call with
-Value *ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping kind, Type *pointeeTy, BuilderBase &builder) {
-  Type *pointerTy = pointeeTy->getPointerTo(ADDR_SPACE_CONST);
+Value *ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping kind, BuilderBase &builder) {
+  Type *pointerTy = builder.getPtrTy(ADDR_SPACE_CONST);
   std::string callName = lgcName::SpecialUserData;
   callName += getSpecialUserDataName(kind);
   callName += ".";
@@ -114,7 +113,7 @@ Value *ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping kind, Type *poi
   Value *userDataValue = builder.CreateNamedCall(
       (Twine(lgcName::SpecialUserData) + getSpecialUserDataName(kind)).str(), pointerTy,
       {builder.getInt32(static_cast<unsigned>(kind)), builder.getInt32(HighAddrPc)}, Attribute::ReadNone);
-  return builder.CreateIntToPtr(userDataValue, pointeeTy->getPointerTo(ADDR_SPACE_CONST));
+  return builder.CreateIntToPtr(userDataValue, pointerTy);
 }
 
 // =====================================================================================================================

@@ -136,8 +136,8 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
   m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
-  case 10:
-  case 11: {
+  case 11:
+  case 10: {
     const unsigned elementBytes = bpp >> 3;
     const unsigned pitchAlign = (256 / elementBytes);
 

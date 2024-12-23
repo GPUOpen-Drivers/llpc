@@ -1,10 +1,19 @@
-# Continuations
+# llvmraytracing
 
-A collection of passes to convert shaders to coroutines.
-Some passes work on DXIL, some passes are generic.
+A library to implement ray tracing pipeline compilation using coroutine transforms.
 
-This is supposed to be used as a submodule in a driver repository.
+## Details
 
-### Tests
+Ray tracing shaders are expected in the `lgc.rt` dialect.
 
-Lit tests are behind the `check-llvmraytracing` CMake target, they can be run with `make check-llvmraytracing`.
+We first lower ray tracing, using the GPURT library which provides implementations for intrinsics to be inlined, and
+standalone driver shaders such as the Traversal shader. The result is in `lgc.cps` dialect form, using await and enqueue
+operations to represent indirect function calls, indirect tail calls, and returns.
+
+Then, we use the LLVM coroutine infrastructure for lowering awaits, splitting functions and introducing resume functions.
+
+At the end, we apply some cleanups to prepare IR for the backend.
+
+## Tests
+
+Lit tests are behind the `check-llvmraytracing` CMake target.

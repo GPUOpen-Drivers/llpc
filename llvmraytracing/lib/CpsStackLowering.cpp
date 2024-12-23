@@ -32,7 +32,6 @@
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/InstructionSimplify.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 
@@ -107,7 +106,7 @@ void CpsStackLowering::visitGetElementPtr(GetElementPtrInst &GEP) {
   if (GEP.getAddressSpace() != lgc::cps::stackAddrSpace)
     return;
 
-  IRBuilder<> Builder(&GEP);
+  Builder.SetInsertPoint(&GEP);
 
   auto Values = TypeLower.getValue(GEP.getPointerOperand());
   Value *AddChain = Values[0];
@@ -151,10 +150,10 @@ void CpsStackLowering::visitLoad(LoadInst &Load) {
 
   auto Values = TypeLower.getValue(Load.getPointerOperand());
 
-  IRBuilder<> Builder(&Load);
-  Values[0] = getRealMemoryAddress(Builder, Values[0]);
+  Builder.SetInsertPoint(&Load);
+  Values[0] = getRealMemoryAddress(Values[0]);
 
-  Values[0] = Builder.CreateBitCast(Values[0], Load.getType()->getPointerTo(getLoweredCpsStackAddrSpace()));
+  Values[0] = Builder.CreateBitCast(Values[0], Builder.getPtrTy(getLoweredCpsStackAddrSpace()));
 
   Load.replaceUsesOfWith(Load.getPointerOperand(), Values[0]);
 }
@@ -169,11 +168,10 @@ void CpsStackLowering::visitStore(llvm::StoreInst &Store) {
 
   auto Values = TypeLower.getValue(Store.getPointerOperand());
 
-  IRBuilder<> Builder(&Store);
-  Values[0] = getRealMemoryAddress(Builder, Values[0]);
+  Builder.SetInsertPoint(&Store);
+  Values[0] = getRealMemoryAddress(Values[0]);
 
-  Values[0] =
-      Builder.CreateBitCast(Values[0], Store.getValueOperand()->getType()->getPointerTo(getLoweredCpsStackAddrSpace()));
+  Values[0] = Builder.CreateBitCast(Values[0], Builder.getPtrTy(getLoweredCpsStackAddrSpace()));
 
   Store.replaceUsesOfWith(Store.getPointerOperand(), Values[0]);
 }
@@ -184,7 +182,7 @@ void CpsStackLowering::visitStore(llvm::StoreInst &Store) {
 // @param JumpOp: the instruction
 void CpsStackLowering::visitJump(lgc::cps::JumpOp &JumpOp) {
   Builder.SetInsertPoint(&JumpOp);
-  Value *CSP = loadCsp(Builder);
+  Value *CSP = loadCsp();
 
   // Update previously lowered arguments
   SmallVector<Value *> TailArgs{JumpOp.getTail()};
@@ -205,8 +203,8 @@ void CpsStackLowering::visitJump(lgc::cps::JumpOp &JumpOp) {
 //
 // @param Continue: the instruction
 void CpsStackLowering::visitContinue(lgc::ilcps::ContinueOp &Continue) {
-  IRBuilder<> Builder(&Continue);
-  Continue.setCsp(loadCsp(Builder));
+  Builder.SetInsertPoint(&Continue);
+  Continue.setCsp(loadCsp());
 }
 
 // =====================================================================================================================
@@ -214,8 +212,8 @@ void CpsStackLowering::visitContinue(lgc::ilcps::ContinueOp &Continue) {
 //
 // @param WaitContinue: the instruction
 void CpsStackLowering::visitWaitContinue(lgc::ilcps::WaitContinueOp &WaitContinue) {
-  IRBuilder<> Builder(&WaitContinue);
-  WaitContinue.setCsp(loadCsp(Builder));
+  Builder.SetInsertPoint(&WaitContinue);
+  WaitContinue.setCsp(loadCsp());
 }
 
 // =====================================================================================================================
@@ -264,14 +262,14 @@ void CpsStackLowering::visitBitCastInst(llvm::BitCastInst &BC) {
 //
 // @param AllocOp: the instruction
 void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
-  IRBuilder<> Builder(&AllocOp);
+  Builder.SetInsertPoint(&AllocOp);
   Value *Size = AllocOp.getSize();
 
   if (Instruction *Inst = dyn_cast<Instruction>(Size))
     if (auto *NewSize = llvm::simplifyInstruction(Inst, *SQ))
       Size = NewSize;
 
-  Value *CSP = loadCsp(Builder);
+  Value *CSP = loadCsp();
 
   // align Size to ContinuationStackAlignment
   ConstantInt *Const = cast<ConstantInt>(Size);
@@ -295,14 +293,14 @@ void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
 //
 // @param FreeOp: the instruction
 void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
-  IRBuilder<> Builder(&FreeOp);
+  Builder.SetInsertPoint(&FreeOp);
   Value *Size = FreeOp.getSize();
 
   if (Instruction *Inst = dyn_cast<Instruction>(Size))
     if (auto *NewSize = llvm::simplifyInstruction(Inst, *SQ))
       Size = NewSize;
 
-  Value *CSP = loadCsp(Builder);
+  Value *CSP = loadCsp();
 
   // align Size to ContinuationStackAlignment and subtract from CSP
   ConstantInt *Const = cast<ConstantInt>(Size);
@@ -324,9 +322,9 @@ void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
 //
 // @param PeekOp: the instruction
 void CpsStackLowering::visitCpsPeek(lgc::cps::PeekOp &PeekOp) {
-  IRBuilder<> Builder(&PeekOp);
+  Builder.SetInsertPoint(&PeekOp);
 
-  auto *Ptr = loadCsp(Builder);
+  auto *Ptr = loadCsp();
   auto *Size = PeekOp.getSize();
 
   int ImmSize = cast<ConstantInt>(Size)->getSExtValue();
@@ -346,10 +344,10 @@ void CpsStackLowering::visitCpsPeek(lgc::cps::PeekOp &PeekOp) {
 void CpsStackLowering::visitSetVsp(lgc::cps::SetVspOp &SetVsp) {
   auto *Ptr = SetVsp.getPtr();
 
-  IRBuilder<> B(&SetVsp);
+  Builder.SetInsertPoint(&SetVsp);
 
   auto Values = TypeLower.getValue(Ptr);
-  B.CreateStore(Values[0], CpsStackAlloca);
+  Builder.CreateStore(Values[0], CpsStackAlloca);
   TypeLower.replaceInstruction(&SetVsp, {});
 }
 
@@ -358,8 +356,8 @@ void CpsStackLowering::visitSetVsp(lgc::cps::SetVspOp &SetVsp) {
 //
 // @param GetVsp: the instruction
 void CpsStackLowering::visitGetVsp(lgc::cps::GetVspOp &GetVsp) {
-  IRBuilder<> B(&GetVsp);
-  TypeLower.replaceInstruction(&GetVsp, {loadCsp(B)});
+  Builder.SetInsertPoint(&GetVsp);
+  TypeLower.replaceInstruction(&GetVsp, {loadCsp()});
 }
 
 // =====================================================================================================================
@@ -371,7 +369,7 @@ void CpsStackLowering::visitGetVsp(lgc::cps::GetVspOp &GetVsp) {
 // @param Offset: The offset to the base address, given as integer with bitwidth
 // <= 32.
 //
-Value *CpsStackLowering::getRealMemoryAddress(IRBuilder<> &Builder, Value *Offset) {
+Value *CpsStackLowering::getRealMemoryAddress(Value *Offset) {
   // Since we are using at most 32-bit offsets, assert that we don't put in any
   // offset larger 32 bit.
   assert(Offset->getType()->isIntegerTy() && Offset->getType()->getIntegerBitWidth() <= 32);
@@ -382,13 +380,12 @@ Value *CpsStackLowering::getRealMemoryAddress(IRBuilder<> &Builder, Value *Offse
   Value *GepBase = BasePointer;
   Value *GepIndex = Offset;
 
-  Type *I8 = Builder.getInt8Ty();
   if (isa<ConstantPointerNull>(BasePointer)) {
-    GepBase = Builder.CreateIntToPtr(Offset, I8->getPointerTo(getLoweredCpsStackAddrSpace()));
+    GepBase = Builder.CreateIntToPtr(Offset, Builder.getPtrTy(getLoweredCpsStackAddrSpace()));
     GepIndex = Builder.getInt32(0);
   }
 
-  return Builder.CreateGEP(I8, GepBase, {GepIndex});
+  return Builder.CreateGEP(Builder.getInt8Ty(), GepBase, {GepIndex});
 }
 
 // =====================================================================================================================
@@ -402,7 +399,6 @@ Function *CpsStackLowering::addOrInitCsp(Function *F, Function *GetGlobalMemBase
   CompilerUtils::CrossModuleInliner CrossInliner;
   auto &GpurtContext = lgc::GpurtContext::get(Mod->getContext());
   auto &GpurtLibrary = GpurtContext.theModule ? *GpurtContext.theModule : *Mod;
-  IRBuilder<> Builder(F->getContext());
   Value *Initializer = nullptr;
 
   Builder.SetInsertPointPastAllocas(F);
@@ -448,13 +444,13 @@ Function *CpsStackLowering::addOrInitCsp(Function *F, Function *GetGlobalMemBase
   // Get the global memory base address.
   if (GetGlobalMemBase) {
     auto *Base = CrossInliner.inlineCall(Builder, GetGlobalMemBase).returnValue;
-    auto *CspTy = Builder.getInt8Ty()->getPointerTo(getLoweredCpsStackAddrSpace());
+    auto *CspTy = Builder.getPtrTy(getLoweredCpsStackAddrSpace());
     setRealBasePointer(Builder.CreateIntToPtr(Base, CspTy));
   }
 
   return F;
 }
 
-Value *CpsStackLowering::loadCsp(IRBuilder<> &Builder) {
+Value *CpsStackLowering::loadCsp() {
   return Builder.CreateLoad(CpsStackAlloca->getAllocatedType(), CpsStackAlloca);
 }

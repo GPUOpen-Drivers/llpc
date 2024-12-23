@@ -182,7 +182,7 @@ bool StructurizeBuffersImpl::run() {
         strided = m_builder.create<StridedIndexAddOp>(strided, bufferIndexOp->getIndex());
 
         toRemove.push_back(bufferIndexOp);
-        CompilerUtils::replaceAllPointerUses(&m_builder, bufferIndexOp, strided, toRemove);
+        CompilerUtils::replaceAllPointerUses(bufferIndexOp, strided, toRemove);
       }
     }
   }

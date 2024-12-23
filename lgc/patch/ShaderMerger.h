@@ -119,7 +119,8 @@ private:
 
   void processRayQueryLdsStack(llvm::Function *entryPoint1, llvm::Function *entryPoint2) const;
 
-  void storeTessFactorsWithOpt(llvm::Value *threadIdInWave, llvm::IRBuilder<> &builder);
+  void storeTessFactorsAndHsOutputsWithOpt(llvm::Value *threadIdInWave, llvm::Value *relPatchId, llvm::Value *vertexIdx,
+                                           BuilderBase &builder);
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
   void createBarrier(llvm::IRBuilder<> &builder);

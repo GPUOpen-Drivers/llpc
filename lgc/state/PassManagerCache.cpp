@@ -95,7 +95,7 @@ std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassMana
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(EarlyCSEPass(true));
   passManagers.first->addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
-  passManagers.first->addPass(PatchSetupTargetFeatures());
+  passManagers.first->addPass(SetUpTargetFeatures());
   passManagers.first->addPass(IncludeLlvmIr());
 
   // Add one last pass that does nothing, but invalidates all the analyses.

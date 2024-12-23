@@ -177,6 +177,7 @@ target_sources(LLVMlgc PRIVATE
     patch/LowerInOut.cpp
     patch/LowerInvariantLoads.cpp
     patch/IncludeLlvmIr.cpp
+    patch/InitializeWorkgroupMemory.cpp
     patch/ScalarizeLoads.cpp
     patch/LowerMulDx9Zero.cpp
     patch/AddLoopMetadata.cpp
@@ -187,7 +188,6 @@ target_sources(LLVMlgc PRIVATE
     patch/CollectResourceUsage.cpp
     patch/SetupTargetFeatures.cpp
     patch/PassthroughHullShader.cpp
-    patch/PatchInitializeWorkgroupMemory.cpp
     patch/ApplyWorkarounds.cpp
     patch/ShaderInputs.cpp
     patch/ShaderMerger.cpp
@@ -216,6 +216,7 @@ target_sources(LLVMlgc PRIVATE
     include/lgc/patch/FragmentColorExport.h
     include/lgc/patch/GenerateCopyShader.h
     include/lgc/patch/IncludeLlvmIr.h
+    include/lgc/patch/InitializeWorkgroupMemory.h
     include/lgc/patch/LgcLowering.h
     include/lgc/patch/LowerBufferOperations.h
     include/lgc/patch/LowerCooperativeMatrix.h
@@ -230,7 +231,6 @@ target_sources(LLVMlgc PRIVATE
     include/lgc/patch/LowerSubgroupOps.h
     include/lgc/patch/MutateEntryPoint.h
     include/lgc/patch/PassthroughHullShader.h
-    include/lgc/patch/PatchInitializeWorkgroupMemory.h
     include/lgc/patch/PeepholeOptimization.h
     include/lgc/patch/PreparePipelineAbi.h
     include/lgc/patch/ScalarizeLoads.h
@@ -293,7 +293,6 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     include/lgc/util/AddressExtender.h
     include/lgc/util/BuilderBase.h
-    include/lgc/util/Debug.h
     include/lgc/util/GfxRegHandler.h
     include/lgc/util/GfxRegHandlerBase.h
     include/lgc/util/Internal.h
@@ -308,6 +307,7 @@ target_sources(LLVMlgc PRIVATE
     interface/lgc/BuiltInDefs.h
     interface/lgc/BuiltIns.h
     interface/lgc/CommonDefs.h
+    interface/lgc/Debug.h
     interface/lgc/Disassembler.h
     interface/lgc/ElfLinker.h
     interface/lgc/EnumIterator.h

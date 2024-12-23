@@ -144,7 +144,7 @@ public:
 
   /// Construct with a function that returns a pass. It can then parallelize compilation by calling
   /// the function once for each parallel thread.
-  explicit ModuleBunchToModulePassAdaptor(function_ref<std::unique_ptr<PassConceptT>()> PassMaker,
+  explicit ModuleBunchToModulePassAdaptor(std::function<std::unique_ptr<PassConceptT>()> PassMaker,
                                           bool EagerlyInvalidate = false)
       : PassMaker(PassMaker), EagerlyInvalidate(EagerlyInvalidate) {}
 
@@ -160,7 +160,7 @@ public:
 
 private:
   std::unique_ptr<PassConceptT> Pass;
-  function_ref<std::unique_ptr<PassConceptT>()> PassMaker;
+  std::function<std::unique_ptr<PassConceptT>()> PassMaker;
   bool EagerlyInvalidate;
 };
 

@@ -15,7 +15,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spi
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(4)
 ; CHECK-NEXT:    call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) [[TMP4]], i32 4), "dereferenceable"(ptr addrspace(4) [[TMP4]], i32 -1) ]
 ; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP4]], i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = call ptr addrspace(7) @lgc.buffer.load.desc.to.ptr(ptr addrspace(4) [[TMP5]], i1 false, i1 false)
+; CHECK-NEXT:    [[TMP6:%.*]] = call ptr addrspace(7) @lgc.buffer.load.desc.to.ptr(ptr addrspace(4) [[TMP5]], i1 false, i1 false, i1 false)
 ; CHECK-NEXT:    [[TMP7:%.*]] = and i32 [[LOCALINVOCATIONID]], 1023
 ; CHECK-NEXT:    [[TMP8:%.*]] = insertelement <3 x i32> poison, i32 [[TMP7]], i64 0
 ; CHECK-NEXT:    [[TMP9:%.*]] = lshr i32 [[LOCALINVOCATIONID]], 10
@@ -78,7 +78,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spi
   %5 = inttoptr i64 %4 to ptr addrspace(4)
   call void @llvm.assume(i1 true) [ "align"(ptr addrspace(4) %5, i32 4), "dereferenceable"(ptr addrspace(4) %5, i32 -1) ]
   %6 = getelementptr i8, ptr addrspace(4) %5, i32 0
-  %7 = call ptr addrspace(7) @lgc.buffer.load.desc.to.ptr(ptr addrspace(4) %6, i1 false, i1 false)
+  %7 = call ptr addrspace(7) @lgc.buffer.load.desc.to.ptr(ptr addrspace(4) %6, i1 false, i1 false, i1 false)
   %8 = call i32 @lgc.shader.input.LocalInvocationId(i32 50) #2
   %9 = and i32 %8, 1023
   %10 = insertelement <3 x i32> poison, i32 %9, i64 0
@@ -165,7 +165,7 @@ declare noundef i64 @llvm.amdgcn.s.getpc() #3
 declare void @llvm.assume(i1 noundef) #4
 
 ; Function Attrs: nounwind willreturn memory(none)
-declare ptr addrspace(7) @lgc.buffer.load.desc.to.ptr(ptr addrspace(4), i1, i1) #1
+declare ptr addrspace(7) @lgc.buffer.load.desc.to.ptr(ptr addrspace(4), i1, i1, i1) #1
 
 attributes #0 = { nounwind "denormal-fp-math-f32"="preserve-sign" "target-features"=",+wavefrontsize32" }
 attributes #1 = { nounwind willreturn memory(none) }

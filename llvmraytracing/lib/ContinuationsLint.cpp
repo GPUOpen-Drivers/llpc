@@ -31,6 +31,7 @@
 
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Analysis.h"
@@ -147,21 +148,37 @@ void ContinuationsLintPassImpl::checkJumpTargets() {
 
 // Check that every function has at most one setLocalRootIndex call.
 void ContinuationsLintPassImpl::checkSetLocalRootIndex() {
-  if (auto *SetF = Mod.getFunction("amd.dx.setLocalRootIndex")) {
+  struct VisitorState {
+    const AwaitFuncSetTy &FuncsWithAwaits;
     SmallDenseSet<Function *> HasSetF;
+    SmallVector<Function *> InvalidFuncs;
+  };
 
-    llvm::forEachCall(*SetF, [&](CallInst &CInst) {
-      // Returns true if it is a new value
-      Function *Func = CInst.getFunction();
-      // It is allowed to have multiple setLocalRootIndex calls if the call resides in a function that was not yet
-      // split.
-      if (FuncsWithAwaits.contains(Func))
-        return;
+  static const auto Visitor =
+      llvm_dialects::VisitorBuilder<VisitorState>()
+          .add<lgc::ilcps::SetLocalRootIndexOp>([](VisitorState &S, lgc::ilcps::SetLocalRootIndexOp &Op) {
+            // Collect all functions that have more than one call to lgc.ilcps.setLocalRootIndex, but only if these
+            // calls do not reside in functions that are not yet split.
 
-      auto Inserted = HasSetF.insert(Func);
-      Check(Inserted.second, "Found a function with more than one call to setLocalRootIndex", Func);
-    });
-  }
+            // Returns true if it is a new value
+            Function *Func = Op.getFunction();
+            // It is allowed to have multiple setLocalRootIndex calls if the call resides in a function that was not yet
+            // split.
+            if (S.FuncsWithAwaits.contains(Func))
+              return;
+
+            auto Inserted = S.HasSetF.insert(Func);
+            if (!Inserted.second)
+              S.InvalidFuncs.push_back(Func);
+          })
+          .build();
+
+  VisitorState State{FuncsWithAwaits, {}, {}};
+
+  Visitor.visit(State, Mod);
+
+  for (auto *Func : State.InvalidFuncs)
+    checkFailed("Found a function with more than one call to setLocalRootIndex", Func);
 }
 
 PreservedAnalyses ContinuationsLintPass::run(Module &Mod, ModuleAnalysisManager &AnalysisManager) {

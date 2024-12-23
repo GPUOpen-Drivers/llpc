@@ -31,6 +31,7 @@
 
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -412,8 +413,7 @@ bool DXILContLgcRtOpConverterPass::convertDxOp(Function &Func) {
 void DXILContLgcRtOpConverterPass::setupLocalRootIndex(Function *F) {
   Builder->SetInsertPointPastAllocas(F);
   auto *LocalIndex = Builder->create<lgc::rt::ShaderIndexOp>();
-  auto *SetLocalRootIndex = llvm::getSetLocalRootIndex(*F->getParent());
-  Builder->CreateCall(SetLocalRootIndex, LocalIndex);
+  Builder->create<lgc::ilcps::SetLocalRootIndexOp>(LocalIndex);
 }
 
 // Do preparation transformations to entry-point shaders.

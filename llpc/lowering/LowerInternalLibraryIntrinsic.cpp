@@ -315,12 +315,12 @@ static void createLoadStore(Function *func, Builder *builder, bool isLoad, bool 
   gpuAddrAsPtr = builder->CreateGEP(builder->getInt8Ty(), gpuAddrAsPtr, offset);
 
   // Cast to the return type pointer
-  Type *gpuAddrAsTy = builder->getInt32Ty();
-  gpuAddrAsPtrTy = gpuAddrAsTy->getPointerTo(SPIRAS_Global);
+  gpuAddrAsPtrTy = builder->getPtrTy(SPIRAS_Global);
   gpuAddrAsPtr = builder->CreateBitCast(gpuAddrAsPtr, gpuAddrAsPtrTy);
 
   // Load value
   if (isLoad) {
+    Type *gpuAddrAsTy = builder->getInt32Ty();
     Value *loadValue = builder->CreateLoad(gpuAddrAsTy, gpuAddrAsPtr, isUncached);
     builder->CreateRet(loadValue);
   } else {
@@ -392,6 +392,7 @@ InternalLibraryIntrinsicUtil::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdExtLaneIndex"] = &createLaneIndex;
   m_libFuncPtrs["AmdExtLaneCount"] = &createLaneCount;
   m_libFuncPtrs["AmdExtHalt"] = &createHalt;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_Halt"] = &createHalt;
   m_libFuncPtrs["AmdExtDeviceMemoryAcquire"] = &createDeviceMemoryAcquire;
   m_libFuncPtrs["AmdExtDeviceMemoryRelease"] = &createDeviceMemoryRelease;
   m_libFuncPtrs["AmdExtNumWavesCompute"] = &createNumWavesCompute;

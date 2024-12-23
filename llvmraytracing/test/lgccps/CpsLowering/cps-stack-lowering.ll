@@ -34,7 +34,7 @@ define void @test.0() !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} !continuation 
 ; CHECK-NEXT:    store i8 99, ptr addrspace(5) [[TMP9]], align 1
 ; CHECK-NEXT:    [[CR:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @test.1)
 ; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP10]], i32 poison, i32 [[TMP7]], i32 [[TMP4]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP10]], i32 poison, i32 6, i32 [[TMP7]], i32 [[TMP4]])
 ; CHECK-NEXT:    unreachable
 ;
   %mem = call ptr addrspace(32) @lgc.cps.alloc(i32 10)   ; round up to 12 during lowering
@@ -50,7 +50,7 @@ define void @test.0() !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} !continuation 
   %q1 = ptrtoint ptr addrspace(32) %p1 to i32
 
   %cr = call i32 @lgc.cps.as.continuation.reference(ptr @test.1)
-  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, ptr addrspace(32) %p2, i32 %q1)
+  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, i32 6, ptr addrspace(32) %p2, i32 %q1)
   unreachable
 }
 
@@ -68,7 +68,7 @@ define void @test.1(ptr addrspace(32) %p2, i32 %q1) !lgc.cps !{i32 1} !lgc.shade
 ; CHECK-NEXT:    [[N99:%.*]] = load i8, ptr addrspace(5) [[TMP3]], align 1
 ; CHECK-NEXT:    [[CR:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @test.2)
 ; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP4]], i32 poison)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP4]], i32 poison, i32 4)
 ; CHECK-NEXT:    unreachable
 ;
   %p1 = inttoptr i32 %q1 to ptr addrspace(32)
@@ -76,7 +76,7 @@ define void @test.1(ptr addrspace(32) %p2, i32 %q1) !lgc.cps !{i32 1} !lgc.shade
   %n99 = load i8, ptr addrspace(32) %p2
 
   %cr = call i32 @lgc.cps.as.continuation.reference(ptr @test.2)
-  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison)
+  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, i32 4)
   unreachable
 }
 
@@ -143,7 +143,7 @@ define void @test.gep() !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} !continuatio
 ; CHECK-NEXT:    store i32 [[TMP17]], ptr addrspace(5) [[TMP19]], align 4
 ; CHECK-NEXT:    [[CR:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @test.1)
 ; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP20]], i32 poison, i32 [[TMP17]], i32 [[TMP17]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP20]], i32 poison, i32 5, i32 [[TMP17]], i32 [[TMP17]])
 ; CHECK-NEXT:    unreachable
 ;
   %mem = call ptr addrspace(32) @lgc.cps.alloc(i32 10)   ; round up to 12 during lowering
@@ -168,7 +168,7 @@ define void @test.gep() !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} !continuatio
   store i32 %vsp.3.i, ptr addrspace(32) %3
 
   %cr = call i32 @lgc.cps.as.continuation.reference(ptr @test.1)
-  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, ptr addrspace(32) %vsp.3, i32 %vsp.3.i)
+  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, i32 5, ptr addrspace(32) %vsp.3, i32 %vsp.3.i)
   unreachable
 }
 
@@ -192,7 +192,7 @@ define void @test.nested.gep() !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} !cont
 ; CHECK-NEXT:    store i32 [[TMP5]], ptr addrspace(5) [[TMP7]], align 4
 ; CHECK-NEXT:    [[CR:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @test.1)
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP8]], i32 poison, i32 [[TMP5]], i32 [[TMP5]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP8]], i32 poison, i32 3, i32 [[TMP5]], i32 [[TMP5]])
 ; CHECK-NEXT:    unreachable
 ;
   %mem = call ptr addrspace(32) @lgc.cps.alloc(i32 10)   ; round up to 12 during lowering
@@ -205,7 +205,7 @@ define void @test.nested.gep() !lgc.cps !{i32 1} !lgc.shaderstage !{i32 7} !cont
   store i32 %vsp.i, ptr addrspace(32) %1
 
   %cr = call i32 @lgc.cps.as.continuation.reference(ptr @test.1)
-  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, ptr addrspace(32) %vsp, i32 %vsp.i)
+  call void (...) @lgc.cps.jump(i32 %cr, i32 2, i32 poison, i32 poison, i32 3, ptr addrspace(32) %vsp, i32 %vsp.i)
   unreachable
 }
 

@@ -1,0 +1,39 @@
+
+// Test that payload is not put into continuations state.
+// RUN: amdllpc %gfxip --llpc-raytracing-mode=continuations --report-cont-state-sizes %s 2>&1 | FileCheck -check-prefix=CHECK %s
+// CHECK: Continuation state size of "_rgen_1" (raygeneration): 0 bytes
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+struct RayPayload {
+  vec4 a;
+  vec4 b;
+  float c;
+};
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(binding = 1, set = 0, rgba32f) uniform image2D g_dst;
+layout(binding = 2, set = 0) uniform Buf {
+  vec4 u_a;
+  vec4 u_b;
+  float u_c;
+};
+
+layout(location = 14) rayPayloadEXT RayPayload g_ray;
+
+void main() {
+  g_ray.a = u_a;
+  g_ray.b = u_b;
+  g_ray.c = u_c;
+  vec3 origin;
+  origin.x = gl_LaunchIDEXT.x;
+  origin.y = gl_LaunchIDEXT.y;
+  origin.z = 0;
+
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff, 
+              /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
+              origin.xyz, /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
+              /* tmax */ 48.0, /* payload location */ 14);
+
+  imageStore(g_dst, ivec2(gl_LaunchIDEXT.xy), g_ray.a);
+}

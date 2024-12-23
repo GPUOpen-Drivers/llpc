@@ -30,6 +30,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvmraytracing/Continuations.h"
+#include "ContStateBuilder.h"
 #include "compilerutils/CompilerUtils.h"
 #include "compilerutils/DxilToLlvm.h"
 #include "llvmraytracing/ContinuationsUtil.h"
@@ -57,6 +58,7 @@
 #include "llvm/Transforms/Coroutines/CoroEarly.h"
 #include "llvm/Transforms/Coroutines/CoroElide.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/SROA.h"
@@ -580,6 +582,9 @@ void ContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
   FPM.addPass(SROAPass(SROAOptions::ModifyCFG));
   FPM.addPass(InstSimplifyPass());
   FPM.addPass(SimplifyCFGPass());
+  // Intentionally do another round of InstSimplify+SimplifyCFG to ensure traits in Gpurt are fully optimized out
+  FPM.addPass(InstSimplifyPass());
+  FPM.addPass(SimplifyCFGPass());
   FPM.addPass(ADCEPass());
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 }
@@ -852,7 +857,10 @@ Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *Sys
     FakeUse = cast<FreezeInst>(B.CreateFreeze(Replacement));
   }
   Inliner.inlineCall(*NewCall);
-  B.SetInsertPoint(&*B.GetInsertPoint());
+  auto *OldInsertPt = &*B.GetInsertPoint();
+  // If insert point happens to be `Call`, move it to the next instruction
+  B.SetInsertPoint(OldInsertPt == Call ? Call->getNextNode() : OldInsertPt);
+
   Call->eraseFromParent();
   // Inlined, so original replacement is now invalid
   Replacement = nullptr;
@@ -875,23 +883,28 @@ static bool replaceEnqueueIntrinsic(Function &F) {
     B.SetInsertPoint(&CInst);
     CallInst *NewCall = nullptr;
     Value *WaitMask = nullptr;
+    Value *ShaderRecIdx = nullptr;
     Value *RetAddr = nullptr;
     if (IsWaitEnqueue) {
       // Handle WaitEnqueue.
       WaitMask = CInst.getArgOperand(1);
-      RetAddr = CInst.getArgOperand(2);
+      ShaderRecIdx = CInst.getArgOperand(2);
+      RetAddr = CInst.getArgOperand(3);
     } else {
-      RetAddr = CInst.getArgOperand(1);
+      ShaderRecIdx = CInst.getArgOperand(1);
+      RetAddr = CInst.getArgOperand(2);
     }
 
     SmallVector<Value *> TailArgs;
-    TailArgs.append(CInst.arg_begin() + (WaitMask ? 3 : 2), CInst.arg_end());
+    const uint32_t TailArgStartIdx = WaitMask ? 4 : 3;
+    TailArgs.append(CInst.arg_begin() + TailArgStartIdx, CInst.arg_end());
 
     // For DX, these arguments are unused right now and are just here to fulfill the `JumpOp`s requirements as being
     // defined in the LgcCpsDialect.
     const uint32_t DummyLevelsArg = -1;
     Value *DummyCsp = PoisonValue::get(B.getInt32Ty());
-    NewCall = B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyCsp, RetAddr, TailArgs);
+    NewCall =
+        B.create<lgc::cps::JumpOp>(CInst.getArgOperand(0), DummyLevelsArg, DummyCsp, ShaderRecIdx, RetAddr, TailArgs);
 
     if (WaitMask) {
       // The only supported wait mask is a constant -1. We don't enforce having a constant here because the SPIR-V
@@ -967,21 +980,15 @@ static void handleGetRtip(Function &Func, uint32_t RtipLevel) {
          && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
 
   auto *RtipConst = ConstantInt::get(IntegerType::get(Func.getContext(), 32), RtipLevel);
-  for (auto &Use : make_early_inc_range(Func.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        CInst->replaceAllUsesWith(RtipConst);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  llvm::replaceCallsToFunction(Func, *RtipConst);
 }
 
 static void handleGetUninitialized(Function &Func) {
   auto *ArgTy = Func.getReturnType();
   auto *Poison = PoisonValue::get(ArgTy);
+  IRBuilder<> B{Func.getContext()};
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    IRBuilder<> B(&CInst);
+    B.SetInsertPoint(&CInst);
     // Create a frozen poison value so poison doesn't propagate into
     // dependent values, e.g. when bitpacking the uninitialized value into
     // a bitfield that should not be invalidated.
@@ -1163,14 +1170,22 @@ uint64_t llvm::computePayloadSpillSize(uint64_t NumI32s, uint64_t NumReservedReg
   return NumStackI32s * RegisterBytes;
 }
 
-namespace llvm {
-namespace coro {
-bool defaultMaterializable(Instruction &V);
-} // End namespace coro
-} // End namespace llvm
+DXILCoroSplitPass::DXILCoroSplitPass()
+    : CoroSplitPass(std::function<bool(Instruction &)>(&DXILMaterializable), {[](Function &F, coro::Shape &S) {
+                      return std::make_unique<llvmraytracing::ContStateBuilder>(F, S, DXILMaterializable);
+                    }},
+                    /*OptimizeFrame*/ true) {
+}
+
+LgcCoroSplitPass::LgcCoroSplitPass()
+    : CoroSplitPass(std::function<bool(Instruction &)>(&LgcMaterializable), {[](Function &F, coro::Shape &S) {
+                      return std::make_unique<llvmraytracing::ContStateBuilder>(F, S, LgcMaterializable);
+                    }},
+                    /*OptimizeFrame*/ true) {
+}
 
 bool llvm::commonMaterializable(Instruction &Inst) {
-  if (coro::defaultMaterializable(Inst))
+  if (coro::isTriviallyMaterializable(Inst))
     return true;
 
   // Insert into constant.
@@ -1237,7 +1252,7 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
       // FIXME: switch to dialectOp check.
       if (CalledName.starts_with("lgc.user.data") || CalledName.starts_with("lgc.shader.input") ||
           CalledName.starts_with("lgc.create.get.desc.ptr") || CalledName.starts_with("lgc.load.buffer.desc") ||
-          CalledName.starts_with("lgc.load.user.data"))
+          CalledName.starts_with("lgc.load.strided.buffer.desc") || CalledName.starts_with("lgc.load.user.data"))
         return true;
     }
   }
@@ -1313,6 +1328,8 @@ void addLgcContinuationTransform(ModulePassManager &MPM) {
 
   MPM.addPass(LowerAwaitPass());
 
+  MPM.addPass(createModuleToFunctionPassAdaptor(InstCombinePass()));
+
   MPM.addPass(CoroEarlyPass());
   CGSCCPassManager CGPM;
   CGPM.addPass(LgcCoroSplitPass());
@@ -1325,6 +1342,7 @@ void addLgcContinuationTransform(ModulePassManager &MPM) {
 #ifndef NDEBUG
   MPM.addPass(ContinuationsLintPass());
 #endif
+  MPM.addPass(ContinuationsStatsReportPass());
 
   MPM.addPass(createModuleToFunctionPassAdaptor(LowerSwitchPass()));
   MPM.addPass(createModuleToFunctionPassAdaptor(FixIrreduciblePass()));

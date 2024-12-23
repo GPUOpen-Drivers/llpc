@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021 Google LLC. All Rights Reserved.
+ *  Copyright (c) 2021-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/Support/Error.h"
 #include <atomic>
 #include <mutex>
@@ -38,6 +39,22 @@
 #include <vector>
 
 namespace Llpc {
+
+class IHelperThreadProvider;
+
+/// The level of exclusion that is required for helper threads in @ref parallelForWithContext.
+enum class HelperThreadExclusion {
+  // No exclusion necessary.
+  None,
+
+  // The main thread must no longer be running with context == nullptr when the taskFunction is called for a helper
+  // thread.
+  Task,
+
+  // In addition to @ref Task, the main thread also must not be running with context == nullptr when the createContext
+  // function is called.
+  CreateContext,
+};
 
 namespace detail {
 // =====================================================================================================================
@@ -62,7 +79,49 @@ inline unsigned decideNumConcurrentThreads(size_t numThreadsRequested, size_t nu
 
   return std::min(numThreadsRequested, numTasks);
 }
+
+llvm::Error parallelForWithContextImpl(size_t numExtraThreads, IHelperThreadProvider *helperThreadProvider,
+                                       size_t numTasks, HelperThreadExclusion helperThreadExclusion,
+                                       llvm::function_ref<void *()> createContext,
+                                       llvm::function_ref<llvm::Error(size_t, void *)> taskFunction,
+                                       llvm::function_ref<void(void *)> destroyContext);
 } // namespace detail
+
+// A parallel for loop using an optional IHelperThreadProvider and a given number of extra threads that are created
+// on-the-fly.
+//
+// This function is designed for tasks where the helper threads require some context that is expensive to set up and/or
+// running on a helper thread is less efficient, and the context can be re-used across individual tasks.
+//
+// The taskFunction is called for each task (as long as no error is encountered), with a context created by
+// createContext as an argument or null if the task is called on the main thread (the thread calling
+// parallelForWithContext).
+//
+// Set helperExclusion to a value other than @ref HelperThreadExclusion::None if helper tasks cannot run while
+// taskFunction is running with a null context on the main thread. In that case, as soon as helper threads join,
+// the main thread will create its own context to run subsequent tasks with.
+//
+// Returns the first error that was returned by taskFunction. Once an error is encountered, subsequent tasks may be
+// skipped.
+template <typename ContextT>
+llvm::Error parallelForWithContext(size_t numExtraThreads, IHelperThreadProvider *helperThreadProvider, size_t numTasks,
+                                   HelperThreadExclusion helperThreadExclusion,
+                                   llvm::function_ref<std::unique_ptr<ContextT>()> createContext,
+                                   llvm::function_ref<llvm::Error(size_t, ContextT *)> taskFunction,
+                                   llvm::function_ref<void(std::unique_ptr<ContextT>)> destroyContext) {
+  // Forward to a type-erased implementation. The type erasure costs a heap allocation of the context (instead of a
+  // stack allocation on the helper thread stack), but the premise is that the context is expensive to create anyway.
+  return ::Llpc::detail::parallelForWithContextImpl(
+      numExtraThreads, helperThreadProvider, numTasks, helperThreadExclusion,
+      [createContext]() -> void * {
+        std::unique_ptr<ContextT> ctx = createContext();
+        return ctx.release();
+      },
+      [taskFunction](size_t idx, void *context) -> llvm::Error {
+        return taskFunction(idx, static_cast<ContextT *>(context));
+      },
+      [destroyContext](void *context) { destroyContext(std::unique_ptr<ContextT>(static_cast<ContextT *>(context))); });
+}
 
 // =====================================================================================================================
 // A parallel for loop implementation using a simple worker thread pool. Unlike `llvm::parallel*` algorithms, does not

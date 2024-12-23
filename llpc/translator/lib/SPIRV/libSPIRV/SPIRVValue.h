@@ -275,6 +275,11 @@ protected:
   std::vector<SPIRVId> Elements;
 };
 
+class SPIRVConstantCompositeReplicateEXT : public SPIRVConstantComposite {
+public:
+  SPIRVConstantCompositeReplicateEXT() : SPIRVConstantComposite() { OpCode = OpConstantCompositeReplicateEXT; }
+};
+
 class SPIRVSpecConstantTrue : public SPIRVConstantBool<OpSpecConstantTrue> {
 public:
   SPIRVSpecConstantTrue() : SPIRVConstantBool() {}
@@ -293,6 +298,11 @@ public:
 class SPIRVSpecConstantComposite : public SPIRVConstantComposite {
 public:
   SPIRVSpecConstantComposite() : SPIRVConstantComposite() { OpCode = OpSpecConstantComposite; }
+};
+
+class SPIRVSpecConstantCompositeReplicateEXT : public SPIRVConstantComposite {
+public:
+  SPIRVSpecConstantCompositeReplicateEXT() : SPIRVConstantComposite() { OpCode = OpSpecConstantCompositeReplicateEXT; }
 };
 
 class SPIRVForward : public SPIRVValue, public SPIRVComponentExecutionModes {

@@ -32,6 +32,7 @@
 #include "MeshTaskShader.h"
 #include "NggPrimShader.h"
 #include "lgc/Builder.h"
+#include "lgc/Debug.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -39,7 +40,6 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/BuilderBase.h"
-#include "lgc/util/Debug.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -477,7 +477,7 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
       break;
     }
 
-    gsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
+    gsResUsage->inOutUsage.gs.hwConfig.inputVertices = inVertsPerPrim;
   } else if (hasTs) {
     inVertsPerPrim = m_pipelineState->getNumPatchControlPoints();
   } else {
@@ -525,15 +525,15 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
     assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
     (void(maxHwGsLdsSizeDwords)); // Unused
 
-    gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = 1;
-    gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = 1;
+    gsResUsage->inOutUsage.gs.hwConfig.esVertsPerSubgroup = 1;
+    gsResUsage->inOutUsage.gs.hwConfig.gsPrimsPerSubgroup = 1;
 
-    gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = ldsSizeDwords;
+    gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize = ldsSizeDwords;
 
-    gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = 0;
-    gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = 0;
+    gsResUsage->inOutUsage.gs.hwConfig.esGsRingItemSize = 0;
+    gsResUsage->inOutUsage.gs.hwConfig.gsVsRingItemSize = 0;
 
-    gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
+    gsResUsage->inOutUsage.gs.hwConfig.primAmpFactor = primAmpFactor;
 
     gsOnChip = true; // For mesh shader, GS is always on-chip
   } else if (nggControl->enableNgg) {
@@ -737,23 +737,23 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
     // EN_MAX_VERT_OUT_PER_GS_INSTANCE.
     assert(!hasTs || enableMaxVertOut || gsPrimsPerSubgroup >= 3);
 
-    gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
-    gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
+    gsResUsage->inOutUsage.gs.hwConfig.esVertsPerSubgroup = esVertsPerSubgroup;
+    gsResUsage->inOutUsage.gs.hwConfig.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
 
     // EsGsLdsSize is unnecessary when there is no API GS.
-    gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = hasGs ? expectedEsLdsSize : 0;
-    gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = needsLds ? ldsSizeDwords : 0;
+    gsResUsage->inOutUsage.gs.hwConfig.esGsLdsSize = hasGs ? expectedEsLdsSize : 0;
+    gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize = needsLds ? ldsSizeDwords : 0;
 
-    gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
-    gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsVsRingItemSize;
+    gsResUsage->inOutUsage.gs.hwConfig.esGsRingItemSize = esGsRingItemSize;
+    gsResUsage->inOutUsage.gs.hwConfig.gsVsRingItemSize = gsVsRingItemSize;
 
     for (int i = 0; i < MaxGsStreams; ++i) {
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] = gsVsVertexItemSize[i];
+      gsResUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i] = gsVsVertexItemSize[i];
     }
 
-    gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
-    gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut = enableMaxVertOut;
-    gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
+    gsResUsage->inOutUsage.gs.hwConfig.primAmpFactor = primAmpFactor;
+    gsResUsage->inOutUsage.gs.hwConfig.enableMaxVertOut = enableMaxVertOut;
+    gsResUsage->inOutUsage.gs.hwConfig.rayQueryLdsStackSize = rayQueryLdsStackSize;
 
     gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
   } else {
@@ -917,17 +917,17 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
     if (gsResUsage->useRayQueryLdsStack)
       gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, MaxRayQueryThreadsPerGroup);
 
-    gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
-    gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
-    gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = esGsLdsSize;
-    gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = gsOnChipLdsSize;
-    gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
+    gsResUsage->inOutUsage.gs.hwConfig.esVertsPerSubgroup = esVertsPerSubgroup;
+    gsResUsage->inOutUsage.gs.hwConfig.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
+    gsResUsage->inOutUsage.gs.hwConfig.esGsLdsSize = esGsLdsSize;
+    gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize = gsOnChipLdsSize;
+    gsResUsage->inOutUsage.gs.hwConfig.rayQueryLdsStackSize = rayQueryLdsStackSize;
 
-    gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
-    gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
+    gsResUsage->inOutUsage.gs.hwConfig.esGsRingItemSize = esGsRingItemSize;
+    gsResUsage->inOutUsage.gs.hwConfig.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
 
     for (int i = 0; i < MaxGsStreams; ++i) {
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] = gsVsVertexItemSize[i];
+      gsResUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i] = gsVsVertexItemSize[i];
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10 && hasTs && !gsOnChip) {
@@ -940,10 +940,10 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
         if (onChipGsLdsMagicSize > maxLdsSize) {
           // Decrease the verts
           esVertsNum = (maxLdsSize - esGsExtraLdsDwords) / esGsRingItemSize;
-          gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
+          gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize = maxLdsSize;
         } else {
           // Increase the size
-          gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
+          gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize = onChipGsLdsMagicSize;
         }
       }
       // Support multiple GS instances
@@ -957,8 +957,8 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
       if (gsResUsage->useRayQueryLdsStack)
         gsPrimsNum = std::min(gsPrimsNum, MaxRayQueryThreadsPerGroup);
 
-      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
-      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
+      gsResUsage->inOutUsage.gs.hwConfig.esVertsPerSubgroup = esVertsNum;
+      gsResUsage->inOutUsage.gs.hwConfig.gsPrimsPerSubgroup = gsPrimsNum;
     }
   }
 
@@ -974,31 +974,31 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
   }
   LLPC_OUTS("\n");
 
-  LLPC_OUTS("EsVerts = " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << " verts/subgroup\n");
-  LLPC_OUTS("GsPrims = " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << " prims/subgroup\n");
+  LLPC_OUTS("EsVerts = " << gsResUsage->inOutUsage.gs.hwConfig.esVertsPerSubgroup << " verts/subgroup\n");
+  LLPC_OUTS("GsPrims = " << gsResUsage->inOutUsage.gs.hwConfig.gsPrimsPerSubgroup << " prims/subgroup\n");
   LLPC_OUTS("\n");
 
-  LLPC_OUTS("EsGsLdsSize = " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << " dwords\n");
-  LLPC_OUTS("GsOnchipLdsSize = " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << " dwords\n");
-  if (gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize > 0) {
-    LLPC_OUTS("RayQueryLdsStack = " << gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize << " dwords (Start = "
-                                    << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << ")\n");
+  LLPC_OUTS("EsGsLdsSize = " << gsResUsage->inOutUsage.gs.hwConfig.esGsLdsSize << " dwords\n");
+  LLPC_OUTS("GsOnchipLdsSize = " << gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize << " dwords\n");
+  if (gsResUsage->inOutUsage.gs.hwConfig.rayQueryLdsStackSize > 0) {
+    LLPC_OUTS("RayQueryLdsStack = " << gsResUsage->inOutUsage.gs.hwConfig.rayQueryLdsStackSize << " dwords (Start = "
+                                    << gsResUsage->inOutUsage.gs.hwConfig.gsOnChipLdsSize << ")\n");
   }
   LLPC_OUTS("\n");
 
-  LLPC_OUTS("EsGsRingItemSize = " << gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize << " dwords\n");
-  LLPC_OUTS("GsVsRingItemSize = " << gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize << " dwords\n");
+  LLPC_OUTS("EsGsRingItemSize = " << gsResUsage->inOutUsage.gs.hwConfig.esGsRingItemSize << " dwords\n");
+  LLPC_OUTS("GsVsRingItemSize = " << gsResUsage->inOutUsage.gs.hwConfig.gsVsRingItemSize << " dwords\n");
   LLPC_OUTS("GsVsVertexItemSizes = [");
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    LLPC_OUTS(gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i]);
+    LLPC_OUTS(gsResUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i]);
     LLPC_OUTS((i == MaxGsStreams - 1 ? "" : ", "));
   }
   LLPC_OUTS("] dwords\n");
   LLPC_OUTS("\n");
 
   if (meshPipeline || m_pipelineState->getNggControl()->enableNgg) {
-    LLPC_OUTS("PrimAmpFactor = " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
-    LLPC_OUTS("EnableMaxVertOut = " << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false")
+    LLPC_OUTS("PrimAmpFactor = " << gsResUsage->inOutUsage.gs.hwConfig.primAmpFactor << "\n");
+    LLPC_OUTS("EnableMaxVertOut = " << (gsResUsage->inOutUsage.gs.hwConfig.enableMaxVertOut ? "true" : "false")
                                     << "\n");
     LLPC_OUTS("\n");
   }
@@ -1055,8 +1055,7 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
 
     const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      unsigned streamItemSize =
-          gsResUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] * geometryMode.outputVertices;
+      unsigned streamItemSize = gsResUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i] * geometryMode.outputVertices;
       LLPC_OUTS("Stream[" << i << "] = " << streamItemSize << " dwords");
       if (streamItemSize == 0)
         LLPC_OUTS(" (Inactive)");
@@ -1304,8 +1303,8 @@ void CollectResourceUsage::visitCallInst(CallInst &callInst) {
         }
       }
     }
-  } else if (mangledName.starts_with(lgcName::OutputExportXfb)) {
-    auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
+  } else if (isa<WriteXfbOutputOp>(callInst)) {
+    auto outputValue = cast<WriteXfbOutputOp>(callInst).getOutputValue();
     if (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue)) {
       // NOTE: If an output value is unspecified, we can safely drop it and remove the transform feedback export call.
       m_deadCalls.push_back(&callInst);
@@ -2135,6 +2134,11 @@ void CollectResourceUsage::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
         inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        if (m_importedOutputBuiltIns.find(BuiltInLayer) != m_importedOutputBuiltIns.end())
+          inOutUsage.builtInOutputLocMap[BuiltInLayer] = InvalidValue;
+        else
+          builtInUsage.tcs.layer = false;
       }
 
       if (nextBuiltInUsage.viewportIndexIn) {
@@ -2142,16 +2146,24 @@ void CollectResourceUsage::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
         inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        if (m_importedOutputBuiltIns.find(BuiltInViewportIndex) != m_importedOutputBuiltIns.end())
+          inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = InvalidValue;
+        else
+          builtInUsage.tcs.viewportIndex = false;
       }
 
-      // NOTE: We shouldn't clear the usage of tessellation levels if the next stage doesn't read them back because they
-      // are always required to be written to TF buffer.
       if (nextBuiltInUsage.tessLevelOuter) {
         assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelOuter) !=
                nextInOutUsage.perPatchBuiltInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = mapLoc;
         availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
+      } else {
+        if (m_importedOutputBuiltIns.find(BuiltInTessLevelOuter) != m_importedOutputBuiltIns.end())
+          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = InvalidValue;
+        else
+          builtInUsage.tcs.tessLevelOuter = false;
       }
 
       if (nextBuiltInUsage.tessLevelInner) {
@@ -2160,6 +2172,11 @@ void CollectResourceUsage::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = mapLoc;
         availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
+      } else {
+        if (m_importedOutputBuiltIns.find(BuiltInTessLevelInner) != m_importedOutputBuiltIns.end())
+          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = InvalidValue;
+        else
+          builtInUsage.tcs.tessLevelInner = false;
       }
 
       // Revisit built-in outputs and map those unmapped to generic ones
@@ -2178,6 +2195,24 @@ void CollectResourceUsage::mapBuiltInToGenericInOut() {
       if (inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end() &&
           inOutUsage.builtInOutputLocMap[BuiltInCullDistance] == InvalidValue)
         inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
+
+      if (inOutUsage.builtInOutputLocMap.find(BuiltInLayer) != inOutUsage.builtInOutputLocMap.end() &&
+          inOutUsage.builtInOutputLocMap[BuiltInLayer] == InvalidValue)
+        inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
+
+      if (inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) != inOutUsage.builtInOutputLocMap.end() &&
+          inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] == InvalidValue)
+        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = availOutMapLoc++;
+
+      if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelOuter) !=
+              inOutUsage.perPatchBuiltInOutputLocMap.end() &&
+          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] == InvalidValue)
+        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
+
+      if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelInner) !=
+              inOutUsage.perPatchBuiltInOutputLocMap.end() &&
+          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] == InvalidValue)
+        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
     } else if (!nextStage) {
       // TCS only
       if (builtInUsage.tcs.position)

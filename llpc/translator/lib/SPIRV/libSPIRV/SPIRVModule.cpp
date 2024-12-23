@@ -228,6 +228,8 @@ public:
   SPIRVInstruction *addLoadInst(SPIRVValue *, const std::vector<SPIRVWord> &, SPIRVBasicBlock *) override;
   SPIRVInstruction *addPhiInst(SPIRVType *, std::vector<SPIRVValue *>, SPIRVBasicBlock *) override;
   SPIRVInstruction *addCompositeConstructInst(SPIRVType *, const std::vector<SPIRVId> &, SPIRVBasicBlock *) override;
+  SPIRVInstruction *addCompositeConstructReplicateEXTInst(SPIRVType *, const std::vector<SPIRVId> &,
+                                                          SPIRVBasicBlock *) override;
   SPIRVInstruction *addCompositeExtractInst(SPIRVType *, SPIRVValue *, const std::vector<SPIRVWord> &,
                                             SPIRVBasicBlock *) override;
   SPIRVInstruction *addCompositeInsertInst(SPIRVValue *Object, SPIRVValue *Composite,
@@ -1004,6 +1006,12 @@ SPIRVInstruction *SPIRVModuleImpl::addPtrAccessChainInst(SPIRVType *Type, SPIRVV
 SPIRVInstruction *SPIRVModuleImpl::addCompositeConstructInst(SPIRVType *Type, const std::vector<SPIRVId> &Constituents,
                                                              SPIRVBasicBlock *BB) {
   return addInstruction(new SPIRVCompositeConstruct(Type, getId(), Constituents, BB), BB);
+}
+
+SPIRVInstruction *SPIRVModuleImpl::addCompositeConstructReplicateEXTInst(SPIRVType *Type,
+                                                                         const std::vector<SPIRVId> &Constituents,
+                                                                         SPIRVBasicBlock *BB) {
+  return addInstruction(new SPIRVCompositeConstructReplicateEXT(Type, getId(), Constituents, BB), BB);
 }
 
 SPIRVInstruction *SPIRVModuleImpl::addCompositeExtractInst(SPIRVType *Type, SPIRVValue *TheVector,

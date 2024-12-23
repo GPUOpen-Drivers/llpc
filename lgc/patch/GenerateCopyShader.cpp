@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/GenerateCopyShader.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
@@ -486,7 +487,7 @@ Value *GenerateCopyShader::calcGsVsRingOffsetForInput(unsigned location, unsigne
   Value *ringOffset = nullptr;
   if (m_pipelineState->isGsOnChip()) {
     // ringOffset = esGsLdsSize + vertexOffset + location * 4 + compIdx
-    ringOffset = builder.getInt32(resUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
+    ringOffset = builder.getInt32(resUsage->inOutUsage.gs.hwConfig.esGsLdsSize);
     ringOffset = builder.CreateAdd(ringOffset, vertexOffset);
     ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(location * 4 + compIdx));
   } else {
@@ -533,15 +534,8 @@ Value *GenerateCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location
   else
     assert(elemCount + component <= 4);
 
-  if (m_pipelineState->getNggControl()->enableNgg) {
-    // NOTE: For NGG, reading GS output from GS-VS ring is represented by a call and the call is replaced with
-    // real instructions when when NGG primitive shader is generated.
-    std::string callName(lgcName::NggReadGsOutput);
-    callName += getTypeName(loadTy);
-    return builder.CreateNamedCall(
-        callName, loadTy, {builder.getInt32(location), builder.getInt32(component), builder.getInt32(streamId)},
-        {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn});
-  }
+  if (m_pipelineState->getNggControl()->enableNgg)
+    return builder.create<NggReadGsOutputOp>(loadTy, location, component, streamId);
 
   // NOTE: NGG with GS must have been handled. Here we only handle pre-GFX11 generations with legacy pipeline.
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11);
@@ -632,12 +626,7 @@ void GenerateCopyShader::exportXfbOutput(Value *outputValue, const XfbOutInfo &x
     inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
   }
 
-  Value *args[] = {builder.getInt32(xfbOutInfo.xfbBuffer), builder.getInt32(xfbOutInfo.xfbOffset),
-                   builder.getInt32(xfbOutInfo.streamId), outputValue};
-
-  std::string instName(lgcName::OutputExportXfb);
-  addTypeMangling(nullptr, args, instName);
-  builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
+  builder.create<WriteXfbOutputOp>(xfbOutInfo.xfbBuffer, xfbOutInfo.xfbOffset, xfbOutInfo.streamId, outputValue);
 }
 
 // =====================================================================================================================
@@ -668,11 +657,7 @@ void GenerateCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind bui
       }
 
       const auto &xfbOutInfo = locInfoXfbOutInfoMapIt->second;
-      std::string instName(lgcName::OutputExportXfb);
-      Value *args[] = {builder.getInt32(xfbOutInfo.xfbBuffer), builder.getInt32(xfbOutInfo.xfbOffset),
-                       builder.getInt32(0), outputValue};
-      addTypeMangling(nullptr, args, instName);
-      builder.CreateNamedCall(instName, builder.getVoidTy(), args, {});
+      builder.create<WriteXfbOutputOp>(xfbOutInfo.xfbBuffer, xfbOutInfo.xfbOffset, 0, outputValue);
     }
   }
 

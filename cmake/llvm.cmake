@@ -56,6 +56,12 @@ if(CMAKE_BUILD_TYPE_DEBUG)
         # See: llvm-project/llvm/cmake/modules/CrossCompile.cmake
         set(CROSS_TOOLCHAIN_FLAGS_NATIVE "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" CACHE STRING
             "Toolchain flags for native build" FORCE)
+
+        # Fail early to avoid the dreaded -ologo error.
+        if(CMAKE_VERSION VERSION_LESS "3.27")
+            message(FATAL_ERROR "Using LLVM_OPTIMIZED_TABLEGEN in a Debug build requires CMake 3.27 or higher."
+                                " The current CMake version is ${CMAKE_VERSION}.")
+        endif()
     endif()
 #endif
 endif()

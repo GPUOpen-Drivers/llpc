@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  PassthroughHullShader.cpp
- * @brief LLPC source file: contains declaration and implementation of class lgc::TcsPassthroughShader.
+ * @brief LLPC source file: contains declaration and implementation of class lgc::PassthroughHullShader.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PassthroughHullShader.h"
@@ -45,7 +45,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "lgc-patch-tcs-passthrough-shader"
+#define DEBUG_TYPE "lgc-passthrough-hull-shader"
 
 using namespace lgc;
 using namespace llvm;
@@ -56,13 +56,13 @@ using namespace llvm;
 // @param module : LLVM module to be run on
 // @param analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses TcsPassthroughShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass TCS pass-through shader\n");
+PreservedAnalyses PassthroughHullShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the pass pass-through hull shader\n");
 
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
 
-  generateTcsPassthroughShader(module, pipelineShaders, pipelineState);
+  generatePassthroughHullShader(module, pipelineShaders, pipelineState);
   updatePipelineState(module, pipelineState);
 
   return PreservedAnalyses::none();
@@ -73,7 +73,7 @@ PreservedAnalyses TcsPassthroughShader::run(Module &module, ModuleAnalysisManage
 //
 // @param module : LLVM module to be run on
 // @param pipelineState : The pipeline state read from module.
-void TcsPassthroughShader::updatePipelineState(Module &module, PipelineState *pipelineState) const {
+void PassthroughHullShader::updatePipelineState(Module &module, PipelineState *pipelineState) const {
   pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | ShaderStageMask(ShaderStage::TessControl));
 
   TessellationMode tessellationMode = pipelineState->getShaderModes()->getTessellationMode();
@@ -94,10 +94,10 @@ void TcsPassthroughShader::updatePipelineState(Module &module, PipelineState *pi
 // @param pipelineShaders : Pipeline shaders analysis result
 // @param pipelineState : The pipeline state read from module.
 // @returns : the entry point for the TCS pass-through shader.
-Function *TcsPassthroughShader::generateTcsPassthroughShader(Module &module, PipelineShadersResult &pipelineShaders,
-                                                             PipelineState *pipelineState) {
+Function *PassthroughHullShader::generatePassthroughHullShader(Module &module, PipelineShadersResult &pipelineShaders,
+                                                               PipelineState *pipelineState) {
   Function *entryPoint = generateTcsPassthroughEntryPoint(module, pipelineState);
-  generateTcsPassthroughShaderBody(module, pipelineShaders, pipelineState, entryPoint);
+  generatePassthroughHullShaderBody(module, pipelineShaders, pipelineState, entryPoint);
   return entryPoint;
 }
 
@@ -107,7 +107,7 @@ Function *TcsPassthroughShader::generateTcsPassthroughShader(Module &module, Pip
 // @param module : The LLVM module in which to add the shader.
 // @param pipelineState : The pipeline state read from module.
 // @returns : The new entry point.
-Function *TcsPassthroughShader::generateTcsPassthroughEntryPoint(Module &module, PipelineState *pipelineState) {
+Function *PassthroughHullShader::generateTcsPassthroughEntryPoint(Module &module, PipelineState *pipelineState) {
   FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
   Function *entryPoint =
       Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::TcsPassthroughEntryPoint, &module);
@@ -124,8 +124,8 @@ Function *TcsPassthroughShader::generateTcsPassthroughEntryPoint(Module &module,
 // @param pipelineShaders : Pipeline shaders analysis result
 // @param pipelineState : The pipeline state read from module.
 // @param entryPointName : the entry point for the TCS pass-through shader.
-void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, PipelineShadersResult &pipelineShaders,
-                                                            PipelineState *pipelineState, Function *entryPoint) {
+void PassthroughHullShader::generatePassthroughHullShaderBody(Module &module, PipelineShadersResult &pipelineShaders,
+                                                              PipelineState *pipelineState, Function *entryPoint) {
   BasicBlock *block = BasicBlock::Create(entryPoint->getContext(), "", entryPoint);
 
   BuilderBase builder(module.getContext());

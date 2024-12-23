@@ -53,18 +53,18 @@ define void @testConstantVector() {
 ; CHECK: (<9 x i8> zeroinitializer): Constant: 0x0; Constant: 0x0; Constant: 0x0
   call void @analyze(<9 x i8> zeroinitializer)
 
-; CHECK: (<1 x i32> <i32 -559038737>): Constant: 0xdeadbeef
+; CHECK: (<1 x i32> {{(splat \(i32 \-559038737\))|(><i32 -559038737>)}}): Constant: 0xdeadbeef
   call void @analyze(<1 x i32> <i32 u0xdeadbeef>)
 
 ; CHECK: (<4 x i8> <i8 1, i8 2, i8 3, i8 4>): Constant: 0x4030201
   call void @analyze(<4 x i8> <i8 1, i8 2, i8 3, i8 4>)
 
-; CHECK: (<1 x float> <float 1.250000e-01>): Constant: 0x3e000000
+; CHECK: (<1 x float> {{(splat \(float 1\.250000e\-01\))|(<float 1\.250000e\-01>)}}): Constant: 0x3e000000
   call void @analyze(<1 x float> <float 1.250000e-01>)
 
 ; computeKnownBits only supports integer vectors, and our
 ; handling doesn't support smaller-than-slice element types.
-; CHECK: (<1 x half> <half 0xH1234>): Dynamic
+; CHECK: (<1 x half> {{(splat \(half 0xH1234\))|(<half 0xH1234>)}}): Dynamic
   call void @analyze(<1 x half> <half 0xH1234>)
 
 ; CHECK: (<4 x float> <float 0.000000e+00, float 2.560000e+02, float 0.000000e+00, float undef>): Constant: 0x0; Constant: 0x43800000; Constant: 0x0; UndefOrPoison

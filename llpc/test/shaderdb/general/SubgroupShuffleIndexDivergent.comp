@@ -1,0 +1,31 @@
+// RUN: amdllpc -gfxip 11.0 -filetype=asm -o - %s | FileCheck -check-prefix=GFX11 %s
+
+// TODO: Should use Wave32 and a single ds_bpermute_b32
+
+// GFX11: v_permlane64_b32
+// GFX11: ds_bpermute_b32
+// GFX11: ds_bpermute_b32
+
+#version 450
+#extension GL_KHR_shader_subgroup_shuffle : enable
+
+layout(local_size_x = 32) in;
+
+layout(set = 0, binding = 0, std430) buffer InBuffer {
+    int a[32];
+} inbuf;
+
+layout(set = 0, binding = 1, std430) buffer OutBuffer {
+    int b[32];
+} outbuf;
+
+layout(set = 0, binding = 1, std430) buffer PermBuffer {
+    int perm[32];
+} permbuf;
+
+void main() {
+    uint id = gl_SubgroupInvocationID;
+    int x = inbuf.a[id];
+    x = subgroupShuffle(x, permbuf.perm[id]);
+    outbuf.b[id] = x;
+}

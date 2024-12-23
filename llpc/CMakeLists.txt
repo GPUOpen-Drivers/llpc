@@ -199,6 +199,10 @@ if(ICD_BUILD_LLPC)
         lowering/ScalarReplacementOfBuiltins.h
         lowering/ProcessGfxRuntimeLibrary.cpp
         lowering/ProcessGfxRuntimeLibrary.h
+        lowering/LinkTransformShaders.cpp
+        lowering/LinkTransformShaders.h
+        lowering/PrepareTransformVertexShader.cpp
+        lowering/PrepareTransformVertexShader.h
     )
 
 # llpc/translator
@@ -248,6 +252,8 @@ if(ICD_BUILD_LLPC)
         util/llpcFile.h
         util/llpcShaderModuleHelper.cpp
         util/llpcShaderModuleHelper.h
+        util/llpcThreading.cpp
+        util/llpcThreading.h
         util/llpcTimerProfiler.cpp
         util/llpcTimerProfiler.h
         util/llpcUtil.cpp

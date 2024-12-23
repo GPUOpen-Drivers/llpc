@@ -521,6 +521,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityFragmentShaderSampleInterlockEXT, "FragmentShaderSampleInterlockEXT");
   add(CapabilityFragmentShaderShadingRateInterlockEXT, "FragmentShaderShadingRateInterlockEXT");
   add(CapabilityFragmentShaderPixelInterlockEXT, "FragmentShaderPixelInterlockEXT");
+  add(CapabilityReplicatedCompositesEXT, "ReplicatedCompositesEXT");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 
@@ -528,6 +529,10 @@ template <> inline void SPIRVMap<PackedVectorFormat, std::string>::init() {
   add(PackedVectorFormatPackedVectorFormat4x8BitKHR, "4x8BitKHR");
 }
 SPIRV_DEF_NAMEMAP(PackedVectorFormat, SPIRVPackedVectorFormatNameMap);
+
+template <> inline void SPIRVMap<FPEncoding, std::string>::init() {
+}
+SPIRV_DEF_NAMEMAP(FPEncoding, SPIRVFPEncodingNameMap);
 
 } /* namespace SPIRV */
 

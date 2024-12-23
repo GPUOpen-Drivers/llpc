@@ -32,12 +32,14 @@
 #include "lgc/patch/LowerInOut.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
+#include "lgc/Debug.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
-#include "lgc/util/Debug.h"
 #include "lgc/util/WorkgroupLayout.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/Debug.h"
@@ -100,6 +102,17 @@ PreservedAnalyses LowerInOut::run(Module &module, ModuleAnalysisManager &analysi
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   m_pipelineSysValues.initialize(m_pipelineState);
 
+  auto entryPoint = pipelineShaders.getEntryPoint(ShaderStage::Fragment);
+  if (entryPoint) {
+    m_entryPoint = entryPoint;
+    m_shaderStage = ShaderStage::Fragment;
+    const auto fetchVisitor = llvm_dialects::VisitorBuilder<LowerInOut>()
+                                  .add(&LowerInOut::visitEvalIjOffsetSmoothOp)
+                                  .add(&LowerInOut::visitAdjustIjOp)
+                                  .build();
+    fetchVisitor.visit(*this, module);
+  }
+
   const auto stageMask = m_pipelineState->getShaderStageMask();
   m_hasTs = stageMask.contains_any({ShaderStage::TessControl, ShaderStage::TessEval});
   m_hasGs = stageMask.contains(ShaderStage::Geometry);
@@ -109,7 +122,7 @@ PreservedAnalyses LowerInOut::run(Module &module, ModuleAnalysisManager &analysi
     auto name = func.getName();
     if (name.starts_with("lgc.input"))
       inputCallees.push_back(&func);
-    else if (name.starts_with("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
+    else if (name.starts_with("lgc.output") || name.starts_with("lgc.gs") || name == "lgc.write.xfb.output")
       otherCallees.push_back(&func);
   }
 
@@ -170,6 +183,12 @@ PreservedAnalyses LowerInOut::run(Module &module, ModuleAnalysisManager &analysi
   }
   m_exportCalls.clear();
 
+  for (auto callInst : m_gsMsgCalls) {
+    callInst->dropAllReferences();
+    callInst->eraseFromParent();
+  }
+  m_gsMsgCalls.clear();
+
   m_pipelineSysValues.clear();
 
   return PreservedAnalyses::none();
@@ -201,6 +220,10 @@ void LowerInOut::processFunction(Function &func, ShaderStageEnum shaderStage, Sm
 // @param [in/out] func : LLVM function to be run on
 // @param postDomTree : The PostDominatorTree of the \p func
 void LowerInOut::markExportDone(Function *func, PostDominatorTree &postDomTree) {
+  // Position export in NGG primitive shader is handled later on. Here we only process position export in legacy HW VS.
+  if (m_pipelineState->getNggControl()->enableNgg)
+    return;
+
   SmallVector<CallInst *, 4> expInsts;
 
   Function *expDecl = m_module->getFunction("llvm.amdgcn.exp.f32");
@@ -269,89 +292,100 @@ void LowerInOut::processShader() {
     m_threadId = getSubgroupLocalInvocationId(builder);
   }
 
-  // Initialize calculation factors for tessellation shader
+  // Initialize HW configurations for tessellation shaders
   if (m_shaderStage == ShaderStage::TessControl || m_shaderStage == ShaderStage::TessEval) {
     const auto stageMask = m_pipelineState->getShaderStageMask();
     const bool hasTcs = stageMask.contains(ShaderStage::TessControl);
 
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-    if (!calcFactor.initialized) {
-      calcFactor.initialized = true;
+    auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
+    if (!hwConfig.initialized) {
+      hwConfig.initialized = true;
 
       //
       // NOTE: The LDS for tessellation is as follow:
       //
-      //          +-------------+----------------+------------------+-------------+
-      // On-chip  | Tess Factor | HS Patch Count | Special TF Value | Input Patch | (LDS)
-      //          +-------------+----------------+------------------+-------------+
+      //          +----------------+------------------+--------------+-------------+-------------+-------------+
+      // On-chip  | HS Patch Count | Special TF Value | Output Patch | Patch Const | Tess Factor | Input Patch | (LDS)
+      //          +----------------+------------------+--------------+-------------+-------------+-------------+
       //
       //          +--------------+-------------+
       // Off-chip | Output Patch | Patch Const | (LDS Buffer)
       //          +--------------+-------------+
       //
-      // inPatchTotalSize = inVertexCount * inVertexStride * patchCountPerThreadGroup
-      // outPatchTotalSize = outVertexCount * outVertexStride * patchCountPerThreadGroup
-      // patchConstTotalSize = patchConstCount * 4 * patchCountPerThreadGroup
-      // tessFactorTotalSize = 6 * patchCountPerThreadGroup
+      // inputPatchTotalSize = inputVertexCount * inputVertexStride * maxNumHsPatchesPerGroup
+      // outputPatchTotalSize = outputVertexCount * outputVertexStride * maxNumHsPatchesPerGroup
+      // patchConstTotalSize = patchConstCount * 4 * maxNumHsPatchesPerGroup
+      // tessFactorTotalSize = 6 * maxNumHsPatchesPerGroup
       //
       const auto &tcsInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage;
       const auto &tesInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->inOutUsage;
 
-      const unsigned inLocCount = std::max(tcsInOutUsage.inputMapLocCount, 1u);
-      const unsigned outLocCount =
+      const unsigned inputLocCount = std::max(tcsInOutUsage.inputMapLocCount, 1u);
+      const unsigned outputLocCount =
           hasTcs ? std::max(tcsInOutUsage.outputMapLocCount, 1u) : std::max(tesInOutUsage.inputMapLocCount, 1u);
 
-      const unsigned inVertexCount = m_pipelineState->getNumPatchControlPoints();
-      const unsigned outVertexCount =
+      const unsigned inputVertexCount = m_pipelineState->getNumPatchControlPoints();
+      const unsigned outputVertexCount =
           hasTcs ? m_pipelineState->getShaderModes()->getTessellationMode().outputVertices : MaxTessPatchVertices;
 
-      unsigned tessFactorStride = 0;
+      unsigned tessFactorCount = 0;
       switch (m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode) {
       case PrimitiveMode::Triangles:
-        tessFactorStride = 4;
+        tessFactorCount = 4;
         break;
       case PrimitiveMode::Quads:
-        tessFactorStride = 6;
+        tessFactorCount = 6;
         break;
       case PrimitiveMode::Isolines:
-        tessFactorStride = 2;
+        tessFactorCount = 2;
         break;
       default:
         llvm_unreachable("Should never be called!");
         break;
       }
+      // Use odd-dword stride to avoid LDS bank conflict
+      assert(tessFactorCount % 2 == 0);
+      hwConfig.onChip.tessFactorStride = tessFactorCount + 1;
 
-      calcFactor.inVertexStride = inLocCount * 4;
-      calcFactor.outVertexStride = outLocCount * 4;
+      // Use odd-dword stride to avoid LDS bank conflict
+      hwConfig.onChip.inputVertexStride = (inputLocCount * 4) | 1;
+      hwConfig.onChip.inputPatchSize = inputVertexCount * hwConfig.onChip.inputVertexStride;
+
+      hwConfig.onChip.outputVertexStride = (outputLocCount * 4) | 1;
+      hwConfig.onChip.outputPatchSize = outputVertexCount * hwConfig.onChip.outputVertexStride;
+
+      hwConfig.offChip.outputVertexStride = outputLocCount * 4;
+      hwConfig.offChip.outputPatchSize = outputVertexCount * hwConfig.offChip.outputVertexStride;
 
       const unsigned patchConstCount =
           hasTcs ? tcsInOutUsage.perPatchOutputMapLocCount : tesInOutUsage.perPatchInputMapLocCount;
-      calcFactor.patchConstSize = patchConstCount * 4;
+      // Use odd-dword stride to avoid LDS bank conflict
+      hwConfig.onChip.patchConstSize = 0;
+      hwConfig.offChip.patchConstSize = 0;
+      if (patchConstCount > 0) {
+        hwConfig.onChip.patchConstSize = (patchConstCount * 4) | 1;
+        hwConfig.offChip.patchConstSize = patchConstCount * 4;
+      }
 
-      calcFactor.patchCountPerThreadGroup =
-          calcPatchCountPerThreadGroup(inVertexCount, calcFactor.inVertexStride, outVertexCount,
-                                       calcFactor.outVertexStride, patchConstCount, tessFactorStride);
+      const unsigned ldsSizePerPatch = hwConfig.onChip.outputPatchSize + hwConfig.onChip.patchConstSize +
+                                       hwConfig.onChip.tessFactorStride + hwConfig.onChip.inputPatchSize;
+      const unsigned ldsBufferSizePerPatch = hwConfig.offChip.outputPatchSize + hwConfig.offChip.patchConstSize;
+      hwConfig.maxNumPatchesPerGroup = calcMaxNumPatchesPerGroup(inputVertexCount, outputVertexCount, tessFactorCount,
+                                                                 ldsSizePerPatch, ldsBufferSizePerPatch);
 
-      const unsigned inPatchSize = inVertexCount * calcFactor.inVertexStride;
-      const unsigned inPatchTotalSize = calcFactor.patchCountPerThreadGroup * inPatchSize;
+      const unsigned onChipOutputPatchTotalSize = hwConfig.maxNumPatchesPerGroup * hwConfig.onChip.outputPatchSize;
+      const unsigned offChipOutputPatchTotalSize = hwConfig.maxNumPatchesPerGroup * hwConfig.offChip.outputPatchSize;
 
-      const unsigned outPatchSize = outVertexCount * calcFactor.outVertexStride;
-      const unsigned outPatchTotalSize = calcFactor.patchCountPerThreadGroup * outPatchSize;
+      const unsigned onChipPatchConstTotalSize = hwConfig.maxNumPatchesPerGroup * hwConfig.onChip.patchConstSize;
+      const unsigned offChipPatchConstTotalSize = hwConfig.maxNumPatchesPerGroup * hwConfig.offChip.patchConstSize;
 
-      const unsigned patchConstTotalSize = calcFactor.patchCountPerThreadGroup * calcFactor.patchConstSize;
-      const unsigned tessFactorTotalSize = calcFactor.patchCountPerThreadGroup * MaxTessFactorsPerPatch;
+      const unsigned inputPatchTotalSize = hwConfig.maxNumPatchesPerGroup * hwConfig.onChip.inputPatchSize;
+      const unsigned tessFactorTotalSize = hwConfig.maxNumPatchesPerGroup * hwConfig.onChip.tessFactorStride;
 
-      calcFactor.outPatchSize = outPatchSize;
-      calcFactor.inPatchSize = inPatchSize;
-
-      // NOTE: Tess factors are always stored to on-chip LDS first. Then, they are store to TF buffer and off-chip
-      // LDS buffer (which will be loaded by TES).
-      calcFactor.offChip.outPatchStart = 0;
-      calcFactor.offChip.patchConstStart = calcFactor.offChip.outPatchStart + outPatchTotalSize;
-
-      calcFactor.tessFactorStride = tessFactorStride;
-      calcFactor.onChip.inPatchStart = tessFactorTotalSize;
-      calcFactor.tessOnChipLdsSize = tessFactorTotalSize + inPatchTotalSize;
+      // NOTE: Tess factors and TCS outputs are always stored to on-chip LDS first. Then, they are store to TF buffer
+      // and off-chip LDS buffer (which will be loaded by TES).
+      hwConfig.offChip.outputPatchStart = 0;
+      hwConfig.offChip.patchConstStart = hwConfig.offChip.outputPatchStart + offChipOutputPatchTotalSize;
 
       if (m_pipelineState->canOptimizeTessFactor()) {
         //
@@ -365,15 +399,20 @@ void LowerInOut::processShader() {
         //                  |<---- Wave 0 --->|     |<---- Wave N --->|
         //
         assert(m_gfxIp.major >= 11);
-        calcFactor.onChip.hsPatchCountStart = calcFactor.onChip.inPatchStart; // One dword to store actual HS wave count
-        calcFactor.onChip.specialTfValueStart = calcFactor.onChip.hsPatchCountStart + 1;
+        hwConfig.onChip.hsPatchCountStart = 0; // One dword to store actual HS patch count
+        hwConfig.onChip.specialTfValueStart = hwConfig.onChip.hsPatchCountStart + 1;
 
         const unsigned maxNumHsWaves =
-            MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
-        calcFactor.specialTfValueSize = maxNumHsWaves * 2;
-        calcFactor.tessOnChipLdsSize += 1 + calcFactor.specialTfValueSize;
-        calcFactor.onChip.inPatchStart += 1 + calcFactor.specialTfValueSize;
+            MaxHsThreadsPerSubgroup / m_pipelineState->getShaderWaveSize(ShaderStage::TessControl);
+        hwConfig.onChip.specialTfValueSize = maxNumHsWaves * 2;
       }
+
+      hwConfig.onChip.outputPatchStart = hwConfig.onChip.specialTfValueStart + hwConfig.onChip.specialTfValueSize;
+      hwConfig.onChip.patchConstStart = hwConfig.onChip.outputPatchStart + onChipOutputPatchTotalSize;
+      hwConfig.onChip.tessFactorStart = hwConfig.onChip.patchConstStart + onChipPatchConstTotalSize;
+      hwConfig.onChip.inputPatchStart = hwConfig.onChip.tessFactorStart + tessFactorTotalSize;
+
+      hwConfig.tessOnChipLdsSize = hwConfig.onChip.inputPatchStart + inputPatchTotalSize;
 
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -381,59 +420,69 @@ void LowerInOut::processShader() {
       const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
       const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
       if (vsResUsage->useRayQueryLdsStack || tcsResUsage->useRayQueryLdsStack)
-        calcFactor.rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
+        hwConfig.rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
+
+      // Make sure we don't run out of LDS space.
+      assert(hwConfig.tessOnChipLdsSize + hwConfig.rayQueryLdsStackSize <=
+             m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup);
+
+      auto printLdsLayout = [=](const char *name, unsigned offset, unsigned size) {
+        if (size != 0) {
+          LLPC_OUTS(format("%-30s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32, name, offset, size));
+          LLPC_OUTS("\n");
+        }
+      };
 
       LLPC_OUTS("===============================================================================\n");
-      LLPC_OUTS("// LLPC tessellation calculation factor results\n\n");
-      LLPC_OUTS("Patch count per thread group: " << calcFactor.patchCountPerThreadGroup << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Tess factor start: 0 (LDS)\n");
-      LLPC_OUTS("Tess factor total size (in dwords): " << tessFactorTotalSize << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Input vertex count: " << inVertexCount << "\n");
-      LLPC_OUTS("Input vertex stride: " << calcFactor.inVertexStride << "\n");
-      LLPC_OUTS("Input patch size (in dwords): " << inPatchSize << "\n");
-      LLPC_OUTS("Input patch start: " << calcFactor.onChip.inPatchStart << " (LDS)\n");
-      LLPC_OUTS("Input patch total size (in dwords): " << inPatchTotalSize << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Output vertex count: " << outVertexCount << "\n");
-      LLPC_OUTS("Output vertex stride: " << calcFactor.outVertexStride << "\n");
-      LLPC_OUTS("Output patch size (in dwords): " << outPatchSize << "\n");
-      LLPC_OUTS("Output patch start: " << calcFactor.offChip.outPatchStart << " (LDS buffer)\n");
-      LLPC_OUTS("Output patch total size (in dwords): " << outPatchTotalSize << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Patch constant count: " << patchConstCount << "\n");
-      LLPC_OUTS("Patch constant size (in dwords): " << calcFactor.patchConstSize << "\n");
-      LLPC_OUTS("Patch constant start: " << calcFactor.offChip.patchConstStart << " (LDS buffer)\n");
-      LLPC_OUTS("Patch constant total size (in dwords): " << patchConstTotalSize << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("HS patch count start: " << calcFactor.onChip.hsPatchCountStart << " (LDS)\n");
-      LLPC_OUTS("HS wave count size (in dwords): " << 1 << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Special TF value start: " << calcFactor.onChip.specialTfValueStart << " (LDS)\n");
-      LLPC_OUTS("Special TF value size (in dwords): " << calcFactor.specialTfValueSize << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("Tess factor stride: " << tessFactorStride << " (");
+      LLPC_OUTS("// LLPC HW tessellation configurations\n\n");
+      LLPC_OUTS("MaxNumPatchesPerGroup = " << hwConfig.maxNumPatchesPerGroup << "\n");
+      LLPC_OUTS("Primitive = ");
       switch (m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode) {
       case PrimitiveMode::Triangles:
-        LLPC_OUTS("triangles");
+        LLPC_OUTS("Triangles");
         break;
       case PrimitiveMode::Quads:
-        LLPC_OUTS("quads");
+        LLPC_OUTS("Quads");
         break;
       case PrimitiveMode::Isolines:
-        LLPC_OUTS("isolines");
+        LLPC_OUTS("Isolines");
         break;
       default:
         llvm_unreachable("Should never be called!");
         break;
       }
-      LLPC_OUTS(")\n\n");
-      LLPC_OUTS("Tess on-chip LDS total size (in dwords): " << calcFactor.tessOnChipLdsSize << "\n");
-      if (calcFactor.rayQueryLdsStackSize > 0) {
-        LLPC_OUTS("Ray query LDS stack size (in dwords): " << calcFactor.rayQueryLdsStackSize
-                                                           << " (start = " << calcFactor.tessOnChipLdsSize << ")\n");
+      LLPC_OUTS(" (HW TFs = " << tessFactorCount << " dwords)\n");
+      LLPC_OUTS("TF0/TF1 Messaging = " << (m_pipelineState->canOptimizeTessFactor() ? "true" : "false") << "\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Tessellator Patch:\n");
+      LLPC_OUTS("InputVertices = " << inputVertexCount << ", VertexStride = " << hwConfig.onChip.inputVertexStride
+                                   << " dwords, Size = " << hwConfig.onChip.inputPatchSize << " dwords\n");
+      LLPC_OUTS("OutputVertices = " << outputVertexCount << ", VertexStride = [" << hwConfig.onChip.outputVertexStride
+                                    << ", " << hwConfig.offChip.outputVertexStride << "] dwords, Size = ["
+                                    << hwConfig.onChip.outputPatchSize << ", " << hwConfig.offChip.outputPatchSize
+                                    << "] dwords\n");
+      LLPC_OUTS("PatchConstants = " << patchConstCount << ", Size = [" << hwConfig.onChip.patchConstSize << ", "
+                                    << hwConfig.offChip.patchConstSize << "] dwords\n");
+
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Onchip LDS Layout (in dwords):\n");
+      if (m_pipelineState->canOptimizeTessFactor()) {
+        printLdsLayout("HS Patch Count", hwConfig.onChip.hsPatchCountStart, 1);
+        printLdsLayout("Special TF Values", hwConfig.onChip.specialTfValueStart, hwConfig.onChip.specialTfValueSize);
       }
+      printLdsLayout("Output Patches", hwConfig.onChip.outputPatchStart, onChipOutputPatchTotalSize);
+      printLdsLayout("Patch Constants", hwConfig.onChip.patchConstStart, onChipPatchConstTotalSize);
+      printLdsLayout("TFs", hwConfig.onChip.tessFactorStart, tessFactorTotalSize);
+      printLdsLayout("Input Patches", hwConfig.onChip.inputPatchStart, inputPatchTotalSize);
+      if (hwConfig.rayQueryLdsStackSize > 0)
+        printLdsLayout("Ray Query Stack", hwConfig.tessOnChipLdsSize, hwConfig.rayQueryLdsStackSize);
+      LLPC_OUTS("Total Onchip LDS = " << hwConfig.tessOnChipLdsSize + hwConfig.rayQueryLdsStackSize << " dwords\n");
+      LLPC_OUTS("\n");
+      LLPC_OUTS("Offchip LDS Buffer Layout (in dwords):\n");
+      printLdsLayout("Output Patches", hwConfig.offChip.outputPatchStart, offChipOutputPatchTotalSize);
+      printLdsLayout("Patch Constants", hwConfig.offChip.patchConstStart, offChipPatchConstTotalSize);
+      LLPC_OUTS("Total Offchip LDS Buffer = " << offChipOutputPatchTotalSize + offChipPatchConstTotalSize
+                                              << " dwords\n");
       LLPC_OUTS("\n");
     }
   }
@@ -527,11 +576,10 @@ void LowerInOut::visitCallInst(CallInst &callInst) {
 
   auto exportGenericOutput = lgcName::OutputExportGeneric;
   auto exportBuiltInOutput = lgcName::OutputExportBuiltIn;
-  auto exportXfbOutput = lgcName::OutputExportXfb;
 
   const bool isGenericOutputExport = mangledName.starts_with(exportGenericOutput);
   const bool isBuiltInOutputExport = mangledName.starts_with(exportBuiltInOutput);
-  const bool isXfbOutputExport = mangledName.starts_with(exportXfbOutput);
+  const bool isXfbOutputExport = isa<WriteXfbOutputOp>(callInst);
 
   const bool isExport = (isGenericOutputExport || isBuiltInOutputExport || isXfbOutputExport);
 
@@ -952,7 +1000,7 @@ void LowerInOut::visitCallInst(CallInst &callInst) {
         exist = true;
         loc = value;
       } else {
-        // Generic output exports of FS should have been handled by the LowerFragColorExport pass
+        // Generic output exports of FS should have been handled by the LowerFragmentColorExport pass
         assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::Geometry ||
                m_shaderStage == ShaderStage::TessEval);
 
@@ -1039,68 +1087,92 @@ void LowerInOut::visitCallInst(CallInst &callInst) {
     }
   } else {
     // Other calls relevant to input/output import/export
-    if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg) {
-      unsigned emitStream = InvalidValue;
-      uint64_t message = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
-      if (message == GsEmitStream0 || message == GsEmitStream1 || message == GsEmitStream2 ||
-          message == GsEmitStream3) {
-        // NOTE: MSG[9:8] = STREAM_ID
-        emitStream = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
+    if (isa<GsEmitStreamOp>(callInst)) {
+      assert(m_shaderStage == ShaderStage::Geometry); // Must be geometry shader
+
+      const unsigned streamId = cast<GsEmitStreamOp>(callInst).getStreamId();
+      assert(streamId < MaxGsStreams);
+
+      // NOTE: Implicitly store the value of view index to GS-VS ring buffer for raster stream if multi-view is
+      // enabled. Copy shader will read the value from GS-VS ring and export it to vertex position data.
+      if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
+        auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
+        auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+
+        if (streamId == rasterStream) {
+          // When multiview and viewIndexFromDeviceIndex enable, it can't use the device ID
+          // as viewId to storeValueToGsVsRing when multiview in the same device
+          auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
+          auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+
+          const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+          assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
+          unsigned loc = builtInOutLocMap.find(BuiltInViewIndex)->second;
+
+          storeValueToGsVsRing(viewIndex, loc, 0, rasterStream, builder);
+        }
       }
 
-      if (emitStream != InvalidValue) {
-        assert(m_shaderStage == ShaderStage::Geometry); // Must be geometry shader
+      // Increment emit counter
+      auto emitCounterPair = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr();
+      auto emitCounterTy = emitCounterPair.first;
+      auto emitCounterPtr = emitCounterPair.second[streamId];
+      Value *emitCounter = builder.CreateLoad(emitCounterTy, emitCounterPtr);
+      emitCounter = builder.CreateAdd(emitCounter, builder.getInt32(1));
+      builder.CreateStore(emitCounter, emitCounterPtr);
 
-        // NOTE: Implicitly store the value of view index to GS-VS ring buffer for raster stream if multi-view is
-        // enabled. Copy shader will read the value from GS-VS ring and export it to vertex position data.
-        if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
-          auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
-          auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+      // Increment total emit counter
+      if (m_pipelineState->getShaderModes()->getGeometryShaderMode().robustGsEmits) {
+        auto totalEmitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getTotalEmitCounterPtr();
+        Value *totalEmitCounter = builder.CreateLoad(builder.getInt32Ty(), totalEmitCounterPtr);
 
-          if (emitStream == rasterStream) {
-            // When multiview and viewIndexFromDeviceIndex enable, it can't use the device id
-            // as viewId to storeValueToGsVsRing when multiview in the same device
-            auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
-            auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
+        // totalEmitCounter++
+        totalEmitCounter = builder.CreateAdd(totalEmitCounter, builder.getInt32(1));
+        builder.CreateStore(totalEmitCounter, totalEmitCounterPtr);
 
-            const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
-            assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
-            unsigned loc = builtInOutLocMap.find(BuiltInViewIndex)->second;
+        if (!m_pipelineState->getNggControl()->enableNgg) {
+          // NOTE: For legacy GS, the counters of primitives written are driven by the message GS_EMIT/GS_CUT.
+          // Therefore, we must send such message conditionally by checking if the emit is within expected range.
+          assert(m_gfxIp.major < 11);
 
-            storeValueToGsVsRing(viewIndex, loc, 0, rasterStream, builder);
-          }
+          // validEmit = totalEmitCounter <= outputVertices
+          const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
+          auto validEmit = builder.CreateICmpULE(totalEmitCounter, builder.getInt32(geometryMode.outputVertices));
+
+          // Send the GS_EMIT message conditionally
+          builder.CreateIf(validEmit, false);
+          callInst.moveBefore(&*builder.GetInsertPoint());
+          builder.SetInsertPoint(&callInst); // Restore insert point modified by CreateIf
         }
+      }
 
-        // Increment emit vertex counter
-        auto emitCounterPair = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr();
-        auto emitCounterTy = emitCounterPair.first;
-        auto emitCounterPtr = emitCounterPair.second[emitStream];
-        Value *emitCounter = builder.CreateLoad(emitCounterTy, emitCounterPtr);
-        emitCounter = builder.CreateAdd(emitCounter, builder.getInt32(1));
-        builder.CreateStore(emitCounter, emitCounterPtr);
+      // For legacy GS, lower the dialect op GsEmitStreamOp to sendmsg intrinsic
+      if (!m_pipelineState->getNggControl()->enableNgg) {
+        m_gsMsgCalls.push_back(&callInst);
 
-        // Increment total emit vertex counter
-        if (m_pipelineState->getShaderModes()->getGeometryShaderMode().robustGsEmits) {
-          auto totalEmitCounterPtr = m_pipelineSysValues.get(m_entryPoint)->getTotalEmitCounterPtr();
-          Value *totalEmitCounter = builder.CreateLoad(builder.getInt32Ty(), totalEmitCounterPtr);
+        auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
+        auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
 
-          // totalEmitCounter++
-          totalEmitCounter = builder.CreateAdd(totalEmitCounter, builder.getInt32(1));
-          builder.CreateStore(totalEmitCounter, totalEmitCounterPtr);
+        // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
+        unsigned msg = (streamId << 8) | GsEmit;
+        builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {builder.getInt32(msg), gsWaveId}, nullptr);
+      }
+    } else if (isa<GsCutStreamOp>(callInst)) {
+      assert(m_shaderStage == ShaderStage::Geometry); // Must be geometry shader
 
-          if (m_gfxIp.major < 11) {
-            // NOTE: For pre-GFX11, the counters of primitives written are driven by the message GS_EMIT/GS_CUT.
-            // Therefore, we must send such message conditionally by checking if the emit is within expected range.
+      const unsigned streamId = cast<GsCutStreamOp>(callInst).getStreamId();
+      assert(streamId < MaxGsStreams);
 
-            // validEmit = totalEmitCounter <= outputVertices
-            const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
-            auto validEmit = builder.CreateICmpULE(totalEmitCounter, builder.getInt32(geometryMode.outputVertices));
+      // For legacy GS, lower the dialect op GsCutStreamOp to sendmsg intrinsic
+      if (!m_pipelineState->getNggControl()->enableNgg) {
+        m_gsMsgCalls.push_back(&callInst);
 
-            // Send the GS_EMIT message conditionally
-            builder.CreateIf(validEmit, false);
-            callInst.moveBefore(&*builder.GetInsertPoint());
-          }
-        }
+        auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
+        auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
+
+        // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
+        unsigned msg = (streamId << 8) | GsCut;
+        builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {builder.getInt32(msg), gsWaveId}, nullptr);
       }
     }
   }
@@ -1267,19 +1339,8 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
     const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs;
 
     // NOTE: If gl_Position is not present in this shader stage, we have to export a dummy one.
-    if (!usePosition) {
-      Value *args[] = {
-          builder.getInt32(EXP_TARGET_POS_0), // tgt
-          builder.getInt32(0xF),              // en
-          zero,                               // src0
-          zero,                               // src1
-          zero,                               // src2
-          one,                                // src3
-          builder.getInt1(false),             // done
-          builder.getInt1(false)              // vm
-      };
-      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
-    }
+    if (!usePosition)
+      exportPosition(0, {zero, zero, zero, one}, builder);
 
     // NOTE: In such case, last shader in the pre-rasterization doesn't export layer while fragment shader expects to
     // read it. Should export 0 to fragment shader, which is required by the spec.
@@ -1306,7 +1367,7 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
         cullDistance.push_back(builder.CreateExtractValue(m_cullDistance, i));
 
       // Merge gl_ClipDistance[] and gl_CullDistance[]
-      std::vector<Value *> clipCullDistance;
+      SmallVector<Value *, 8> clipCullDistance;
       clipCullDistance.reserve(clipDistance.size() + cullDistance.size());
       for (auto clipDistanceElement : clipDistance)
         clipCullDistance.push_back(clipDistanceElement);
@@ -1326,41 +1387,22 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
       bool miscExport =
           usePointSize || useLayer || useViewportIndex || useShadingRate || enableMultiView || useEdgeFlag;
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
-      unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+      unsigned exportSlot = miscExport ? 2 : 1;
 
       unsigned clipPlaneMask = m_pipelineState->getOptions().clipPlaneMask;
       bool needMapClipDistMask = ((clipPlaneMask != 0) && m_pipelineState->getOptions().enableMapClipDistMask);
       assert(!m_pipelineState->getOptions().enableMapClipDistMask || ((clipPlaneMask & 0xF) == 0));
 
-      Value *args[] = {
-          builder.getInt32(pos),  // tgt
-          builder.getInt32(0xF),  // en
-          clipCullDistance[0],    // src0
-          clipCullDistance[1],    // src1
-          clipCullDistance[2],    // src2
-          clipCullDistance[3],    // src3
-          builder.getInt1(false), // done
-          builder.getInt1(false)  // vm
-      };
-
       if (!needMapClipDistMask) {
-        builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
-        pos++;
+        exportPosition(exportSlot, {clipCullDistance[0], clipCullDistance[1], clipCullDistance[2], clipCullDistance[3]},
+                       builder);
+        exportSlot++;
       }
 
       if (clipCullDistance.size() > 4) {
         // Do the second exporting
-        Value *args[] = {
-            builder.getInt32(pos),  // tgt
-            builder.getInt32(0xF),  // en
-            clipCullDistance[4],    // src0
-            clipCullDistance[5],    // src1
-            clipCullDistance[6],    // src2
-            clipCullDistance[7],    // src3
-            builder.getInt1(false), // done
-            builder.getInt1(false)  // vm
-        };
-        builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
+        exportPosition(exportSlot, {clipCullDistance[4], clipCullDistance[5], clipCullDistance[6], clipCullDistance[7]},
+                       builder);
       }
 
       // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
@@ -1404,13 +1446,13 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
         assert(it != builtInOutLocs.end());
         const unsigned loc = it->second;
 
-        recordVertexAttribExport(loc,
-                                 {clipCullDistance[0], clipCullDistance[1], clipCullDistance[2], clipCullDistance[3]});
+        recordVertexAttribute(loc,
+                              {clipCullDistance[0], clipCullDistance[1], clipCullDistance[2], clipCullDistance[3]});
 
         if (clipCullDistance.size() > 4) {
           // Do the second exporting
-          recordVertexAttribExport(
-              loc + 1, {clipCullDistance[4], clipCullDistance[5], clipCullDistance[6], clipCullDistance[7]});
+          recordVertexAttribute(loc + 1,
+                                {clipCullDistance[4], clipCullDistance[5], clipCullDistance[6], clipCullDistance[7]});
         }
       }
     }
@@ -1434,14 +1476,13 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
         assert(m_primitiveId);
         Value *primitiveId = builder.CreateBitCast(m_primitiveId, builder.getFloatTy());
 
-        recordVertexAttribExport(loc, {primitiveId, poison, poison, poison});
+        recordVertexAttribute(loc, {primitiveId, poison, poison, poison});
       }
     }
 
     // Export EdgeFlag
-    if (useEdgeFlag) {
+    if (useEdgeFlag)
       addExportInstForBuiltInOutput(m_edgeFlag, BuiltInEdgeFlag, builder);
-    }
 
     // Export gl_Layer and gl_ViewportIndex before entry-point returns
     if (useLayer || useViewportIndex || enableMultiView) {
@@ -1482,19 +1523,7 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
       }
 
       viewportIndexAndLayer = builder.CreateBitCast(viewportIndexAndLayer, builder.getFloatTy());
-
-      Value *args[] = {
-          builder.getInt32(EXP_TARGET_POS_1), // tgt
-          builder.getInt32(0x4),              // en
-          poison,                             // src0
-          poison,                             // src1
-          viewportIndexAndLayer,              // src2
-          poison,                             // src3
-          builder.getInt1(false),             // done
-          builder.getInt1(false)              // vm
-      };
-
-      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args, {});
+      exportPosition(1, {poison, poison, viewportIndexAndLayer, poison}, builder);
 
       // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
       if (useViewportIndex) {
@@ -1511,7 +1540,7 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
 
           Value *viewportIndex = builder.CreateBitCast(m_viewportIndex, builder.getFloatTy());
 
-          recordVertexAttribExport(loc, {viewportIndex, poison, poison, poison});
+          recordVertexAttribute(loc, {viewportIndex, poison, poison, poison});
         }
       }
 
@@ -1530,21 +1559,13 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
 
           Value *layer = builder.CreateBitCast(m_layer, builder.getFloatTy());
 
-          recordVertexAttribExport(loc, {layer, poison, poison, poison});
+          recordVertexAttribute(loc, {layer, poison, poison, poison});
         }
       }
     }
 
-    // NOTE: For GFX10+, dummy generic output is no longer needed. Field NO_PC_EXPORT of SPI_VS_OUT_CONFIG
-    // will control the behavior.
-    if (m_gfxIp.major <= 9) {
-      // NOTE: If no generic outputs is present in this shader, we have to export a dummy one
-      if (inOutUsage.expCount == 0)
-        recordVertexAttribExport(0, {poison, poison, poison, poison});
-    }
-
     // Export vertex attributes that were recorded previously
-    exportVertexAttribs(builder);
+    exportAttributes(builder);
 
     if (m_pipelineState->isUnlinked()) {
       // If we are building unlinked relocatable shaders, it is possible there are
@@ -1579,7 +1600,7 @@ void LowerInOut::visitReturnInst(ReturnInst &retInst) {
       builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_sendmsg, {builder.getInt32(GsDone), gsWaveId});
     }
   } else if (m_shaderStage == ShaderStage::Fragment) {
-    // Fragment shader export are handled in LowerFragColorExport.
+    // Fragment shader export are handled in LowerFragmentColorExport.
     return;
   }
 }
@@ -1971,7 +1992,7 @@ Value *LowerInOut::patchTcsGenericOutputImport(Type *outputTy, unsigned location
                                                Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx);
   auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, builder);
-  return readValueFromLds(true, outputTy, ldsOffset, builder);
+  return readValueFromLds(false, outputTy, ldsOffset, builder);
 }
 
 // =====================================================================================================================
@@ -2021,9 +2042,8 @@ void LowerInOut::patchVsGenericOutputExport(Value *output, unsigned location, un
 void LowerInOut::patchTcsGenericOutputExport(Value *output, unsigned location, Value *locOffset, Value *compIdx,
                                              Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx);
-  Type *outputTy = output->getType();
-  auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, builder);
-  writeValueToLds(true, output, ldsOffset, builder);
+  auto ldsOffset = calcLdsOffsetForTcsOutput(output->getType(), location, locOffset, compIdx, vertexIdx, builder);
+  writeValueToLds(false, output, ldsOffset, builder);
 }
 
 // =====================================================================================================================
@@ -2161,7 +2181,7 @@ Value *LowerInOut::patchTcsBuiltInInputImport(Type *inputTy, unsigned builtInId,
         auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTcsInput(elemTy, loc, nullptr, elemIdx, vertexIdx, builder);
         auto elem = readValueFromLds(false, elemTy, ldsOffset, builder);
-        builder.CreateInsertValue(input, elem, i);
+        input = builder.CreateInsertValue(input, elem, i);
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
@@ -2378,11 +2398,6 @@ Value *LowerInOut::patchGsBuiltInInputImport(Type *inputTy, unsigned builtInId, 
       }
     } else
       input = builder.getInt32(0);
-    break;
-  }
-  // Handle internal-use built-ins
-  case BuiltInGsWaveId: {
-    input = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
     break;
   }
   default: {
@@ -2722,6 +2737,7 @@ Value *LowerInOut::patchFsBuiltInInputImport(Type *inputTy, unsigned builtInId, 
       input = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
                                       {sampleInfo, builder.getInt32(2), builder.getInt32(5)});
     } else {
+      assert(m_pipelineState->getRasterizerState().numSamples != 0);
       input = builder.getInt32(m_pipelineState->getRasterizerState().numSamples);
     }
     break;
@@ -2851,6 +2867,7 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
   const auto &builtInUsage = resUsage->builtInUsage.tcs;
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+  const auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
 
   switch (builtInId) {
   case BuiltInPosition:
@@ -2863,7 +2880,7 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
     unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    output = readValueFromLds(true, outputTy, ldsOffset, builder);
+    output = readValueFromLds(false, outputTy, ldsOffset, builder);
 
     break;
   }
@@ -2889,12 +2906,12 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
         auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTcsOutput(elemTy, loc, nullptr, elemIdx, vertexIdx, builder);
-        auto elem = readValueFromLds(true, elemTy, ldsOffset, builder);
+        auto elem = readValueFromLds(false, elemTy, ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-      output = readValueFromLds(true, outputTy, ldsOffset, builder);
+      output = readValueFromLds(false, outputTy, ldsOffset, builder);
     }
 
     break;
@@ -2905,26 +2922,19 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
     assert(builtInId != BuiltInTessLevelInner || builtInUsage.tessLevelInner);
     (void(builtInUsage)); // Unused
 
-    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = relativeId * MaxTessFactorsPerPatch + elemIdx
-    uint32_t tessOffset = 0;
-    if (builtInId == BuiltInTessLevelInner)
-      tessOffset += 4;
-
-    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
-    Value *baseOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
+    assert(perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end());
+    unsigned loc = perPatchBuiltInOutLocMap.find(builtInId)->second;
 
     if (outputTy->isArrayTy()) {
-      // Import the whole tessLevel array
+      // Handle the whole array
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset + i));
+        auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
         auto elem = readValueFromLds(false, builder.getFloatTy(), ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
-      // Import a single element of tessLevel array
-      Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset));
-      ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
+      // Handle a single element of the array
+      auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, builder);
       output = readValueFromLds(false, outputTy, ldsOffset, builder);
     }
 
@@ -3119,6 +3129,7 @@ void LowerInOut::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, 
   const auto &builtInUsage = resUsage->builtInUsage.tcs;
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
   const auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
+  const auto &hwConfig = resUsage->inOutUsage.tcs.hwConfig;
 
   switch (builtInId) {
   case BuiltInPosition:
@@ -3137,7 +3148,7 @@ void LowerInOut::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, 
     unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    writeValueToLds(true, output, ldsOffset, builder);
+    writeValueToLds(false, output, ldsOffset, builder);
 
     break;
   }
@@ -3158,56 +3169,98 @@ void LowerInOut::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, 
         auto elem = builder.CreateExtractValue(output, i);
         auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, builder);
-        writeValueToLds(true, elem, ldsOffset, builder);
+        writeValueToLds(false, elem, ldsOffset, builder);
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-      writeValueToLds(true, output, ldsOffset, builder);
+      writeValueToLds(false, output, ldsOffset, builder);
     }
 
     break;
   }
   case BuiltInTessLevelOuter:
   case BuiltInTessLevelInner: {
-    auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
+    if ((builtInId == BuiltInTessLevelOuter && builtInUsage.tessLevelOuter) ||
+        (builtInId == BuiltInTessLevelInner && builtInUsage.tessLevelInner)) {
+      unsigned loc = perPatchBuiltInOutLocMap.find(builtInId)->second;
 
-    // tessLevelOuter (float[4]) + tessLevelInner (float[2])
-    // ldsOffset = relativeId * MaxTessFactorsPerPatch + elemIdx
+      if (outputTy->isArrayTy()) {
+        // Handle the whole array
+        for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+          auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
+          auto elem = builder.CreateExtractValue(output, {i});
+          writeValueToLds(false, elem, ldsOffset, builder);
+        }
+      } else {
+        // Handle a single element of the array
+        auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, builder);
+        writeValueToLds(false, output, ldsOffset, builder);
+      }
+    }
+
+    // Write TFs to the dedicated region of on-chip LDS for later HW TF buffer store (read by HW tessellator)
+    unsigned numOuterTfs = 0;
+    unsigned numInnerTfs = 0;
+    unsigned numTfs = 0;
+
+    const auto primitiveMode = m_pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
+    switch (primitiveMode) {
+    case PrimitiveMode::Triangles:
+      numOuterTfs = 3;
+      numInnerTfs = 1;
+      break;
+    case PrimitiveMode::Quads:
+      numOuterTfs = 4;
+      numInnerTfs = 2;
+      break;
+    case PrimitiveMode::Isolines:
+      numOuterTfs = 2;
+      numInnerTfs = 0;
+      break;
+    default:
+      llvm_unreachable("Unknown primitive mode!");
+      break;
+    }
+    numTfs = (builtInId == BuiltInTessLevelOuter) ? numOuterTfs : numInnerTfs;
+
+    auto relPatchId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
+
+    // tessLevelOuter (numOuterTfs) + tessLevelInner (numInnerTfs)
+    // ldsOffset = tessFactorStart + relPatchId * tessFactorStride + elemIdx
     uint32_t tessOffset = 0;
     if (builtInId == BuiltInTessLevelInner)
-      tessOffset += 4;
+      tessOffset += numOuterTfs;
 
-    // Write tessellation factors to on-chip LDS for later TF buffer store
-    Value *baseOffset = builder.CreateMul(relativeId, builder.getInt32(MaxTessFactorsPerPatch));
+    Value *baseOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.onChip.tessFactorStride));
+    baseOffset = builder.CreateAdd(baseOffset, builder.getInt32(hwConfig.onChip.tessFactorStart));
+
     if (outputTy->isArrayTy()) {
-      // Handle the whole tessLevelOuter array
-      for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
+      // Handle the whole array, skip irrelevant TFs
+      for (unsigned i = 0; i < numTfs; ++i) {
         Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset + i));
         auto elem = builder.CreateExtractValue(output, {i});
         writeValueToLds(false, elem, ldsOffset, builder);
       }
     } else {
-      // Handle a single element of tessLevelOuter array
+      // Handle a single element of the array
       Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessOffset));
-      ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
-      writeValueToLds(false, output, ldsOffset, builder);
-    }
-
-    // Write tessellation factors for TES to read if needed
-    if (perPatchBuiltInOutLocMap.find(builtInId) != perPatchBuiltInOutLocMap.end()) {
-      unsigned loc = perPatchBuiltInOutLocMap.find(builtInId)->second;
-
-      if (outputTy->isArrayTy()) {
-        // Handle the whole tessLevelOuter array
-        for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-          auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
-          auto elem = builder.CreateExtractValue(output, {i});
-          writeValueToLds(true, elem, ldsOffset, builder);
+      if (isa<ConstantInt>(elemIdx)) {
+        // Skip irrelevant TFs
+        if (cast<ConstantInt>(elemIdx)->getZExtValue() < numTfs) {
+          ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
+          writeValueToLds(false, output, ldsOffset, builder);
         }
       } else {
-        // Handle a single element of tessLevelOuter array
-        auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, builder);
-        writeValueToLds(true, output, ldsOffset, builder);
+        // NOTE: We use odd-dword stride to avoid LDS bank conflict. Since the number of TFs is always even, the last
+        // TF slot is unused. We can reuse it to store irrelevant TFs.
+        assert(numOuterTfs + numInnerTfs + 1 == hwConfig.onChip.tessFactorStride);
+        unsigned invalidElemIdx = hwConfig.onChip.tessFactorStride - 1;
+
+        // elemIdx = elemIdx < numTfs ? elemIdx : invalidElemIdx
+        auto relevantTf = builder.CreateICmpULT(elemIdx, builder.getInt32(numTfs));
+        elemIdx = builder.CreateSelect(relevantTf, elemIdx, builder.getInt32(invalidElemIdx));
+        ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
+        writeValueToLds(false, output, ldsOffset, builder);
       }
     }
 
@@ -3757,46 +3810,20 @@ void LowerInOut::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuff
          m_shaderStage == ShaderStage::CopyShader);
   assert(xfbBuffer < MaxTransformFeedbackBuffers);
 
-  if (m_pipelineState->enableSwXfb()) {
-    // NOTE: For GFX11+, exporting transform feedback outputs is represented by a call and the call is
-    // replaced with real instructions when when NGG primitive shader is generated.
-    std::string callName = lgcName::NggXfbExport + getTypeName(storeValue->getType());
-    builder.CreateNamedCall(
-        callName, builder.getVoidTy(),
-        {builder.getInt32(xfbBuffer), builder.getInt32(xfbOffset), builder.getInt32(streamId), storeValue}, {});
+  auto storeTy = storeValue->getType();
+  assert(storeTy->getScalarSizeInBits() == 32); // Must be 32-bit type
+
+  unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
+  assert(compCount <= 4);
+
+  if (m_pipelineState->getNggControl()->enableNgg) {
+    assert(m_pipelineState->enableSwXfb());
+    builder.create<WriteXfbOutputOp>(xfbBuffer, xfbOffset, streamId, storeValue);
     return;
   }
 
   // NOTE: SW XFB must have been handled. Here we only handle HW XFB on pre-GFX11 generations.
   assert(m_gfxIp.major == 10);
-
-  auto storeTy = storeValue->getType();
-
-  unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
-  assert(compCount <= 4);
-
-  const uint64_t bitWidth = storeTy->getScalarSizeInBits();
-  assert(bitWidth == 16 || bitWidth == 32);
-
-  if (storeTy->isIntOrIntVectorTy(16)) {
-    Type *newStoreTy = compCount > 1 ? FixedVectorType::get(builder.getHalfTy(), compCount) : builder.getHalfTy();
-    storeValue = builder.CreateBitCast(storeValue, newStoreTy);
-    storeTy = newStoreTy;
-  }
-
-  // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2 and
-  // 16scalar.
-  if (bitWidth == 16 && compCount == 3) {
-    // 16vec3 -> 16vec2 + 16scalar
-    Value *compX2 = builder.CreateShuffleVector(storeValue, {0, 1});
-    storeValueToStreamOutBuffer(compX2, xfbBuffer, xfbOffset, xfbStride, streamId, builder);
-
-    Value *comp = builder.CreateExtractElement(storeValue, 2);
-    xfbOffset += 2 * (bitWidth / 8);
-    storeValueToStreamOutBuffer(comp, xfbBuffer, xfbOffset, xfbStride, streamId, builder);
-
-    return;
-  }
 
   Value *streamInfo = nullptr;
   Value *writeIndex = nullptr;
@@ -3847,13 +3874,13 @@ void LowerInOut::storeValueToStreamOutBuffer(Value *storeValue, unsigned xfbBuff
   // writeIndex += threadId
   writeIndex = builder.CreateAdd(writeIndex, m_threadId);
 
-  static unsigned char formatTable[4][2] = {
-      {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
-      {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10},
-      {BUF_FORMAT_INVALID, BUF_FORMAT_32_32_32_FLOAT_GFX10},
-      {BUF_FORMAT_16_16_16_16_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
+  static unsigned char formatTable[] = {
+      BUF_FORMAT_32_FLOAT,
+      BUF_FORMAT_32_32_FLOAT_GFX10,
+      BUF_FORMAT_32_32_32_FLOAT_GFX10,
+      BUF_FORMAT_32_32_32_32_FLOAT_GFX10,
   };
-  unsigned format = formatTable[compCount - 1][bitWidth == 32];
+  unsigned format = formatTable[compCount - 1];
 
   CoherentFlag coherent = {};
   coherent.bits.glc = true;
@@ -4000,16 +4027,12 @@ void LowerInOut::storeValueToGsVsRing(Value *storeValue, unsigned location, unsi
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
   if (m_pipelineState->getNggControl()->enableNgg) {
-    // NOTE: For NGG, writing GS output to GS-VS ring is represented by a call and the call is replaced with
-    // real instructions when when NGG primitive shader is generated.
-    Value *args[] = {builder.getInt32(location), builder.getInt32(compIdx), builder.getInt32(streamId), storeValue};
-    std::string callName = lgcName::NggWriteGsOutput + getTypeName(storeTy);
-    builder.CreateNamedCall(callName, Type::getVoidTy(*m_context), args, {});
+    builder.create<NggWriteGsOutputOp>(location, compIdx, streamId, storeValue);
     return;
   }
 
   // NOTE: NGG with GS must have been handled. Here we only handle pre-GFX11 generations.
-  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11);
+  assert(m_gfxIp.major < 11);
 
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
     const unsigned elemCount = storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements()
@@ -4072,16 +4095,6 @@ void LowerInOut::storeValueToGsVsRing(Value *storeValue, unsigned location, unsi
       // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit
       // control of soffset. This is required by swizzle enabled mode when address range checking should be
       // complied with.
-      unsigned format;
-      if (m_gfxIp.major <= 9) {
-        CombineFormat combineFormat = {};
-        combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
-        combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
-        format = combineFormat.u32All;
-      } else {
-        format = BUF_FORMAT_32_UINT;
-      }
-
       CoherentFlag coherent = {};
       coherent.bits.glc = true;
       coherent.bits.slc = true;
@@ -4092,7 +4105,7 @@ void LowerInOut::storeValueToGsVsRing(Value *storeValue, unsigned location, unsi
           m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc
           ringOffset,                                                          // voffset
           gsVsOffset,                                                          // soffset
-          builder.getInt32(format),
+          builder.getInt32(BUF_FORMAT_32_UINT),
           builder.getInt32(coherent.u32All) // glc, slc, swz
       };
       builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store, args);
@@ -4112,9 +4125,9 @@ Value *LowerInOut::calcEsGsRingOffsetForOutput(unsigned location, unsigned compI
   // ES -> GS ring is always on-chip on GFX10+
   // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
   assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+  const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
 
-  Value *ringOffset = builder.CreateMul(m_threadId, builder.getInt32(calcFactor.esGsRingItemSize));
+  Value *ringOffset = builder.CreateMul(m_threadId, builder.getInt32(hwConfig.esGsRingItemSize));
   ringOffset = builder.CreateAdd(ringOffset, esGsOffset);
   ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(location * 4 + compIdx));
 
@@ -4132,7 +4145,7 @@ Value *LowerInOut::calcEsGsRingOffsetForInput(unsigned location, unsigned compId
                                               BuilderBase &builder) {
   // ES -> GS ring is always on-chip on GFX10+
   assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+  const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
 
   auto esGsOffsets = m_pipelineSysValues.get(m_entryPoint)->getEsGsOffsets();
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
@@ -4153,7 +4166,7 @@ Value *LowerInOut::calcEsGsRingOffsetForInput(unsigned location, unsigned compId
     // +-----------------+-----------------+-----+-------------------+
     // |<-------------------------- Patch -------------------------->|
     //
-    vertexOffset = builder.CreateMul(vertexIdx, builder.getInt32(calcFactor.esGsRingItemSize));
+    vertexOffset = builder.CreateMul(vertexIdx, builder.getInt32(hwConfig.esGsRingItemSize));
     vertexOffset = builder.CreateAdd(builder.CreateExtractElement(esGsOffsets, static_cast<uint64_t>(0)), vertexOffset);
   } else {
     // vertexOffset = esGsOffsets[vertexIdx] (vertexIdx < 6)
@@ -4184,7 +4197,7 @@ Value *LowerInOut::calcGsVsRingOffsetForOutput(unsigned location, unsigned compI
   unsigned streamBase = 0;
   for (int i = 0; i < MaxGsStreams; ++i) {
     streamBases[i] = streamBase;
-    streamBase += (resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] *
+    streamBase += (resUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i] *
                    m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices);
   }
 
@@ -4194,15 +4207,15 @@ Value *LowerInOut::calcGsVsRingOffsetForOutput(unsigned location, unsigned compI
     //              threadId * gsVsRingItemSize +
     //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase (in dwords)
 
-    auto esGsLdsSize = builder.getInt32(resUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
+    auto esGsLdsSize = builder.getInt32(resUsage->inOutUsage.gs.hwConfig.esGsLdsSize);
 
     gsVsOffset = builder.CreateLShr(gsVsOffset, 2, "", /*isExact=*/true);
 
     auto ringItemOffset =
-        builder.CreateMul(m_threadId, builder.getInt32(resUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize));
+        builder.CreateMul(m_threadId, builder.getInt32(resUsage->inOutUsage.gs.hwConfig.gsVsRingItemSize));
 
     // VertexSize is stream output vertexSize x 4 (in dwords)
-    unsigned vertexItemSize = resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[streamId];
+    unsigned vertexItemSize = resUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[streamId];
     auto vertexItemOffset = builder.CreateMul(vertexIdx, builder.getInt32(vertexItemSize));
     ringOffset = builder.CreateAdd(esGsLdsSize, gsVsOffset);
     ringOffset = builder.CreateAdd(ringOffset, ringItemOffset);
@@ -4255,9 +4268,7 @@ Value *LowerInOut::readValueFromLds(bool offChip, Type *readTy, Value *ldsOffset
     ldsOffset = builder.CreateMul(ldsOffset, builder.getInt32(4));
 
     CoherentFlag coherent = {};
-    if (m_gfxIp.major <= 9)
-      coherent.bits.glc = true;
-    else if (m_gfxIp.major == 10) {
+    if (m_gfxIp.major == 10) {
       coherent.bits.glc = true;
       coherent.bits.dlc = true;
     } else if (m_gfxIp.major == 11) {
@@ -4396,11 +4407,11 @@ Value *LowerInOut::calcLdsOffsetForVsOutput(Type *outputTy, unsigned location, u
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex)->entryArgIdxs.vs;
   auto relVertexId = getFunctionArgument(m_entryPoint, entryArgIdxs.relVertexId);
 
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-  auto vertexStride = builder.getInt32(calcFactor.inVertexStride);
-  // dwordOffset = inPatchStart + relVertexId * vertexStride + attribOffset
-  Value *ldsOffset = builder.getInt32(calcFactor.onChip.inPatchStart);
-  ldsOffset = builder.CreateAdd(ldsOffset, builder.CreateMul(relVertexId, vertexStride));
+  const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
+  // dwordOffset = inputPatchStart + relVertexId * vertexStride + attribOffset
+  Value *ldsOffset = builder.getInt32(hwConfig.onChip.inputPatchStart);
+  ldsOffset =
+      builder.CreateAdd(ldsOffset, builder.CreateMul(relVertexId, builder.getInt32(hwConfig.onChip.inputVertexStride)));
   ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
 
   return ldsOffset;
@@ -4420,7 +4431,7 @@ Value *LowerInOut::calcLdsOffsetForTcsInput(Type *inputTy, unsigned location, Va
   assert(m_shaderStage == ShaderStage::TessControl);
 
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs;
-  const auto &calcFactor = inOutUsage.calcFactor;
+  const auto &hwConfig = inOutUsage.hwConfig;
 
   // attribOffset = (location + locOffset) * 4 + compIdx
   Value *attribOffset = builder.getInt32(location);
@@ -4442,16 +4453,14 @@ Value *LowerInOut::calcLdsOffsetForTcsInput(Type *inputTy, unsigned location, Va
     attribOffset = builder.CreateAdd(attribOffset, compIdx);
   }
 
-  // dwordOffset = inPatchStart + (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
-  auto inVertexCount = m_pipelineState->getNumPatchControlPoints();
-  auto inVertexCountVal = builder.getInt32(inVertexCount);
+  // dwordOffset = inputPatchStart + (relativeId * inputVertexCount + vertexIdx) * inputVertexStride + attribOffset
+  auto inputVertexCount = m_pipelineState->getNumPatchControlPoints();
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
-  Value *ldsOffset = builder.CreateMul(relativeId, inVertexCountVal);
+  Value *ldsOffset = builder.CreateMul(relativeId, builder.getInt32(inputVertexCount));
   ldsOffset = builder.CreateAdd(ldsOffset, vertexIdx);
-  auto inVertexStride = builder.getInt32(calcFactor.inVertexStride);
-  ldsOffset = builder.CreateMul(ldsOffset, inVertexStride);
+  ldsOffset = builder.CreateMul(ldsOffset, builder.getInt32(hwConfig.onChip.inputVertexStride));
   ldsOffset =
-      builder.CreateAdd(builder.getInt32(calcFactor.onChip.inPatchStart), builder.CreateAdd(ldsOffset, attribOffset));
+      builder.CreateAdd(builder.getInt32(hwConfig.onChip.inputPatchStart), builder.CreateAdd(ldsOffset, attribOffset));
 
   return ldsOffset;
 }
@@ -4467,13 +4476,12 @@ Value *LowerInOut::calcLdsOffsetForTcsInput(Type *inputTy, unsigned location, Va
 // @param builder : The IR builder to create and insert IR instruction
 Value *LowerInOut::calcLdsOffsetForTcsOutput(Type *outputTy, unsigned location, Value *locOffset, Value *compIdx,
                                              Value *vertexIdx, BuilderBase &builder) {
+  // NOTE: TCS outputs are always stored to on-chip LDS first. Then, they are store to off-chip LDS buffer (which will
+  // be loaded by TES).
   assert(m_shaderStage == ShaderStage::TessControl);
 
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs;
-  const auto &calcFactor = inOutUsage.calcFactor;
-
-  auto outPatchStart = calcFactor.offChip.outPatchStart;
-  auto patchConstStart = calcFactor.offChip.patchConstStart;
+  const auto &hwConfig = inOutUsage.hwConfig;
 
   // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
   Value *attribOffset = builder.getInt32(location);
@@ -4496,30 +4504,19 @@ Value *LowerInOut::calcLdsOffsetForTcsOutput(Type *outputTy, unsigned location, 
   }
 
   Value *ldsOffset = nullptr;
-
-  const bool perPatch = (!vertexIdx); // Vertex indexing is unavailable for per-patch output
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
-  if (perPatch) {
-    // dwordOffset = patchConstStart + relativeId * patchConstSize + attribOffset
-    auto patchConstSize = builder.getInt32(calcFactor.patchConstSize);
-    ldsOffset = builder.CreateMul(relativeId, patchConstSize);
-
-    auto patchConstStartVal = builder.getInt32(patchConstStart);
-    ldsOffset = builder.CreateAdd(ldsOffset, patchConstStartVal);
-
+  if (vertexIdx) {
+    // dwordOffset = outputPatchStart + (relativeId * outputVertexCount + vertexIdx) * outputVertexStride + attribOffset
+    //             = outputPatchStart + relativeId * outputPatchSize + vertexIdx * outputVertexStride + attribOffset
+    ldsOffset = builder.CreateMul(relativeId, builder.getInt32(hwConfig.onChip.outputPatchSize));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(hwConfig.onChip.outputPatchStart));
+    ldsOffset = builder.CreateAdd(ldsOffset,
+                                  builder.CreateMul(vertexIdx, builder.getInt32(hwConfig.onChip.outputVertexStride)));
     ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
   } else {
-    // dwordOffset = outPatchStart + (relativeId * outVertexCount + vertexId) * outVertexStride + attribOffset
-    //             = outPatchStart + relativeId * outPatchSize + vertexId  * outVertexStride + attribOffset
-    auto outPatchSize = builder.getInt32(calcFactor.outPatchSize);
-    ldsOffset = builder.CreateMul(relativeId, outPatchSize);
-
-    auto outPatchStartVal = builder.getInt32(outPatchStart);
-    ldsOffset = builder.CreateAdd(ldsOffset, outPatchStartVal);
-
-    auto outVertexStride = builder.getInt32(calcFactor.outVertexStride);
-    ldsOffset = builder.CreateAdd(ldsOffset, builder.CreateMul(vertexIdx, outVertexStride));
-
+    // dwordOffset = patchConstStart + relativeId * patchConstSize + attribOffset
+    ldsOffset = builder.CreateMul(relativeId, builder.getInt32(hwConfig.onChip.patchConstSize));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(hwConfig.onChip.patchConstStart));
     ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
   }
 
@@ -4539,11 +4536,7 @@ Value *LowerInOut::calcLdsOffsetForTesInput(Type *inputTy, unsigned location, Va
                                             Value *vertexIdx, BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::TessEval);
 
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-
-  auto outPatchStart = calcFactor.offChip.outPatchStart;
-  auto patchConstStart = calcFactor.offChip.patchConstStart;
-
+  const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage.value())->entryArgIdxs.tes;
 
   auto relPatchId = getFunctionArgument(m_entryPoint, entryArgIdxs.relPatchId);
@@ -4569,29 +4562,18 @@ Value *LowerInOut::calcLdsOffsetForTesInput(Type *inputTy, unsigned location, Va
   }
 
   Value *ldsOffset = nullptr;
-
-  const bool perPatch = (!vertexIdx); // Vertex indexing is unavailable for per-patch input
-  if (perPatch) {
-    // dwordOffset = patchConstStart + relPatchId * patchConstSize + attribOffset
-    auto patchConstSize = builder.getInt32(calcFactor.patchConstSize);
-    ldsOffset = builder.CreateMul(relPatchId, patchConstSize);
-
-    auto patchConstStartVal = builder.getInt32(patchConstStart);
-    ldsOffset = builder.CreateAdd(ldsOffset, patchConstStartVal);
-
+  if (vertexIdx) {
+    // dwordOffset = patchStart + (relPatchId * vertexCount + vertexIdx) * vertexStride + attribOffset
+    //             = patchStart + relPatchId * patchSize + vertexIdx * vertexStride + attribOffset
+    ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.offChip.outputPatchSize));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(hwConfig.offChip.outputPatchStart));
+    ldsOffset = builder.CreateAdd(ldsOffset,
+                                  builder.CreateMul(vertexIdx, builder.getInt32(hwConfig.offChip.outputVertexStride)));
     ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
   } else {
-    // dwordOffset = patchStart + (relPatchId * vertexCount + vertexId) * vertexStride + attribOffset
-    //             = patchStart + relPatchId * patchSize + vertexId  * vertexStride + attribOffset
-    auto patchSize = builder.getInt32(calcFactor.outPatchSize);
-    ldsOffset = builder.CreateMul(relPatchId, patchSize);
-
-    auto patchStart = builder.getInt32(outPatchStart);
-    ldsOffset = builder.CreateAdd(ldsOffset, patchStart);
-
-    auto vertexStride = builder.getInt32(calcFactor.outVertexStride);
-    ldsOffset = builder.CreateAdd(ldsOffset, builder.CreateMul(vertexIdx, vertexStride));
-
+    // dwordOffset = patchConstStart + relPatchId * patchConstSize + attribOffset
+    ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.offChip.patchConstSize));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(hwConfig.offChip.patchConstStart));
     ldsOffset = builder.CreateAdd(ldsOffset, attribOffset);
   }
 
@@ -4599,18 +4581,17 @@ Value *LowerInOut::calcLdsOffsetForTesInput(Type *inputTy, unsigned location, Va
 }
 
 // =====================================================================================================================
-// Calculates the patch count for per-thread group.
+// Calculates maximum number of HS patches per thread group.
 //
-// @param inVertexCount : Count of vertices of input patch
-// @param inVertexStride : Vertex stride of input patch in (dwords)
-// @param outVertexCount : Count of vertices of output patch
-// @param outVertexStride : Vertex stride of output patch in (dwords)
-// @param patchConstCount : Count of output patch constants
-// @param tessFactorStride : Stride of tessellation factors (dwords)
-unsigned LowerInOut::calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride,
-                                                  unsigned outVertexCount, unsigned outVertexStride,
-                                                  unsigned patchConstCount, unsigned tessFactorStride) const {
-  unsigned maxThreadCountPerThreadGroup = MaxHsThreadsPerSubgroup;
+// @param inputVertexCount : Count of vertices of input patch
+// @param outputVertexCount : Count of vertices of output patch
+// @param tessFactorCount : Count of tessellation factors
+// @param ldsSizePerPatch : On-chip LDS size per patch (in dwords)
+// @param ldsBufferSizePerPatch : Off-chip LDS buffer size per patch (in dwords)
+unsigned LowerInOut::calcMaxNumPatchesPerGroup(unsigned inputVertexCount, unsigned outputVertexCount,
+                                               unsigned tessFactorCount, unsigned ldsSizePerPatch,
+                                               unsigned ldsBufferSizePerPatch) const {
+  unsigned maxNumThreadsPerGroup = MaxHsThreadsPerSubgroup;
 
   // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
   // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -4619,46 +4600,38 @@ unsigned LowerInOut::calcPatchCountPerThreadGroup(unsigned inVertexCount, unsign
   const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
   const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
   if (vsResUsage->useRayQueryLdsStack || tcsResUsage->useRayQueryLdsStack) {
-    maxThreadCountPerThreadGroup = std::min(MaxRayQueryThreadsPerGroup, maxThreadCountPerThreadGroup);
+    maxNumThreadsPerGroup = std::min(MaxRayQueryThreadsPerGroup, maxNumThreadsPerGroup);
     rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
   }
 
-  const unsigned maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
-  const unsigned patchCountLimitedByThread = maxThreadCountPerThreadGroup / maxThreadCountPerPatch;
+  const unsigned maxNumThreadsPerPatch = std::max(inputVertexCount, outputVertexCount);
+  const unsigned numPatchesLimitedByThread = maxNumThreadsPerGroup / maxNumThreadsPerPatch;
 
-  const unsigned inPatchSize = (inVertexCount * inVertexStride);
-  const unsigned outPatchSize = (outVertexCount * outVertexStride);
-  const unsigned patchConstSize = patchConstCount * 4;
-
-  // Compute the required LDS size per patch, always include the space for input patch and tess factor
-  unsigned ldsSizePerPatch = inPatchSize + MaxTessFactorsPerPatch;
-
-  unsigned ldsSizePerThreadGroup = m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
+  unsigned ldsSizePerGroup = m_pipelineState->getTargetInfo().getGpuProperty().ldsSizePerThreadGroup;
   if (m_pipelineState->canOptimizeTessFactor()) {
     // NOTE: If we are going to optimize TF store, we need additional on-chip LDS size. The required size is
     // 2 dwords per HS wave (1 dword all-ones flag or 1 dword all-zeros flag) plus an extra dword to
     // count actual HS patches.
     assert(m_gfxIp.major >= 11);
     const unsigned maxNumHsWaves =
-        MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
-    ldsSizePerThreadGroup -= 1 + maxNumHsWaves * 2;
+        MaxHsThreadsPerSubgroup / m_pipelineState->getShaderWaveSize(ShaderStage::TessControl);
+    ldsSizePerGroup -= 1 + maxNumHsWaves * 2;
   }
-  ldsSizePerThreadGroup -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
+  ldsSizePerGroup -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
 
-  unsigned patchCountLimitedByLds = ldsSizePerThreadGroup / ldsSizePerPatch;
+  unsigned numPatchesLimitedByLds = ldsSizePerGroup / ldsSizePerPatch;
 
-  unsigned patchCountPerThreadGroup = std::min(patchCountLimitedByThread, patchCountLimitedByLds);
+  unsigned maxNumPatchesPerGroup = std::min(numPatchesLimitedByThread, numPatchesLimitedByLds);
 
-  // NOTE: Performance analysis shows that 16 patches per thread group is an optimal upper-bound. The value is only
-  // an experimental number. For GFX9. 64 is an optimal number instead.
-  const unsigned optimalPatchCountPerThreadGroup = 64;
+  // NOTE: Performance analysis shows that 16 patches per group is an optimal upper-bound. The value is only
+  // an experimental number.
+  const unsigned optimalNumPatchesPerGroup = 64;
+  maxNumPatchesPerGroup = std::min(maxNumPatchesPerGroup, optimalNumPatchesPerGroup);
 
-  patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
-
-  auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
-  auto tessOffChipPatchCountPerThreadGroup =
-      m_pipelineState->getTargetInfo().getGpuProperty().tessOffChipLdsBufferSize / outPatchLdsBufferSize;
-  patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
+  unsigned outputPatchLdsBufferSize = ldsBufferSizePerPatch * sizeof(unsigned);
+  auto offChipNumHsPatchesPerGroup =
+      m_pipelineState->getTargetInfo().getGpuProperty().tessOffChipLdsBufferSize / outputPatchLdsBufferSize;
+  maxNumPatchesPerGroup = std::min(maxNumPatchesPerGroup, offChipNumHsPatchesPerGroup);
 
   // TF-Buffer-based limit for Patchers per Thread Group:
   // ---------------------------------------------------------------------------------------------
@@ -4667,22 +4640,22 @@ unsigned LowerInOut::calcPatchCountPerThreadGroup(unsigned inVertexCount, unsign
   // assume that one thread-group could at most utilize all of the TF Buffer.
   const unsigned tfBufferSizeInBytes =
       sizeof(unsigned) * m_pipelineState->getTargetInfo().getGpuProperty().tessFactorBufferSizePerSe;
-  unsigned tfBufferPatchCountLimit = tfBufferSizeInBytes / (tessFactorStride * sizeof(unsigned));
+  unsigned tfBufferNumPatchesLimit = tfBufferSizeInBytes / (tessFactorCount * sizeof(unsigned));
 
   const auto workarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
   if (workarounds->gfx10.waTessFactorBufferSizeLimitGeUtcl1Underflow) {
-    tfBufferPatchCountLimit /= 2;
+    tfBufferNumPatchesLimit /= 2;
   }
 
-  patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
+  maxNumPatchesPerGroup = std::min(maxNumPatchesPerGroup, tfBufferNumPatchesLimit);
 
   // For all-offchip tessellation, we need to write an additional 4-byte TCS control word to the TF buffer whenever
   // the patch-ID is zero.
-  const unsigned offChipTfBufferPatchCountLimit =
-      (tfBufferSizeInBytes - (patchCountPerThreadGroup * sizeof(unsigned))) / (tessFactorStride * sizeof(unsigned));
-  patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, offChipTfBufferPatchCountLimit);
+  const unsigned offChipTfBufferNumPatchesLimit =
+      (tfBufferSizeInBytes - (maxNumPatchesPerGroup * sizeof(unsigned))) / (tessFactorCount * sizeof(unsigned));
+  maxNumPatchesPerGroup = std::min(maxNumPatchesPerGroup, offChipTfBufferNumPatchesLimit);
 
-  return patchCountPerThreadGroup;
+  return maxNumPatchesPerGroup;
 }
 
 // =====================================================================================================================
@@ -4764,7 +4737,7 @@ void LowerInOut::addExportInstForGenericOutput(Value *output, unsigned location,
       attribValues[i] = exportValues[i - startChannel];
 
     m_expLocs.insert(location);
-    recordVertexAttribExport(location, {attribValues[0], attribValues[1], attribValues[2], attribValues[3]});
+    recordVertexAttribute(location, {attribValues[0], attribValues[1], attribValues[2], attribValues[3]});
   } else {
     // We have to do exporting twice for this output
     assert(startChannel == 0); // Other values are disallowed according to GLSL spec
@@ -4775,10 +4748,10 @@ void LowerInOut::addExportInstForGenericOutput(Value *output, unsigned location,
       attribValues[i] = exportValues[i];
 
     m_expLocs.insert(location); // First export
-    recordVertexAttribExport(location, {attribValues[0], attribValues[1], attribValues[2], attribValues[3]});
+    recordVertexAttribute(location, {attribValues[0], attribValues[1], attribValues[2], attribValues[3]});
 
     m_expLocs.insert(location + 1); // Second export
-    recordVertexAttribExport(location + 1, {attribValues[4], attribValues[5], attribValues[6], attribValues[7]});
+    recordVertexAttribute(location + 1, {attribValues[4], attribValues[5], attribValues[6], attribValues[7]});
   }
 }
 
@@ -4793,38 +4766,15 @@ void LowerInOut::addExportInstForBuiltInOutput(Value *output, unsigned builtInId
 
   switch (builtInId) {
   case BuiltInPosition: {
-    Value *args[] = {
-        builder.getInt32(EXP_TARGET_POS_0), // tgt
-        builder.getInt32(0xF),              // en
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        builder.getInt1(false), // done
-        builder.getInt1(false)  // vm
-    };
+    SmallVector<Value *, 4> positions;
+    for (unsigned i = 0; i < 4; ++i)
+      positions.push_back(builder.CreateExtractElement(output, builder.getInt32(i)));
 
-    // src0 ~ src3
-    for (unsigned i = 0; i < 4; ++i) {
-      auto compValue = builder.CreateExtractElement(output, builder.getInt32(i));
-      args[2 + i] = compValue;
-    }
-
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
+    exportPosition(0, positions, builder);
     break;
   }
   case BuiltInPointSize: {
-    Value *args[] = {
-        builder.getInt32(EXP_TARGET_POS_1), // tgt
-        builder.getInt32(0x1),              // en
-        output,                             // src0
-        poison,                             // src1
-        poison,                             // src2
-        poison,                             // src3
-        builder.getInt1(false),             // done
-        builder.getInt1(false)              // vm
-    };
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
+    exportPosition(1, {output, poison, poison, poison}, builder);
     break;
   }
   case BuiltInPrimitiveShadingRate: {
@@ -4835,19 +4785,8 @@ void LowerInOut::addExportInstForBuiltInOutput(Value *output, unsigned builtInId
     break;
   }
   case BuiltInEdgeFlag: {
-    Value *edgeflag = builder.CreateBitCast(output, builder.getFloatTy());
-
-    Value *args[] = {
-        builder.getInt32(EXP_TARGET_POS_1),     // tgt
-        builder.getInt32(0x2),                  // en
-        PoisonValue::get(builder.getFloatTy()), // src1
-        edgeflag,                               // src0
-        PoisonValue::get(builder.getFloatTy()), // src2
-        PoisonValue::get(builder.getFloatTy()), // src3
-        builder.getInt1(false),                 // done
-        builder.getInt1(false)                  // vm
-    };
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
+    Value *edgeFlag = builder.CreateBitCast(output, builder.getFloatTy());
+    exportPosition(1, {poison, edgeFlag, poison, poison}, builder);
     break;
   }
   default: {
@@ -5290,16 +5229,7 @@ void LowerInOut::exportShadingRate(Value *shadingRate, BuilderBase &builder) {
   }
 
   auto poison = PoisonValue::get(builder.getFloatTy());
-  // "Done" flag is valid for exporting position 0 ~ 3
-  builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
-                          {builder.getInt32(EXP_TARGET_POS_1), // tgt
-                           builder.getInt32(0x2),              // en
-                           poison,                             // src0
-                           hwShadingRate,                      // src1
-                           poison,                             // src2
-                           poison,                             // src3
-                           builder.getFalse(),                 // done
-                           builder.getFalse()});               // src0
+  exportPosition(1, {poison, hwShadingRate, poison, poison}, builder);
 }
 
 // =====================================================================================================================
@@ -5381,27 +5311,27 @@ Value *LowerInOut::getShadingRate(BuilderBase &builder) {
 }
 
 // =====================================================================================================================
-// Records export info of vertex attributes
+// Record export info of vertex attributes.
 //
-// @param location : Vertex attribute location
-// @param attribValues : Values of this vertex attribute to export
-void LowerInOut::recordVertexAttribExport(unsigned location, ArrayRef<Value *> attribValues) {
+// @param exportSlot : Export slot
+// @param exportValues : Values of this vertex attribute to export
+void LowerInOut::recordVertexAttribute(unsigned exportSlot, ArrayRef<Value *> exportValues) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader); // Valid shader stages
-  assert(location <= MaxInOutLocCount);             // 32 attributes at most
-  assert(attribValues.size() == 4);                 // Must have 4 elements, corresponds to <4 x float>
+  assert(exportSlot <= MaxInOutLocCount);           // 32 attributes at most
+  assert(exportValues.size() == 4);                 // Must have 4 elements, corresponds to <4 x float>
 
   auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
 
   // Vertex attribute not existing, insert a new one and initialize it
-  if (m_attribExports.count(location) == 0) {
+  if (m_attribExports.count(exportSlot) == 0) {
     for (unsigned i = 0; i < 4; ++i)
-      m_attribExports[location][i] = poison;
+      m_attribExports[exportSlot][i] = poison;
   }
 
   for (unsigned i = 0; i < 4; ++i) {
-    assert(attribValues[i]);
-    if (isa<UndefValue>(attribValues[i]) || isa<PoisonValue>(attribValues[i]))
+    assert(exportValues[i]);
+    if (isa<UndefValue>(exportValues[i]) || isa<PoisonValue>(exportValues[i]))
       continue; // Here, we only record new attribute values that are valid (not unspecified ones)
 
     // NOTE: The existing values must have been initialized to unspecified ones already. Overlapping is disallowed (see
@@ -5412,19 +5342,19 @@ void LowerInOut::recordVertexAttribExport(unsigned location, ArrayRef<Value *> a
     //   - Invalid:
     //       Existing: attrib0, <1.0, 2.0, 3.0, undef/poison>
     //       New:      attrib0, <undef/poison, undef/poison, 4.0, 5.0>
-    assert(isa<UndefValue>(m_attribExports[location][i]) || isa<PoisonValue>(m_attribExports[location][i]));
-    m_attribExports[location][i] = attribValues[i]; // Update values that are valid
+    assert(isa<UndefValue>(m_attribExports[exportSlot][i]) || isa<PoisonValue>(m_attribExports[exportSlot][i]));
+    m_attribExports[exportSlot][i] = exportValues[i]; // Update values that are valid
   }
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage.value())->inOutUsage;
-  inOutUsage.expCount = std::max(inOutUsage.expCount, location + 1); // Update export count
+  inOutUsage.expCount = std::max(inOutUsage.expCount, exportSlot + 1); // Update export count
 }
 
 // =====================================================================================================================
-// Exports vertex attributes that were recorded previously
+// Export vertex attributes that were recorded previously.
 //
-// @param builder : the builder to use
-void LowerInOut::exportVertexAttribs(BuilderBase &builder) {
+// @param builder : IR builder
+void LowerInOut::exportAttributes(BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader); // Valid shader stages
   if (m_attribExports.empty()) {
@@ -5433,32 +5363,115 @@ void LowerInOut::exportVertexAttribs(BuilderBase &builder) {
   }
 
   for (auto &attribExport : m_attribExports) {
-    if (m_pipelineState->exportAttributeByExportInstruction()) {
+    const auto &[exportSlot, exportValues] = attribExport;
+    assert(exportValues.size() == 4); // Must be <4 x float>
+
+    if (m_pipelineState->getNggControl()->enableNgg) {
+      builder.create<NggExportAttributeOp>(exportSlot, exportValues[0], exportValues[1], exportValues[2],
+                                           exportValues[3]);
+    } else {
       unsigned channelMask = 0;
       for (unsigned i = 0; i < 4; ++i) {
-        assert(attribExport.second[i]);
-        if (!isa<UndefValue>(attribExport.second[i]) && !isa<PoisonValue>(attribExport.second[i]))
+        assert(exportValues[i]);
+        if (!isa<UndefValue>(exportValues[i]) && !isa<PoisonValue>(exportValues[i]))
           channelMask |= (1u << i); // Update channel mask if the value is valid (not unspecified)
       }
 
       builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
-                              {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
-                               builder.getInt32(channelMask),                             // en
-                               attribExport.second[0],                                    // src0
-                               attribExport.second[1],                                    // src1
-                               attribExport.second[2],                                    // src2
-                               attribExport.second[3],                                    // src3
-                               builder.getFalse(),                                        // done
-                               builder.getFalse()});                                      // src0
-    } else {
-      Value *attribValue = PoisonValue::get(FixedVectorType::get(builder.getFloatTy(), 4)); // Always be <4 x float>
-      for (unsigned i = 0; i < 4; ++i)
-        attribValue = builder.CreateInsertElement(attribValue, attribExport.second[i], i);
-      // NOTE: Create a call if we export vertex attribute through memory. This call will be expanded when NGG primitive
-      // shader is generated. The arguments are: attribute location, and attribute export value.
-      builder.CreateNamedCall(lgcName::NggAttributeThroughMemory, builder.getVoidTy(),
-                              {builder.getInt32(attribExport.first), attribValue}, {});
+                              {builder.getInt32(EXP_TARGET_PARAM_0 + exportSlot), // tgt
+                               builder.getInt32(channelMask),                     // en
+                               exportValues[0],                                   // src0
+                               exportValues[1],                                   // src1
+                               exportValues[2],                                   // src2
+                               exportValues[3],                                   // src3
+                               builder.getFalse(),                                // done
+                               builder.getFalse()});                              // vm
     }
+  }
+}
+
+// =====================================================================================================================
+static Value *adjustIj(Value *value, Value *offset, BuilderImpl &builder) {
+  offset = builder.CreateFPExt(offset, FixedVectorType::get(builder.getFloatTy(), 2));
+  Value *offsetX = builder.CreateExtractElement(offset, uint64_t(0));
+  Value *offsetY = builder.CreateExtractElement(offset, 1);
+  if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
+    offsetX = builder.CreateVectorSplat(vecTy->getNumElements(), offsetX);
+    offsetY = builder.CreateVectorSplat(vecTy->getNumElements(), offsetY);
+  }
+  Value *derivX = builder.CreateDerivative(value, /*isY=*/false, /*isFine=*/true);
+  Value *derivY = builder.CreateDerivative(value, /*isY=*/true, /*isFine=*/true);
+  Value *adjustX = builder.CreateFAdd(value, builder.CreateFMul(derivX, offsetX));
+  Value *adjustY = builder.CreateFAdd(adjustX, builder.CreateFMul(derivY, offsetY));
+  return adjustY;
+}
+
+// =====================================================================================================================
+// Evaluate I,J for interpolation: center offset, smooth (perspective) version
+void LowerInOut::visitEvalIjOffsetSmoothOp(EvalIjOffsetSmoothOp &op) {
+  BuilderBase builderBase(&op);
+  // Get <I/W, J/W, 1/W>
+  Value *pullModel = patchFsBuiltInInputImport(FixedVectorType::get(builderBase.getFloatTy(), 3), BuiltInInterpPullMode,
+                                               nullptr, builderBase);
+  BuilderImpl builder(m_pipelineState);
+  builder.SetInsertPoint(builderBase.GetInsertPoint());
+  builder.setFastMathFlags(op.getFastMathFlags());
+  // Adjust each coefficient by offset.
+  Value *adjusted = adjustIj(pullModel, op.getValue(), builder);
+  // Extract <I/W, J/W, 1/W> part of that
+  Value *ijDivW = builder.CreateShuffleVector(adjusted, adjusted, ArrayRef<int>{0, 1});
+  Value *rcpW = builder.CreateExtractElement(adjusted, 2);
+  // Get W by making a reciprocal of 1/W
+  Value *w = builder.CreateFDiv(ConstantFP::get(builder.getFloatTy(), 1.0), rcpW);
+  w = builder.CreateVectorSplat(2, w);
+  auto res = builder.CreateFMul(ijDivW, w);
+
+  op.replaceAllUsesWith(res);
+  op.eraseFromParent();
+}
+
+// =====================================================================================================================
+// Adjusts value by its X and Y derivatives times the X and Y components of offset.
+void LowerInOut::visitAdjustIjOp(AdjustIjOp &op) {
+  BuilderImpl builder(m_pipelineState);
+  builder.SetInsertPoint(&op);
+  builder.setFastMathFlags(op.getFastMathFlags());
+  Value *adjusted = adjustIj(op.getValue(), op.getOffset(), builder);
+
+  op.replaceAllUsesWith(adjusted);
+  op.eraseFromParent();
+}
+
+// =====================================================================================================================
+// Export vertex position.
+//
+// @param exportSlot : Export slot
+// @param exportValues : Vertex position values to export
+// @param builder : IR builder
+void LowerInOut::exportPosition(unsigned exportSlot, ArrayRef<llvm::Value *> exportValues, BuilderBase &builder) {
+  assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
+         m_shaderStage == ShaderStage::CopyShader); // Valid shader stages
+  assert(exportValues.size() == 4);                 // Must be <4 x float>
+
+  if (m_pipelineState->getNggControl()->enableNgg) {
+    builder.create<NggExportPositionOp>(exportSlot, exportValues[0], exportValues[1], exportValues[2], exportValues[3]);
+  } else {
+    unsigned channelMask = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+      assert(exportValues[i]);
+      if (!isa<UndefValue>(exportValues[i]) && !isa<PoisonValue>(exportValues[i]))
+        channelMask |= (1u << i); // Update channel mask if the value is valid (not unspecified)
+    }
+
+    builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
+                            {builder.getInt32(EXP_TARGET_POS_0 + exportSlot), // tgt
+                             builder.getInt32(channelMask),                   // en
+                             exportValues[0],                                 // src0
+                             exportValues[1],                                 // src1
+                             exportValues[2],                                 // src2
+                             exportValues[3],                                 // src3
+                             builder.getFalse(),                              // done
+                             builder.getFalse()});                            // vm
   }
 }
 

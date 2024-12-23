@@ -28,6 +28,7 @@
  * @brief LLPC source file: implementation of miscellaneous Builder methods
  ***********************************************************************************************************************
  */
+#include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/InlineAsm.h"
@@ -52,15 +53,7 @@ Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
       m_pipelineState->getRasterizerState().rasterStream == streamId)
     m_pipelineState->setVertexStreamActive(streamId);
 
-  // Get GsWaveId
-  std::string callName = lgcName::InputImportBuiltIn;
-  callName += "GsWaveId.i32.i32";
-  Value *gsWaveId = CreateNamedCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {});
-
-  // Do the sendmsg.
-  // [9:8] = stream, [5:4] = 2 (emit), [3:0] = 2 (GS)
-  unsigned msg = (streamId << GsEmitCutStreamIdShift) | GsEmit;
-  return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {getInt32(msg), gsWaveId}, nullptr);
+  return create<GsEmitStreamOp>(streamId);
 }
 
 // =====================================================================================================================
@@ -76,15 +69,7 @@ Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
       m_pipelineState->getRasterizerState().rasterStream == streamId)
     m_pipelineState->setVertexStreamActive(streamId);
 
-  // Get GsWaveId
-  std::string callName = lgcName::InputImportBuiltIn;
-  callName += "GsWaveId.i32.i32";
-  Value *gsWaveId = CreateNamedCall(callName, getInt32Ty(), getInt32(BuiltInGsWaveId), {});
-
-  // Do the sendmsg.
-  // [9:8] = stream, [5:4] = 1 (cut), [3:0] = 2 (GS)
-  unsigned msg = (streamId << GsEmitCutStreamIdShift) | GsCut;
-  return CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {getInt32(msg), gsWaveId}, nullptr);
+  return create<GsCutStreamOp>(streamId);
 }
 
 // =====================================================================================================================

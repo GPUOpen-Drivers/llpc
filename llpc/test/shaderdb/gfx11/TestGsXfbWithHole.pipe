@@ -5,11 +5,11 @@
 ; RUN: amdllpc -gfxip=11 -stop-after=lgc-generate-copy-shader -v %s | FileCheck -check-prefix=CHECK %s
 
 ; CHECK-LABEL: @lgc.shader.COPY.main(
-; CHECK: [[TMP1:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 0, i32 0)
-; CHECK: [[TMP2:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 2, i32 0)
-; CHECK: [[TMP3:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 1, i32 0)
-; CHECK: call void @lgc.output.export.xfb.i32.i32.i32.f32(i32 0, i32 0, i32 0, float [[TMP1]])
-; CHECK: call void @lgc.output.export.xfb.i32.i32.i32.f32(i32 0, i32 8, i32 0, float [[TMP2]])
+; CHECK: [[TMP1:%.*]] = call float @lgc.ngg.read.gs.output__f32(i32 0, i32 0, i32 0)
+; CHECK: [[TMP2:%.*]] = call float @lgc.ngg.read.gs.output__f32(i32 0, i32 2, i32 0)
+; CHECK: [[TMP3:%.*]] = call float @lgc.ngg.read.gs.output__f32(i32 0, i32 1, i32 0)
+; CHECK: call void (...) @lgc.write.xfb.output(i32 0, i32 0, i32 0, float [[TMP1]])
+; CHECK: call void (...) @lgc.write.xfb.output(i32 0, i32 8, i32 0, float [[TMP2]])
 ; CHECK: [[TMP4:%.*]] = insertelement <3 x float> poison, float [[TMP1]], i64 0
 ; CHECK: [[TMP5:%.*]] = insertelement <3 x float> [[TMP4]], float [[TMP2]], i64 2
 ; CHECK: [[TMP6:%.*]] = insertelement <3 x float> [[TMP5]], float [[TMP3]], i64 1

@@ -44,7 +44,7 @@ using namespace llvm;
 // @returns : The module containing the null fragment shader.
 Module *NullFragmentShader::generate() {
   Module *module = generateEmptyModule();
-  FragColorExport::generateNullFragmentShader(*module, m_pipelineState, getGlueShaderName());
+  FragmentColorExport::generateNullFragmentShader(*module, m_pipelineState, getGlueShaderName());
   return module;
 }
 

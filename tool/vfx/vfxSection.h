@@ -87,6 +87,8 @@ enum MemberType : unsigned {
   MemberTypeFloat,                        // VFX member type: 32 bit float
   MemberTypeFloat16,                      // VFX member type: 16 bit float
   MemberTypeDouble,                       // VFX member type: 64 bit double
+  MemberTypeInt64,                        // VFX member type: 64bit integer
+  MemberTypeUint64,                       // VFX member type: 64bit unsigned integer
   MemberTypeBool,                         // VFX member type: boolean
   MemberTypeIVec4,                        // VFX member type: int vec4
   MemberTypeI64Vec2,                      // VFX member type: int64 vec2

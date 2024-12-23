@@ -266,7 +266,7 @@ Instruction *LowerAccessChain::tryToCoalesceChain(Instruction *getElemPtr) {
   // Create the coalesced "getelementptr" instruction (do combining)
   auto *coalescedGetElemPtr =
       isCustomGep ? cast<Instruction>(m_builder->create<StructuralGepOp>(basePtr, coalescedType, false, indices))
-                  : cast<Instruction>(GetElementPtrInst::Create(coalescedType, basePtr, indices, "", getElemPtr));
+                  : cast<Instruction>(m_builder->CreateGEP(coalescedType, basePtr, indices));
   getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
 
   // Remove dead "getelementptr" instructions where possible.

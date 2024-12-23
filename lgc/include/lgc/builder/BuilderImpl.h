@@ -37,7 +37,7 @@
 namespace lgc {
 
 // Map vkgc - uint32 -1 is zero extended
-static constexpr uint64_t InternalDescriptorSetId = 0x00000000FFFFFFFFull;
+static constexpr uint64_t InternalDescriptorSetId = 0x00000000FFFFFFF0ull;
 
 // =====================================================================================================================
 // Builder implementation class
@@ -138,6 +138,10 @@ public:
   // Create scalar or vector FP truncate operation with rounding mode.
   llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy, llvm::RoundingMode roundingMode,
                                          const llvm::Twine &instName = "");
+
+  // The conversion between float8 and float32.
+  llvm::Value *CreateFp8Convert(llvm::Value *value, llvm::Type *destTy, bool isBfloat = false,
+                                const llvm::Twine &instName = "");
 
   // Create quantize operation.
   llvm::Value *CreateQuantizeToFp16(llvm::Value *value, const llvm::Twine &instName = "");
@@ -310,7 +314,7 @@ public:
   bool useVertexBufferDescArray();
 
   // Build buffer compact descriptor
-  llvm::Value *buildBufferCompactDesc(llvm::Value *desc, unsigned stride);
+  llvm::Value *buildBufferCompactDesc(llvm::Value *desc, llvm::Value *stride);
 
   // Build image sampler feedback descriptor
   llvm::Value *CreateSamplerFeedbackDesc(llvm::Value *feedbackDesc, llvm::Value *resourceDesc,
@@ -545,8 +549,6 @@ private:
                                   llvm::Value *elemIdx, unsigned &locationCount, InOutInfo &inOutInfo);
 
   std::tuple<unsigned, llvm::Value *> getInterpModeAndValue(InOutInfo inputInfo, llvm::Value *auxInterpValue);
-  llvm::Value *evalIjOffsetSmooth(llvm::Value *offset);
-  llvm::Value *adjustIj(llvm::Value *value, llvm::Value *offset);
 
   // Read (part of) a built-in value
   llvm::Value *readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo inOutInfo, llvm::Value *vertexIndex,

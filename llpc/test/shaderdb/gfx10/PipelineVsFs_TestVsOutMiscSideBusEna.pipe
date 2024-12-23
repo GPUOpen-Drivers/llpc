@@ -26,7 +26,7 @@ entryPoint = main
 ; SHADERTEST-LABEL: amdgpu_vs_main:
 ; SHADERTEST:         v_mov_b32_e32 v0, 1.0
 ; SHADERTEST-NEXT:    exp pos0 v0, v0, v0, v0
-; SHADERTEST-NEXT:    exp pos1 v0, v0, v0, v0 done
+; SHADERTEST-NEXT:    exp pos1 v0, off, off, off done
 ; SHADERTEST-NEXT:    s_endpgm
 ;
 ; SHADERTEST-LABEL: amdgpu_ps_main:

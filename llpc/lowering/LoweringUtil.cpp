@@ -35,6 +35,7 @@
 #include "llpcUtil.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Linker/Linker.h"
 
 using namespace llvm;
 
@@ -134,7 +135,9 @@ BasicBlock *clearBlock(Function *func) {
 // Clear non entry external functions
 // @param module : LLVM module to remove functions.
 // @param entryName : Entry Function Name
-void clearNonEntryFunctions(Module *module, StringRef entryName) {
+// @return whether anything was changed
+bool clearNonEntryFunctions(Module *module, StringRef entryName) {
+  bool change = false;
   for (auto funcIt = module->begin(), funcEnd = module->end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if ((func->getLinkage() == GlobalValue::ExternalLinkage || func->getLinkage() == GlobalValue::WeakAnyLinkage) &&
@@ -142,9 +145,32 @@ void clearNonEntryFunctions(Module *module, StringRef entryName) {
       if (!func->getName().starts_with(entryName)) {
         func->dropAllReferences();
         func->eraseFromParent();
+        change = true;
       }
     }
   }
+  return change;
+}
+
+// =====================================================================================================================
+// Run the ClearNonEntryFunctions pass on the given Module.
+PreservedAnalyses ClearNonEntryFunctionsPass::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  return clearNonEntryFunctions(&module, m_entryName) ? PreservedAnalyses::none() : PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Run the MergeModules pass on the given ModuleBunch.
+PreservedAnalyses MergeModulesPass::run(ModuleBunch &moduleBunch, ModuleBunchAnalysisManager &analysisManager) {
+  auto modules = moduleBunch.getMutableModules();
+  if (modules.size() < 2)
+    return PreservedAnalyses::all();
+
+  Linker linker(*modules[0]);
+  for (auto &module : modules.drop_front())
+    linker.linkInModule(std::move(module));
+
+  moduleBunch.renormalize();
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

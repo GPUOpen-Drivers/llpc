@@ -53,7 +53,7 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
                                .getMap(true);
     m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
   }
-  m_key = FragColorExport::computeKey(exports, pipelineState);
+  m_key = FragmentColorExport::computeKey(exports, pipelineState);
 }
 
 // =====================================================================================================================
@@ -121,7 +121,7 @@ Module *ColorExportShader::generate() {
   Function *colorExportFunc = createColorExportFunc();
 
   // Process each fragment output.
-  FragColorExport fragColorExport(m_lgcContext);
+  FragmentColorExport fragColorExport(m_lgcContext);
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
 

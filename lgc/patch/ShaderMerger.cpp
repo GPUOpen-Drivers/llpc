@@ -470,11 +470,11 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     // NOTE: The hsPatchCount is only valid for the first wave in the group. We have to store it to LDS to distribute
     // it through the group.
-    Value *hasPatchCount = builder.CreateLShr(mergeWaveInfo, 16); // hsWaveCount = mergedWaveInfo[24:16]
-    hasPatchCount = builder.CreateAnd(hasPatchCount, 0xFF);
+    Value *hsPatchCount = builder.CreateLShr(mergeWaveInfo, 16); // hsWaveCount = mergedWaveInfo[24:16]
+    hsPatchCount = builder.CreateAnd(hsPatchCount, 0xFF);
     const auto hsPatchCountStart = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)
-                                       ->inOutUsage.tcs.calcFactor.onChip.hsPatchCountStart;
-    writeValueToLds(hasPatchCount, builder.getInt32(hsPatchCountStart), builder);
+                                       ->inOutUsage.tcs.hwConfig.onChip.hsPatchCountStart;
+    writeValueToLds(hsPatchCount, builder.getInt32(hsPatchCountStart), builder);
     builder.CreateBr(endDistribHsPatchCountBlock);
 
     // Construct ".endDistribHsPatchCount" block
@@ -522,8 +522,12 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // Construct ".endHs" block
   builder.SetInsertPoint(endHsBlock);
 
-  if (m_pipelineState->canOptimizeTessFactor())
-    storeTessFactorsWithOpt(threadIdInWave, builder);
+  if (m_pipelineState->canOptimizeTessFactor()) {
+    auto relativePatchId = builder.CreateAnd(relPatchId, builder.getInt32(0xFF));
+    auto vertexIdx = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                             {relPatchId, builder.getInt32(8), builder.getInt32(5)});
+    storeTessFactorsAndHsOutputsWithOpt(threadIdInWave, relativePatchId, vertexIdx, builder);
+  }
 
   builder.CreateRetVoid();
 
@@ -678,7 +682,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     Run GS
   // }
   //
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+  const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
 
   SmallVector<Argument *, 32> args;
   for (auto &arg : entryPoint->args())
@@ -724,7 +728,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
                                                 {mergedWaveInfo, builder.getInt32(24), builder.getInt32(4)});
   waveInSubgroup->setName("waveInSubgroup");
 
-  auto esGsOffset = builder.CreateMul(waveInSubgroup, builder.getInt32(64 * calcFactor.esGsRingItemSize));
+  auto esGsOffset = builder.CreateMul(waveInSubgroup, builder.getInt32(64 * hwConfig.esGsRingItemSize));
 
   auto validEsVert = builder.CreateICmpULT(threadIdInWave, esVertCount, "validEsVert");
   builder.CreateCondBr(validEsVert, beginEsBlock, endEsBlock);
@@ -737,7 +741,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *esGsOffsets01 = vgprArgs[0];
 
   Value *esGsOffsets23 = PoisonValue::get(builder.getInt32Ty());
-  if (calcFactor.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch) {
+  if (hwConfig.inputVertices > 2 && geometryMode.inputPrimitive != InputPrimitives::Patch) {
     // NOTE: ES to GS offset (vertex 2 and 3) is valid once the primitive type has more than 2 vertices.
     esGsOffsets23 = vgprArgs[1];
   }
@@ -746,7 +750,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   Value *invocationId = vgprArgs[3];
 
   Value *esGsOffsets45 = PoisonValue::get(builder.getInt32Ty());
-  if (calcFactor.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) {
+  if (hwConfig.inputVertices > 4 && geometryMode.inputPrimitive != InputPrimitives::Patch) {
     // NOTE: ES to GS offset (vertex 4 and 5) is valid once the primitive type has more than 4 vertices.
     esGsOffsets45 = vgprArgs[4];
   }
@@ -965,13 +969,12 @@ void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entr
 
     if (shaderStage == ShaderStage::TessControl) {
       // Must be LS-HS merged shader
-      const auto &calcFactor =
-          m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-      hasLdsStack = calcFactor.rayQueryLdsStackSize > 0;
+      const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
+      hasLdsStack = hwConfig.rayQueryLdsStackSize > 0;
     } else {
       // Must be ES-GS merged shader or NGG primitive shader
-      const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
-      hasLdsStack = calcFactor.rayQueryLdsStackSize > 0;
+      const auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
+      hasLdsStack = hwConfig.rayQueryLdsStackSize > 0;
     }
 
     if (hasLdsStack) {
@@ -997,21 +1000,31 @@ void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entr
 }
 
 // =====================================================================================================================
-// Handle the store of tessellation factors with optimization (TF0/TF1 messaging)
+// Handle the store of tessellation factors with optimization (TF0/TF1 messaging) and the store of HS outputs to
+// off-chip LDS buffer if the patch is valid (all of its outer TFs are greater than zero).
 //
 // @param threadIdInWave : Thread ID in wave
+// @param relPatchId : Relative patch ID (output patch ID in group)
+// @param vertexIdx : Vertex indexing (output control point ID)
 // @param builder : IR builder to insert instructions
-void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &builder) {
+void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Value *relPatchId, Value *vertexIdx,
+                                                       BuilderBase &builder) {
   assert(m_pipelineState->canOptimizeTessFactor());
 
   //
   // The processing is something like this:
   //
-  // OPTIMIZED_TF_STORE() {
+  // OPTIMIZED_TF_STORE_AND_HS_OUTPUTS_STORE() {
+  //   if (threadIdInWave < hsVertexCount) {
+  //     Read TFs from LDS (each thread corresponds to an output vertex)
+  //     if (outerTfs > 0.0)
+  //       Write HS outputs to off-chip LDS buffer
+  //   }
+  //
   //   Read hsPatchCount from LDS
   //
   //   if (threadIdInGroup < hsPatchCount) {
-  //     Read TFs from LDS (with a barrier to make sure TFs are written)
+  //     Read TFs from LDS (each thread corresponds to a patch)
   //     Compute per-thread specielTf
   //     Compute per-wave specielTf
   //   }
@@ -1038,12 +1051,18 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   // }
   //
 
+  const auto fastMathFlags = builder.getFastMathFlags();
+  FastMathFlags newFastMathFlags(fastMathFlags);
+  newFastMathFlags.setNoNaNs(); // Set NoNaNs flag to let LLVM optimize floating-point min/max/eq in this algorithm.
+  builder.setFastMathFlags(newFastMathFlags);
+
   auto insertBlock = builder.GetInsertBlock();
   auto entryPoint = insertBlock->getParent();
   assert(entryPoint->getName() == lgcName::LsHsEntryPoint); // Must be LS-HS merged shader
 
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-  const unsigned waveSize = m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage;
+  const auto &hwConfig = inOutUsage.tcs.hwConfig;
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::TessControl);
   assert(waveSize == 32 || waveSize == 64);
 
   // Helper to create a basic block
@@ -1084,19 +1103,36 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   auto storeTfBlock = createBlock(".storeTf");
   auto endTryStoreTfBlock = createBlock(".endTryStoreTf");
 
+  auto tryStoreHsOutputsBlock = createBlock(".tryStoreHsOutputs");
+  auto endTryStoreHsOutputsBlock = createBlock(".endTryStoreHsOutputs");
+
   // Construct current insert block
+  Type *bufferDescTy = FixedVectorType::get(builder.getInt32Ty(), 4);
+  Value *globalTablePtr = nullptr;
   Value *waveIdInGroup = nullptr;
   Value *threadIdInGroup = nullptr;
   Value *hsPatchCount = nullptr;
   Value *validHsPatch = nullptr;
   {
+    auto userData = getFunctionArgument(entryPoint, NumSpecialSgprInputs);
+    auto globalTable = builder.CreateExtractElement(
+        userData, static_cast<uint64_t>(0)); // The first element of user data argument is always internal global table
+
+    Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+    pc = builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2));
+
+    globalTablePtr = builder.CreateInsertElement(pc, globalTable, static_cast<uint64_t>(0));
+    globalTablePtr = builder.CreateBitCast(globalTablePtr, builder.getInt64Ty());
+    globalTablePtr =
+        builder.CreateIntToPtr(globalTablePtr, PointerType::get(bufferDescTy, ADDR_SPACE_CONST), "globalTablePtr");
+
     waveIdInGroup = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::waveIdInGroup));
     waveIdInGroup = builder.CreateAnd(waveIdInGroup, 0x1F, "waveIdInGroup"); // waveIdInGroup = [4:0]
 
     threadIdInGroup = builder.CreateMul(builder.getInt32(waveSize), waveIdInGroup);
     threadIdInGroup = builder.CreateAdd(threadIdInGroup, threadIdInWave, "threadIdInGroup");
 
-    const auto hsPatchCountStart = calcFactor.onChip.hsPatchCountStart;
+    const auto hsPatchCountStart = hwConfig.onChip.hsPatchCountStart;
     hsPatchCount = readValueFromLds(builder.getInt32Ty(), builder.getInt32(hsPatchCountStart), builder);
     hsPatchCount = builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, hsPatchCount);
     hsPatchCount->setName("hsPatchCount");
@@ -1117,45 +1153,40 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
     outerTf = tessFactors.first;
     innerTf = tessFactors.second;
 
-    // Check special TFs
-    Value *one = ConstantFP::get(builder.getFloatTy(), 1.0);
-    Value *zero = ConstantFP::get(builder.getFloatTy(), 0.0);
-
-    Value *isAllOnesTf = builder.getTrue();
-    Value *isAllZerosTf = builder.getTrue();
-
     // Check if the thread has all-ones/all-zeros TFs
-    for (unsigned i = 0; i < cast<FixedVectorType>(outerTf->getType())->getNumElements(); ++i) {
-      auto elem = builder.CreateExtractElement(outerTf, i);
-      Value *isOne = builder.CreateFCmpOEQ(elem, one);
-      Value *isZero = builder.CreateFCmpOEQ(elem, zero);
-
-      isAllOnesTf = builder.CreateAnd(isAllOnesTf, isOne);
-      isAllZerosTf = builder.CreateAnd(isAllZerosTf, isZero);
+    auto minTf = builder.CreateExtractElement(outerTf, static_cast<uint64_t>(0));
+    auto maxTf = minTf;
+    for (unsigned i = 1; i < cast<FixedVectorType>(outerTf->getType())->getNumElements(); ++i) {
+      auto elemTf = builder.CreateExtractElement(outerTf, i);
+      minTf = builder.CreateBinaryIntrinsic(Intrinsic::minimum, minTf, elemTf);
+      maxTf = builder.CreateBinaryIntrinsic(Intrinsic::maximum, maxTf, elemTf);
     }
 
-    // Check inner tessellation factors
     if (innerTf) {
       // Isoline doesn't have inner tessellation factors
       for (unsigned i = 0; i < cast<FixedVectorType>(innerTf->getType())->getNumElements(); ++i) {
-        auto elem = builder.CreateExtractElement(innerTf, i);
-        Value *isOne = builder.CreateFCmpOEQ(elem, one);
-        Value *isZero = builder.CreateFCmpOEQ(elem, zero);
-
-        isAllOnesTf = builder.CreateAnd(isAllOnesTf, isOne);
-        isAllZerosTf = builder.CreateAnd(isAllZerosTf, isZero);
+        auto elemTf = builder.CreateExtractElement(innerTf, i);
+        minTf = builder.CreateBinaryIntrinsic(Intrinsic::minimum, minTf, elemTf);
+        maxTf = builder.CreateBinaryIntrinsic(Intrinsic::maximum, maxTf, elemTf);
       }
     }
 
-    auto validhMask = ballot(builder.getTrue());
+    auto minTfEqMaxTf = builder.CreateFCmpOEQ(minTf, maxTf);
+    Value *isOne = builder.CreateFCmpOEQ(minTf, ConstantFP::get(builder.getFloatTy(), 1.0));
+    Value *isZero = builder.CreateFCmpOEQ(minTf, ConstantFP::get(builder.getFloatTy(), 0.0));
+
+    auto isAllOnesTf = builder.CreateAnd(minTfEqMaxTf, isOne);
+    auto isAllZerosTf = builder.CreateAnd(minTfEqMaxTf, isZero);
+
+    auto validMask = ballot(builder.getTrue());
 
     // Check if the wave has all-ones TFs uniformly
     Value *allOnesTfMask = ballot(isAllOnesTf);
-    auto isAllOnesTfInWave = builder.CreateICmpEQ(allOnesTfMask, validhMask);
+    auto isAllOnesTfInWave = builder.CreateICmpEQ(allOnesTfMask, validMask);
 
     // Check if the wave has all-zeros TFs uniformly
     Value *allZerosTfMask = ballot(isAllZerosTf);
-    auto isAllZerosTfInWave = builder.CreateICmpEQ(allZerosTfMask, validhMask);
+    auto isAllZerosTfInWave = builder.CreateICmpEQ(allZerosTfMask, validMask);
 
     specialTfInWave = std::make_pair(isAllOnesTfInWave, isAllZerosTfInWave);
 
@@ -1195,7 +1226,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   {
     builder.SetInsertPoint(handleMultiWaveBlock);
 
-    const unsigned specialTfValueStart = calcFactor.onChip.specialTfValueStart;
+    const unsigned specialTfValueStart = hwConfig.onChip.specialTfValueStart;
 
     // ldsOffset = specialTfValueStart + 2 * waveIdInGroup
     auto ldsOffset = builder.CreateAdd(builder.getInt32(specialTfValueStart), builder.CreateShl(waveIdInGroup, 1));
@@ -1220,7 +1251,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   {
     builder.SetInsertPoint(checkSpecilTfInGroupBlock);
 
-    const unsigned specialTfValueStart = calcFactor.onChip.specialTfValueStart;
+    const unsigned specialTfValueStart = hwConfig.onChip.specialTfValueStart;
 
     // ldsOffset = specialTfValueStart + 2 * threadIdInWave
     auto ldsOffset = builder.CreateAdd(builder.getInt32(specialTfValueStart), builder.CreateShl(threadIdInWave, 1));
@@ -1307,23 +1338,10 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   {
     builder.SetInsertPoint(storeTfBlock);
 
-    auto userData = getFunctionArgument(entryPoint, NumSpecialSgprInputs);
-    auto globalTable = builder.CreateExtractElement(
-        userData, static_cast<uint64_t>(0)); // The first element of user data argument is always internal global table
-
-    Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
-    pc = builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2));
-
-    Value *globalTablePtr = builder.CreateInsertElement(pc, globalTable, static_cast<uint64_t>(0));
-    globalTablePtr = builder.CreateBitCast(globalTablePtr, builder.getInt64Ty());
-    Type *tfBufferDescTy = FixedVectorType::get(builder.getInt32Ty(), 4);
-    globalTablePtr =
-        builder.CreateIntToPtr(globalTablePtr, PointerType::get(tfBufferDescTy, ADDR_SPACE_CONST), "globalTablePtr");
-
     Value *tfBufferDescPtr =
         builder.CreateConstGEP1_32(builder.getInt8Ty(), globalTablePtr, SiDrvTableTfBufferOffs * 4, "tfBufferDescPtr");
-    auto tfBufferDesc = builder.CreateLoad(tfBufferDescTy, tfBufferDescPtr, "tfBufferDesc");
-    Value *tfBufferBase = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
+    auto tfBufferDesc = builder.CreateLoad(bufferDescTy, tfBufferDescPtr, "tfBufferDesc");
+    auto tfBufferBase = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::TfBufferBase));
 
     // Store TFs to TF buffer
     PreparePipelineAbi::writeTessFactors(m_pipelineState, tfBufferDesc, tfBufferBase, threadIdInGroup, outerTf, innerTf,
@@ -1334,8 +1352,41 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   // Construct ".endTryStoreTf" block
   {
     builder.SetInsertPoint(endTryStoreTfBlock);
+
+    // hsVertexCount = mergeWaveInfo[15:8]
+    auto mergeWaveInfo = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::MergedWaveInfo));
+    auto hsVertexCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                                 {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
+    hsVertexCount->setName("hsVertexCount");
+
+    auto validHsVertex = builder.CreateICmpULT(threadIdInWave, hsVertexCount, "validHsVertex");
+    builder.CreateCondBr(validHsVertex, tryStoreHsOutputsBlock, endTryStoreHsOutputsBlock);
+  }
+
+  // Construct ".tryStoreHsOutputs" block
+  {
+    builder.SetInsertPoint(tryStoreHsOutputsBlock);
+
+    Value *offChipLdsDescPtr = builder.CreateConstGEP1_32(builder.getInt8Ty(), globalTablePtr,
+                                                          SiDrvTableHsBufferOffs * 4, "offChipLdsDescPtr");
+    auto offChipLdsDesc = builder.CreateLoad(bufferDescTy, offChipLdsDescPtr, "offChipLdsDesc");
+    auto offChipLdsBase = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::OffChipLdsBase));
+
+    // Store HS outputs to off-chip LDS buffer
+    const auto &[outerTf, innerTf] = PreparePipelineAbi::readTessFactors(m_pipelineState, relPatchId, builder);
+    PreparePipelineAbi::writeHsOutputs(m_pipelineState, offChipLdsDesc, offChipLdsBase, relPatchId, vertexIdx, outerTf,
+                                       builder);
+
+    builder.CreateBr(endTryStoreHsOutputsBlock);
+  }
+
+  // Construct ".endTryStoreHsOutputs" block
+  {
+    builder.SetInsertPoint(endTryStoreHsOutputsBlock);
     // Do nothing
   }
+
+  builder.setFastMathFlags(fastMathFlags); // Restore fast math flags
 }
 
 // =====================================================================================================================

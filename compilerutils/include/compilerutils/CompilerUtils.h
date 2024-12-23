@@ -156,7 +156,7 @@ private:
 // Writes instructions which are redundant after the replacement into
 // the given ToBeRemoved vector.
 // The caller has to handle the erasure afterwards.
-void replaceAllPointerUses(llvm::IRBuilder<> *builder, llvm::Value *oldPointerValue, llvm::Value *newPointerValue,
+void replaceAllPointerUses(llvm::Value *oldPointerValue, llvm::Value *newPointerValue,
                            llvm::SmallVectorImpl<llvm::Instruction *> &toBeRemoved);
 
 // Create a GEP if idx is non-null, otherwise return the pointer.
@@ -168,13 +168,6 @@ llvm::Value *simplifyingCreateConstInBoundsGEP1_32(llvm::IRBuilder<> &builder, l
 } // namespace CompilerUtils
 
 namespace llvm {
-
-// Replacement for PointerType::getWithSamePointeeType that works with new LLVM.
-// Returns a typed pointer type if the pointer type is typed.
-//
-// TODO: Remove this as soon as all internal users of opaque pointers have been
-//       fixed.
-PointerType *getWithSamePointeeType(PointerType *ptrTy, unsigned addressSpace);
 
 /// Free-standing helpers.
 

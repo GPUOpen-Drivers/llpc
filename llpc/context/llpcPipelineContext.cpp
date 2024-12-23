@@ -326,6 +326,86 @@ Options PipelineContext::computePipelineOptions() const {
 }
 
 // =====================================================================================================================
+// Set vertex input descriptions in middle-end Pipeline object, or hash them.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] gfxBuildInfo : graphics pipeline build info
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline, const GraphicsPipelineBuildInfo *gfxBuildInfo,
+                                                 Util::MetroHash64 *hasher) const {
+  if (!gfxBuildInfo || !pipeline)
+    return;
+
+  auto vertexInput = gfxBuildInfo->pVertexInput;
+  if (!vertexInput)
+    return;
+
+  if (hasher) {
+    PipelineDumper::updateHashForVertexInputState(vertexInput, gfxBuildInfo->dynamicVertexStride, hasher);
+  }
+
+  // Gather the bindings.
+  SmallVector<VertexInputDescription, 8> bindings;
+  for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i) {
+    auto binding = &vertexInput->pVertexBindingDescriptions[i];
+    unsigned idx = binding->binding;
+    if (idx >= bindings.size())
+      bindings.resize(idx + 1);
+    bindings[idx].binding = binding->binding;
+    bindings[idx].stride = binding->stride;
+    switch (binding->inputRate) {
+    case VK_VERTEX_INPUT_RATE_VERTEX:
+      bindings[idx].inputRate = VertexInputRateVertex;
+      break;
+    case VK_VERTEX_INPUT_RATE_INSTANCE:
+      bindings[idx].inputRate = VertexInputRateInstance;
+      bindings[idx].divisor = 1; // Set default divisor
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+    }
+  }
+
+  // Check for divisors.
+  auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT, vertexInput->pNext);
+  if (vertexDivisor) {
+    for (unsigned i = 0; i < vertexDivisor->vertexBindingDivisorCount; ++i) {
+      auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
+      if (divisor->binding <= bindings.size())
+        bindings[divisor->binding].divisor = divisor->divisor;
+    }
+  }
+
+  // Gather the vertex inputs.
+  SmallVector<VertexInputDescription, 8> descriptions;
+  auto vbLowBits = gfxBuildInfo->getGlState().vbAddressLowBits;
+  auto vbAddressLowBitsKnown = gfxBuildInfo->getGlState().vbAddressLowBitsKnown;
+  for (unsigned i = 0; i < vertexInput->vertexAttributeDescriptionCount; ++i) {
+    auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
+    if (attrib->binding >= bindings.size())
+      continue;
+    auto binding = &bindings[attrib->binding];
+    if (binding->binding != attrib->binding)
+      continue;
+
+    auto dfmt = BufDataFormatInvalid;
+    auto nfmt = BufNumFormatUnorm;
+    std::tie(dfmt, nfmt) = mapVkFormat(attrib->format, /*isColorExport=*/false);
+    const uint8_t vbOffsetLowBits = vbAddressLowBitsKnown ? vbLowBits[attrib->binding] : 0;
+
+    if (dfmt != BufDataFormatInvalid) {
+      descriptions.push_back({attrib->location, attrib->binding, attrib->offset,
+                              (gfxBuildInfo->dynamicVertexStride ? 0 : binding->stride), dfmt, nfmt, binding->inputRate,
+                              binding->divisor, vbOffsetLowBits});
+    }
+  }
+
+  // Give the vertex input descriptions to the middle-end Pipeline object.
+  pipeline->setVertexInputDescriptions(descriptions);
+}
+
+// =====================================================================================================================
 // Give the user data nodes and descriptor range values to the middle-end.
 // The user data nodes have been merged so they are the same in each shader stage. Get them from
 // the first active stage.
@@ -714,6 +794,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
       static_cast<InvariantLoadsOption>(shaderInfo.options.aggressiveInvariantLoads);
   shaderOptions.viewIndexFromDeviceIndex = shaderInfo.options.viewIndexFromDeviceIndex;
 
+  shaderOptions.forceUnderflowPrevention = shaderInfo.options.forceUnderflowPrevention;
   return shaderOptions;
 }
 

@@ -1,0 +1,48 @@
+// NOTE : Do not autogenerate
+
+// Check that we calculate payload size correctly using scalar alignment (requested by spec)
+
+#version 460 // COMMON
+#extension GL_EXT_ray_tracing : enable // COMMON
+#extension GL_EXT_shader_explicit_arithmetic_types : require // COMMON
+
+// Different payload types for testing
+
+#define PAYLOAD_TYPE vec3 // TEST-1
+
+#define PAYLOAD_TYPE struct { float a; double b; } // TEST-2
+
+#define PAYLOAD_TYPE vec3[2] // TEST-3
+
+#define PAYLOAD_TYPE struct { float a; vec4 b; vec3 c; } // TEST-4
+
+#define PAYLOAD_TYPE float16_t[3] // TEST-5
+
+// Common testing part
+layout(location = 0) rayPayloadEXT PAYLOAD_TYPE g_ray; // COMMON
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh; // COMMON
+
+void main() { // COMMON
+  vec3 origin = {gl_LaunchIDEXT.x, gl_LaunchIDEXT.y, 0}; // COMMON
+  traceRayEXT(g_bvh, 0, 0xff, 0, 1, 0, origin.xyz, 0.0, vec3(1, 0, 0), 48.0, 0); // COMMON
+} // COMMON
+
+// RUN: grep -e COMMON -e TEST-1 %s > %t.rgen
+// RUN: amdllpc -gfxip=11.0 -llpc-raytracing-mode=continuations --report-payload-register-sizes=max %t.rgen 2>&1 | FileCheck -check-prefix=CHECK-1 %s
+// CHECK-1: Incoming and max outgoing payload VGPR size of "_rgen_1" (raygeneration): 0 and 3 dwords
+
+// RUN: grep -e COMMON -e TEST-2 %s > %t.rgen
+// RUN: amdllpc -gfxip=11.0 -llpc-raytracing-mode=continuations --report-payload-register-sizes=max %t.rgen 2>&1 | FileCheck -check-prefix=CHECK-2 %s
+// CHECK-2: Incoming and max outgoing payload VGPR size of "_rgen_1" (raygeneration): 0 and 4 dwords
+
+// RUN: grep -e COMMON -e TEST-3 %s > %t.rgen
+// RUN: amdllpc -gfxip=11.0 -llpc-raytracing-mode=continuations --report-payload-register-sizes=max %t.rgen 2>&1 | FileCheck -check-prefix=CHECK-3 %s
+// CHECK-3: Incoming and max outgoing payload VGPR size of "_rgen_1" (raygeneration): 0 and 6 dwords
+
+// RUN: grep -e COMMON -e TEST-4 %s > %t.rgen
+// RUN: amdllpc -gfxip=11.0 -llpc-raytracing-mode=continuations --report-payload-register-sizes=max %t.rgen 2>&1 | FileCheck -check-prefix=CHECK-4 %s
+// CHECK-4: Incoming and max outgoing payload VGPR size of "_rgen_1" (raygeneration): 0 and 8 dwords
+
+// RUN: grep -e COMMON -e TEST-5 %s > %t.rgen
+// RUN: amdllpc -gfxip=11.0 -llpc-raytracing-mode=continuations --report-payload-register-sizes=max %t.rgen 2>&1 | FileCheck -check-prefix=CHECK-5 %s
+// CHECK-5: Incoming and max outgoing payload VGPR size of "_rgen_1" (raygeneration): 0 and 2 dwords

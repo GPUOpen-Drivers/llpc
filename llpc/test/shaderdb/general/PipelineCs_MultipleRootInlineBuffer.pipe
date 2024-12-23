@@ -15,7 +15,7 @@
 ; SHADERTEST: [[buf1:%[0-9]*]] = ptrtoint ptr addrspace(4) [[buf_addr1]] to i64
 
 ; Get the "fat pointer" for the buffer
-; SHADERTEST: call ptr addrspace(7) @lgc.buffer.addr.to.ptr(i64 [[buf1]])
+; SHADERTEST: call ptr addrspace(7) @lgc.buffer.addr.to.ptr(i64 [[buf1]], i1 false)
 
 ; Get a pointer to the first inline buffer. Offset 4 comes from the user data nodes
 ; SHADERTEST: [[buf_addr0:%[0-9]*]] = call ptr addrspace(4) @lgc.user.data(i32 4)

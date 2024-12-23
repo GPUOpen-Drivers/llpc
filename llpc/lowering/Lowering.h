@@ -32,6 +32,7 @@
 
 #include "llpc.h"
 #include "llpcUtil.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
 namespace llvm {
@@ -44,6 +45,7 @@ class Timer;
 namespace lgc {
 
 class Builder;
+class MbPassManager;
 class PassManager;
 
 } // namespace lgc
@@ -70,12 +72,12 @@ public:
   explicit SpirvLower() {}
 
   // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer,
+  static void addPasses(Context *context, ShaderStage stage, llvm::ModulePassManager &passMgr, llvm::Timer *lowerTimer,
                         LowerFlag lowerFlag);
   // Register all the translation passes into the given pass manager
-  static void registerTranslationPasses(lgc::PassManager &passMgr);
+  template <typename PassManagerT> static void registerTranslationPasses(PassManagerT &passMgr);
   // Register all the lowering passes into the given pass manager
-  static void registerLoweringPasses(lgc::PassManager &passMgr);
+  template <typename PassManagerT> static void registerLoweringPasses(PassManagerT &passMgr);
 
   static void replaceGlobal(Context *context, llvm::GlobalVariable *original, llvm::GlobalVariable *replacement);
 
@@ -88,5 +90,11 @@ protected:
   llvm::Function *m_entryPoint = nullptr;         // Entry point of input module
   lgc::Builder *m_builder = nullptr;              // LGC builder object
 };
+
+extern template void SpirvLower::registerTranslationPasses<lgc::PassManager>(lgc::PassManager &);
+extern template void SpirvLower::registerTranslationPasses<lgc::MbPassManager>(lgc::MbPassManager &);
+
+extern template void SpirvLower::registerLoweringPasses<lgc::PassManager>(lgc::PassManager &);
+extern template void SpirvLower::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
 } // namespace Llpc

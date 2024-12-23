@@ -556,8 +556,8 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
 
   // Lower returns.
   for (auto *ret : retInstrs) {
-    auto *cspTy = builder.getInt32Ty();
-    exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(cspTy)}));
+    auto *dummyI32 = PoisonValue::get(builder.getInt32Ty());
+    exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), dummyI32, dummyI32}));
     builder.SetInsertPoint(ret);
     builder.CreateBr(tailBlock);
     ret->eraseFromParent();
@@ -568,7 +568,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     vgprNum = std::max(exit.vgpr.size(), vgprNum);
 
   SmallVector<Value *> newVgpr;
-  // Put LocalInvocationId before {vcr, csp}.
+  // Put LocalInvocationId before {vcr, csp, shaderIndex}.
   if (haveLocalInvocationId)
     newVgpr.push_back(func->getArg(numUserdata));
 
@@ -578,8 +578,9 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     newVgpr.append(exitInfos[0].vgpr);
   } else {
     for (size_t vgprIdx = 0; vgprIdx < vgprNum; vgprIdx++) {
-      // We always have the leading two fixed vgpr arguments: vcr, csp. The other remaining payloads are i32 type.
-      Type *phiTy = vgprIdx < 2 ? exitInfos[0].vgpr[vgprIdx]->getType() : builder.getInt32Ty();
+      // We always have the leading three fixed vgpr arguments: csp, shaderIndex, vcr. The other remaining payloads are
+      // i32 type.
+      Type *phiTy = vgprIdx < 3 ? exitInfos[0].vgpr[vgprIdx]->getType() : builder.getInt32Ty();
       PHINode *phi = builder.CreatePHI(phiTy, exitInfos.size());
       for (size_t exitIdx = 0; exitIdx < exitInfos.size(); exitIdx++) {
         if (vgprIdx < exitInfos[exitIdx].vgpr.size())
@@ -832,10 +833,11 @@ void MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, Basic
   // Add extra args specific to the target function.
   SmallVector<Value *> remainingArgs{jumpOp->getTail()};
 
-  // Packing VGPR arguments {vcr, csp, rcr, args...}
+  // Packing VGPR arguments {vcr, csp, shaderRecIdx, rcr, args...}
   SmallVector<Value *> vgprArgs;
   vgprArgs.push_back(jumpOp->getTarget());
   vgprArgs.push_back(jumpOp->getCsp());
+  vgprArgs.push_back(jumpOp->getShaderIndex());
   vgprArgs.push_back(jumpOp->getRcr());
   splitIntoI32(layout, builder, remainingArgs, vgprArgs);
 
@@ -971,6 +973,11 @@ void MutateEntryPoint::gatherUserDataUsage(Module *module) {
             userDataUsage->loads.push_back(load);
             userDataUsage->addLoad(load.dwordOffset, load.dwordSize);
           })
+          .add<WriteXfbOutputOp>([](MutateEntryPoint &self, WriteXfbOutputOp &op) {
+            auto lastVertexStage = self.m_pipelineState->getLastVertexProcessingStage();
+            lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
+            self.getUserDataUsage(lastVertexStage.value())->usesStreamOutTable = true;
+          })
           .build();
 
   visitor.visit(*this, *module);
@@ -990,16 +997,15 @@ void MutateEntryPoint::gatherUserDataUsage(Module *module) {
         specialUserData.resize(std::max(specialUserData.size(), size_t(index + 1)));
         specialUserData[index].users.push_back(call);
       }
-      continue;
     }
+  }
 
-    if ((func.getName().starts_with(lgcName::OutputExportXfb) && !func.use_empty()) || m_pipelineState->enableSwXfb()) {
-      // NOTE: For GFX11+, SW emulated stream-out will always use stream-out buffer descriptors and stream-out buffer
-      // offsets to calculate numbers of written primitives/dwords and update the counters.  auto lastVertexStage =
-      auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
-      lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
-      getUserDataUsage(lastVertexStage.value())->usesStreamOutTable = true;
-    }
+  if (m_pipelineState->enableSwXfb()) {
+    // NOTE: For GFX11+, SW emulated stream-out will always use stream-out buffer descriptors and stream-out buffer
+    // offsets to calculate numbers of written primitives/dwords and update the counters.
+    auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
+    lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
+    getUserDataUsage(lastVertexStage.value())->usesStreamOutTable = true;
   }
 }
 

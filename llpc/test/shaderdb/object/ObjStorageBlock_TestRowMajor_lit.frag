@@ -25,11 +25,11 @@ void main()
 // SHADERTEST-NEXT:  .entry:
 // SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // SHADERTEST-NEXT:    store float 1.000000e+00, ptr addrspace(7) [[TMP0]], align 4
-// SHADERTEST-NEXT:    [[TMP1:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 16
+// SHADERTEST-NEXT:    [[TMP1:%.*]] = getelementptr inbounds {{(nuw )?}}i8, ptr addrspace(7) [[TMP0]], i32 16
 // SHADERTEST-NEXT:    store float 1.000000e+00, ptr addrspace(7) [[TMP1]], align 4
-// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 32
+// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds {{(nuw )?}}i8, ptr addrspace(7) [[TMP0]], i32 32
 // SHADERTEST-NEXT:    store float 1.000000e+00, ptr addrspace(7) [[TMP2]], align 4
-// SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr inbounds i8, ptr addrspace(7) [[TMP0]], i32 48
+// SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr inbounds {{(nuw )?}}i8, ptr addrspace(7) [[TMP0]], i32 48
 // SHADERTEST-NEXT:    store float 1.000000e+00, ptr addrspace(7) [[TMP3]], align 4
 // SHADERTEST-NEXT:    [[TMP4:%.*]] = load float, ptr addrspace(7) [[TMP0]], align 16
 // SHADERTEST-NEXT:    [[TMP5:%.*]] = insertelement <4 x float> poison, float [[TMP4]], i64 0

@@ -42,7 +42,8 @@ void mustSucceed(Vkgc::Result result, const llvm::Twine &errorMessage = {});
 
 // Prints the error to LLPC_ERRS and consumes it. Returns the underlying `Result` when the error is a `ResultError`, or
 // `Result::ErrorUnknown` otherwise.
-LLPC_NODISCARD Vkgc::Result reportError(llvm::Error &&err);
+LLPC_NODISCARD Vkgc::Result reportError(llvm::Error &&err,
+                                        Vkgc::Result defaultErrorResult = Vkgc::Result::ErrorUnknown);
 
 // Converts a `Vkgc::Result` to `std::error_code` with a custom error category.
 LLPC_NODISCARD std::error_code resultToErrorCode(Vkgc::Result result);
@@ -118,6 +119,12 @@ private:
 // @returns : New `llvm::Error` containing a `ResultError(result, errorMessage)`
 inline llvm::Error createResultError(Vkgc::Result result, const llvm::Twine &errorMessage = {}) {
   return llvm::make_error<ResultError>(result, errorMessage);
+}
+
+inline llvm::Error resultToError(Vkgc::Result result, const llvm::Twine &errorMessage = {}) {
+  if (result == Vkgc::Result::Success)
+    return llvm::Error::success();
+  return createResultError(result, errorMessage);
 }
 
 // Extracts the `Result` value from the given `ResultError`. Assumes that `err` is either a `ResultError` or

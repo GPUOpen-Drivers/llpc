@@ -94,7 +94,7 @@ userDataNode[2].visibility = 2
 userDataNode[2].type = DescriptorBufferCompact
 userDataNode[2].offsetInDwords = 2
 userDataNode[2].sizeInDwords = 2
-userDataNode[2].set = 0xFFFFFFFF
+userDataNode[2].set = 0xFFFFFFF0
 userDataNode[2].binding = 5
 
 [GraphicsPipelineState]

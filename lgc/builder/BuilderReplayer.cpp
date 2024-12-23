@@ -192,6 +192,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateFpTruncWithRounding(args[0], call->getType(), roundingMode);
   }
 
+  case BuilderOpcode::Fp8Convert: {
+    return m_builder->CreateFp8Convert(args[0], call->getType(), cast<ConstantInt>(args[1])->getZExtValue());
+  }
+
   case BuilderOpcode::QuantizeToFp16: {
     return m_builder->CreateQuantizeToFp16(args[0]);
   }

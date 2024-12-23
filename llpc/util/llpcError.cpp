@@ -114,12 +114,13 @@ std::error_code resultToErrorCode(Result result) {
 // Prints the error message in `err` to LLPC_ERRS and consumes the error.
 //
 // @param err : The error to handle. This must not be an `ErrorSuccess`.
-// @returns: The underlying `Result` when `err` is a `ResultError`, `Result::ErrorUnknown` otherwise.
-Result reportError(Error &&err) {
+// @param defaultErrorResult : The Result code to use for unknown error kinds.
+// @returns: The underlying `Result` when `err` is a `ResultError`, defaultErrorResult otherwise.
+Result reportError(Error &&err, Result defaultErrorResult) {
   // For details on llvm error handling, see https://llvm.org/docs/ProgrammersManual.html#recoverable-errors.
   assert(err && "llvm::ErrorSuccess is not an error");
 
-  Result result = Result::ErrorUnknown;
+  Result result = defaultErrorResult;
   handleAllErrors(
       std::move(err),
       [&result](const ResultError &resultError) {

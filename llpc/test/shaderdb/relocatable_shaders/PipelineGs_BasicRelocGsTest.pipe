@@ -10,11 +10,11 @@
 ; SHADERTEST-LABEL: PalMetadata
 ; SHADERTEST-LABEL: .hardware_stages
 ; SHADERTEST-LABEL: .gs:
-; SHADERTEST-LABEL: .entry_point: _amdgpu_gs_main
+; SHADERTEST-LABEL: .entry_point{{(_symbol)?}}: _amdgpu_gs_main
 ; SHADERTEST-LABEL: .ps:
-; SHADERTEST-LABEL: .entry_point: _amdgpu_ps_main
+; SHADERTEST-LABEL: .entry_point{{(_symbol)?}}: _amdgpu_ps_main
 ; SHADERTEST-LABEL: .vs:
-; SHADERTEST-LABEL: .entry_point: _amdgpu_vs_main
+; SHADERTEST-LABEL: .entry_point{{(_symbol)?}}: _amdgpu_vs_main
 ; SHADERTEST-LABEL: .type: Gs
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

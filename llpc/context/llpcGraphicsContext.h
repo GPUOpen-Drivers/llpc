@@ -90,9 +90,6 @@ protected:
   void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher,
                            bool disableDualSourceBlend = false) const;
 
-  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
-  void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
-
   // Give the graphics pipeline state to the middle-end, and/or hash it.
   void setGraphicsStateInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
 

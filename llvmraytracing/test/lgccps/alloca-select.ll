@@ -5,7 +5,7 @@
 
 declare !lgc.cps !0 void @callee({}, i32, float)
 
-define void @test({} %state, i32 %rcr, float %arg, i32 %arg1) !lgc.cps !0 {
+define void @test(i32 %shaderIndex, i32 %rcr, float %arg, i32 %arg1) !lgc.cps !0 {
   %a1 = alloca i32
   %a2 = alloca i32
   %cond = icmp ult i32 %arg1, 0
@@ -13,12 +13,12 @@ define void @test({} %state, i32 %rcr, float %arg, i32 %arg1) !lgc.cps !0 {
   store i32 111, ptr %p, align 4
   %t0 = fadd float %arg, 1.0
   %cr = call i32 @lgc.cps.as.continuation.reference(ptr @callee)
-  %t1 = call { float } (...) @lgc.cps.await__f32(i32 %cr, i32 2, float %t0), !continuation.returnedRegistercount !{i32 0}
-  %res = extractvalue { float } %t1, 0
+  %t1 = call { i32, float } (...) @lgc.cps.await__sl_i32f32(i32 %cr, i32 2, i32 poison, float %t0), !continuation.returnedRegistercount !{i32 0}
+  %res = extractvalue { i32, float } %t1, 1
   %tmp = fmul float %res, %arg
   %v111 = load float, ptr %p, align 4
   %returnvalue = fmul float %tmp, %v111
-  call void (...) @lgc.cps.jump(i32 %rcr, i32 2,  i32 poison, i32 poison, float %returnvalue)
+  call void (...) @lgc.cps.jump(i32 %rcr, i32 2,  i32 poison, i32 poison, i32 poison, float %returnvalue)
   unreachable
 }
 
@@ -28,10 +28,10 @@ define void @test({} %state, i32 %rcr, float %arg, i32 %arg1) !lgc.cps !0 {
 !1 = !{i32 5}
 
 declare i32 @lgc.cps.as.continuation.reference(...) memory(none)
-declare { float } @lgc.cps.await__f32(...)
+declare { i32, float } @lgc.cps.await__sl_i32f32(...)
 declare void @lgc.cps.jump(...)
 ; CHECK-LABEL: define void @test
-; CHECK-SAME: (i32 [[CSPINIT:%.*]], {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]], i32 [[ARG1:%.*]]) !lgc.cps [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] !continuation.stacksize [[META3:![0-9]+]] !continuation.state [[META3]] {
+; CHECK-SAME: (i32 [[CSPINIT:%.*]], i32 [[SHADERINDEX:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]], i32 [[ARG1:%.*]]) !lgc.cps [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] !continuation.stacksize [[META3:![0-9]+]] !continuation.state [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -39,18 +39,18 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], 20
 ; CHECK-NEXT:    store i32 [[TMP1]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP0]], 4
-; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP0]], 16
-; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(5)
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP4]], i32 0
-; CHECK-NEXT:    store i32 [[ARG1]], ptr addrspace(5) [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP0]], 12
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i32 [[TMP6]] to ptr addrspace(5)
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP7]], i32 0
-; CHECK-NEXT:    store float [[ARG]], ptr addrspace(5) [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[TMP0]], 8
-; CHECK-NEXT:    [[TMP10:%.*]] = inttoptr i32 [[TMP9]] to ptr addrspace(5)
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP0]], 8
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP0]], 12
+; CHECK-NEXT:    [[TMP5:%.*]] = add i32 [[TMP0]], 16
+; CHECK-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(5)
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP6]], i32 0
+; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(5) [[TMP7]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = inttoptr i32 [[TMP4]] to ptr addrspace(5)
+; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP8]], i32 0
+; CHECK-NEXT:    store float [[ARG]], ptr addrspace(5) [[TMP9]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP10]], i32 0
-; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(5) [[TMP11]], align 4
+; CHECK-NEXT:    store i32 [[ARG1]], ptr addrspace(5) [[TMP11]], align 4
 ; CHECK-NEXT:    [[COND:%.*]] = icmp ult i32 [[ARG1]], 0
 ; CHECK-NEXT:    [[P_0:%.*]] = select i1 [[COND]], i32 [[TMP0]], i32 [[TMP2]]
 ; CHECK-NEXT:    [[TMP12:%.*]] = inttoptr i32 [[P_0]] to ptr addrspace(5)
@@ -61,35 +61,36 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[TMP14:%.*]] = inttoptr i32 [[CR]] to ptr
 ; CHECK-NEXT:    [[TMP15:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.0)
 ; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP16]], i32 [[TMP15]], float [[T0]]), !continuation.returnedRegistercount [[META4:![0-9]+]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, i32 [[TMP16]], i32 poison, i32 [[TMP15]], float [[T0]]), !continuation.returnedRegistercount [[META4:![0-9]+]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define dso_local void @test.resume.0
-; CHECK-SAME: (i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], i32 [[TMP1:%.*]], float [[TMP2:%.*]]) !lgc.cps [[META1]] !continuation [[META2]] !continuation.registercount [[META4]] {
+; CHECK-SAME: (i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], float [[TMP1:%.*]]) !lgc.cps [[META1]] !continuation [[META2]] !continuation.registercount [[META4]] {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -20
-; CHECK-NEXT:    [[TMP5:%.*]] = insertvalue { float } poison, float [[TMP2]], 0
-; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP4]], 4
-; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[TMP4]], 16
-; CHECK-NEXT:    [[TMP8:%.*]] = inttoptr i32 [[TMP7]] to ptr addrspace(5)
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP8]], i32 0
-; CHECK-NEXT:    [[ARG1_RELOAD:%.*]] = load i32, ptr addrspace(5) [[TMP9]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = add i32 [[TMP4]], 12
-; CHECK-NEXT:    [[TMP11:%.*]] = inttoptr i32 [[TMP10]] to ptr addrspace(5)
-; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP11]], i32 0
-; CHECK-NEXT:    [[ARG_RELOAD:%.*]] = load float, ptr addrspace(5) [[TMP12]], align 4
-; CHECK-NEXT:    [[TMP13:%.*]] = add i32 [[TMP4]], 8
-; CHECK-NEXT:    [[TMP14:%.*]] = inttoptr i32 [[TMP13]] to ptr addrspace(5)
+; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CSP]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -20
+; CHECK-NEXT:    [[TMP4:%.*]] = insertvalue { i32, float } poison, i32 [[TMP0]], 0
+; CHECK-NEXT:    [[TMP5:%.*]] = insertvalue { i32, float } [[TMP4]], float [[TMP1]], 1
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP3]], 4
+; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[TMP3]], 8
+; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP3]], 12
+; CHECK-NEXT:    [[TMP9:%.*]] = add i32 [[TMP3]], 16
+; CHECK-NEXT:    [[TMP10:%.*]] = inttoptr i32 [[TMP7]] to ptr addrspace(5)
+; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP10]], i32 0
+; CHECK-NEXT:    [[RELOAD_ROW0_RCR_:%.*]] = load i32, ptr addrspace(5) [[TMP11]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(5)
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP12]], i32 0
+; CHECK-NEXT:    [[RELOAD_ROW1_ARG_:%.*]] = load float, ptr addrspace(5) [[TMP13]], align 4
+; CHECK-NEXT:    [[TMP14:%.*]] = inttoptr i32 [[TMP9]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP14]], i32 0
-; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(5) [[TMP15]], align 4
-; CHECK-NEXT:    [[COND2:%.*]] = icmp ult i32 [[ARG1_RELOAD]], 0
-; CHECK-NEXT:    [[P1_0:%.*]] = select i1 [[COND2]], i32 [[TMP4]], i32 [[TMP6]]
-; CHECK-NEXT:    [[RES:%.*]] = extractvalue { float } [[TMP5]], 0
-; CHECK-NEXT:    [[TMP:%.*]] = fmul float [[RES]], [[ARG_RELOAD]]
+; CHECK-NEXT:    [[RELOAD_ROW2_ARG1_:%.*]] = load i32, ptr addrspace(5) [[TMP15]], align 4
+; CHECK-NEXT:    [[COND2:%.*]] = icmp ult i32 [[RELOAD_ROW2_ARG1_]], 0
+; CHECK-NEXT:    [[P1_0:%.*]] = select i1 [[COND2]], i32 [[TMP3]], i32 [[TMP6]]
+; CHECK-NEXT:    [[RES:%.*]] = extractvalue { i32, float } [[TMP5]], 1
+; CHECK-NEXT:    [[TMP:%.*]] = fmul float [[RES]], [[RELOAD_ROW1_ARG_]]
 ; CHECK-NEXT:    [[TMP16:%.*]] = inttoptr i32 [[P1_0]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP16]], i32 0
 ; CHECK-NEXT:    [[V111:%.*]] = load float, ptr addrspace(5) [[TMP17]], align 4
@@ -98,6 +99,6 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[TMP19:%.*]] = add i32 [[TMP18]], -20
 ; CHECK-NEXT:    store i32 [[TMP19]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 2, i32 [[TMP20]], i32 poison, float [[RETURNVALUE]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RELOAD_ROW0_RCR_]], i32 2, i32 [[TMP20]], i32 poison, i32 poison, float [[RETURNVALUE]])
 ; CHECK-NEXT:    unreachable
 ;

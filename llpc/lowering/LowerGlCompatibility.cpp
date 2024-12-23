@@ -48,8 +48,8 @@ namespace Llpc {
 
 // =====================================================================================================================
 LowerGlCompatibility::LowerGlCompatibility()
-    : m_retInst(nullptr), m_entryPointEnd(nullptr), m_originalEntryBlock(nullptr), m_out(nullptr),
-      m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr), m_frontColor(nullptr), m_backColor(nullptr),
+    : m_retInst(nullptr), m_entryPointEnd(nullptr), m_originalEntryBlock(nullptr), m_clipVertex(nullptr),
+      m_clipDistance(nullptr), m_clipPlane(nullptr), m_frontColor(nullptr), m_backColor(nullptr),
       m_frontSecondaryColor(nullptr), m_backSecondaryColor(nullptr), m_color(nullptr), m_secondaryColor(nullptr),
       m_frontFacing(nullptr), m_patchTexCoord(nullptr), m_fragColor(nullptr), m_fragDepth(), m_fragStencilRef() {
 }
@@ -63,14 +63,9 @@ PreservedAnalyses LowerGlCompatibility::run(Module &module, ModuleAnalysisManage
   SpirvLower::init(&module);
   LLVM_DEBUG(dbgs() << "Run the pass Lower-gl-compatibility\n");
 
-  if (!needRun())
-    return PreservedAnalyses::all();
-
   collectEmulationResource();
 
-  if (!needLowerClipVertex() && !needLowerFrontColor() && !needLowerBackColor() && !needLowerFrontSecondaryColor() &&
-      !needLowerBackSecondaryColor() && !needEmulateDrawPixels() && !needEmulateTwoSideLighting() &&
-      !needEmulateBitmap() && !needLowerFragColor() && !needEmulateSmoothStipple() && !needLowerAlphaTest())
+  if (!needRun())
     return PreservedAnalyses::all();
 
   buildPatchPositionInfo();
@@ -155,49 +150,22 @@ unsigned LowerGlCompatibility::getUniformLocation(llvm::GlobalVariable *var) {
 }
 
 // =====================================================================================================================
-// Get in/out meta data by indices from from aggregate type.
+// Retrieves metadata for shader input/output elements based on their type.
 //
-// @param [in]  valueTy : The metadata's embellish type.
-// @param [in]  mds     : The metadata constant of InOut Global variable to be decode.
-// @param [in]  index   : The the index of the metadata in the embellish type.
-// @param [out] out     : Use to output the element's metadatas of the InOut Global variable.
-void LowerGlCompatibility::decodeInOutMetaRecursivelyByIndex(llvm::Type *valueTy, llvm::Constant *mds,
-                                                             ArrayRef<Value *> index,
-                                                             llvm::SmallVector<ShaderInOutMetadata> &out) {
-  auto currentType = valueTy;
-  auto currentMds = mds;
-  if (!index.empty()) {
-    if (valueTy->isSingleValueType()) {
-      // Single type's metadata:{uint64, uint64}
-      assert(mds->getType() == StructType::get(*m_context, {m_builder->getInt64Ty(), m_builder->getInt64Ty()}));
-      ShaderInOutMetadata md = {};
-      md.U64All[0] = cast<ConstantInt>(mds->getOperand(0))->getZExtValue();
-      md.U64All[1] = cast<ConstantInt>(mds->getOperand(1))->getZExtValue();
-      out.push_back(md);
-    } else if (valueTy->isArrayTy()) {
-      assert(mds->getType()->getStructNumElements() == 4);
-      currentType = valueTy->getArrayElementType();
-      currentMds = cast<Constant>(mds->getOperand(1));
-      index = index.drop_front();
-      if (index.empty())
-        decodeInOutMetaRecursively(currentType, currentMds, out);
-      else {
-        decodeInOutMetaRecursivelyByIndex(currentType, currentMds, index, out);
-      }
-    } else if (valueTy->isStructTy()) {
-      // Structure type's metadata:[{element metadata type}, ...]
-      assert(valueTy->getStructNumElements() == mds->getType()->getStructNumElements());
-      auto opIdx = cast<ConstantInt>(index[0])->getZExtValue();
-      currentType = valueTy->getStructElementType(opIdx);
-      currentMds = cast<Constant>(mds->getOperand(opIdx));
-      index = index.drop_front();
-      if (index.empty())
-        decodeInOutMetaRecursively(currentType, currentMds, out);
-      else {
-        decodeInOutMetaRecursivelyByIndex(currentType, currentMds, index, out);
-      }
-    }
+// @param elementType : Type of the shader input/output element
+// @param elementMetadata : Metadata values for initializing the metadata structure
+ShaderInOutMetadata LowerGlCompatibility::getShaderInOutMetadata(Type *elementType, Constant *elementMetadata) {
+  ShaderInOutMetadata inOutMeta = {};
+  if (elementType->isArrayTy()) {
+    assert(elementMetadata->getNumOperands() == 4);
+    inOutMeta.U64All[0] = cast<ConstantInt>(elementMetadata->getOperand(2))->getZExtValue();
+    inOutMeta.U64All[1] = cast<ConstantInt>(elementMetadata->getOperand(3))->getZExtValue();
+  } else {
+    assert(elementMetadata->getNumOperands() == 2);
+    inOutMeta.U64All[0] = cast<ConstantInt>(elementMetadata->getOperand(0))->getZExtValue();
+    inOutMeta.U64All[1] = cast<ConstantInt>(elementMetadata->getOperand(1))->getZExtValue();
   }
+  return inOutMeta;
 }
 
 // =====================================================================================================================
@@ -252,151 +220,92 @@ void LowerGlCompatibility::collectEmitInst() {
 void LowerGlCompatibility::collectEmulationResource() {
   // Collect emulation information.
   for (auto &global : m_module->globals()) {
+    Type *valueType = global.getValueType();
+    // Note: The compatibility type structure or array of structures will be separated in this lowering pass
+    // by ScalarReplacementOfBuiltins. There are no types to handle in this lower compatibility pass.
+    if (valueType->isStructTy())
+      continue;
     if (global.getType()->getAddressSpace() == SPIRAS_Uniform && global.hasMetadata(gSPIRVMD::UniformConstant)) {
       if (getUniformLocation(&global) == Vkgc::GlCompatibilityUniformLocation::ClipPlane) {
         assert(m_clipPlane == nullptr);
         m_clipPlane = &global;
       }
     } else if (global.getType()->getAddressSpace() == SPIRAS_Input) {
-      llvm::SmallVector<ShaderInOutMetadata> mds;
       MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
       assert(metaNode);
-      auto inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
-      auto valueType = global.getValueType();
-      bool isStructureOrArrayOfStructure =
-          (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
-      decodeInOutMetaRecursively(valueType, inOutMetaConst, mds);
+      Constant *inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
+      ShaderInOutMetadata inOutMeta = getShaderInOutMetadata(valueType, inOutMetaConst);
+      unsigned builtInId = inOutMeta.Value;
+
       if (m_shaderStage == ShaderStageFragment) {
         // In fragment shader, gl_Color have same location with gl_FrontColor in pre-stage outputs.
         // gl_SecondaryColor have same location with gl_FrontSecondaryColor in pre-stage outputs.
         // So we can use location of gl_FrontColor and gl_FrontSecondaryColor to find gl_Color and gl_FrontColor
-        for (auto md : mds) {
-          if (md.IsLoc) {
-            if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor) {
-              if (isStructureOrArrayOfStructure)
-                m_out = &global;
-              else
-                m_color = &global;
-            }
-            if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor) {
-              if (isStructureOrArrayOfStructure)
-                m_out = &global;
-              else
-                m_secondaryColor = &global;
-            }
-          }
+        if (inOutMeta.IsLoc) {
+          if (builtInId == Vkgc::GlCompatibilityInOutLocation::FrontColor)
+            m_color = &global;
+          else if (builtInId == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor)
+            m_secondaryColor = &global;
         }
       }
     } else if (global.getType()->getAddressSpace() == SPIRAS_Output) {
-      llvm::SmallVector<ShaderInOutMetadata> mds;
       MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
       assert(metaNode);
-      auto inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
-      auto valueType = global.getValueType();
-      bool isStructureOrArrayOfStructure =
-          (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
-      assert(!isStructureOrArrayOfStructure);
+      Constant *inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
+      ShaderInOutMetadata inOutMeta = getShaderInOutMetadata(valueType, inOutMetaConst);
+      unsigned builtInId = inOutMeta.Value;
 
-      decodeInOutMetaRecursively(valueType, inOutMetaConst, mds);
       if (m_shaderStage == ShaderStageFragment) {
-        for (auto md : mds) {
-          if (md.IsBuiltIn) {
-            if (md.Value == spv::BuiltInFragDepth) {
-              m_fragDepth = &global;
-            }
-            if (md.Value == spv::BuiltInFragStencilRefEXT) {
-              m_fragStencilRef = &global;
-            }
-          } else {
-            assert(m_fragColor == nullptr);
+        if (inOutMeta.IsBuiltIn) {
+          if (builtInId == spv::BuiltInFragDepth)
+            m_fragDepth = &global;
+          else if (builtInId == spv::BuiltInFragStencilRefEXT)
+            m_fragStencilRef = &global;
+        } else {
+          if (builtInId == Vkgc::GlCompatibilityInOutLocation::SpecialFragOut)
             m_fragColor = &global;
-          }
         }
       }
-      for (auto md : mds) {
-        if (md.IsLoc) {
-          if (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex) {
-            m_clipVertex = &global;
-          }
-          if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor) {
-            if (isStructureOrArrayOfStructure)
-              m_out = &global;
-            else
-              m_frontColor = &global;
-          }
-          if (md.Value == Vkgc::GlCompatibilityInOutLocation::BackColor) {
-            if (isStructureOrArrayOfStructure)
-              m_out = &global;
-            else
-              m_backColor = &global;
-          }
-          if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor) {
-            if (isStructureOrArrayOfStructure)
-              m_out = &global;
-            else
-              m_frontSecondaryColor = &global;
-          }
-          if (md.Value == Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor) {
-            if (isStructureOrArrayOfStructure)
-              m_out = &global;
-            else
-              m_backSecondaryColor = &global;
-          }
-        } else if (md.IsBuiltIn) {
-          if (md.Value == spv::BuiltInClipDistance) {
-            m_clipDistance = &global;
-          }
-          if (md.Value == spv::BuiltInFrontFacing)
-            m_frontFacing = &global;
-        }
-      }
-    }
-  }
 
-  // If gl_in/gl_out used in shader, then the Gl deprecated builtin variable will be pack in the structure:
-  // gl_PerVertex. We need traversal the user of m_out to get the usage information Gl deprecated builtin variable.
-  if (m_out != nullptr) {
-    assert((m_clipVertex == nullptr) && (m_clipDistance == nullptr));
-    llvm::SmallVector<ShaderInOutMetadata> mds;
-    auto glOut = cast<GlobalVariable>(m_out);
-    MDNode *metaNode = glOut->getMetadata(gSPIRVMD::InOut);
-    assert(metaNode);
-    auto inOutMetaConst = mdconst::extract<Constant>(metaNode->getOperand(0));
-    for (User *user : m_out->users()) {
-      SmallVector<Value *> indexOperands;
-      // The user is a GEP
-      // Check to see if the value has been stored.
-      bool beenModified = false;
-      User *gep = nullptr;
-      assert(!isa<ConstantExpr>(user) && !isa<GetElementPtrInst>(user));
-      if (auto *gepInst = dyn_cast<StructuralGepOp>(user)) {
-        // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
-        assert(cast<ConstantInt>(*gepInst->getIndices().begin())->isZero() && "Non-zero GEP first index\n");
-        for (auto *idx : llvm::drop_begin(gepInst->getIndices()))
-          indexOperands.push_back(m_builder->CreateZExtOrTrunc(idx, m_builder->getInt32Ty()));
-        gep = gepInst;
-      }
-      if (gep != nullptr) {
-        for (User *gepUser : gep->users()) {
-          assert(!isa<StructuralGepOp>(gepUser));
-          beenModified |= isa<StoreInst>(gepUser);
+      if (inOutMeta.IsLoc) {
+        switch (builtInId) {
+        case Vkgc::GlCompatibilityInOutLocation::ClipVertex:
+          m_clipVertex = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::FrontColor:
+          m_frontColor = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::BackColor:
+          m_backColor = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor:
+          m_frontSecondaryColor = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor:
+          m_backSecondaryColor = &global;
+          break;
+        default:
+          break;
         }
-        decodeInOutMetaRecursivelyByIndex(glOut->getValueType(), inOutMetaConst, indexOperands, mds);
-        for (auto md : mds) {
-          if (md.IsLoc) {
-            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex))
-              m_clipVertex = gep;
-            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor))
-              m_frontColor = gep;
-            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::BackColor))
-              m_backColor = gep;
-            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor))
-              m_frontSecondaryColor = gep;
-            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor))
-              m_backSecondaryColor = gep;
-          } else if (md.IsBuiltIn && md.Value == spv::BuiltInClipDistance) {
-            m_clipDistance = gep;
-          }
+      } else if (inOutMeta.IsBuiltIn) {
+        switch (builtInId) {
+        case spv::BuiltInClipDistance:
+          m_clipDistance = &global;
+          break;
+        case spv::BuiltInFrontFacing:
+          m_frontFacing = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::BackColor:
+          m_backColor = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor:
+          m_frontSecondaryColor = &global;
+          break;
+        case Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor:
+          m_backSecondaryColor = &global;
+          break;
+        default:
+          break;
         }
       }
     }
@@ -427,31 +336,31 @@ void LowerGlCompatibility::buildPatchPositionInfo() {
 // =====================================================================================================================
 // Check whether need do lower for ClipVertex.
 bool LowerGlCompatibility::needLowerClipVertex() {
-  return (m_clipVertex != nullptr && !m_clipVertex->user_empty());
+  return m_clipVertex != nullptr;
 }
 
 // =====================================================================================================================
 // Check whether need do lower for FrontColor.
 bool LowerGlCompatibility::needLowerFrontColor() {
-  return (m_frontColor != nullptr && !m_frontColor->user_empty());
+  return m_frontColor != nullptr;
 }
 
 // =====================================================================================================================
 // Check whether need do lower for BackColor.
 bool LowerGlCompatibility::needLowerBackColor() {
-  return (m_backColor != nullptr && !m_backColor->user_empty());
+  return m_backColor != nullptr;
 }
 
 // =====================================================================================================================
 // Check whether need do lower for FrontSecondaryColor.
 bool LowerGlCompatibility::needLowerFrontSecondaryColor() {
-  return (m_frontSecondaryColor != nullptr && !m_frontSecondaryColor->user_empty());
+  return m_frontSecondaryColor != nullptr;
 }
 
 // =====================================================================================================================
 // Check whether need do lower for BackSecondaryColor.
 bool LowerGlCompatibility::needLowerBackSecondaryColor() {
-  return (m_backSecondaryColor != nullptr && !m_backSecondaryColor->user_empty());
+  return m_backSecondaryColor != nullptr;
 }
 
 // =====================================================================================================================

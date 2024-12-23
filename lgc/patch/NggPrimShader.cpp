@@ -30,9 +30,11 @@
  */
 #include "NggPrimShader.h"
 #include "ShaderMerger.h"
+#include "lgc/Debug.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PalMetadata.h"
-#include "lgc/util/Debug.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/InlineAsm.h"
@@ -133,15 +135,14 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     unsigned vertexItemSizes[MaxGsStreams] = {};
     auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
     for (unsigned i = 0; i < MaxGsStreams; ++i)
-      vertexItemSizes[i] = resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i];
+      vertexItemSizes[i] = resUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i];
 
     unsigned gsVsRingItemSizes[MaxGsStreams] = {};
     const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
     for (unsigned i = 0; i < MaxGsStreams; ++i)
       gsVsRingItemSizes[i] = vertexItemSizes[i] * geometryMode.outputVertices;
 
-    const unsigned gsPrimsPerSubgroup =
-        resUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup * geometryMode.invocations;
+    const unsigned gsPrimsPerSubgroup = resUsage->inOutUsage.gs.hwConfig.gsPrimsPerSubgroup * geometryMode.invocations;
     unsigned gsStreamBase = 0;
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       m_gsStreamBases[i] = gsStreamBase;
@@ -197,7 +198,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
                                                           PrimShaderLdsLayout *ldsLayout) {
   assert(pipelineState->getNggControl()->enableNgg); // Must enable NGG
 
-  const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+  const auto &hwConfig = pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
 
   unsigned ldsOffset = 0;     // In dwords
   unsigned ldsRegionSize = 0; // In dwords
@@ -247,7 +248,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // ES-GS ring
     if (ldsLayout) {
-      ldsRegionSize = calcFactor.esGsLdsSize;
+      ldsRegionSize = hwConfig.esGsLdsSize;
 
       printLdsRegionInfo("ES-GS Ring", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::EsGsRing] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -343,7 +344,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // GS-VS ring
     if (ldsLayout) {
       const unsigned esGsRingLdsSize = (*ldsLayout)[PrimShaderLdsRegion::EsGsRing].second;
-      ldsRegionSize = calcFactor.gsOnChipLdsSize - esGsRingLdsSize - ldsUsageInfo.gsExtraLdsSize;
+      ldsRegionSize = hwConfig.gsOnChipLdsSize - esGsRingLdsSize - ldsUsageInfo.gsExtraLdsSize;
 
       printLdsRegionInfo("GS-VS Ring", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::GsVsRing] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -394,7 +395,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // Distributed primitive ID
     if (distributePrimitiveId) {
       if (ldsLayout) {
-        ldsRegionSize = calcFactor.esVertsPerSubgroup; // 1 dword per vertex thread
+        ldsRegionSize = hwConfig.esVertsPerSubgroup; // 1 dword per vertex thread
 
         printLdsRegionInfo("Distributed Primitive ID", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::DistributedPrimitiveId] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -407,8 +408,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // XFB outputs
     if (pipelineState->enableSwXfb()) {
       if (ldsLayout) {
-        ldsRegionSize = calcFactor.esVertsPerSubgroup *
-                        calcFactor.esGsRingItemSize; // Transform feedback outputs are stored as a ES-GS ring item
+        ldsRegionSize = hwConfig.esVertsPerSubgroup *
+                        hwConfig.esGsRingItemSize; // Transform feedback outputs are stored as a ES-GS ring item
 
         printLdsRegionInfo("XFB Outputs", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::XfbOutput] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -462,7 +463,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   // Distributed primitive ID
   if (distributePrimitiveId) {
     if (ldsLayout) {
-      ldsRegionSize = calcFactor.esVertsPerSubgroup; // 1 dword per vertex thread
+      ldsRegionSize = hwConfig.esVertsPerSubgroup; // 1 dword per vertex thread
 
       printLdsRegionInfo("Distributed Primitive ID", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::DistributedPrimitiveId] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -484,7 +485,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   // Vertex cull info
   if (ldsLayout) {
     ldsRegionSize =
-        calcFactor.esGsRingItemSize * calcFactor.esVertsPerSubgroup; // Vertex cull info is stored as a ES-GS ring item
+        hwConfig.esGsRingItemSize * hwConfig.esVertsPerSubgroup; // Vertex cull info is stored as a ES-GS ring item
 
     printLdsRegionInfo("Vertex Cull Info", ldsOffset, ldsRegionSize);
     (*ldsLayout)[PrimShaderLdsRegion::VertexCullInfo] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -769,26 +770,24 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 unsigned NggPrimShader::calcEsXfbOutputsSize(Function *esMain) {
   unsigned xfbOutputsSize = 0;
 
-  for (auto &func : esMain->getParent()->functions()) {
-    if (!func.getName().starts_with(lgcName::OutputExportXfb) && !func.getName().starts_with(lgcName::NggXfbExport))
-      continue;
+  struct Payload {
+    unsigned &xfbOutputsSize;
+  };
+  Payload payload = {xfbOutputsSize};
 
-    for (auto user : func.users()) {
-      CallInst *const call = dyn_cast<CallInst>(user);
-      assert(call);
-
-      if (call->getFunction() != esMain)
-        continue;
-
-      auto xfbOutput = call->getArgOperand(call->arg_size() - 1);
-
-      Type *xfbOutputTy = xfbOutput->getType();
-      unsigned xfbOutputSize = xfbOutputTy->isVectorTy() ? cast<FixedVectorType>(xfbOutputTy)->getNumElements() : 1;
-      if (xfbOutputTy->getScalarSizeInBits() == 64)
-        xfbOutputSize *= 2; // Double it
-      xfbOutputsSize += xfbOutputSize;
-    }
-  }
+  static const auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                                  .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                                  .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+                                    Type *xfbOutputTy = writeXfbOutputOp.getOutputValue()->getType();
+                                    unsigned xfbOutputSize = xfbOutputTy->isVectorTy()
+                                                                 ? cast<FixedVectorType>(xfbOutputTy)->getNumElements()
+                                                                 : 1;
+                                    if (xfbOutputTy->getScalarSizeInBits() == 64)
+                                      xfbOutputSize *= 2; // Double it
+                                    payload.xfbOutputsSize += xfbOutputSize;
+                                  })
+                                  .build();
+  visitor.visit(payload, *esMain);
 
   return xfbOutputsSize;
 }
@@ -1285,7 +1284,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   const unsigned dummyExportCount = waNggCullingNoEmptySubgroups ? 1 : 0;
 
   const unsigned esGsRingItemSize =
-      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
 
   // NOTE: Make sure vertex position data is 4-dword alignment because we will use 128-bit LDS read/write for it.
   assert(getLdsRegionStart(PrimShaderLdsRegion::VertexPosition) % 4U == 0);
@@ -1910,6 +1909,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   const bool cullingMode = !m_nggControl->passthroughMode;
 
   const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+  const bool noRasterization = rasterStream == InvalidValue;
 
   SmallVector<Argument *, 32> args;
   for (auto &arg : primShader->args())
@@ -2010,34 +2010,70 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   auto beginGsBlock = createBlock(primShader, ".beginGs");
   auto endGsBlock = createBlock(primShader, ".endGs");
 
-  auto initVertexCountsBlock = createBlock(primShader, ".initVertexCounts");
-  auto endInitVertexCountsBlock = createBlock(primShader, ".endInitVertexCounts");
+  BasicBlock *initVertexCountsBlock = nullptr;
+  BasicBlock *endInitVertexCountsBlock = nullptr;
 
-  auto cullPrimitiveBlock = createBlock(primShader, ".cullPrimitive");
-  auto nullifyPrimitiveDataBlock = createBlock(primShader, ".nullifyPrimitiveData");
-  auto endCullPrimitiveBlock = createBlock(primShader, ".endCullPrimitive");
+  BasicBlock *cullPrimitiveBlock = nullptr;
+  BasicBlock *nullifyPrimitiveDataBlock = nullptr;
+  BasicBlock *endCullPrimitiveBlock = nullptr;
 
-  auto checkVertexDrawFlagBlock = createBlock(primShader, ".checkVertexDrawFlag");
-  auto endCheckVertexDrawFlagBlock = createBlock(primShader, ".endCheckVertexDrawFlag");
+  BasicBlock *checkVertexDrawFlagBlock = nullptr;
+  BasicBlock *endCheckVertexDrawFlagBlock = nullptr;
 
-  auto accumVertexCountsBlock = createBlock(primShader, ".accumVertexCounts");
-  auto endAccumVertexCountsBlock = createBlock(primShader, ".endAccumVertexCounts");
+  BasicBlock *accumVertexCountsBlock = nullptr;
+  BasicBlock *endAccumVertexCountsBlock = nullptr;
 
-  auto compactVertexIndexBlock = createBlock(primShader, ".compactVertexIndex");
-  auto endCompactVertexIndexBlock = createBlock(primShader, ".endCompactVertexIndex");
+  BasicBlock *compactVertexIndexBlock = nullptr;
+  BasicBlock *endCompactVertexIndexBlock = nullptr;
 
-  auto sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
-  auto endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
+  BasicBlock *sendGsAllocReqBlock = nullptr;
+  BasicBlock *endSendGsAllocReqBlock = nullptr;
 
-  auto exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
-  auto endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
+  BasicBlock *exportPrimitiveBlock = nullptr;
+  BasicBlock *endExportPrimitiveBlock = nullptr;
 
-  auto checkEmptyWaveBlock = createBlock(primShader, ".checkEmptyWave");
-  auto dummyVertexExportBlock = createBlock(primShader, ".dummyVertexExport");
-  auto checkExportVertexBlock = createBlock(primShader, ".checkExportVertex");
+  BasicBlock *checkEmptyWaveBlock = nullptr;
+  BasicBlock *dummyVertexExportBlock = nullptr;
+  BasicBlock *checkExportVertexBlock = nullptr;
 
-  auto exportVertexBlock = createBlock(primShader, ".exportVertex");
-  auto endExportVertexBlock = createBlock(primShader, ".endExportVertex");
+  BasicBlock *exportVertexBlock = nullptr;
+  BasicBlock *endExportVertexBlock = nullptr;
+
+  if (noRasterization) {
+    // NOTE: For the case of no rasterization (DX-specific), primitive/vertex exports could be completely ignored.
+    // We just send message GS_ALLOC_REQ to tell HW we don't have any primitive/vertex to export.
+    sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
+    endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
+  } else {
+    initVertexCountsBlock = createBlock(primShader, ".initVertexCounts");
+    endInitVertexCountsBlock = createBlock(primShader, ".endInitVertexCounts");
+
+    cullPrimitiveBlock = createBlock(primShader, ".cullPrimitive");
+    nullifyPrimitiveDataBlock = createBlock(primShader, ".nullifyPrimitiveData");
+    endCullPrimitiveBlock = createBlock(primShader, ".endCullPrimitive");
+
+    checkVertexDrawFlagBlock = createBlock(primShader, ".checkVertexDrawFlag");
+    endCheckVertexDrawFlagBlock = createBlock(primShader, ".endCheckVertexDrawFlag");
+
+    accumVertexCountsBlock = createBlock(primShader, ".accumVertexCounts");
+    endAccumVertexCountsBlock = createBlock(primShader, ".endAccumVertexCounts");
+
+    compactVertexIndexBlock = createBlock(primShader, ".compactVertexIndex");
+    endCompactVertexIndexBlock = createBlock(primShader, ".endCompactVertexIndex");
+
+    sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
+    endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
+
+    exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
+    endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
+
+    checkEmptyWaveBlock = createBlock(primShader, ".checkEmptyWave");
+    dummyVertexExportBlock = createBlock(primShader, ".dummyVertexExport");
+    checkExportVertexBlock = createBlock(primShader, ".checkExportVertex");
+
+    exportVertexBlock = createBlock(primShader, ".exportVertex");
+    endExportVertexBlock = createBlock(primShader, ".endExportVertex");
+  }
 
   // Construct ".entry" block
   {
@@ -2120,10 +2156,43 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     else if (m_pipelineState->enablePrimStats())
       collectPrimitiveStats();
 
-    auto validWave =
-        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(m_maxWavesPerSubgroup + 1));
-    m_builder.CreateCondBr(validWave, initVertexCountsBlock, endInitVertexCountsBlock);
+    if (noRasterization) {
+      auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
+      m_builder.CreateCondBr(firstWaveInSubgroup, sendGsAllocReqBlock, endSendGsAllocReqBlock);
+    } else {
+      auto validWave =
+          m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(m_maxWavesPerSubgroup + 1));
+      m_builder.CreateCondBr(validWave, initVertexCountsBlock, endInitVertexCountsBlock);
+    }
   }
+
+  // NOTE: Here, we handle the case of no rasterization (DX-specific). In such case, primitive/vertex exports could be
+  // completely ignored.
+  if (noRasterization) {
+    // Construct ".sendGsAllocReq" block
+    {
+      m_builder.SetInsertPoint(sendGsAllocReqBlock);
+
+      // Clear primitive/vertex count
+      m_nggInputs.primCountInSubgroup = m_builder.getInt32(0);
+      m_nggInputs.vertCountInSubgroup = m_builder.getInt32(0);
+
+      sendGsAllocReqMessage();
+      m_builder.CreateBr(endSendGsAllocReqBlock);
+    }
+
+    // Construct ".endSendGsAllocReq" block
+    {
+      m_builder.SetInsertPoint(endSendGsAllocReqBlock);
+
+      m_builder.CreateRetVoid(); // Early return for no rasterization case
+    }
+
+    return;
+  }
+
+  // The rasterization stream must be specified now
+  assert(rasterStream != InvalidValue);
 
   // Construct ".initVertexCounts" block
   {
@@ -2484,7 +2553,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 }
 
 // =====================================================================================================================
-// Extracts merged group/wave info and initializes part of NGG calculation factors.
+// Extracts merged group/wave info and initializes part of NGG inputs.
 //
 // NOTE: This function must be invoked by the entry block of NGG shader module.
 //
@@ -2886,7 +2955,7 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
       m_builder.SetInsertPoint(compactVertexIndexBlock);
 
       const unsigned esGsRingItemSize =
-          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
 
       auto vertexItemOffset0 = m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize));
       auto vertexItemOffset1 = m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize));
@@ -2979,6 +3048,7 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   //   Export primitive
   //
   const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+  assert(rasterStream != InvalidValue);
   Value *primData =
       readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
                                PrimShaderLdsRegion::PrimitiveData, m_maxThreadsPerSubgroup * rasterStream);
@@ -3155,17 +3225,18 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
     return;
   }
 
-  if (!m_pipelineState->exportAttributeByExportInstruction()) {
-    if (!m_hasGs) // For GS, ATM is done in copy shader
-      exportVertexAttributeThroughMemory(m_esHandlers.main);
+  if (!m_hasGs) {
+    // For GS, vertex export is done in copy shader
+    IRBuilder<>::InsertPointGuard guard(m_builder);
+    mutateToExportVertex(m_esHandlers.main);
   }
 
   Value *esGsOffset = nullptr;
   if (m_hasGs) {
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+    auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
     unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
     esGsOffset =
-        m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(waveSize * calcFactor.esGsRingItemSize));
+        m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(waveSize * hwConfig.esGsRingItemSize));
   }
 
   Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
@@ -3310,7 +3381,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
       m_builder.SetInsertPoint(uncompactVertexBlock);
 
       const unsigned esGsRingItemSize =
-          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
 
       auto uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
                                                              PrimShaderLdsRegion::VertexIndexMap);
@@ -3438,23 +3509,9 @@ void NggPrimShader::splitEs() {
   assert(m_hasGs == false); // GS must not be present
 
   //
-  // Collect all export calls for further analysis
-  //
-  SmallVector<Function *, 8> expFuncs;
-  for (auto &func : m_esHandlers.main->getParent()->functions()) {
-    if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
-      expFuncs.push_back(&func);
-    else if (m_gfxIp.major >= 11) {
-      if (func.getName().starts_with(lgcName::NggAttributeThroughMemory) ||
-          func.getName().starts_with(lgcName::NggXfbExport))
-        expFuncs.push_back(&func);
-    }
-  }
-
-  //
   // Preparation for fetching cull distances
   //
-  unsigned clipCullPos = EXP_TARGET_POS_1;
+  unsigned clipCullExportSlot = 1;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
 
@@ -3466,7 +3523,7 @@ void NggPrimShader::splitEs() {
       const auto &builtInUsage = resUsage->builtInUsage.tes;
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-      clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+      clipCullExportSlot = miscExport ? 2 : 1;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
     } else {
@@ -3474,7 +3531,7 @@ void NggPrimShader::splitEs() {
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
       miscExport |= builtInUsage.primitiveShadingRate;
-      clipCullPos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
+      clipCullExportSlot = miscExport ? 2 : 1;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
     }
@@ -3525,49 +3582,66 @@ void NggPrimShader::splitEs() {
   IRBuilder<>::InsertPointGuard guard(m_builder);
   m_builder.SetInsertPoint(retBlock);
 
-  SmallVector<CallInst *, 8> removedCalls;
+  SmallVector<CallInst *, 8> callsToRemove;
 
   // Fetch position and cull distances
   Value *position = PoisonValue::get(positionTy);
   SmallVector<Value *, MaxClipCullDistanceCount> clipCullDistance(MaxClipCullDistanceCount);
 
-  for (auto func : expFuncs) {
-    for (auto user : func->users()) {
-      CallInst *const call = cast<CallInst>(user);
+  {
+    struct Payload {
+      NggPrimShader &self;
+      const unsigned clipCullExportSlot;
+      const unsigned clipDistanceCount;
+      const unsigned cullDistanceCount;
+      Value *&position;
+      SmallVectorImpl<Value *> &clipCullDistance;
+      SmallVectorImpl<CallInst *> &callsToRemove;
+    };
+    Payload payload = {*this,    clipCullExportSlot, clipDistanceCount, cullDistanceCount,
+                       position, clipCullDistance,   callsToRemove};
 
-      if (call->getParent()->getParent() != esCullDataFetcher)
-        continue; // Export call doesn't belong to targeted function, skip
+    static const auto visitor =
+        llvm_dialects::VisitorBuilder<Payload>()
+            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+            .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
+              auto &builder = payload.self.m_builder;
 
-      assert(call->getParent() == retBlock); // Must in return block
+              auto exportSlot = exportPositionOp.getExportSlot();
+              if (exportSlot == 0) {
+                // Get position value
+                payload.self.m_constPositionZ = isa<Constant>(exportPositionOp.getExportValue2());
+                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue0(),
+                                                               static_cast<uint64_t>(0));
+                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue1(), 1);
+                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue2(), 2);
+                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue3(), 3);
+              } else if (exportSlot == payload.clipCullExportSlot) {
+                // Get clip/cull distance value
+                if (payload.self.m_nggControl->enableCullDistanceCulling) {
+                  payload.clipCullDistance[0] = exportPositionOp.getExportValue0();
+                  payload.clipCullDistance[1] = exportPositionOp.getExportValue1();
+                  payload.clipCullDistance[2] = exportPositionOp.getExportValue2();
+                  payload.clipCullDistance[3] = exportPositionOp.getExportValue3();
+                }
+              } else if (exportSlot == payload.clipCullExportSlot + 1 &&
+                         payload.clipDistanceCount + payload.cullDistanceCount > 4) {
+                // Get clip/cull distance value
+                if (payload.self.m_nggControl->enableCullDistanceCulling) {
+                  payload.clipCullDistance[4] = exportPositionOp.getExportValue0();
+                  payload.clipCullDistance[5] = exportPositionOp.getExportValue1();
+                  payload.clipCullDistance[6] = exportPositionOp.getExportValue2();
+                  payload.clipCullDistance[7] = exportPositionOp.getExportValue3();
+                }
+              }
 
-      if (func->isIntrinsic() && func->getIntrinsicID() == Intrinsic::amdgcn_exp) {
-        unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        if (exportTarget == EXP_TARGET_POS_0) {
-          // Get position value
-          m_constPositionZ = isa<Constant>(call->getArgOperand(4));
-          for (unsigned i = 0; i < 4; ++i)
-            position = m_builder.CreateInsertElement(position, call->getArgOperand(2 + i), i);
-        } else if (exportTarget == clipCullPos) {
-          // Get clip/cull distance value
-          if (m_nggControl->enableCullDistanceCulling) {
-            clipCullDistance[0] = call->getArgOperand(2);
-            clipCullDistance[1] = call->getArgOperand(3);
-            clipCullDistance[2] = call->getArgOperand(4);
-            clipCullDistance[3] = call->getArgOperand(5);
-          }
-        } else if (exportTarget == clipCullPos + 1 && clipDistanceCount + cullDistanceCount > 4) {
-          // Get clip/cull distance value
-          if (m_nggControl->enableCullDistanceCulling) {
-            clipCullDistance[4] = call->getArgOperand(2);
-            clipCullDistance[5] = call->getArgOperand(3);
-            clipCullDistance[6] = call->getArgOperand(4);
-            clipCullDistance[7] = call->getArgOperand(5);
-          }
-        }
-      }
-
-      removedCalls.push_back(call); // Remove export
-    }
+              payload.callsToRemove.push_back(&exportPositionOp);
+            })
+            .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
+              payload.callsToRemove.push_back(&exportAttributeOp);
+            })
+            .build();
+    visitor.visit(payload, *esCullDataFetcher);
   }
 
   Value *cullData = position;
@@ -3596,29 +3670,34 @@ void NggPrimShader::splitEs() {
   position = esVertexExporter->getArg(0); // The first argument is vertex position data
   assert(position->getType() == positionTy);
 
-  for (auto func : expFuncs) {
-    for (auto user : func->users()) {
-      CallInst *const call = cast<CallInst>(user);
+  {
+    struct Payload {
+      NggPrimShader &self;
+      Value *position;
+    };
+    Payload payload = {*this, position};
 
-      if (call->getParent()->getParent() != esVertexExporter)
-        continue; // Export call doesn't belong to targeted function, skip
+    static const auto visitor =
+        llvm_dialects::VisitorBuilder<Payload>()
+            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+            .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
+              auto &builder = payload.self.m_builder;
+              builder.SetInsertPoint(&exportPositionOp);
 
-      if (func->isIntrinsic() && func->getIntrinsicID() == Intrinsic::amdgcn_exp) {
-        unsigned exportTarget = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        if (exportTarget == EXP_TARGET_POS_0) {
-          // Replace vertex position data
-          m_builder.SetInsertPoint(call);
-          call->setArgOperand(2, m_builder.CreateExtractElement(position, static_cast<uint64_t>(0)));
-          call->setArgOperand(3, m_builder.CreateExtractElement(position, 1));
-          call->setArgOperand(4, m_builder.CreateExtractElement(position, 2));
-          call->setArgOperand(5, m_builder.CreateExtractElement(position, 3));
-        }
-      }
-    }
+              if (exportPositionOp.getExportSlot() == 0) {
+                // Replace vertex position data
+                exportPositionOp.setExportValue0(
+                    builder.CreateExtractElement(payload.position, static_cast<uint64_t>(0)));
+                exportPositionOp.setExportValue1(builder.CreateExtractElement(payload.position, 1));
+                exportPositionOp.setExportValue2(builder.CreateExtractElement(payload.position, 2));
+                exportPositionOp.setExportValue3(builder.CreateExtractElement(payload.position, 3));
+              }
+            })
+            .build();
+    visitor.visit(payload, *esVertexExporter);
   }
 
-  if (!m_pipelineState->exportAttributeByExportInstruction())
-    exportVertexAttributeThroughMemory(esVertexExporter);
+  mutateToExportVertex(esVertexExporter);
 
   // Remove original ES since it is no longer needed
   assert(m_esHandlers.main->use_empty());
@@ -3629,8 +3708,7 @@ void NggPrimShader::splitEs() {
   m_esHandlers.cullDataFetcher = esCullDataFetcher;
   m_esHandlers.vertexExporter = esVertexExporter;
 
-  // Remove calls
-  for (auto call : removedCalls) {
+  for (auto call : callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -3715,7 +3793,7 @@ void NggPrimShader::mutateGs() {
 
   IRBuilder<>::InsertPointGuard guard(m_builder);
 
-  SmallVector<Instruction *, 32> removedCalls;
+  SmallVector<CallInst *, 32> callsToRemove;
 
   m_builder.SetInsertPointPastAllocas(m_gsHandlers.main);
 
@@ -3761,62 +3839,62 @@ void NggPrimShader::mutateGs() {
   auto threadIdInSubgroup = m_builder.CreateMul(waveId, m_builder.getInt32(waveSize));
   threadIdInSubgroup = m_builder.CreateAdd(threadIdInSubgroup, threadIdInWave);
 
-  // Handle GS message and GS output export
-  for (auto &func : m_gsHandlers.main->getParent()->functions()) {
-    if (func.getName().starts_with(lgcName::NggWriteGsOutput)) {
-      // Export GS outputs to GS-VS ring
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
-        m_builder.SetInsertPoint(call);
+  // Handle dialect op NggWriteGsOutputOp and GS message
+  struct Payload {
+    NggPrimShader &self;
+    const ArrayRef<Value *> emitVertsPtrs;
+    const ArrayRef<Value *> outVertsPtrs;
+    Value *totalEmitVertsPtr;
+    Value *threadIdInSubgroup;
+    SmallVectorImpl<CallInst *> &callsToRemove;
+  };
+  Payload payload = {*this, emitVertsPtrs, outVertsPtrs, totalEmitVertsPtr, threadIdInSubgroup, callsToRemove};
 
-        assert(call->arg_size() == 4);
-        const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-        const unsigned compIdx = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-        const unsigned streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
-        assert(streamId < MaxGsStreams);
-        Value *output = call->getOperand(3);
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<Payload>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .add<NggWriteGsOutputOp>([](Payload &payload, NggWriteGsOutputOp &writeGsOutputOp) {
+            auto &builder = payload.self.m_builder;
+            builder.SetInsertPoint(&writeGsOutputOp);
 
-        auto emitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), emitVertsPtrs[streamId]);
-        auto totalEmitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), totalEmitVertsPtr);
-        writeGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts, totalEmitVerts);
+            const unsigned streamId = writeGsOutputOp.getStreamId();
+            assert(streamId < MaxGsStreams);
 
-        removedCalls.push_back(call);
-      }
-    } else if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg) {
-      // Handle GS message
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
-        m_builder.SetInsertPoint(call);
+            auto emitVerts = builder.CreateLoad(builder.getInt32Ty(), payload.emitVertsPtrs[streamId]);
+            auto totalEmitVerts = builder.CreateLoad(builder.getInt32Ty(), payload.totalEmitVertsPtr);
+            payload.self.writeGsOutput(writeGsOutputOp.getOutputValue(), writeGsOutputOp.getLocation(),
+                                       writeGsOutputOp.getComponent(), streamId, payload.threadIdInSubgroup, emitVerts,
+                                       totalEmitVerts);
 
-        if (getShaderStage(call->getParent()->getParent()) != ShaderStage::Geometry)
-          continue; // Not belong to GS messages
+            payload.callsToRemove.push_back(&writeGsOutputOp);
+          })
+          .add<GsEmitStreamOp>([](Payload &payload, GsEmitStreamOp &gsEmitStreamOp) {
+            auto &builder = payload.self.m_builder;
+            builder.SetInsertPoint(&gsEmitStreamOp);
 
-        uint64_t message = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        if (message == GsEmitStream0 || message == GsEmitStream1 || message == GsEmitStream2 ||
-            message == GsEmitStream3) {
-          // Handle GS_EMIT, MSG[9:8] = STREAM_ID
-          unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
-          assert(streamId < MaxGsStreams);
-          processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId],
-                        totalEmitVertsPtr);
-        } else if (message == GsCutStream0 || message == GsCutStream1 || message == GsCutStream2 ||
-                   message == GsCutStream3) {
-          // Handle GS_CUT, MSG[9:8] = STREAM_ID
-          unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
-          assert(streamId < MaxGsStreams);
-          processGsCut(streamId, outVertsPtrs[streamId]);
-        } else {
-          // Unexpected GS message
-          llvm_unreachable("Unexpected GS message!");
-        }
+            const unsigned streamId = gsEmitStreamOp.getStreamId();
+            assert(streamId < MaxGsStreams);
 
-        removedCalls.push_back(call);
-      }
-    }
-  }
+            payload.self.processGsEmit(streamId, payload.threadIdInSubgroup, payload.emitVertsPtrs[streamId],
+                                       payload.outVertsPtrs[streamId], payload.totalEmitVertsPtr);
 
-  // Clear removed calls
-  for (auto call : removedCalls) {
+            payload.callsToRemove.push_back(&gsEmitStreamOp);
+          })
+          .add<GsCutStreamOp>([](Payload &payload, GsCutStreamOp &gsCutStreamOp) {
+            auto &builder = payload.self.m_builder;
+            builder.SetInsertPoint(&gsCutStreamOp);
+
+            const unsigned streamId = gsCutStreamOp.getStreamId();
+            assert(streamId < MaxGsStreams);
+
+            payload.self.processGsCut(streamId, payload.outVertsPtrs[streamId]);
+
+            payload.callsToRemove.push_back(&gsCutStreamOp);
+          })
+          .build();
+  visitor.visit(payload, *m_gsHandlers.main);
+
+  for (auto call : callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -3888,48 +3966,49 @@ void NggPrimShader::runCopyShader(ArrayRef<Argument *> args) {
 // =====================================================================================================================
 // Mutates copy shader to handle the reading GS outputs from GS-VS ring.
 void NggPrimShader::mutateCopyShader() {
-  if (!m_pipelineState->exportAttributeByExportInstruction())
-    exportVertexAttributeThroughMemory(m_gsHandlers.copyShader);
-
   IRBuilder<>::InsertPointGuard guard(m_builder);
+
+  mutateToExportVertex(m_gsHandlers.copyShader);
 
   // Relative vertex index is always the last argument
   auto vertexIndex = getFunctionArgument(m_gsHandlers.copyShader, m_gsHandlers.copyShader->arg_size() - 1);
   const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+  assert(rasterStream != InvalidValue);
 
-  SmallVector<Instruction *, 32> removedCalls;
+  SmallVector<NggReadGsOutputOp *, 32> callsToRemove;
 
-  for (auto &func : m_gsHandlers.copyShader->getParent()->functions()) {
-    if (func.getName().starts_with(lgcName::NggReadGsOutput)) {
-      // Import GS outputs from GS-VS ring
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
+  struct Payload {
+    NggPrimShader &self;
+    Value *vertexIndex;
+    const unsigned rasterStream;
+    SmallVectorImpl<NggReadGsOutputOp *> &callsToRemove;
+  };
+  Payload payload = {*this, vertexIndex, rasterStream, callsToRemove};
 
-        if (call->getFunction() != m_gsHandlers.copyShader)
-          continue; // Not belong to copy shader
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<Payload>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .add<NggReadGsOutputOp>([](Payload &payload, NggReadGsOutputOp &readGsOutputOp) {
+            auto &builder = payload.self.m_builder;
+            builder.SetInsertPoint(&readGsOutputOp);
 
-        m_builder.SetInsertPoint(call);
+            const unsigned streamId = readGsOutputOp.getStreamId();
+            assert(streamId < MaxGsStreams);
 
-        assert(call->arg_size() == 3);
-        const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-        const unsigned component = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
-        const unsigned streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
-        assert(streamId < MaxGsStreams);
+            // Only lower the dialect op if it belongs to the rasterization stream.
+            if (streamId == payload.rasterStream) {
+              auto vertexOffset = payload.self.calcVertexItemOffset(streamId, payload.vertexIndex);
+              auto outputValue = payload.self.readGsOutput(readGsOutputOp.getType(), readGsOutputOp.getLocation(),
+                                                           readGsOutputOp.getComponent(), streamId, vertexOffset);
+              readGsOutputOp.replaceAllUsesWith(outputValue);
+            }
 
-        // Only lower the GS output import calls if they belong to the rasterization stream.
-        if (streamId == rasterStream) {
-          auto vertexOffset = calcVertexItemOffset(streamId, vertexIndex);
-          auto output = readGsOutput(call->getType(), location, component, streamId, vertexOffset);
-          call->replaceAllUsesWith(output);
-        }
+            payload.callsToRemove.push_back(&readGsOutputOp);
+          })
+          .build();
+  visitor.visit(payload, *m_gsHandlers.copyShader);
 
-        removedCalls.push_back(call);
-      }
-    }
-  }
-
-  // Clear removed calls
-  for (auto call : removedCalls) {
+  for (auto call : callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -4026,6 +4105,7 @@ void NggPrimShader::appendUserData(SmallVectorImpl<Value *> &args, Function *tar
 // @param totalEmitVerts : Counter of GS emitted vertices for all streams
 void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned component, unsigned streamId,
                                   Value *primitiveIndex, Value *emitVerts, llvm::Value *totalEmitVerts) {
+  assert(streamId < MaxGsStreams);
   if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
@@ -4102,6 +4182,7 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in dwords)
 Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned component, unsigned streamId,
                                    Value *vertexOffset) {
+  assert(streamId < MaxGsStreams);
   if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
@@ -4144,7 +4225,7 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 }
 
 // =====================================================================================================================
-// Processes the message GS_EMIT.
+// Process the dialect op NggGsEmit.
 //
 // @param streamId : ID of output vertex stream
 // @param primitiveIndex : Relative primitive index in subgroup
@@ -4164,7 +4245,7 @@ void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Valu
 }
 
 // =====================================================================================================================
-// Processes the message GS_CUT.
+// Process the dialect op NggGsCut.
 //
 // @param streamId : ID of output vertex stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
@@ -4179,7 +4260,7 @@ void NggPrimShader::processGsCut(unsigned streamId, Value *outVertsPtr) {
 }
 
 // =====================================================================================================================
-// Creates the function that processes GS_EMIT.
+// Create the function that processes the dialect op NggGsEmit.
 Function *NggPrimShader::createGsEmitHandler() {
   assert(m_hasGs);
 
@@ -4312,7 +4393,7 @@ Function *NggPrimShader::createGsEmitHandler() {
 }
 
 // =====================================================================================================================
-// Creates the function that processes GS_CUT.
+// Create the function that processes the dialect op NggGsCut.
 Function *NggPrimShader::createGsCutHandler() {
   assert(m_hasGs);
 
@@ -6116,139 +6197,6 @@ Value *NggPrimShader::ballot(Value *value) {
 }
 
 // =====================================================================================================================
-// Export vertex attribute through memory (ATM) by handing the calls. We mutate the argument list of the target function
-// by adding three additional arguments (attribute ring buffer descriptor, attribute ring base offset, and relative
-// vertex index in subgroup). Also, we expand all export calls by replacing it with real instructions that do vertex
-// attribute exporting through memory.
-//
-// @param [in/out] target : Target function to process vertex attribute export
-void NggPrimShader::exportVertexAttributeThroughMemory(Function *&target) {
-  assert(m_gfxIp.major >= 11);                                    // For GFX11+
-  assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
-
-  if (!m_attribRingBufDesc && !m_attribRingBaseOffset)
-    return; // No ATM, no attributes to export
-
-  IRBuilder<>::InsertPointGuard guard(m_builder);
-
-  //
-  // Mutate the argument list by adding two additional arguments
-  //
-  auto newTarget =
-      addFunctionArgs(target, nullptr,
-                      {
-                          FixedVectorType::get(m_builder.getInt32Ty(), 4), // Attribute ring buffer descriptor (4 SGPRs)
-                          m_builder.getInt32Ty(),                          // Attribute ring base offset (SGPR)
-                          m_builder.getInt32Ty()                           // Relative vertex index in subgroup (VGPR)
-                      },
-                      {"attribRingBufDesc", "attribRingBaseOffset", "vertexIndex"}, 0x3);
-
-  // Original function is no longer needed
-  assert(target->use_empty());
-  target->eraseFromParent();
-
-  target = newTarget;
-
-  //
-  // Expand vertex attribute export calls by replacing them with real instructions
-  //
-
-  // Always the first three arguments, added by us
-  auto attribRingBufDesc = target->getArg(0);
-  auto attribRingBaseOffset = target->getArg(1);
-  auto vertexIndex = target->getArg(2);
-
-  m_builder.SetInsertPointPastAllocas(target);
-
-  SmallVector<CallInst *, 8> removedCalls;
-
-  for (auto &func : target->getParent()->functions()) {
-    if (func.getName().starts_with(lgcName::NggAttributeThroughMemory)) {
-      for (auto user : func.users()) {
-        CallInst *const call = dyn_cast<CallInst>(user);
-        assert(call);
-
-        if (call->getParent()->getParent() != target)
-          continue; // Export call doesn't belong to targeted function, skip
-
-        m_builder.SetInsertPoint(call);
-
-        // Export vertex attributes
-        const unsigned location = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        auto locationOffset = m_builder.getInt32(location * SizeOfVec4);
-
-        auto attribValue = call->getArgOperand(1);
-        assert(attribValue->getType() == FixedVectorType::get(m_builder.getFloatTy(), 4)); // Must be <4 xfloat>
-
-        CoherentFlag coherent = {};
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-          coherent.bits.glc = true;
-        }
-        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
-                                  {attribValue, attribRingBufDesc, vertexIndex, locationOffset, attribRingBaseOffset,
-                                   m_builder.getInt32(coherent.u32All)});
-
-        removedCalls.push_back(call);
-      }
-
-      break; // Vertex attribute export calls are handled, could exit the loop
-    }
-  }
-
-  // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to collect
-  // all vertex position export calls and move them before the return instruction. This actually places them after the
-  // writing operations of attributes-through-memory
-  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
-    SmallVector<CallInst *, 4> exportCalls;
-
-    // Colllect export calls of vertex position data
-    for (auto &func : target->getParent()->functions()) {
-      if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) {
-        for (auto user : func.users()) {
-          CallInst *const call = dyn_cast<CallInst>(user);
-          assert(call);
-
-          if (call->getParent()->getParent() != target)
-            continue; // Export call doesn't belong to targeted function, skip
-
-          exportCalls.push_back(call);
-        }
-      }
-    }
-
-    // Move the export calls before the return instructions
-    ReturnInst *retInst = nullptr;
-    for (unsigned i = 0; i < exportCalls.size(); ++i) {
-      auto exportCall = exportCalls[i];
-
-      if (retInst) {
-        // All export calls are expected to be in the same basic block
-        assert(retInst == exportCall->getParent()->getTerminator());
-      } else {
-        retInst = dyn_cast<ReturnInst>(exportCall->getParent()->getTerminator());
-        assert(retInst);
-      }
-
-      exportCall->setOperand(
-          6, m_builder.getInt1(i == exportCalls.size() - 1)); // Make export done flag for the last export call
-      exportCall->moveBefore(retInst);
-    }
-
-    // Before the first export call, add s_wait_vscnt 0 to make sure the completion of all attributes being written
-    // to the attribute ring buffer
-    assert(!exportCalls.empty()); // Position export is always present
-    m_builder.SetInsertPoint(exportCalls[0]);
-    m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
-  }
-
-  // Remove calls
-  for (auto call : removedCalls) {
-    call->dropAllReferences();
-    call->eraseFromParent();
-  }
-}
-
-// =====================================================================================================================
 // Append additional arguments to the argument list for attribute-through-memory (ATM) of the specified shader stage.
 // Currently, three arguments are required to do attribute-through-memory:
 //   (1) Attribute ring buffer descriptor;
@@ -6266,6 +6214,208 @@ void NggPrimShader::appendAttributeThroughMemoryArguments(SmallVectorImpl<llvm::
   args.push_back(m_attribRingBufDesc);
   args.push_back(m_attribRingBaseOffset);
   args.push_back(m_nggInputs.threadIdInSubgroup);
+}
+
+// =====================================================================================================================
+// Mutate the target function to export vertex (positions and attributes) by lowering position/attribute exporting. If
+// attribute through memory (ATM) is required, we mutate its argument list by adding three additional arguments
+// (attribute ring buffer descriptor, attribute ring base offset, and relative vertex index in subgroup).
+//
+// @param [in/out] target : Target function to process vertex export
+void NggPrimShader::mutateToExportVertex(Function *&target) {
+  Value *attribRingBufDesc = nullptr;
+  Value *attribRingBaseOffset = nullptr;
+  Value *vertexIndex = nullptr;
+
+  //
+  // Mutate the argument list of the target function for ATM.
+  //
+  if (!m_pipelineState->exportAttributeByExportInstruction()) {
+    assert(m_gfxIp.major >= 11); // Must be GFX11+
+
+    // Could be no ATM
+    if (m_attribRingBufDesc && m_attribRingBaseOffset) {
+      // Mutate the argument list by adding two additional arguments
+      auto newTarget = addFunctionArgs(
+          target, nullptr,
+          {
+              FixedVectorType::get(m_builder.getInt32Ty(), 4), // Attribute ring buffer descriptor (4 SGPRs)
+              m_builder.getInt32Ty(),                          // Attribute ring base offset (SGPR)
+              m_builder.getInt32Ty()                           // Relative vertex index in subgroup (VGPR)
+          },
+          {"attribRingBufDesc", "attribRingBaseOffset", "vertexIndex"}, 0x3);
+
+      // Original function is no longer needed
+      assert(target->use_empty());
+      target->eraseFromParent();
+
+      target = newTarget;
+
+      attribRingBufDesc = target->getArg(0);
+      attribRingBaseOffset = target->getArg(1);
+      vertexIndex = target->getArg(2);
+    }
+  }
+
+  //
+  // Collect vertex position/attribute exports.
+  //
+  SmallVector<NggExportPositionOp *, 4> exportPositionOps;
+  SmallVector<NggExportAttributeOp *, 4> exportAttributeOps;
+
+  // Collect vertex poistion/attribute exports
+  struct Payload {
+    SmallVectorImpl<NggExportPositionOp *> &exportPositionOps;
+    SmallVectorImpl<NggExportAttributeOp *> &exportAttributeOps;
+  };
+  Payload payload = {exportPositionOps, exportAttributeOps};
+
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<Payload>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
+            payload.exportPositionOps.push_back(&exportPositionOp);
+          })
+          .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
+            payload.exportAttributeOps.push_back(&exportAttributeOp);
+          })
+          .build();
+  visitor.visit(payload, *target);
+
+  // If there are no position/attribute exports, skip further processing
+  if (exportPositionOps.empty() && exportAttributeOps.empty())
+    return;
+
+  assert(!exportPositionOps.empty()); // Position0 export is always present
+  ReturnInst *retInst = dyn_cast<ReturnInst>(exportPositionOps[0]->getParent()->getTerminator());
+  assert(retInst);
+
+  //
+  // Reorder vertex position/attribute exports.
+  //
+  for (auto exportPositionOp : exportPositionOps)
+    exportPositionOp->moveBefore(retInst);
+
+  // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to
+  // place vertex exports after all attribute exports (ATM operations).
+  Instruction *movePoint = retInst;
+  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
+    if (!exportAttributeOps.empty()) {
+      m_builder.SetInsertPoint(exportPositionOps[0]);
+      movePoint =
+          m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
+    }
+  }
+
+  for (auto exportAttributeOp : exportAttributeOps)
+    exportAttributeOp->moveBefore(movePoint);
+
+  //
+  // Lower vertex position/attribute exports.
+  //
+  for (auto exportPositionOp : exportPositionOps) {
+    m_builder.SetInsertPoint(exportPositionOp);
+    const bool lastExport = exportPositionOp == exportPositionOps[exportPositionOps.size() - 1];
+    exportPosition(exportPositionOp->getExportSlot(),
+                   {exportPositionOp->getExportValue0(), exportPositionOp->getExportValue1(),
+                    exportPositionOp->getExportValue2(), exportPositionOp->getExportValue3()},
+                   lastExport);
+  }
+
+  for (auto exportAttributeOp : exportAttributeOps) {
+    m_builder.SetInsertPoint(exportAttributeOp);
+    exportAttribute(exportAttributeOp->getExportSlot(),
+                    {exportAttributeOp->getExportValue0(), exportAttributeOp->getExportValue1(),
+                     exportAttributeOp->getExportValue2(), exportAttributeOp->getExportValue3()},
+                    attribRingBufDesc, attribRingBaseOffset, vertexIndex);
+  }
+
+  //
+  // Remove export dialect ops.
+  //
+  for (auto exportPositionOp : exportPositionOps) {
+    exportPositionOp->dropAllReferences();
+    exportPositionOp->eraseFromParent();
+  }
+
+  for (auto exportAttributeOp : exportAttributeOps) {
+    exportAttributeOp->dropAllReferences();
+    exportAttributeOp->eraseFromParent();
+  }
+}
+
+// =====================================================================================================================
+// Export vertex position.
+//
+// @param exportSlot : Export slot
+// @param exportValues : Vertex position values to export
+// @param lastExport : Whether this is the last export
+void NggPrimShader::exportPosition(unsigned exportSlot, ArrayRef<Value *> exportValues, bool lastExport) {
+  assert(exportValues.size() == 4);
+
+  unsigned channelMask = 0;
+  for (unsigned i = 0; i < 4; ++i) {
+    assert(exportValues[i]);
+    if (!isa<UndefValue>(exportValues[i]) && !isa<PoisonValue>(exportValues[i]))
+      channelMask |= (1u << i); // Update channel mask if the value is valid (not unspecified)
+  }
+
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
+                            {m_builder.getInt32(EXP_TARGET_POS_0 + exportSlot), // tgt
+                             m_builder.getInt32(channelMask),                   // en
+                             exportValues[0],                                   // src0
+                             exportValues[1],                                   // src1
+                             exportValues[2],                                   // src2
+                             exportValues[3],                                   // src3
+                             m_builder.getInt1(lastExport),                     // done
+                             m_builder.getFalse()});                            // vm
+}
+
+// =====================================================================================================================
+// Export vertex attribute.
+//
+// @param exportSlot : Export slot
+// @param exportValues : Vertex attribute values to export
+// @param attribRingBufDesc : Attribute ring buffer descriptor
+// @param attribRingBaseOffset : Subgroup's attribute ring base offset (in bytes)
+// @param vertexIndex :  Vertex index in subgroup
+void NggPrimShader::exportAttribute(unsigned exportSlot, ArrayRef<Value *> exportValues, Value *attribRingBufDesc,
+                                    Value *attribRingBaseOffset, Value *vertexIndex) {
+  assert(exportValues.size() == 4);
+
+  if (m_pipelineState->exportAttributeByExportInstruction()) {
+    unsigned channelMask = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+      assert(exportValues[i]);
+      if (!isa<UndefValue>(exportValues[i]) && !isa<PoisonValue>(exportValues[i]))
+        channelMask |= (1u << i); // Update channel mask if the value is valid (not unspecified)
+    }
+
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
+                              {m_builder.getInt32(EXP_TARGET_PARAM_0 + exportSlot), // tgt
+                               m_builder.getInt32(channelMask),                     // en
+                               exportValues[0],                                     // src0
+                               exportValues[1],                                     // src1
+                               exportValues[2],                                     // src2
+                               exportValues[3],                                     // src3
+                               m_builder.getFalse(),                                // done
+                               m_builder.getFalse()});                              // vm
+  } else {
+    auto locationOffset = m_builder.getInt32(exportSlot * SizeOfVec4);
+
+    Value *exportValue = PoisonValue::get(FixedVectorType::get(m_builder.getFloatTy(), 4)); // Must be <4 x float>
+    for (unsigned i = 0; i < 4; ++i)
+      exportValue = m_builder.CreateInsertElement(exportValue, exportValues[i], i);
+
+    CoherentFlag coherent = {};
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+      coherent.bits.glc = true;
+    }
+
+    m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
+                              {exportValue, attribRingBufDesc, vertexIndex, locationOffset, attribRingBaseOffset,
+                               m_builder.getInt32(coherent.u32All)});
+  }
 }
 
 // =====================================================================================================================
@@ -6403,29 +6553,19 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
                                           : m_builder.getFloatTy(),
           vertexIndices[i], xfbOutputExport.offsetInVertex);
 
-      if (xfbOutputExport.is16bit) {
-        // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
-        outputValue = m_builder.CreateBitCast(
-            outputValue, FixedVectorType::get(m_builder.getInt32Ty(), xfbOutputExport.numElements));
-        outputValue = m_builder.CreateTrunc(outputValue,
-                                            FixedVectorType::get(m_builder.getInt16Ty(), xfbOutputExport.numElements));
-        outputValue = m_builder.CreateBitCast(outputValue,
-                                              FixedVectorType::get(m_builder.getHalfTy(), xfbOutputExport.numElements));
-      }
-
       unsigned format = 0;
       switch (xfbOutputExport.numElements) {
       case 1:
-        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_FLOAT : BUF_FORMAT_32_FLOAT;
+        format = BUF_FORMAT_32_FLOAT;
         break;
       case 2:
-        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_FLOAT_GFX11;
+        format = BUF_FORMAT_32_32_FLOAT_GFX11;
         break;
       case 3:
-        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_32_FLOAT_GFX11;
+        format = BUF_FORMAT_32_32_32_FLOAT_GFX11;
         break;
       case 4:
-        format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_16_16_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
+        format = BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
         break;
       default:
         llvm_unreachable("Unexpected element number!");
@@ -6445,34 +6585,13 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
       // xfbOutputOffset = vertexOffset + xfbOffset
       Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbOutputExport.xfbOffset));
 
-      if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
-        // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
-        // and 16scalar.
-        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                  {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
-                                   m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
-                                   xfbOutputOffset,                                                 // offset
-                                   streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
-                                   m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
-                                   m_builder.getInt32(coherent.u32All)});                           // auxiliary data
-
-        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                  {m_builder.CreateExtractElement(outputValue, 2), // vdata
-                                   m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                   m_builder.CreateAdd(xfbOutputOffset,
-                                                       m_builder.getInt32(2 * sizeof(uint16_t))), // offset
-                                   streamOutOffsets[xfbOutputExport.xfbBuffer],                   // soffset
-                                   m_builder.getInt32(BUF_FORMAT_16_FLOAT),                       // format
-                                   m_builder.getInt32(coherent.u32All)});                         // auxiliary data
-      } else {
-        m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                  {outputValue,                                    // vdata
-                                   m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                   xfbOutputOffset,                                // offset
-                                   streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
-                                   m_builder.getInt32(format),                     // format
-                                   m_builder.getInt32(coherent.u32All)});          // auxiliary data
-      }
+      m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+                                {outputValue,                                    // vdata
+                                 m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                 xfbOutputOffset,                                // offset
+                                 streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
+                                 m_builder.getInt32(format),                     // format
+                                 m_builder.getInt32(coherent.u32All)});          // auxiliary data
     }
 
     if (i == possibleVertsPerPrim - 1) {
@@ -6870,29 +6989,19 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
                            xfbOutputExport.locInfo.location, xfbOutputExport.locInfo.component, i,
                            calcVertexItemOffset(i, vertexIndices[j]));
 
-          if (xfbOutputExport.is16bit) {
-            // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
-            outputValue = m_builder.CreateBitCast(
-                outputValue, FixedVectorType::get(m_builder.getInt32Ty(), xfbOutputExport.numElements));
-            outputValue = m_builder.CreateTrunc(
-                outputValue, FixedVectorType::get(m_builder.getInt16Ty(), xfbOutputExport.numElements));
-            outputValue = m_builder.CreateBitCast(
-                outputValue, FixedVectorType::get(m_builder.getHalfTy(), xfbOutputExport.numElements));
-          }
-
           unsigned format = 0;
           switch (xfbOutputExport.numElements) {
           case 1:
-            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_FLOAT : BUF_FORMAT_32_FLOAT;
+            format = BUF_FORMAT_32_FLOAT;
             break;
           case 2:
-            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_FLOAT_GFX11;
+            format = BUF_FORMAT_32_32_FLOAT_GFX11;
             break;
           case 3:
-            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_FLOAT : BUF_FORMAT_32_32_32_FLOAT_GFX11;
+            format = BUF_FORMAT_32_32_32_FLOAT_GFX11;
             break;
           case 4:
-            format = xfbOutputExport.is16bit ? BUF_FORMAT_16_16_16_16_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
+            format = BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
             break;
           default:
             llvm_unreachable("Unexpected element number!");
@@ -6913,34 +7022,13 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
           // xfbOutputOffset = vertexOffset + xfbOffset
           Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbOutputExport.xfbOffset));
 
-          if (xfbOutputExport.is16bit && xfbOutputExport.numElements == 3) {
-            // NOTE: For 16vec3, HW doesn't have a corresponding buffer store instruction. We have to split it to 16vec2
-            // and 16scalar.
-            m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                      {m_builder.CreateShuffleVector(outputValue, ArrayRef<int>{0, 1}), // vdata
-                                       m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                  // rsrc
-                                       xfbOutputOffset,                                                 // offset
-                                       streamOutOffsets[xfbOutputExport.xfbBuffer],                     // soffset
-                                       m_builder.getInt32(BUF_FORMAT_16_16_FLOAT),                      // format
-                                       m_builder.getInt32(coherent.u32All)}); // auxiliary data
-
-            m_builder.CreateIntrinsic(
-                m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                {m_builder.CreateExtractElement(outputValue, 2),                                 // vdata
-                 m_streamOutBufDescs[xfbOutputExport.xfbBuffer],                                 // rsrc
-                 m_builder.CreateAdd(xfbOutputOffset, m_builder.getInt32(2 * sizeof(uint16_t))), // offset
-                 streamOutOffsets[xfbOutputExport.xfbBuffer],                                    // soffset
-                 m_builder.getInt32(BUF_FORMAT_16_FLOAT),                                        // format
-                 m_builder.getInt32(coherent.u32All)});                                          // auxiliary data
-          } else {
-            m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                      {outputValue,                                    // vdata
-                                       m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                       xfbOutputOffset,                                // offset
-                                       streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
-                                       m_builder.getInt32(format),                     // format
-                                       m_builder.getInt32(coherent.u32All)});          // auxiliary data
-          }
+          m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+                                    {outputValue,                                    // vdata
+                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
+                                     xfbOutputOffset,                                // offset
+                                     streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
+                                     m_builder.getInt32(format),                     // format
+                                     m_builder.getInt32(coherent.u32All)});          // auxiliary data
         }
       }
 
@@ -7168,7 +7256,7 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
 // @param args : Arguments of primitive shader entry-point
 // @param [out] xfbOutputExports : Export info of transform feedback outputs
 Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args,
-                                     SmallVector<XfbOutputExport, 32> &xfbOutputExports) {
+                                     SmallVectorImpl<XfbOutputExport> &xfbOutputExports) {
   assert(m_pipelineState->enableSwXfb());
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(
@@ -7182,23 +7270,10 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   //
   // Clone the target function or just mutate the target function to fetch transform feedback outputs
   //
+  auto savedInsertPos = m_builder.saveIP();
 
   // We don't clone the target function if we are in passthrough mode without GS
-  bool dontClone = !m_hasGs && m_nggControl->passthroughMode;
-
-  // Collect all export calls for further analysis
-  SmallVector<Function *, 8> expFuncs;
-  for (auto &func : target->getParent()->functions()) {
-    if (dontClone) {
-      if (func.getName().starts_with(lgcName::NggXfbExport))
-        expFuncs.push_back(&func);
-    } else {
-      if ((func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) ||
-          func.getName().starts_with(lgcName::NggAttributeThroughMemory) ||
-          func.getName().starts_with(lgcName::NggXfbExport))
-        expFuncs.push_back(&func);
-    }
-  }
+  const bool makeClone = m_hasGs || !m_nggControl->passthroughMode;
 
   // Clone or mutate the target function
   xfbOutputExports.resize(xfbOutputCount);
@@ -7211,16 +7286,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   Type *xfbReturnTy = m_hasGs ? m_builder.getVoidTy() : xfbOutputsTy;
 
   Function *xfbFetcher = target;
-  if (dontClone) {
-    if (!m_pipelineState->exportAttributeByExportInstruction())
-      exportVertexAttributeThroughMemory(target);
-
-    xfbFetcher = addFunctionArgs(target, xfbReturnTy, {}, {}, 0);
-
-    // Original target function is no longer needed
-    assert(target->use_empty());
-    target->eraseFromParent();
-  } else {
+  if (makeClone) {
     auto xfbFetcherTy = FunctionType::get(xfbReturnTy, target->getFunctionType()->params(), false);
     xfbFetcher = Function::Create(xfbFetcherTy, target->getLinkage(), "", target->getParent());
 
@@ -7233,6 +7299,15 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     SmallVector<ReturnInst *, 8> retInsts;
     CloneFunctionInto(xfbFetcher, target, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
     xfbFetcher->setName(NggXfbFetcher);
+  } else {
+    mutateToExportVertex(target);
+
+    xfbFetcher = addFunctionArgs(target, xfbReturnTy, {}, {}, 0);
+
+    // Original target function is no longer needed
+    assert(target->use_empty());
+    target->eraseFromParent();
+    target = nullptr;
   }
 
   // Find the return block
@@ -7248,126 +7323,132 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     }
   }
   assert(retBlock);
-
-  auto savedInsertPos = m_builder.saveIP();
   m_builder.SetInsertPoint(retBlock);
 
-  // Visit all export calls, removing those unnecessary and mutating the return type
-  SmallVector<CallInst *, 8> removedCalls;
+  // Visit XFB writes and vertex position/attribute exports by lowering or removing them, and mutating the return type
+  SmallVector<CallInst *, 8> callsToRemove;
 
   Value *xfbOutputs = PoisonValue::get(xfbOutputsTy);
   unsigned outputIndex = 0;
   unsigned offsetInVertex = 0;
 
-  for (auto func : expFuncs) {
-    for (auto user : func->users()) {
-      CallInst *const call = dyn_cast<CallInst>(user);
-      assert(call);
+  struct Payload {
+    NggPrimShader &self;
+    Value *&xfbOutputs;
+    unsigned &outputIndex;
+    unsigned &offsetInVertex;
+    SmallVectorImpl<XfbOutputExport> &xfbOutputExports;
+    SmallVectorImpl<CallInst *> &callsToRemove;
+  };
+  Payload payload = {*this, xfbOutputs, outputIndex, offsetInVertex, xfbOutputExports, callsToRemove};
 
-      if (!dontClone) {
-        // Remove transform feedback export calls from the target function. No need of doing this if we
-        // just mutate it without cloning.
-        if (call->getFunction() == target && func->getName().starts_with(lgcName::NggXfbExport)) {
-          removedCalls.push_back(call);
-          continue;
-        }
-      }
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<Payload>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+            auto &builder = payload.self.m_builder;
 
-      if (call->getFunction() != xfbFetcher)
-        continue;
+            auto xfbBuffer = writeXfbOutputOp.getXfbBuffer();
+            auto xfbOffset = writeXfbOutputOp.getXfbOffset();
+            auto outputValue = writeXfbOutputOp.getOutputValue();
+            assert(outputValue->getType()->getScalarSizeInBits() == 32);
 
-      assert(call->getParent() == retBlock); // Must in return block
+            const unsigned numElements = outputValue->getType()->isVectorTy()
+                                             ? cast<FixedVectorType>(outputValue->getType())->getNumElements()
+                                             : 1;
+            assert(numElements <= 4);
 
-      if (func->getName().starts_with(lgcName::NggXfbExport)) {
-        // Lower transform feedback export calls
-        auto xfbBuffer = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
-        auto xfbOffset = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
-        auto outputValue = call->getArgOperand(3);
+            // Those values are just for GS
+            auto streamId = InvalidValue;
+            unsigned location = InvalidValue;
+            unsigned component = InvalidValue;
 
-        const unsigned numElements =
-            outputValue->getType()->isVectorTy() ? cast<FixedVectorType>(outputValue->getType())->getNumElements() : 1;
-        const bool is16bit = outputValue->getType()->getScalarSizeInBits() == 16;
-
-        // Those values are just for GS
-        auto streamId = InvalidValue;
-        unsigned location = InvalidValue;
-        unsigned component = InvalidValue;
-
-        if (m_hasGs) {
-          // NOTE: For GS, the output value must be loaded by GS read output call. This is generated by copy shader.
-          CallInst *readCall = dyn_cast<CallInst>(outputValue);
-          assert(readCall && readCall->getCalledFunction()->getName().starts_with(lgcName::NggReadGsOutput));
-          streamId = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-          assert(streamId == cast<ConstantInt>(readCall->getArgOperand(2))->getZExtValue()); // Stream ID must match
-          location = cast<ConstantInt>(readCall->getArgOperand(0))->getZExtValue();
-          component = cast<ConstantInt>(readCall->getArgOperand(1))->getZExtValue();
-        } else {
-          // If the output value is floating point, cast it to integer type
-          if (outputValue->getType()->isFPOrFPVectorTy()) {
-            if (numElements == 1) {
-              outputValue =
-                  m_builder.CreateBitCast(outputValue, is16bit ? m_builder.getInt16Ty() : m_builder.getInt32Ty());
+            if (payload.self.m_hasGs) {
+              // NOTE: For GS, the output value must be loaded by NggReadGsOutputOp. This is generated by copy
+              // shader.
+              NggReadGsOutputOp *readGsOutputOp = dyn_cast<NggReadGsOutputOp>(outputValue);
+              streamId = writeXfbOutputOp.getStreamId();
+              assert(streamId == readGsOutputOp->getStreamId()); // Stream ID must match
+              location = readGsOutputOp->getLocation();
+              component = readGsOutputOp->getComponent();
             } else {
-              outputValue = m_builder.CreateBitCast(
-                  outputValue,
-                  FixedVectorType::get(is16bit ? m_builder.getInt16Ty() : m_builder.getInt32Ty(), numElements));
+              // If the output value is floating point, cast it to integer type
+              if (outputValue->getType()->isFPOrFPVectorTy()) {
+                if (numElements == 1) {
+                  outputValue = builder.CreateBitCast(outputValue, builder.getInt32Ty());
+                } else {
+                  outputValue =
+                      builder.CreateBitCast(outputValue, FixedVectorType::get(builder.getInt32Ty(), numElements));
+                }
+              }
+
+              // Always pad the output value to <4 x i32>
+              if (numElements == 1) {
+                outputValue =
+                    builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 4)),
+                                                outputValue, static_cast<uint64_t>(0));
+              } else if (numElements < 4) {
+                outputValue = builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),
+                                                          ArrayRef<int>({0U, 1U, 2U, 3U}));
+              }
             }
-          }
 
-          // If the output value is 16-bit, zero-extend it to 32-bit
-          if (is16bit)
-            outputValue = m_builder.CreateZExt(outputValue, FixedVectorType::get(m_builder.getInt32Ty(), numElements));
+            // For VS/TES, return the output value
+            if (!payload.self.m_hasGs)
+              payload.xfbOutputs = builder.CreateInsertValue(payload.xfbOutputs, outputValue, payload.outputIndex);
 
-          // Always pad the output value to <4 x i32>
-          if (numElements == 1) {
-            outputValue =
-                m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4)),
-                                              outputValue, static_cast<uint64_t>(0));
-          } else if (numElements < 4) {
-            outputValue = m_builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),
-                                                        ArrayRef<int>({0U, 1U, 2U, 3U}));
-          }
-        }
+            // Collect export info
+            payload.xfbOutputExports[payload.outputIndex].xfbBuffer = xfbBuffer;
+            payload.xfbOutputExports[payload.outputIndex].xfbOffset = xfbOffset;
+            payload.xfbOutputExports[payload.outputIndex].numElements = numElements;
 
-        // For VS/TES, return the output value
-        if (!m_hasGs)
-          xfbOutputs = m_builder.CreateInsertValue(xfbOutputs, outputValue, outputIndex);
+            if (payload.self.m_hasGs) {
+              // Update fields for GS to use
+              payload.xfbOutputExports[payload.outputIndex].locInfo.streamId = streamId;
+              payload.xfbOutputExports[payload.outputIndex].locInfo.location = location;
+              payload.xfbOutputExports[payload.outputIndex].locInfo.component = component;
+            } else {
+              // Update the field for ES to use
+              payload.xfbOutputExports[payload.outputIndex].offsetInVertex = payload.offsetInVertex;
+              payload.offsetInVertex += numElements; // Increment the offset
+            }
 
-        // Collect export info
-        xfbOutputExports[outputIndex].xfbBuffer = xfbBuffer;
-        xfbOutputExports[outputIndex].xfbOffset = xfbOffset;
-        xfbOutputExports[outputIndex].numElements = numElements;
-        xfbOutputExports[outputIndex].is16bit = is16bit;
+            ++payload.outputIndex;
 
-        if (m_hasGs) {
-          // Update fields for GS to use
-          xfbOutputExports[outputIndex].locInfo.streamId = streamId;
-          xfbOutputExports[outputIndex].locInfo.location = location;
-          xfbOutputExports[outputIndex].locInfo.component = component;
-        } else {
-          // Update the field for ES to use
-          xfbOutputExports[outputIndex].offsetInVertex = offsetInVertex;
-
-          unsigned xfbOutputSize = numElements;
-          // Double the size if 64-bit output
-          if (outputValue->getType()->getScalarSizeInBits() == 64)
-            xfbOutputSize *= 2;
-          offsetInVertex += xfbOutputSize; // Increment the offset
-        }
-
-        ++outputIndex;
-      }
-
-      removedCalls.push_back(call); // Remove export
-    }
-  }
+            payload.callsToRemove.push_back(&writeXfbOutputOp);
+          })
+          .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
+            payload.callsToRemove.push_back(&exportPositionOp);
+          })
+          .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
+            payload.callsToRemove.push_back(&exportAttributeOp);
+          })
+          .build();
+  visitor.visit(payload, *xfbFetcher);
 
   assert(outputIndex == xfbOutputCount); // Visit all transform feedback export calls
 
   m_builder.CreateRet(xfbOutputs);
 
-  // Remove calls
-  for (auto call : removedCalls) {
+  // Remove XFB writes in original target function
+  if (makeClone) {
+    assert(target);
+
+    struct Payload {
+      SmallVectorImpl<CallInst *> &callsToRemove;
+    };
+    Payload payload = {callsToRemove};
+
+    static const auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                                    .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                                    .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+                                      payload.callsToRemove.push_back(&writeXfbOutputOp);
+                                    })
+                                    .build();
+    visitor.visit(payload, *target);
+  }
+
+  for (auto call : callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -7417,7 +7498,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   SmallVector<Value *, 32> xfbFetcherArgs;
 
   // If we don't clone the target function, we are going to run it and handle vertex attribute through memory here.
-  if (dontClone) {
+  if (!makeClone) {
     if (!m_pipelineState->exportAttributeByExportInstruction()) {
       if (!m_hasGs) // For GS, ATM is done in copy shader
         appendAttributeThroughMemoryArguments(xfbFetcherArgs);
@@ -7699,7 +7780,7 @@ Value *NggPrimShader::readXfbOutputFromLds(Type *readDataTy, Value *vertexIndex,
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
-      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
   auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
 
   if (m_nggControl->passthroughMode) {
@@ -7726,7 +7807,7 @@ void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexIndex, un
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
-      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
   auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
 
   if (m_nggControl->passthroughMode) {
@@ -7759,6 +7840,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexIndex) {
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInPosition];
   const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+  assert(rasterStream != InvalidValue);
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
   return readGsOutput(FixedVectorType::get(m_builder.getFloatTy(), 4), loc, 0, rasterStream, vertexOffset);
@@ -7774,7 +7856,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
   if (!m_hasGs) {
     // ES-only
     const unsigned esGsRingItemSize =
-        m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+        m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
     auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
     return readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset,
                                      m_vertCullInfoOffsets.cullDistanceSignMask);
@@ -7785,6 +7867,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
   const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
+  assert(rasterStream != InvalidValue);
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.gs;
@@ -7812,11 +7895,12 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
 // @param vertexIndex : Relative vertex index in NGG subgroup.
 Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexIndex) {
   assert(m_hasGs); // GS must be present
+  assert(streamId < MaxGsStreams);
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage;
 
   // vertexOffset = gsVsRingStart + streamBases[stream] + vertexIndex * vertexItemSize (in dwords)
-  const unsigned vertexItemSize = inOutUsage.gs.calcFactor.gsVsVertexItemSize[streamId];
+  const unsigned vertexItemSize = inOutUsage.gs.hwConfig.gsVsVertexItemSize[streamId];
 
   auto vertexOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexItemSize));
   vertexOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(m_gsStreamBases[streamId]));

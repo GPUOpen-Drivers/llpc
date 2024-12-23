@@ -68,7 +68,7 @@ PreservedAnalyses GenerateNullFragmentShader::run(Module &module, ModuleAnalysis
   if (hasFs || !pipelineState->isGraphics())
     return PreservedAnalyses::all();
 
-  FragColorExport::generateNullFragmentShader(module, pipelineState, lgcName::NullFsEntryPoint);
+  FragmentColorExport::generateNullFragmentShader(module, pipelineState, lgcName::NullFsEntryPoint);
   updatePipelineState(pipelineState);
   return PreservedAnalyses::none();
 }

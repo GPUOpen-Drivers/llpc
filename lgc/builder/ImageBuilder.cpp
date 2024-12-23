@@ -1643,7 +1643,6 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc, Value *coord,
                                       const Twine &instName) {
-  assert(imageDesc->getType()->isPointerTy() && samplerDesc->getType()->isPointerTy());
   if (isa<PoisonValue>(imageDesc) || isa<PoisonValue>(samplerDesc))
     return PoisonValue::get(FixedVectorType::get(getFloatTy(), 2));
 

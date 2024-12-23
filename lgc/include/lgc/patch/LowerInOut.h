@@ -41,6 +41,9 @@
 
 namespace lgc {
 
+class EvalIjOffsetSmoothOp;
+class AdjustIjOp;
+
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for input import and output export.
 class LowerInOut : public Patch, public llvm::PassInfoMixin<LowerInOut> {
@@ -159,9 +162,8 @@ private:
   llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, BuilderBase &builder);
   void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, BuilderBase &builder);
 
-  unsigned calcPatchCountPerThreadGroup(unsigned inVertexCount, unsigned inVertexStride, unsigned outVertexCount,
-                                        unsigned outVertexStride, unsigned patchConstCount,
-                                        unsigned tessFactorStride) const;
+  unsigned calcMaxNumPatchesPerGroup(unsigned inputVertexCount, unsigned outputVertexCount, unsigned tessFactorCount,
+                                     unsigned ldsSizePerPatch, unsigned ldsBufferSizePerPatch) const;
 
   llvm::Value *calcLdsOffsetForVsOutput(llvm::Type *outputTy, unsigned location, unsigned compIdx,
                                         BuilderBase &builder);
@@ -189,8 +191,12 @@ private:
   llvm::Value *getPrimType(BuilderBase &builder);
   llvm::Value *getLineStipple(BuilderBase &builderBase);
 
-  void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
-  void exportVertexAttribs(BuilderBase &builder);
+  void recordVertexAttribute(unsigned exportSlot, llvm::ArrayRef<llvm::Value *> exportValues);
+  void exportAttributes(BuilderBase &builder);
+  void exportPosition(unsigned exportSlot, llvm::ArrayRef<llvm::Value *> exportValues, BuilderBase &builder);
+
+  void visitEvalIjOffsetSmoothOp(EvalIjOffsetSmoothOp &op);
+  void visitAdjustIjOp(AdjustIjOp &op);
 
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
@@ -218,8 +224,9 @@ private:
 
   std::vector<llvm::CallInst *> m_importCalls; // List of "call" instructions to import inputs
   std::vector<llvm::CallInst *> m_exportCalls; // List of "call" instructions to export outputs
+  std::vector<llvm::CallInst *> m_gsMsgCalls;  // List of "call" instructions to send GS message
   llvm::SmallDenseMap<unsigned, std::array<llvm::Value *, 4>>
-      m_attribExports;                      // Export info of vertex attributes: <attrib loc, attrib values>
+      m_attribExports;                      // Export info of vertex attributes: <export slot, export values>
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
 
   std::set<unsigned> m_expLocs; // The locations that already have an export instruction for the vertex shader.

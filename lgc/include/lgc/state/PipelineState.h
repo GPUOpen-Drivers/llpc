@@ -314,10 +314,11 @@ public:
 
   // Gets wave size for the specified shader stage
   unsigned getShaderWaveSize(ShaderStageEnum stage);
-  // Gets wave size for the merged shader stage
-  unsigned getMergedShaderWaveSize(ShaderStageEnum stage);
   // Gets subgroup size for the specified shader stage
   unsigned getShaderSubgroupSize(ShaderStageEnum stage);
+
+  // Gets shader stage for the specified shader stage that it will merge with
+  ShaderStageEnum getMergingShaderStage(ShaderStageEnum stage);
 
   // Gets Util::Abi::PipelineType for pipeline
   unsigned getAbiPipelineType();
@@ -604,6 +605,11 @@ private:
   void recordGraphicsState(llvm::Module *module);
   void readGraphicsState(llvm::Module *module);
 
+  // Wave sizes handling
+  void recordWaveSize(llvm::Module *module);
+  void readWaveSize(llvm::Module *module);
+  void determineShaderWaveSize(llvm::Module *module);
+
   // ABI Shader Map
   void buildAbiHwShaderMap();
 
@@ -643,8 +649,8 @@ private:
   ShaderStageMap<std::unique_ptr<ResourceUsage>> m_resourceUsage;   // Per-shader ResourceUsage
   ShaderStageMap<std::unique_ptr<InterfaceData>> m_interfaceData;   // Per-shader InterfaceData
   PalMetadata *m_palMetadata = nullptr;                             // PAL metadata object
-  ShaderStageMap<unsigned> m_waveSize;                              // Per-shader wave size
-  ShaderStageMap<unsigned> m_subgroupSize;                          // Per-shader subgroup size
+  unsigned m_waveSize[ShaderStage::Count] = {};                     // Per-shader wave size
+  unsigned m_subgroupSize[ShaderStage::Count] = {};                 // Per-shader subgroup size
   ShaderStageMap<bool> m_inputPackState;                            // The input packable state per shader stage
   ShaderStageMap<bool> m_outputPackState;                           // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};                         // Transform feedback state metadata

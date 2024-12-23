@@ -50,8 +50,7 @@ public:
 private:
   bool needRun();
   unsigned getUniformLocation(llvm::GlobalVariable *var);
-  void decodeInOutMetaRecursivelyByIndex(llvm::Type *valueTy, llvm::Constant *mds, ArrayRef<Value *> index,
-                                         llvm::SmallVector<ShaderInOutMetadata> &out);
+  ShaderInOutMetadata getShaderInOutMetadata(Type *elementType, Constant *elementMetadata);
   void unifyFunctionReturn(Function *func);
   void collectEmitInst();
   void collectEmulationResource();
@@ -101,7 +100,6 @@ private:
   llvm::BasicBlock *m_originalEntryBlock;          // The original entry block of entry point.
 
   // The resource use to lower gl_ClipVertex
-  llvm::User *m_out;                 // The global variable of gl_out[]
   llvm::User *m_clipVertex;          // The global variable of gl_ClipVertex
   llvm::User *m_clipDistance;        // The global variable of gl_ClipDistance
   llvm::User *m_clipPlane;           // The global variable of gl_ClipPlane

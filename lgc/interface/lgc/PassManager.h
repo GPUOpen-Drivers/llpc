@@ -104,6 +104,7 @@ public:
   // Register a pass to identify it with a short name in the pass manager
   virtual void registerPass(llvm::StringRef passName, llvm::StringRef className) = 0;
   virtual void run(llvm::ModuleBunch &moduleBunch) = 0;
+  virtual void setPassIndex(unsigned *passIndex) = 0;
   virtual bool stopped() const = 0;
 
   virtual llvm::PassInstrumentationCallbacks &getInstrumentationCallbacks() = 0;

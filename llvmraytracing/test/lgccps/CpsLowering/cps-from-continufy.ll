@@ -31,14 +31,14 @@ define spir_func void @_rgen_1(i32 %rcr) #0 !spirv.ExecutionModel !15 !lgc.shade
 ; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <4 x i32> [[TMP16]], i32 [[TMP17]], i64 1
 ; CHECK-NEXT:    [[TMP19:%.*]] = insertelement <4 x i32> [[TMP18]], i32 -1, i64 2
 ; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <4 x i32> [[TMP19]], i32 553734060, i64 3
-; CHECK-NEXT:    [[TMP21:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP20]])
+; CHECK-NEXT:    [[TMP21:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP20]], i1 false)
 ; CHECK-NEXT:    [[TMP22:%.*]] = call i32 @lgc.load.user.data__i32(i32 0)
 ; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <2 x i32> [[TMP5]], i32 [[TMP22]], i64 0
 ; CHECK-NEXT:    [[TMP24:%.*]] = bitcast <2 x i32> [[TMP23]] to i64
 ; CHECK-NEXT:    [[TMP25:%.*]] = inttoptr i64 [[TMP24]] to ptr addrspace(4)
 ; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP25]], i32 32
 ; CHECK-NEXT:    [[TMP27:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP26]], align 16
-; CHECK-NEXT:    [[TMP28:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP27]])
+; CHECK-NEXT:    [[TMP28:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP27]], i1 false)
 ; CHECK-NEXT:    [[TMP29:%.*]] = inttoptr i32 [[TMP0]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP29]], i32 0
 ; CHECK-NEXT:    store ptr addrspace(7) [[TMP28]], ptr addrspace(5) [[TMP30]], align 32
@@ -48,7 +48,7 @@ define spir_func void @_rgen_1(i32 %rcr) #0 !spirv.ExecutionModel !15 !lgc.shade
 ; CHECK-NEXT:    [[TMP34:%.*]] = inttoptr i64 [[TMP33]] to ptr addrspace(4)
 ; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP34]], i32 48
 ; CHECK-NEXT:    [[TMP36:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP35]], align 16
-; CHECK-NEXT:    [[TMP37:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP36]])
+; CHECK-NEXT:    [[TMP37:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP36]], i1 false)
 ; CHECK-NEXT:    [[TMP38:%.*]] = add i32 [[TMP0]], 8
 ; CHECK-NEXT:    [[TMP39:%.*]] = inttoptr i32 [[TMP38]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP39]], i32 0
@@ -74,7 +74,7 @@ define spir_func void @_rgen_1(i32 %rcr) #0 !spirv.ExecutionModel !15 !lgc.shade
 ; CHECK-NEXT:    [[TMP58:%.*]] = inttoptr i32 [[TMP57]] to ptr
 ; CHECK-NEXT:    [[TMP59:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @_rgen_1.resume.0)
 ; CHECK-NEXT:    [[TMP60:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[TMP57]], i32 2, i32 [[TMP60]], i32 [[TMP59]], [1 x i32] undef, i32 [[TMP45]])
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[TMP57]], i32 2, i32 [[TMP60]], i32 poison, i32 [[TMP59]], [1 x i32] undef, i32 [[TMP45]])
 ; CHECK-NEXT:    unreachable
 ;
 .entry:
@@ -98,14 +98,14 @@ define spir_func void @_rgen_1(i32 %rcr) #0 !spirv.ExecutionModel !15 !lgc.shade
   %17 = insertelement <4 x i32> %15, i32 %16, i64 1
   %18 = insertelement <4 x i32> %17, i32 -1, i64 2
   %19 = insertelement <4 x i32> %18, i32 553734060, i64 3
-  %20 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %19)
+  %20 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %19, i1 false)
   %21 = call i32 @lgc.load.user.data__i32(i32 0)
   %22 = insertelement <2 x i32> %4, i32 %21, i64 0
   %23 = bitcast <2 x i32> %22 to i64
   %24 = inttoptr i64 %23 to ptr addrspace(4)
   %25 = getelementptr i8, ptr addrspace(4) %24, i32 32
   %26 = load <4 x i32>, ptr addrspace(4) %25, align 16
-  %27 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %26)
+  %27 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %26, i1 false)
   %28 = getelementptr inbounds %_rgen_1.Frame, ptr addrspace(32) %0, i32 0, i32 0
   store ptr addrspace(7) %27, ptr addrspace(32) %28, align 32
   %29 = call i32 @lgc.load.user.data__i32(i32 0)
@@ -114,7 +114,7 @@ define spir_func void @_rgen_1(i32 %rcr) #0 !spirv.ExecutionModel !15 !lgc.shade
   %32 = inttoptr i64 %31 to ptr addrspace(4)
   %33 = getelementptr i8, ptr addrspace(4) %32, i32 48
   %34 = load <4 x i32>, ptr addrspace(4) %33, align 16
-  %35 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %34)
+  %35 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %34, i1 false)
   %36 = getelementptr inbounds %_rgen_1.Frame, ptr addrspace(32) %0, i32 0, i32 1
   store ptr addrspace(7) %35, ptr addrspace(32) %36, align 32
   %37 = load volatile i32, ptr addrspace(7) %35, align 4
@@ -135,7 +135,7 @@ define spir_func void @_rgen_1(i32 %rcr) #0 !spirv.ExecutionModel !15 !lgc.shade
   %51 = or i32 %50, 1
   %52 = inttoptr i32 %51 to ptr
   %53 = call i32 (...) @lgc.cps.as.continuation.reference(ptr @_rgen_1.resume.0)
-  call void (...) @lgc.cps.jump(i32 %51, i32 2, i32 poison, i32 %53, [1 x i32] undef, i32 %39)
+  call void (...) @lgc.cps.jump(i32 %51, i32 2, i32 poison, i32 poison, i32 %53, [1 x i32] undef, i32 %39)
   unreachable
 }
 
@@ -193,7 +193,7 @@ declare i32 @lgc.load.user.data__i32(i32) #1
 
 declare i64 @llvm.amdgcn.s.getpc() #2
 
-declare ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>) #1
+declare ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>, i1) #1
 
 declare ptr addrspace(32) @lgc.cps.alloc(i32) #6
 

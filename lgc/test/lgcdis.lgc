@@ -13,7 +13,7 @@
 ; CHECK:  .ps:
 ; CHECK:  .checksum_value: 0x759bd992
 ; CHECK:  .debug_mode:     false
-; CHECK:  .entry_point:    _amdgpu_ps_main
+; CHECK:  .entry_point{{(_symbol)?}}:    _amdgpu_ps_main
 ; CHECK:  .float_mode:     0xc0
 ; CHECK:  .ieee_mode:      false
 ; CHECK:  .mem_ordered:    true

@@ -43,9 +43,9 @@ ResourceUsage::ResourceUsage(ShaderStageEnum shaderStage) {
     builtInUsage.vs.baseVertex = true;
     builtInUsage.vs.baseInstance = true;
   } else if (shaderStage == ShaderStage::TessControl) {
-    inOutUsage.tcs.calcFactor = {};
+    inOutUsage.tcs.hwConfig = {};
   } else if (shaderStage == ShaderStage::Geometry) {
-    inOutUsage.gs.calcFactor = {};
+    inOutUsage.gs.hwConfig = {};
   } else if (shaderStage == ShaderStage::Fragment) {
     for (uint32_t i = 0; i < MaxColorTargets; ++i) {
       inOutUsage.fs.outputTypes[i] = BasicType::Unknown;

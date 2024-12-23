@@ -1,7 +1,7 @@
 ; RUN: amdllpc -gfxip 11.0 -emit-llvm -o - %s | FileCheck -check-prefixes=CHECK %s
 
 ; This case will have irreducible CFG after continuation transform.
-; Without fixing irreducible, PatchBufferOp would generate several global load.
+; Without fixing irreducible, LowerBufferOperations would generate several global load.
 ; CHECK-LABEL: @_rgen_1.resume.0(
 ; CHECK-NOT:   load {{.*}}, ptr addrspace(1)
 

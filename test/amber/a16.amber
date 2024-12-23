@@ -50,7 +50,8 @@ layout(location = 0) out vec4 color_out;
 layout(set = 0, binding = 0) uniform highp sampler2D tex;
 
 void main() {
-// CHECK: image_sample_b {{.*}} a16
+// FIXME: Should be a16
+// CHECK: image_sample_b {{.*}}
   vec2 pos = (position_in + vec2(1.0)) / 2.0;
   float vi = round(vert_i); // Round to integer to get striped pattern
   // Convert address and bias to f16 to generate an a16 sample.

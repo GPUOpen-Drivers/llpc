@@ -92,7 +92,7 @@ PreservedAnalyses LgcCpsJumpInlinerPassImpl::run() {
     assert(JumpTargetFunc && !JumpTargetFunc->isDeclaration());
 
     Builder.SetInsertPoint(Jump);
-    SmallVector<Value *> ArgList{Jump->getRcr()};
+    SmallVector<Value *> ArgList{Jump->getShaderIndex(), Jump->getRcr()};
 
     ArgList.append(Jump->getTail().begin(), Jump->getTail().end());
 

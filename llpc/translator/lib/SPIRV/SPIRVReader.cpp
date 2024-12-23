@@ -267,12 +267,27 @@ SPIRVWord getStd430AlignedTypeSize(SPIRVType *const spvType) {
   return 0;
 }
 
-static bool isStorageClassExplicitlyLaidOut(SPIRVModule *m_bm, SPIRVStorageClassKind storageClass) {
+bool SPIRVToLLVM::isStorageClassExplicitlyLaidOut(SPIRVStorageClassKind storageClass) {
   return llvm::is_contained({StorageClassStorageBuffer, StorageClassUniform, StorageClassPushConstant,
                              StorageClassPhysicalStorageBufferEXT},
                             storageClass) ||
          storageClass == StorageClassShaderRecordBufferKHR ||
          (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
+}
+
+bool SPIRVToLLVM::isStorageClassScalarLayout(SPIRVStorageClassKind storageClass) {
+  // Per spec, maxPipelineRayPayloadSize and maxPipelineRayHitAttributeSize are calculated using scalar layout, we
+  // need to honor that here to reserve correct size for payload/attribute, e.g., when compiling library.
+  return llvm::is_contained({StorageClassRayPayloadKHR, StorageClassIncomingRayPayloadKHR, StorageClassHitAttributeKHR},
+                            storageClass);
+}
+
+LayoutMode SPIRVToLLVM::getLayoutModeForStorageClass(SPIRVStorageClassKind storageClass) {
+  if (isStorageClassExplicitlyLaidOut(storageClass))
+    return LayoutMode::Explicit;
+  if (isStorageClassScalarLayout(storageClass))
+    return LayoutMode::Scalar;
+  return LayoutMode::Native;
 }
 
 SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
@@ -553,7 +568,7 @@ Type *SPIRVToLLVM::transTypeArray(SPIRVType *const spvType, const unsigned matri
     }
   }
 
-  const SPIRVWord arrayLength = opcode == OpTypeArray ? spvType->getArrayLength() : SPIRVWORD_MAX;
+  const SPIRVWord arrayLength = opcode == OpTypeArray ? spvType->getArrayLength() : 0;
   Type *const arrayType = ArrayType::get(elementType, arrayLength);
 
   // Setup the replaced array type in case this array is used in default uniform struct:
@@ -938,9 +953,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
                                                      const bool isColumnMajor, LayoutMode layout) {
   Type *const compType = transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, layout);
 
-  // If the vector needs explicit/std430 layout, we need to use an array to represent it because of LLVM's data layout
-  // rules.
-  if (layout == LayoutMode::Explicit || layout == LayoutMode::Std430)
+  // If the vector needs explicit/std430/scalar layout, we need to use an array to represent it because of LLVM's data
+  // layout rules.
+  if (layout == LayoutMode::Explicit || layout == LayoutMode::Std430 || layout == LayoutMode::Scalar)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
   return FixedVectorType::get(compType, spvType->getVectorComponentCount());
 }
@@ -960,7 +975,8 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(SPIRVType *co
   unsigned rows = spvType->getCooperativeMatrixKHRRows();
   unsigned columns = spvType->getCooperativeMatrixKHRColumns();
   auto matrixLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(use), elemType, rows, columns);
-  return getBuilder()->getCooperativeMatrixTy(elemType, matrixLayout);
+  const unsigned kSize = rows > columns ? rows : columns;
+  return getBuilder()->getCooperativeMatrixTy(elemType, matrixLayout, kSize);
 }
 
 // =====================================================================================================================
@@ -994,8 +1010,8 @@ Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v, LayoutMode layout) {
       return pointeeType;
   }
 
-  if (isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass()))
-    layout = LayoutMode::Explicit;
+  if (getLayoutModeForStorageClass(v->getType()->getPointerStorageClass()) != LayoutMode::Native)
+    layout = getLayoutModeForStorageClass(v->getType()->getPointerStorageClass());
 
   return transType(v->getType()->getPointerElementType(), 0, true, layout);
 }
@@ -1271,9 +1287,7 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   auto srcSpvType = bc->getOperand(0)->getType();
   auto dstSpvType = bc->getType();
   auto src = transValue(bc->getOperand(0), f, bb, bb != nullptr);
-  auto srcType = src->getType();
   auto dstType = transType(dstSpvType);
-  CastInst::CastOps co = Instruction::BitCast;
 
   // Extension for OGLP: Only valid for bindless texture/image to convert uvec2 to gsampler/gimage
   // uniform uvec2 textureHandle;
@@ -1287,6 +1301,12 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
     Value *imgDescGpuAddress = getBuilder()->CreateBitCast(src, getBuilder()->getInt64Ty());
     return transLoadBindlessImage(dstSpvType, imgDescGpuAddress, bindlessTexture);
   }
+
+  bool isDestFloat8 = false;
+  (void(isDestFloat8));
+
+  auto srcType = src->getType();
+  CastInst::CastOps co = Instruction::BitCast;
 
   lgc::CooperativeMatrixElementType srcElemTy = lgc::CooperativeMatrixElementType::Unknown;
   lgc::CooperativeMatrixElementType dstElemTy = lgc::CooperativeMatrixElementType::Unknown;
@@ -1320,15 +1340,53 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
     co = static_cast<CastInst::CastOps>(OpCodeMap::rmap(bc->getOpCode()));
   }
 
-  if (dstType == srcType)
+  if ((dstType == srcType) && (srcElemTy == dstElemTy)) {
     return src;
+  }
+
   assert(CastInst::isCast(co) && "Invalid cast op code");
   if (bb) {
     if (bv->getType()->isTypeCooperativeMatrixKHR()) {
-      Type *matrixType = getBuilder()->getCooperativeMatrixTy(dstElemTy, dstLayout);
+      unsigned rows = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRRows();
+      unsigned columns = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRColumns();
+      const unsigned kSize = rows > columns ? rows : columns;
+      Type *matrixType = getBuilder()->getCooperativeMatrixTy(dstElemTy, dstLayout, kSize);
       return getBuilder()->create<CooperativeMatrixConvertOp>(matrixType, co, src, srcElemTy, dstElemTy, srcLayout,
                                                               dstLayout, "convert");
     }
+
+    if (co == Instruction::FPTrunc) {
+      if (dstType->getScalarSizeInBits() == srcType->getScalarSizeInBits()) {
+        assert(dstType->getScalarType()->isBFloatTy() || dstType->getScalarType()->isHalfTy());
+        src = getBuilder()->CreateFPExt(
+            src, dstType->isVectorTy() ? FixedVectorType::get(getBuilder()->getFloatTy(),
+                                                              cast<FixedVectorType>(dstType)->getNumElements())
+                                       : getBuilder()->getFloatTy());
+      }
+
+      RoundingMode rm = RoundingMode::Dynamic;
+      SPIRVFPRoundingModeKind rounding;
+      if (bc->hasFPRoundingMode(&rounding)) {
+        switch (rounding) {
+        case FPRoundingModeRTE:
+          rm = RoundingMode::NearestTiesToEven;
+          break;
+        case FPRoundingModeRTZ:
+          rm = RoundingMode::TowardZero;
+          break;
+        case FPRoundingModeRTP:
+          rm = RoundingMode::TowardPositive;
+          break;
+        case FPRoundingModeRTN:
+          rm = RoundingMode::TowardNegative;
+          break;
+        default:
+          llvm_unreachable("Should never be called!");
+        }
+        return getBuilder()->CreateFpTruncWithRounding(src, dstType, rm);
+      }
+    }
+
     bool srcIsPtr = srcType->isPtrOrPtrVectorTy();
     bool dstIsPtr = dstType->isPtrOrPtrVectorTy();
     // OpBitcast in SPIR-V allows casting between pointers and integers (and integer vectors),
@@ -1351,7 +1409,8 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
         return new IntToPtrInst(src, dstType, bv->getName(), bb);
       }
     } else {
-      return CastInst::Create(co, src, dstType, bv->getName(), bb);
+      Value *ret = CastInst::Create(co, src, dstType, bv->getName(), bb);
+      return ret;
     }
   }
   return ConstantExpr::getCast(co, dyn_cast<Constant>(src), dstType);
@@ -1965,7 +2024,7 @@ std::pair<Type *, Value *> SPIRVToLLVM::createLaunderRowMajorMatrix(Type *const 
   Type *const matrixPointerType = pointerToMatrix->getType();
 
   Type *const newMatrixType = getTransposedType(matrixType);
-  Type *const newMatrixPointerType = newMatrixType->getPointerTo(matrixPointerType->getPointerAddressSpace());
+  Type *const newMatrixPointerType = getBuilder()->getPtrTy(matrixPointerType->getPointerAddressSpace());
 
   // Dummy value used to remember matrixType which will be used in postProcessRowMajorMatrix.
   Value *dummyValue = Constant::getNullValue(matrixType);
@@ -2032,7 +2091,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       auto pair = std::make_pair(spvType, i);
       if (m_overlappingStructTypeWorkaroundMap.count(pair) > 0) {
         memberLoadType = m_overlappingStructTypeWorkaroundMap[pair];
-        Type *const type = memberLoadType->getPointerTo(memberLoadPointer->getType()->getPointerAddressSpace());
+        Type *const type = getBuilder()->getPtrTy(memberLoadPointer->getType()->getPointerAddressSpace());
         memberLoadPointer = getBuilder()->CreateBitCast(memberLoadPointer, type);
       }
 
@@ -2277,7 +2336,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
       Constant *indices[] = {zero, getBuilder()->getInt32(memberIndex)};
       Type *const memberStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
       constMembers[memberIndex] =
-          buildConstStoreRecursively(spvType->getStructMemberType(i), memberStoreType->getPointerTo(addrSpace),
+          buildConstStoreRecursively(spvType->getStructMemberType(i), getBuilder()->getPtrTy(addrSpace),
                                      memberStoreType, constStoreValue->getAggregateElement(i));
     }
 
@@ -2302,9 +2361,8 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
         indices.push_back(zero);
 
       Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
-      Constant *const constElement =
-          buildConstStoreRecursively(spvElementType, elementStoreType->getPointerTo(addrSpace), elementStoreType,
-                                     constStoreValue->getAggregateElement(i));
+      Constant *const constElement = buildConstStoreRecursively(
+          spvElementType, getBuilder()->getPtrTy(addrSpace), elementStoreType, constStoreValue->getAggregateElement(i));
 
       if (needsPad) {
         constElements[i] = llvm::ConstantFoldInsertValueInstruction(constElements[i], constElement, 0);
@@ -2343,15 +2401,15 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
 // Translate scope from SPIR-V to LLVM.
 //
 // @param context : The LLVM context.
-// @param spvScope : The scope to translate.
-static SyncScope::ID transScope(LLVMContext &context, const SPIRVConstant *const spvScope) {
-  const unsigned scope = static_cast<unsigned>(spvScope->getZExtIntValue());
-
+// @param scope : The SPIR-V scope to translate.
+static SyncScope::ID transScope(LLVMContext &context, unsigned scope) {
   switch (scope) {
   case ScopeCrossDevice:
+    return SyncScope::System;
   case ScopeDevice:
   case ScopeQueueFamilyKHR:
-    return SyncScope::System;
+  case ScopeShaderCallKHR:
+    return context.getOrInsertSyncScopeID("agent");
   case ScopeInvocation:
     return SyncScope::SingleThread;
   case ScopeWorkgroup:
@@ -2398,7 +2456,8 @@ static AtomicOrdering transMemorySemantics(const SPIRVConstant *const spvMemoryS
 Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWInst::BinOp binOp) {
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
-  const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
+  const SyncScope::ID scope =
+      transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1))->getZExtIntValue());
   const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
@@ -2436,7 +2495,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicLoad>(SPIRVValue *c
 
   SPIRVAtomicLoad *const spvAtomicLoad = static_cast<SPIRVAtomicLoad *>(spvValue);
 
-  const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicLoad->getOpValue(1)));
+  const SyncScope::ID scope =
+      transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicLoad->getOpValue(1))->getZExtIntValue());
   const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicLoad->getOpValue(2)),
                                                        /*readOnly=*/true, /*writeOnly=*/false);
 
@@ -2464,7 +2524,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicStore>(SPIRVValue *
 
   SPIRVAtomicStore *const spvAtomicStore = static_cast<SPIRVAtomicStore *>(spvValue);
 
-  const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicStore->getOpValue(1)));
+  const SyncScope::ID scope =
+      transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicStore->getOpValue(1))->getZExtIntValue());
   const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicStore->getOpValue(2)),
                                                        /*readOnly=*/false, /*writeOnly=*/true);
 
@@ -2663,7 +2724,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIIncrement>(SPIRVVa
 
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
-  const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
+  const SyncScope::ID scope =
+      transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1))->getZExtIntValue());
   const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
@@ -2690,7 +2752,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicIDecrement>(SPIRVVa
 
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
-  const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
+  const SyncScope::ID scope =
+      transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1))->getZExtIntValue());
   const AtomicOrdering ordering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
 
   Value *const atomicPointer = transValue(spvAtomicInst->getOpValue(0), getBuilder()->GetInsertBlock()->getParent(),
@@ -2718,7 +2781,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(SP
 
   SPIRVAtomicInstBase *const spvAtomicInst = static_cast<SPIRVAtomicInstBase *>(spvValue);
 
-  const SyncScope::ID scope = transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1)));
+  const SyncScope::ID scope =
+      transScope(*m_context, static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(1))->getZExtIntValue());
   const AtomicOrdering successOrdering =
       transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(2)));
   AtomicOrdering failureOrdering = transMemorySemantics(static_cast<SPIRVConstant *>(spvAtomicInst->getOpValue(3)),
@@ -2813,9 +2877,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
     spvCopyMemLoadType = spvLoadType->getPointerElementType();
     spvCopyMemStoreType = spvStoreType->getPointerElementType();
   }
-  LayoutMode loadLayout = isStorageClassExplicitlyLaidOut(m_bm, spvLoadType->getPointerStorageClass())
-                              ? LayoutMode::Explicit
-                              : LayoutMode::Native;
+  LayoutMode loadLayout = getLayoutModeForStorageClass(spvLoadType->getPointerStorageClass());
   Type *const loadType = transType(spvCopyMemLoadType, 0, true, loadLayout);
   bool isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(true);
   Value *const load =
@@ -2824,9 +2886,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
   Value *const storePointer = transValue(spvCopyMemory->getTarget(), getBuilder()->GetInsertBlock()->getParent(),
                                          getBuilder()->GetInsertBlock());
 
-  LayoutMode storeLayout = isStorageClassExplicitlyLaidOut(m_bm, spvStoreType->getPointerStorageClass())
-                               ? LayoutMode::Explicit
-                               : LayoutMode::Native;
+  LayoutMode storeLayout = getLayoutModeForStorageClass(spvStoreType->getPointerStorageClass());
 
   Type *const storeType = transType(spvCopyMemStoreType, 0, true, storeLayout);
   isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
@@ -2879,6 +2939,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
       layout = LayoutMode::Std430;
       break;
     }
+  } else if (isStorageClassScalarLayout(storageClassKind)) {
+    layout = LayoutMode::Scalar;
   }
 
   bool isVolatile = spvLoad->SPIRVMemoryAccess::isVolatile(true);
@@ -3347,6 +3409,8 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
       layout = isAccelerationStructureType(spvUltimateElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
       break;
     }
+  } else if (isStorageClassScalarLayout(storageClass)) {
+    layout = LayoutMode::Scalar;
   }
 
   // Determine whether result/base is the mixed image/non-image case
@@ -3402,7 +3466,7 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
 
     const SPIRVStorageClassKind pointerStorageClass = spvBaseType->getPointerStorageClass();
 
-    const bool typeMaybeRemapped = isStorageClassExplicitlyLaidOut(m_bm, pointerStorageClass) ||
+    const bool typeMaybeRemapped = (getLayoutModeForStorageClass(pointerStorageClass) != LayoutMode::Native) ||
                                    pointerStorageClass == StorageClassUniformConstant;
 
     Type *basePointeeType = nullptr;
@@ -3465,8 +3529,7 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
         if (castType) {
           flushGep();
           basePointeeType = castType;
-          base = getBuilder()->CreateBitCast(base,
-                                             basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace()));
+          base = getBuilder()->CreateBitCast(base, getBuilder()->getPtrTy(base->getType()->getPointerAddressSpace()));
         }
 
         spvAccessElementType = spvAccessElementType->getStructMemberType(origMemberIndex);
@@ -3555,7 +3618,7 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
             getBuilder()->getInt32((unsigned)elemType),
             getBuilder()->getInt32((unsigned)layout),
         };
-        Type *retType = basePointeeType->getPointerTo(base->getType()->getPointerAddressSpace());
+        Type *retType = getBuilder()->getPtrTy(base->getType()->getPointerAddressSpace());
         appendTypeMangling(retType, args, mangledName);
         base = getBuilder()->CreateNamedCall(mangledName, retType, args, {Attribute::ReadNone, Attribute::NoUnwind});
 
@@ -4265,7 +4328,7 @@ Value *SPIRV::SPIRVToLLVM::createTraceRayDialectOp(SPIRVValue *const spvValue) {
 
   auto accelStructAsI64 = getBuilder()->CreateBitCast(accelStruct, getBuilder()->getInt64Ty());
 
-  Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType());
+  Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType(), 0, true, LayoutMode::Scalar);
 
   // Wrap payload with struct, PAQ handling expects a struct type.
   // FIXME: We should support non-struct types for PAQ
@@ -4423,18 +4486,19 @@ Value *SPIRVToLLVM::transGroupArithOp(Builder::GroupArithOp groupArithOp, SPIRVV
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
-
   Value *const value = transValue(spvOperands[2], func, block);
+  Value *const clusterSize =
+      spvOperands.size() > 3 ? transValue(spvOperands[3], func, block) : getBuilder()->CreateGetWaveSize();
 
   switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
   case GroupOperationReduce:
-    return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, getBuilder()->CreateGetWaveSize());
+    return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, clusterSize);
   case GroupOperationInclusiveScan:
-    return getBuilder()->CreateSubgroupClusteredInclusive(groupArithOp, value, getBuilder()->CreateGetWaveSize());
+    return getBuilder()->CreateSubgroupClusteredInclusive(groupArithOp, value, clusterSize);
   case GroupOperationExclusiveScan:
-    return getBuilder()->CreateSubgroupClusteredExclusive(groupArithOp, value, getBuilder()->CreateGetWaveSize());
+    return getBuilder()->CreateSubgroupClusteredExclusive(groupArithOp, value, clusterSize);
   case GroupOperationClusteredReduce:
-    return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, transValue(spvOperands[3], func, block));
+    return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, clusterSize);
   default:
     llvm_unreachable("Should never be called!");
     return nullptr;
@@ -5001,7 +5065,7 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
   const SPIRVStorageClassKind storageClass = spvVar->getStorageClass();
   SPIRVType *spvVarType = spvVar->getMemObjType();
 
-  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
+  LayoutMode layout = getLayoutModeForStorageClass(storageClass);
   if (storageClass == StorageClassUniformConstant) {
     SPIRVType *spvElementType = spvVarType;
     while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
@@ -5023,8 +5087,12 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
   Type *const ptrType = transType(spvVar->getType());
   unsigned addrSpace = ptrType->getPointerAddressSpace();
   auto llpcContext = static_cast<Llpc::Context *>(m_context);
-  auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
-
+  // enableInitUndefZero is only supported for Graphics pipelines - assume false otherwise
+  bool enableInitUndefZero = false;
+  if (llpcContext->getPipelineType() == PipelineType::Graphics) {
+    auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+    enableInitUndefZero = buildInfo->enableInitUndefZero;
+  }
   Type *const varType = transType(spvVarType, 0, true, layout);
 
   if (m_hasSamplerInStruct && storageClass == StorageClassUniformConstant) {
@@ -5063,8 +5131,8 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
       // Initialize user-defined output variable to zero
       initializer = Constant::getNullValue(varType);
     }
-  } else if (buildInfo->enableInitUndefZero && (storageClass == SPIRVStorageClassKind::StorageClassPrivate ||
-                                                storageClass == SPIRVStorageClassKind::StorageClassFunction)) {
+  } else if (enableInitUndefZero && (storageClass == SPIRVStorageClassKind::StorageClassPrivate ||
+                                     storageClass == SPIRVStorageClassKind::StorageClassFunction)) {
     initializer = Constant::getNullValue(varType);
   }
 
@@ -5359,25 +5427,6 @@ Value *SPIRVToLLVM::transString(const SPIRVString *spvValue) {
 // |  iu4     |  i32     |   Y   |  Y  |
 // For integer types, arbitrary signedness combinations are supported for the
 // A/B matrices.C/D matrices are always signed.
-
-lgc::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(Type *const elemType) {
-  lgc::CooperativeMatrixElementType basicTy = lgc::CooperativeMatrixElementType::Unknown;
-  if (elemType->isIntegerTy(8)) {
-    basicTy = lgc::CooperativeMatrixElementType::Int8;
-  } else if (elemType->isIntegerTy(16)) {
-    basicTy = lgc::CooperativeMatrixElementType::Int16;
-  } else if (elemType->isIntegerTy(32)) {
-    basicTy = lgc::CooperativeMatrixElementType::Int32;
-  } else if (elemType->isFloatTy()) {
-    basicTy = lgc::CooperativeMatrixElementType::Float32;
-  } else if (elemType->isHalfTy()) {
-    basicTy = lgc::CooperativeMatrixElementType::Float16;
-  } else {
-    llvm_unreachable("The element type is not supported!");
-  }
-  return basicTy;
-}
-
 lgc::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(SPIRVType *const elemType) {
   lgc::CooperativeMatrixElementType basicTy = lgc::CooperativeMatrixElementType::Unknown;
   if (elemType->isTypeInt(8)) {
@@ -5405,7 +5454,7 @@ lgc::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(SPIRVType *const e
 lgc::CooperativeMatrixLayout SPIRVToLLVM::getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
                                                                         lgc::CooperativeMatrixElementType elemType,
                                                                         unsigned rows, unsigned columns) {
-  const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
+  [[maybe_unused]] const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAKHR ||
       use == CooperativeMatrixUse::CooperativeMatrixUseMatrixBKHR) {
 
@@ -5436,7 +5485,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLengthKH
   unsigned rows = matrixType->getCooperativeMatrixKHRRows();
   unsigned columns = matrixType->getCooperativeMatrixKHRColumns();
   auto layout = getCooperativeMatrixKHRLayout(matrixUse, elemType, rows, columns);
-  return getBuilder()->create<CooperativeMatrixLengthOp>(layout);
+  const unsigned kSize = rows > columns ? rows : columns;
+  return getBuilder()->create<CooperativeMatrixLengthOp>(layout, kSize);
 }
 
 // =====================================================================================================================
@@ -5525,9 +5575,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLoadKHR>
   unsigned alignmentInRowCol = (isColMajor ? rows : columns) * elementSize;
   unsigned loadAlignment = std::min((unsigned)16, alignmentInRowCol);
   lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(use, elemType, rows, columns);
-  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+  const unsigned kSize = rows > columns ? rows : columns;
+  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
   auto CoopMatLoadInst = getBuilder()->create<CooperativeMatrixLoadOp>(
-      coopMatrixTy, pointer, stride, isColMajor, elemType, layout, memoryAccess, loadAlignment, "load");
+      coopMatrixTy, pointer, stride, isColMajor, elemType, layout, memoryAccess, loadAlignment, kSize, "load");
   return CoopMatLoadInst;
 }
 
@@ -5591,7 +5642,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixStoreKHR
 
   // Cal elemType
   Type *const elemltType = transType(coopMatStore->getObject()->getType()->getCooperativeMatrixKHRComponentType());
-  lgc::CooperativeMatrixElementType elemType = mapToBasicType(elemltType);
+  lgc::CooperativeMatrixElementType elemType =
+      mapToBasicType(coopMatStore->getObject()->getType()->getCooperativeMatrixKHRComponentType());
 
   CooperativeMatrixUse use =
       static_cast<CooperativeMatrixUse>(coopMatStore->getObject()->getType()->getCooperativeMatrixKHRUse());
@@ -5623,8 +5675,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixStoreKHR
   elementSize = std::max(elementSize, (unsigned)1);
   unsigned alignmentInRowCol = (isColMajor ? rows : columns) * elementSize;
   unsigned storeAlignment = std::min((unsigned)16, alignmentInRowCol);
+  const unsigned kSize = rows > columns ? rows : columns;
   getBuilder()->create<CooperativeMatrixStoreOp>(pointer, stride, isColMajor, elemType, layout, memoryAccess,
-                                                 storeAlignment, matrix);
+                                                 storeAlignment, matrix, kSize);
   return nullptr;
 }
 
@@ -5650,9 +5703,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
   bool isSignedB = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixBSigned());
   bool isSat = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixSatAccumulation());
 
+  [[maybe_unused]] const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
+  unsigned kMultiplier = 1;
+
+  Type *coopMatrixDType = coopMatrixC->getType();
+  lgc::CooperativeMatrixElementType elemBasicTypeD = elemBasicTypeC;
   Value *coopMatrixD = getBuilder()->create<CooperativeMatrixMulAddOp>(
-      coopMatrixC->getType(), coopMatrixA, coopMatrixB, coopMatrixC, isSignedA, isSignedB, isSat, 0, elemBasicTypeA,
-      elemBasicTypeA, elemBasicTypeC, "mulAdd");
+      coopMatrixDType, coopMatrixA, coopMatrixB, coopMatrixC, isSignedA, isSignedB, isSat, 0, elemBasicTypeA,
+      elemBasicTypeA, elemBasicTypeC, elemBasicTypeD, kMultiplier, "mulAdd");
   return coopMatrixD;
 }
 
@@ -5781,6 +5839,52 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       return mapValue(bv, ConstantStruct::get(dyn_cast<StructType>(transType(bcc->getType())), cv));
     }
     case OpTypeMatrix: {
+      return mapValue(bv, ConstantArray::get(dyn_cast<ArrayType>(transType(bcc->getType())), cv));
+    }
+    case OpTypeCooperativeMatrixKHR: {
+      auto elements = transValue(bcc->getElements(), f, bb);
+      return mapValue(bv, transCooperativeMatrixKHRFromConstruct(bcc->getType(), elements));
+    }
+    default:
+      llvm_unreachable("not implemented");
+      return {};
+    }
+  }
+
+  case OpConstantCompositeReplicateEXT:
+  case OpSpecConstantCompositeReplicateEXT: {
+    auto bcc = static_cast<SPIRVConstantCompositeReplicateEXT *>(bv);
+    auto bccElements = bcc->getElements();
+
+    std::vector<Constant *> cv;
+
+    switch (bv->getType()->getOpCode()) {
+    case OpTypeVector: {
+      unsigned compCount = ((SPIRV::SPIRVTypeVector *)bv->getType())->getComponentCount();
+      for (unsigned i = 0; i < compCount; ++i) {
+        cv.push_back(dyn_cast<Constant>(transValue(bccElements[0], f, bb)));
+      }
+      return mapValue(bv, ConstantVector::get(cv));
+    }
+    case OpTypeArray: {
+      unsigned length = ((SPIRV::SPIRVTypeArray *)bv->getType())->getLength()->getZExtIntValue();
+      for (unsigned i = 0; i < length; ++i) {
+        cv.push_back(dyn_cast<Constant>(transValue(bccElements[0], f, bb)));
+      }
+      return mapValue(bv, ConstantArray::get(dyn_cast<ArrayType>(transType(bcc->getType())), cv));
+    }
+    case OpTypeStruct: {
+      unsigned memCount = ((SPIRV::SPIRVTypeStruct *)bv->getType())->getMemberCount();
+      for (unsigned i = 0; i < memCount; ++i) {
+        cv.push_back(dyn_cast<Constant>(transValue(bccElements[0], f, bb)));
+      }
+      return mapValue(bv, ConstantStruct::get(dyn_cast<StructType>(transType(bcc->getType())), cv));
+    }
+    case OpTypeMatrix: {
+      unsigned matCount = bv->getType()->getMatrixColumnCount();
+      for (unsigned i = 0; i < matCount; ++i) {
+        cv.push_back(dyn_cast<Constant>(transValue(bccElements[0], f, bb)));
+      }
       return mapValue(bv, ConstantArray::get(dyn_cast<ArrayType>(transType(bcc->getType())), cv));
     }
     case OpTypeCooperativeMatrixKHR: {
@@ -6139,6 +6243,58 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     }
   }
 
+  case OpCompositeConstructReplicateEXT: {
+    auto cc = static_cast<SPIRVCompositeConstructReplicateEXT *>(bv);
+    auto constituents = transValue(cc->getConstituents(), f, bb);
+
+    switch (bv->getType()->getOpCode()) {
+    case OpTypeVector: {
+      auto vecTy = transType(cc->getType());
+      unsigned compCount = ((SPIRV::SPIRVTypeVector *)cc->getType())->getComponentCount();
+      Value *v = PoisonValue::get(vecTy);
+      for (unsigned i = 0; i < compCount; ++i) {
+        v = InsertElementInst::Create(v, constituents[0], ConstantInt::get(*m_context, APInt(32, i)), "", bb);
+      }
+      return mapValue(bv, v);
+    }
+    case OpTypeArray: {
+      auto aryTy = transType(cc->getType());
+      Value *v = PoisonValue::get(aryTy);
+      unsigned length = ((SPIRV::SPIRVTypeArray *)cc->getType())->getLength()->getZExtIntValue();
+      for (unsigned i = 0; i < length; ++i) {
+        v = InsertValueInst::Create(v, constituents[0], i, "", bb);
+      }
+      return mapValue(bv, v);
+    }
+    case OpTypeStruct: {
+      auto ccTy = transType(cc->getType());
+      Value *v = PoisonValue::get(ccTy);
+      unsigned memCount = ((SPIRV::SPIRVTypeStruct *)cc->getType())->getMemberCount();
+      for (unsigned i = 0; i < memCount; ++i) {
+        v = InsertValueInst::Create(v, constituents[0], i, "", bb);
+      }
+      return mapValue(bv, v);
+    }
+    case OpTypeMatrix: {
+      auto bvTy = bv->getType();
+      auto matClmTy = transType(bvTy->getMatrixColumnType());
+      auto matCount = bvTy->getMatrixColumnCount();
+      auto matTy = ArrayType::get(matClmTy, matCount);
+
+      Value *v = PoisonValue::get(matTy);
+      for (unsigned i = 0; i < matCount; ++i) {
+        v = InsertValueInst::Create(v, constituents[0], i, "", bb);
+      }
+      return mapValue(bv, v);
+    }
+    case OpTypeCooperativeMatrixKHR: {
+      return mapValue(bv, transCooperativeMatrixKHRFromConstruct(cc->getType(), constituents));
+    }
+    default:
+      llvm_unreachable("Unhandled type!");
+    }
+  }
+
   case OpCompositeExtract: {
     SPIRVCompositeExtract *ce = static_cast<SPIRVCompositeExtract *>(bv);
     if (ce->getComposite()->getType()->isTypeVector()) {
@@ -6343,66 +6499,6 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     // that into account (since LLVM fneg is not).
     fNeg = flushDenorm(fNeg);
     return mapValue(bv, fNeg);
-  }
-
-  case OpFConvert: {
-    SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
-    Value *val = transValue(bc->getOperand(0), f, bb);
-    Type *destTy = transType(bc->getType());
-    // Can't use destTy as for transType will return packed element Type.
-    CastInst::CastOps co = Instruction::BitCast;
-    if (bv->getType()->isTypeCooperativeMatrixKHR()) {
-      SPIRVType *dstType = bc->getType()->getCooperativeMatrixKHRComponentType();
-      lgc::CooperativeMatrixElementType basicDstElemTy = mapToBasicType(dstType);
-      SPIRVType *srcType = bc->getOperand(0)->getType()->getCooperativeMatrixKHRComponentType();
-      bool isExt = dstType->getBitWidth() > srcType->getBitWidth();
-      co = isExt ? Instruction::FPExt : Instruction::FPTrunc;
-      lgc::CooperativeMatrixElementType basicSrcElemTy = mapToBasicType(srcType);
-      lgc::CooperativeMatrixLayout srcLayout = getCooperativeMatrixKHRLayout(
-          static_cast<CooperativeMatrixUse>(bc->getType()->getCooperativeMatrixKHRUse()), basicSrcElemTy,
-          bc->getType()->getCooperativeMatrixKHRRows(), bc->getType()->getCooperativeMatrixKHRColumns());
-      lgc::CooperativeMatrixLayout dstLayout = getCooperativeMatrixKHRLayout(
-          static_cast<CooperativeMatrixUse>(bc->getType()->getCooperativeMatrixKHRUse()), basicDstElemTy,
-          bc->getType()->getCooperativeMatrixKHRRows(), bc->getType()->getCooperativeMatrixKHRColumns());
-
-      Type *matrixType = getBuilder()->getCooperativeMatrixTy(basicDstElemTy, dstLayout);
-      return mapValue(bv, getBuilder()->create<CooperativeMatrixConvertOp>(
-                              matrixType, co, val, basicSrcElemTy, basicDstElemTy, srcLayout, dstLayout, "fConvert"));
-    }
-    unsigned valTypeBitWide = val->getType()->getScalarType()->getPrimitiveSizeInBits();
-    unsigned destTypeBitWide = destTy->getScalarType()->getPrimitiveSizeInBits();
-    if (valTypeBitWide < destTypeBitWide)
-      return mapValue(bv, getBuilder()->CreateFPExt(val, destTy));
-    else if (valTypeBitWide == destTypeBitWide) {
-      assert(val->getType()->getScalarType()->isBFloatTy() || val->getType()->getScalarType()->isHalfTy());
-      val = getBuilder()->CreateFPExt(
-          val, destTy->isVectorTy()
-                   ? FixedVectorType::get(getBuilder()->getFloatTy(), cast<FixedVectorType>(destTy)->getNumElements())
-                   : getBuilder()->getFloatTy());
-    }
-
-    RoundingMode rm = RoundingMode::Dynamic;
-    SPIRVFPRoundingModeKind rounding;
-    if (bc->hasFPRoundingMode(&rounding)) {
-      switch (rounding) {
-      case FPRoundingModeRTE:
-        rm = RoundingMode::NearestTiesToEven;
-        break;
-      case FPRoundingModeRTZ:
-        rm = RoundingMode::TowardZero;
-        break;
-      case FPRoundingModeRTP:
-        rm = RoundingMode::TowardPositive;
-        break;
-      case FPRoundingModeRTN:
-        rm = RoundingMode::TowardNegative;
-        break;
-      default:
-        llvm_unreachable("Should never be called!");
-      }
-      return mapValue(bv, getBuilder()->CreateFpTruncWithRounding(val, destTy, rm));
-    }
-    return mapValue(bv, getBuilder()->CreateFPTrunc(val, destTy));
   }
 
   case OpBitCount: {
@@ -7354,7 +7450,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
 // =============================================================================
 // Scan backwards from an image/sampler or pointer-to-image/sampler value and set non-uniform/coherent/volatile flags.
 static void scanImageDescNonUniformCV(SPIRVToLLVM::ExtractedImageInfo *info, SPIRVValue *spvValue, bool image,
-                                      bool sampler) {
+                                      bool sampler, const PipelineShaderOptions *shaderOption) {
   for (;;) {
     if (image) {
       if (spvValue->hasDecorate(DecorationCoherent))
@@ -7395,9 +7491,9 @@ static void scanImageDescNonUniformCV(SPIRVToLLVM::ExtractedImageInfo *info, SPI
     if (opcode == OpSampledImage) {
       auto *sampledImage = static_cast<SPIRVSampledImage *>(spvValue);
       if (image)
-        scanImageDescNonUniformCV(info, sampledImage->getOperands()[0], true, false);
+        scanImageDescNonUniformCV(info, sampledImage->getOperands()[0], true, false, shaderOption);
       if (sampler)
-        scanImageDescNonUniformCV(info, sampledImage->getOperands()[1], false, true);
+        scanImageDescNonUniformCV(info, sampledImage->getOperands()[1], false, true, shaderOption);
       break;
     }
 
@@ -7546,7 +7642,8 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
       info->flags |= lgc::Builder::ImageFlagNonUniformSampler;
   }
 
-  scanImageDescNonUniformCV(info, bImageInst, components & ImageComponentImage, components & ImageComponentSampler);
+  scanImageDescNonUniformCV(info, bImageInst, components & ImageComponentImage, components & ImageComponentSampler,
+                            m_shaderOptions);
   bool imageUniform = (components & ImageComponentImage) && !(info->flags & lgc::Builder::ImageFlagNonUniformImage);
   bool samplerUniform =
       (components & ImageComponentSampler) && !(info->flags & lgc::Builder::ImageFlagNonUniformSampler);
@@ -8909,25 +9006,32 @@ bool SPIRVToLLVM::transMetadata() {
         for (unsigned i = 0, e = m_bm->getNumConstants(); i != e; ++i) {
           auto bv = m_bm->getConstant(i);
           SPIRVWord builtIn = SPIRVID_INVALID;
-          if ((bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite ||
-               bv->getOpCode() == OpConstant || bv->getOpCode() == OpConstantComposite) &&
-              bv->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
-            if (builtIn == spv::BuiltInWorkgroupSize) {
-              // NOTE: Overwrite values of local sizes specified in execution
-              // mode if the constant corresponding to gl_WorkGroupSize
-              // exists. Take its value since gl_WorkGroupSize could be a
-              // specialization constant.
-              auto workGroupSize = static_cast<SPIRVSpecConstantComposite *>(bv);
-
+          if (bv->hasDecorate(DecorationBuiltIn, 0, &builtIn) && (builtIn == spv::BuiltInWorkgroupSize)) {
+            // NOTE: Overwrite values of local sizes specified in execution
+            // mode if the constant corresponding to gl_WorkGroupSize
+            // exists. Take its value since gl_WorkGroupSize could be a
+            // specialization constant.
+            auto workGroupSize = static_cast<SPIRVSpecConstantComposite *>(bv);
+            if (bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite ||
+                bv->getOpCode() == OpConstant || bv->getOpCode() == OpConstantComposite) {
               // Declared: const uvec3 gl_WorkGroupSize
               assert(workGroupSize->getElements().size() == 3);
-              auto workGroupSizeX = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0]);
-              auto workGroupSizeY = static_cast<SPIRVConstant *>(workGroupSize->getElements()[1]);
-              auto workGroupSizeZ = static_cast<SPIRVConstant *>(workGroupSize->getElements()[2]);
+              meshMode.workgroupSizeX =
+                  static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
+              meshMode.workgroupSizeY =
+                  static_cast<SPIRVConstant *>(workGroupSize->getElements()[1])->getZExtIntValue();
+              meshMode.workgroupSizeZ =
+                  static_cast<SPIRVConstant *>(workGroupSize->getElements()[2])->getZExtIntValue();
 
-              meshMode.workgroupSizeX = workGroupSizeX->getZExtIntValue();
-              meshMode.workgroupSizeY = workGroupSizeY->getZExtIntValue();
-              meshMode.workgroupSizeZ = workGroupSizeZ->getZExtIntValue();
+              break;
+            } else if (bv->getOpCode() == OpConstantCompositeReplicateEXT ||
+                       bv->getOpCode() == OpSpecConstantCompositeReplicateEXT) {
+              meshMode.workgroupSizeX =
+                  static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
+              meshMode.workgroupSizeY =
+                  static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
+              meshMode.workgroupSizeZ =
+                  static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
 
               break;
             }
@@ -9024,21 +9128,26 @@ bool SPIRVToLLVM::transMetadata() {
         for (unsigned i = 0, e = m_bm->getNumConstants(); i != e; ++i) {
           auto bv = m_bm->getConstant(i);
           SPIRVWord builtIn = SPIRVID_INVALID;
-          if ((bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite ||
-               bv->getOpCode() == OpConstant || bv->getOpCode() == OpConstantComposite) &&
-              bv->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
-            if (builtIn == spv::BuiltInWorkgroupSize) {
-              // NOTE: Overwrite values of local sizes specified in execution
-              // mode if the constant corresponding to gl_WorkGroupSize
-              // exists. Take its value since gl_WorkGroupSize could be a
-              // specialization constant.
-              auto workGroupSize = static_cast<SPIRVSpecConstantComposite *>(bv);
-
+          if (bv->hasDecorate(DecorationBuiltIn, 0, &builtIn) && (builtIn == spv::BuiltInWorkgroupSize)) {
+            // NOTE: Overwrite values of local sizes specified in execution
+            // mode if the constant corresponding to gl_WorkGroupSize
+            // exists. Take its value since gl_WorkGroupSize could be a
+            // specialization constant.
+            auto workGroupSize = static_cast<SPIRVSpecConstantComposite *>(bv);
+            if (bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite ||
+                bv->getOpCode() == OpConstant || bv->getOpCode() == OpConstantComposite) {
               // Declared: const uvec3 gl_WorkGroupSize
               assert(workGroupSize->getElements().size() == 3);
               workgroupSizeX = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
               workgroupSizeY = static_cast<SPIRVConstant *>(workGroupSize->getElements()[1])->getZExtIntValue();
               workgroupSizeZ = static_cast<SPIRVConstant *>(workGroupSize->getElements()[2])->getZExtIntValue();
+
+              break;
+            } else if (bv->getOpCode() == OpConstantCompositeReplicateEXT ||
+                       bv->getOpCode() == OpSpecConstantCompositeReplicateEXT) {
+              workgroupSizeX = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
+              workgroupSizeY = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
+              workgroupSizeZ = static_cast<SPIRVConstant *>(workGroupSize->getElements()[0])->getZExtIntValue();
 
               break;
             }
@@ -10382,7 +10491,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // storing.
     if (exp->getType()->isVectorTy()) {
       assert(args[1]->getType()->isPointerTy());
-      Type *const castType = exp->getType()->getPointerTo(args[1]->getType()->getPointerAddressSpace());
+      Type *const castType = getBuilder()->getPtrTy(args[1]->getType()->getPointerAddressSpace());
       args[1] = getBuilder()->CreateBitCast(args[1], castType);
     }
     getBuilder()->CreateStore(exp, args[1]);
@@ -10717,6 +10826,9 @@ void SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord mem
   if (ordering == AtomicOrdering::NotAtomic)
     return;
 
+  if (m_shaderOptions->forceMemoryBarrierScope)
+    memScope = m_shaderOptions->forceMemoryBarrierScope;
+
   // Downgrade ScopeDevice to ScopeWorkgroup if memory semantics permits it.
   // If memory semantics implies that shared memory is local to a workgroup, no need for ScopeDevice that would mean all
   // workgroups in the device.
@@ -10729,31 +10841,7 @@ void SPIRVToLLVM::transMemFence(BasicBlock *bb, SPIRVWord memSema, SPIRVWord mem
     memScope = ScopeWorkgroup;
   }
 
-  SyncScope::ID scope = SyncScope::System;
-
-  switch (memScope) {
-  case ScopeCrossDevice:
-    scope = SyncScope::System;
-    break;
-  case ScopeQueueFamilyKHR:
-  case ScopeShaderCallKHR:
-  case ScopeDevice:
-    scope = m_context->getOrInsertSyncScopeID("agent");
-    break;
-  case ScopeInvocation:
-    scope = SyncScope::SingleThread;
-    break;
-  case ScopeWorkgroup:
-    scope = m_context->getOrInsertSyncScopeID("workgroup");
-    break;
-  case ScopeSubgroup:
-    scope = m_context->getOrInsertSyncScopeID("wavefront");
-    break;
-  default:
-    llvm_unreachable("Invalid scope");
-  }
-
-  getBuilder()->CreateFence(ordering, scope);
+  getBuilder()->CreateFence(ordering, transScope(*m_context, memScope));
 }
 
 void SPIRVToLLVM::transBarrierFence(SPIRVInstruction *mb, BasicBlock *bb) {
@@ -11308,19 +11396,21 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
 
   lgc::CooperativeMatrixLayout layout = lgc::CooperativeMatrixLayout::InvalidLayout;
   lgc::CooperativeMatrixElementType elemType = lgc::CooperativeMatrixElementType::Unknown;
+  unsigned kSize = 16;
   if (oc == OpFNegate || oc == OpSNegate) {
     auto unary = static_cast<SPIRVUnary *>(spvVal);
     Value *srcVal = transValue(unary->getOperand(0), func, bb);
     if (unary->getOperand(0)->getType()->isTypeCooperativeMatrixKHR()) {
       SPIRVType *elemSpvType = unary->getOperand(0)->getType()->getCooperativeMatrixKHRComponentType();
+      elemType = mapToBasicType(elemSpvType);
       unsigned rows = unary->getOperand(0)->getType()->getCooperativeMatrixKHRRows();
       unsigned columns = unary->getOperand(0)->getType()->getCooperativeMatrixKHRColumns();
-      elemType = mapToBasicType(elemSpvType);
+      kSize = rows > columns ? rows : columns;
       layout = getCooperativeMatrixKHRLayout(
           static_cast<CooperativeMatrixUse>(unary->getOperand(0)->getType()->getCooperativeMatrixKHRUse()), elemType,
           rows, columns);
     }
-    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
     return getBuilder()->create<CooperativeMatrixBinaryOp>(resultTy, arithOp, Constant::getNullValue(srcVal->getType()),
                                                            srcVal, elemType, layout);
   } else {
@@ -11329,14 +11419,15 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
     Value *rhs = transValue(binary->getOperand(1), func, bb);
     if (binary->getOperand(0)->getType()->isTypeCooperativeMatrixKHR()) {
       SPIRVType *elemSpvType = binary->getOperand(0)->getType()->getCooperativeMatrixKHRComponentType();
+      elemType = mapToBasicType(elemSpvType);
       unsigned rows = binary->getOperand(0)->getType()->getCooperativeMatrixKHRRows();
       unsigned columns = binary->getOperand(0)->getType()->getCooperativeMatrixKHRColumns();
-      elemType = mapToBasicType(elemSpvType);
+      kSize = rows > columns ? rows : columns;
       layout = getCooperativeMatrixKHRLayout(
           static_cast<CooperativeMatrixUse>(binary->getOperand(0)->getType()->getCooperativeMatrixKHRUse()), elemType,
           rows, columns);
     }
-    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
+    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
     return getBuilder()->create<CooperativeMatrixBinaryOp>(resultTy, arithOp, lhs, rhs, elemType, layout);
   }
 }
@@ -11346,11 +11437,13 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
 Value *SPIRVToLLVM::transCooperativeMatrixKHRFromConstruct(SPIRVType *spvCoopMatTy,
                                                            const std::vector<Value *> &constituents) {
   lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvCoopMatTy->getCooperativeMatrixKHRComponentType());
+  unsigned rows = spvCoopMatTy->getCooperativeMatrixKHRRows();
+  unsigned columns = spvCoopMatTy->getCooperativeMatrixKHRColumns();
+  const unsigned kSize = rows > columns ? rows : columns;
   lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
-      static_cast<CooperativeMatrixUse>(spvCoopMatTy->getCooperativeMatrixKHRUse()), elemType,
-      spvCoopMatTy->getCooperativeMatrixKHRRows(), spvCoopMatTy->getCooperativeMatrixKHRColumns());
-  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout);
-  return getBuilder()->create<CooperativeMatrixFillOp>(coopMatrixTy, constituents[0], elemType, layout);
+      static_cast<CooperativeMatrixUse>(spvCoopMatTy->getCooperativeMatrixKHRUse()), elemType, rows, columns);
+  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
+  return getBuilder()->create<CooperativeMatrixFillOp>(coopMatrixTy, constituents[0], elemType, layout, kSize);
 }
 
 } // namespace SPIRV

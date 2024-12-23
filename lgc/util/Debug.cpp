@@ -28,7 +28,7 @@
  * @brief LLPC header file: middle-end debug functions
  ***********************************************************************************************************************
  */
-#include "lgc/util/Debug.h"
+#include "lgc/Debug.h"
 #include "lgc/LgcContext.h"
 
 using namespace llvm;
@@ -41,4 +41,43 @@ raw_ostream *getLgcOuts() {
   return LgcContext::getLgcOuts();
 }
 
+void InstructionSlot::createFuncSlot(Function *func) {
+  m_iMap.clear();
+  m_valueIndex = 0;
+  for (Argument &arg : func->args())
+    if (!arg.hasName())
+      createSlot(&arg);
+
+  // Add all of the basic blocks and instructions with no names.
+  for (auto &bb : *func) {
+    if (!bb.hasName())
+      createSlot(&bb);
+
+    for (auto &inst : bb) {
+      if (!inst.getType()->isVoidTy())
+        createSlot(&inst);
+    }
+  }
+}
+
+Value *InstructionSlot::getValueByIdx(unsigned idx) {
+  if (m_iMap.find(idx) != m_iMap.end())
+    return m_iMap[idx];
+  return nullptr;
+}
+
+Value *InstructionSlot::getValueByName(StringRef name) {
+  if (m_nMap.find(name) != m_nMap.end())
+    return m_nMap[name];
+  return nullptr;
+}
+
+void InstructionSlot::createSlot(Value *val) {
+  if (val->hasName())
+    m_nMap[val->getName()] = val;
+  else {
+    unsigned destSlot = m_valueIndex++;
+    m_iMap[destSlot] = val;
+  }
+}
 } // namespace lgc

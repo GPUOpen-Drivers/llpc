@@ -166,6 +166,8 @@ public:
 
   void merge(const Self &Other);
 
+  void print(llvm::raw_ostream &OS) const;
+
 private:
   friend class SpecializeDriverShadersPass;
 

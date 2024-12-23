@@ -104,6 +104,7 @@ const ExtensionNamePair ExtensionNameTable[ExtensionCount] = {
     DeclExtensionName(KHR_SHADER_QUAD_CONTROL),
     DeclExtensionName(KHR_SUBGROUP_ROTATE),
     DeclExtensionName(KHR_COMPUTE_SHADER_DERIVATIVES),
+    DeclExtensionName(EXT_REPLICATED_COMPOSITES),
 };
 
 // =====================================================================================================================

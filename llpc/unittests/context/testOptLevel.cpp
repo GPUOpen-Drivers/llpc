@@ -79,7 +79,7 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
     ComputePipelineBuildInfo pipelineInfo = {};
     pipelineInfo.options.optimizationLevel = static_cast<uint32_t>(optLevel);
 
-    ComputeContext computeContext(GfxIp, "Vulkan", &pipelineInfo, &pipelineHash, &cacheHash);
+    ComputeContext computeContext(GfxIp, "Vulkan", &pipelineInfo, StringRef(""), &pipelineHash, &cacheHash);
 
     context.attachPipelineContext(&computeContext);
 

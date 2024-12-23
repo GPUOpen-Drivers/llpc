@@ -79,6 +79,7 @@ public:
 
   bool adjustExports(llvm::Module &module, bool clearAll);
   bool propagateNoContract(llvm::Module &module, bool forward, bool backward);
+  Vkgc::ShaderStage getLastVertexProcessingStage() const;
 };
 
 // =====================================================================================================================

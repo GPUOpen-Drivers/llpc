@@ -229,9 +229,6 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     m_builder->SetInsertPoint(clearBlock(func));
     createEnqueue(func);
     return;
-  } else if (funcName.starts_with("_AmdRestoreSystemData")) {
-    // We don't need this, leave it as dummy function so that it does nothing.
-    return;
   } else if (funcName.starts_with("_AmdValueI32Count")) {
     ContHelper::handleValueI32Count(*func, *m_builder);
     return;
@@ -306,21 +303,12 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     if (isAmdIntrinsic)
       newFunc->deleteBody();
 
-    // Fixup WaitAwait by removing the wait mask, and fixup [Wait]AwaitTraversal by adding a dummy return address.
-    // AwaitTraversal doesn't have a return address in HLSL because the return address is written to system data.
-    bool isWaitAwait = newFunc->getName().starts_with("_AmdWaitAwait");
-    bool isNonWaitAwait = newFunc->getName().starts_with("_AmdAwait");
-    bool isAwaitTraversal = (isWaitAwait || isNonWaitAwait) && newFunc->getName().contains("Traversal");
-    if (isWaitAwait || isAwaitTraversal) {
+    // Fixup WaitAwait by removing the wait mask.
+    if (newFunc->getName().starts_with("_AmdWaitAwait")) {
       llvm::forEachCall(*newFunc, [&](CallInst &CInst) {
         SmallVector<Value *> args(CInst.args());
         // Remove wait mask
-        if (isWaitAwait)
-          args.erase(args.begin() + 1);
-
-        // Add dummy return address
-        if (isAwaitTraversal)
-          args.insert(args.begin() + 1, PoisonValue::get(m_builder->getInt64Ty()));
+        args.erase(args.begin() + 1);
 
         m_builder->SetInsertPoint(&CInst);
         auto *newValue = m_builder->CreateNamedCall("_AmdAwait", CInst.getType(), args, {});
@@ -970,12 +958,12 @@ void ProcessGpuRtLibrary::createEnqueue(Function *func) {
   SmallVector<Value *> tailArgs;
   bool hasWaitMaskArg = funcName.contains("Wait");
   // Skip waitMask
-  unsigned retAddrArgIdx = hasWaitMaskArg ? 2 : 1;
+  const unsigned shaderIdxArgIdx = hasWaitMaskArg ? 2 : 1;
+  Value *shaderIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(shaderIdxArgIdx));
+  const unsigned retAddrArgIdx = shaderIdxArgIdx + 1;
+
   Value *retAddr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(retAddrArgIdx));
-  // Get shader-index from system-data.
-  unsigned systemDataArgIdx = retAddrArgIdx + 1;
-  tailArgs.push_back(m_builder->CreateNamedCall("_cont_GetLocalRootIndex", m_builder->getInt32Ty(),
-                                                {func->getArg(systemDataArgIdx)}, {}));
+  const unsigned systemDataArgIdx = retAddrArgIdx + 1;
   // Process system-data and arguments after.
   unsigned argIdx = systemDataArgIdx;
   while (argIdx < func->arg_size()) {
@@ -984,7 +972,7 @@ void ProcessGpuRtLibrary::createEnqueue(Function *func) {
   }
 
   // TODO: pass the levelMask correctly.
-  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(m_builder->getInt32Ty()), retAddr, tailArgs);
+  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(m_builder->getInt32Ty()), shaderIndex, retAddr, tailArgs);
   m_builder->CreateUnreachable();
 
   // Clear the name so that earlyGpurtTransform doesn't try to handle the function.

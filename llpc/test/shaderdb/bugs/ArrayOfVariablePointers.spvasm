@@ -17,7 +17,7 @@
 ;    }
 ;
 ; It passes SPIR-V validation and is indeed valid to the best of my knowledge,
-; but crashes in PatchBufferOp at the time of writing because it's trying to
+; but crashes in LowerBufferOperations at the time of writing because it's trying to
 ; load/store addrspace(7) pointers.
 
 ; SPIR-V

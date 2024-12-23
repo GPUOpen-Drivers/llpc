@@ -239,7 +239,7 @@ bool SPIRVType::isTypeBool() const {
 }
 
 bool SPIRVType::isTypeComposite() const {
-  return isTypeVector() || isTypeMatrix() || isTypeArray() || isTypeStruct();
+  return isTypeVector() || isTypeMatrix() || isTypeArray() || isTypeStruct() || isTypeCooperativeMatrixKHR();
 }
 
 bool SPIRVType::isTypeFloat(unsigned Bits) const {
@@ -300,6 +300,10 @@ bool SPIRVType::isTypeCooperativeMatrixKHR() const {
 
 void SPIRVTypeFloat::decode(std::istream &I) {
   getDecoder(I) >> (Id) >> (BitWidth);
+  if (WordCount > FixedWC)
+    getDecoder(I) >> (Encoding);
+  else
+    Encoding = FPEncodingMax;
 }
 
 bool SPIRVType::isTypeVectorBool() const {

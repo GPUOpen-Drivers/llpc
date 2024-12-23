@@ -97,7 +97,7 @@ namespace Llpc {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
 // @param lowerFlag : Add the required pass based on the flag
-void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer,
+void SpirvLower::addPasses(Context *context, ShaderStage stage, ModulePassManager &passMgr, Timer *lowerTimer,
                            LowerFlag lowerFlag) {
   // Start timer for lowering passes.
   if (lowerTimer)
@@ -202,19 +202,25 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 // Register all the translation passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
-void SpirvLower::registerTranslationPasses(lgc::PassManager &passMgr) {
+template <typename PassManagerT> void SpirvLower::registerTranslationPasses(PassManagerT &passMgr) {
   passMgr.registerPass("lower-translator", LowerTranslator::name());
   passMgr.registerPass("lower-gpurt-library", ProcessGpuRtLibrary::name());
 }
+
+template void SpirvLower::registerTranslationPasses<lgc::PassManager>(lgc::PassManager &);
+template void SpirvLower::registerTranslationPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
 // =====================================================================================================================
 // Register all the lowering passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
-void SpirvLower::registerLoweringPasses(lgc::PassManager &passMgr) {
+template <typename PassManagerT> void SpirvLower::registerLoweringPasses(PassManagerT &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
 }
+
+template void SpirvLower::registerLoweringPasses<lgc::PassManager>(lgc::PassManager &);
+template void SpirvLower::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
 // =====================================================================================================================
 // Replace global variable with another global variable

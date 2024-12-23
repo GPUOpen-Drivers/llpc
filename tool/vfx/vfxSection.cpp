@@ -351,6 +351,16 @@ void Section::printSelf(Document *pDoc, unsigned level) {
               printf("%s = %.3f\n", m_memberTable[i].memberName, *(((double *)(getMemberAddr(i))) + arrayIndex));
               break;
             }
+            case MemberTypeInt64: {
+              printf("%s = %" PRId64 "\n", m_memberTable[i].memberName,
+                     *(((int64_t *)(getMemberAddr(i))) + arrayIndex));
+              break;
+            }
+            case MemberTypeUint64: {
+              printf("%s = %" PRIu64 "\n", m_memberTable[i].memberName,
+                     *(((uint64_t *)(getMemberAddr(i))) + arrayIndex));
+              break;
+            }
             case MemberTypeIVec4: {
               IUFValue *iufValue = static_cast<IUFValue *>(getMemberAddr(i));
               iufValue += arrayIndex;

@@ -56,7 +56,7 @@ class LgcOp<string mnemonic_, list<Trait> traits_ = []>
                                                               >;
 
 def BufferAddrToPtrOp : LgcOp<"buffer.addr.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins I64:$address);
+  let arguments = (ins I64:$address, AttrI1:$globallyCoherent);
   let results = (outs BufferPointer:$result);
 
   let summary = "convert a buffer address into a buffer fat pointer";
@@ -69,7 +69,7 @@ def BufferAddrToPtrOp : LgcOp<"buffer.addr.to.ptr", [Memory<[]>, WillReturn]> {
 }
 
 def BufferDescToPtrOp : LgcOp<"buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins V4I32:$desc);
+  let arguments = (ins V4I32:$desc, AttrI1:$globallyCoherent);
   let results = (outs BufferPointer:$result);
 
   let summary = "convert a buffer descriptor into a buffer pointer";
@@ -94,7 +94,7 @@ def ConvertToStridedBufferPointerOp : LgcOp<"convert.to.strided.buffer.pointer",
 }
 
 def StridedBufferDescToPtrOp : LgcOp<"strided.buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins V4I32:$desc);
+  let arguments = (ins V4I32:$desc, AttrI1:$globallyCoherent);
   let results = (outs BufferStridedPointer:$result);
 
   let summary = "convert a buffer descriptor into a strided buffer pointer";
@@ -104,7 +104,7 @@ def StridedBufferDescToPtrOp : LgcOp<"strided.buffer.desc.to.ptr", [Memory<[]>, 
 }
 
 def StridedBufferAddrAndStrideToPtrOp : LgcOp<"strided.buffer.addr.and.stride.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins I64:$address, I32:$stride);
+  let arguments = (ins I64:$address, I32:$stride, AttrI1:$globallyCoherent);
   let results = (outs BufferStridedPointer:$result);
 
   let summary = "convert a buffer address and a stride into a strided buffer pointer";
@@ -198,7 +198,7 @@ def LoadStridedBufferDescOp : LgcOp<"load.strided.buffer.desc", [Memory<[]>, Wil
 }
 
 def BufferLoadDescToPtrOp : LgcOp<"buffer.load.desc.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins ConstantPointer:$descPtr, AttrI1:$forceRawView, AttrI1:$isCompact);
+  let arguments = (ins ConstantPointer:$descPtr, AttrI1:$forceRawView, AttrI1:$isCompact, AttrI1:$globallyCoherent);
   let results = (outs BufferPointer:$result);
 
   let summary = "convert a constant buffer pointer to a fat buffer pointer and implicitly do the load";
@@ -208,7 +208,7 @@ def BufferLoadDescToPtrOp : LgcOp<"buffer.load.desc.to.ptr", [Memory<[]>, WillRe
 }
 
 def StridedBufferLoadDescToPtrOp : LgcOp<"stride.buffer.load.desc.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins ConstantPointer:$descPtr, AttrI1:$forceRawView, AttrI1:$isCompact, I32:$stride);
+  let arguments = (ins ConstantPointer:$descPtr, AttrI1:$forceRawView, AttrI1:$isCompact, AttrI1:$globallyCoherent, I32:$stride);
   let results = (outs BufferStridedPointer:$result);
 
   let summary = "convert a constant buffer pointer to a fat strided buffer pointer and implicitly do the load";
@@ -307,7 +307,7 @@ def GetMeshBuiltinInputOp : DivergentLgcOp<"get.mesh.builtin.input", [Memory<[]>
   let description = [{
     Return the value of mesh built-in input.
 
-    `builtIn` is the input built-in ID of mesh shader.
+    `builtin` is the input built-in ID of mesh shader.
   }];
 }
 
@@ -315,7 +315,7 @@ def WriteMeshOutputOp : LgcOp<"write.mesh.output", [Memory<[]>]> {
   let arguments = (ins AttrI1:$is_primitive, AttrI32:$location, I32:$location_offset, I32:$component_index, I32:$prim_or_vertex_index, value:$output_value);
   let results = (outs);
 
-  let summary = "Write mesh shader primitive/vertex outputs";
+  let summary = "write mesh shader primitive/vertex outputs";
   let description = [{
     In the mesh shader, write mesh shader primitive/vertex outputs to LDS.
 
@@ -325,6 +325,108 @@ def WriteMeshOutputOp : LgcOp<"write.mesh.output", [Memory<[]>]> {
     `component_index` is the component index of this output when component addressing is involved.
     `prim_or_vertex_index` is the primitive/vertex index specifying which primitive/vertex to write.
     `output_value` is the output value to write.
+  }];
+}
+
+def NggExportPositionOp : LgcOp<"ngg.export.position", [Memory<[(write)]>]> {
+  let arguments = (ins AttrI32:$export_slot, F32:$export_value0, F32:$export_value1, F32:$export_value2, F32:$export_value3);
+  let results = (outs);
+
+  let summary = "export position in NGG primitive shader";
+  let description = [{
+    In NGG primitive shader, export position
+
+    `export_slot` is the export slot.
+    `export_value0` is the first position value to export.
+    `export_value1` is the second position value to export.
+    `export_value2` is the third position value to export.
+    `export_value3` is the fourth position value to export.
+  }];
+}
+
+def NggExportAttributeOp : LgcOp<"ngg.export.attribute", [Memory<[(write)]>]> {
+  let arguments = (ins AttrI32:$export_slot, F32:$export_value0, F32:$export_value1, F32:$export_value2, F32:$export_value3);
+  let results = (outs);
+
+  let summary = "export attribute in NGG primitive shader";
+  let description = [{
+    In NGG primitive shader, export attribute
+
+    `export_slot` is the export slot.
+    `export_value0` is the first position value to export.
+    `export_value1` is the second position value to export.
+    `export_value2` is the third position value to export.
+    `export_value3` is the fourth position value to export.
+  }];
+}
+
+def WriteXfbOutputOp : LgcOp<"write.xfb.output", [Memory<[(write)]>]> {
+  let arguments = (ins AttrI32:$xfb_buffer, AttrI32:$xfb_offset, AttrI32:$stream_id, value:$output_value);
+  let results = (outs);
+
+  let summary = "write XFB output to XFB buffer";
+  let description = [{
+    Write XFB (transform feedback) output to XFB buffer with the specified XFB offset
+
+    `xfb_buffer` is the XFB buffer.
+    `xfb_offset` is the XFB offset in this buffer.
+    `stream_id` is ID of the vertex stream to write XFB output.
+    `output_value` is the XFB output value to write.
+  }];
+}
+
+def NggReadGsOutputOp : DivergentLgcOp<"ngg.read.gs.output", [Memory<[(read)]>, WillReturn]> {
+  let arguments = (ins AttrI32:$location, AttrI32:$component, AttrI32:$stream_id);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "read the value of the specified GS output from LDS";
+  let description = [{
+    Read the value of the specified GS output from LDS in NGG primitive shader
+
+    `location` is location of the output.
+    `component` is component of the output (used for vector element addressing).
+    `stream_id` is ID of the vertex stream to read GS output.
+  }];
+}
+
+def NggWriteGsOutputOp : LgcOp<"ngg.write.gs.output", [Memory<[(write)]>]> {
+  let arguments = (ins AttrI32:$location, AttrI32:$component, AttrI32:$stream_id, value:$output_value);
+  let results = (outs);
+
+  let summary = "write the value of the specified GS output to LDS";
+  let description = [{
+    Write the value of the specified GS output to LDS in NGG primitive shader
+
+    `location` is location of the output.
+    `component` is component of the output (used for vector element addressing).
+    `stream_id` is ID of the vertex stream to read GS output.
+    `output_value` is the output value to write.
+  }];
+}
+
+def GsEmitStreamOp : DivergentLgcOp<"gs.emit.stream", [Memory<[(write)]>]> {
+let arguments = (ins AttrI32:$stream_id);
+  let results = (outs);
+
+  let summary = "emit a vertex to the current output primitive at the specified stream";
+  let description = [{
+    Emit a vertex to the current output primitive at the specified stream
+
+    `stream_id` is ID of the vertex stream to emit a vertex to the current output primitive.
+  }];
+}
+
+def GsCutStreamOp : DivergentLgcOp<"gs.cut.stream", [Memory<[(write)]>]> {
+let arguments = (ins AttrI32:$stream_id);
+  let results = (outs);
+
+  let summary = "complete the current output primitive at the specified stream";
+  let description = [{
+    Complete the current output primitive at the specified stream
+
+    `stream_id` is ID of the vertex stream to complete the current output primitive.
   }];
 }
 
@@ -405,6 +507,33 @@ def OutputImportGenericOp : DivergentLgcOp<"output.import.generic", [Memory<[(re
     Reads back a generic shader output variable.
 
     Only used in TCS, where outputs can be used to communicate between multiple invocations.
+  }];
+}
+
+def EvalIjOffsetSmoothOp : DivergentLgcOp<"eval.Ij.offset.smooth", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$value);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "evaluate I,J for interpolation: center offset, smooth (perspective) version";
+  let description = [{
+    Evaluate I,J for interpolation: center offset, smooth (perspective) version.
+
+    Only used in Fragment.
+  }];
+}
+
+def AdjustIjOp : DivergentLgcOp<"adjust.Ij", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$value, value:$offset);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "Adjust I,J values by offset.";
+  let description = [{
+    This adjusts value by its X and Y derivatives times the X and Y components of offset.
+    If value is a vector, this is done component-wise.
   }];
 }
 
@@ -747,7 +876,7 @@ def InvariantDecorationOp : LgcOp<"invariant.decoration", [WillReturn]> {
 }
 
 def CooperativeMatrixLengthOp : LgcOp<"cooperative.matrix.length", [Memory<[]>, WillReturn]> {
-  let arguments = (ins CooperativeMatrixLayout:$layout);
+  let arguments = (ins CooperativeMatrixLayout:$layout, AttrI32:$k_size);
   let results = (outs I32:$result);
 
   let summary = "get the length for the cooperative matrix";
@@ -755,12 +884,13 @@ def CooperativeMatrixLengthOp : LgcOp<"cooperative.matrix.length", [Memory<[]>, 
     Get the "length" of a matrix of the given layout, i.e. the number of matrix components stored per lane.
 
     'layout' is layout of cooperative matrix.
+    'k_size' is the matrix K size.
   }];
 }
 
 def CooperativeMatrixLoadOp : DivergentLgcOp<"cooperative.matrix.load", [Memory<[(read)]>, Convergent, WillReturn]> {
   let arguments = (ins value:$pointer, value:$stride, AttrI1:$col_major, CooperativeMatrixElementType:$elem_type,
-                   CooperativeMatrixLayout:$layout, AttrI32:$memory_access, AttrI32:$alignment);
+                   CooperativeMatrixLayout:$layout, AttrI32:$memory_access, AttrI32:$alignment, AttrI32:$k_size);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -783,13 +913,14 @@ def CooperativeMatrixLoadOp : DivergentLgcOp<"cooperative.matrix.load", [Memory<
 	- Bit 2 is set if the memory is temporal.
 
 	'alignment' is the alignment of this load operation.
+  'k_size' is the matrix K size.
   }];
 }
 
 def CooperativeMatrixStoreOp : LgcOp<"cooperative.matrix.store", [Memory<[(write)]>, Convergent]> {
   let arguments = (ins value:$pointer, value:$stride, AttrI1:$col_major, CooperativeMatrixElementType:$elem_type,
                    CooperativeMatrixLayout:$layout, AttrI32:$memory_access, AttrI32:$alignment,
-                   value:$store_value);
+                   value:$store_value, AttrI32:$k_size);
   let results = (outs);
 
   let summary = "Store cooperative matrix elements per lane to the memory";
@@ -810,11 +941,12 @@ def CooperativeMatrixStoreOp : LgcOp<"cooperative.matrix.store", [Memory<[(write
 
     'alignment' is the alignment of this store operation.
     'store_value' is the elements of the cooperative matrix perlane typed in <n x i32> or <n x float> to be stored in memory.
+    'k_size' is the matrix K size.
   }];
 }
 
 def CooperativeMatrixFillOp : DivergentLgcOp<"cooperative.matrix.fill", [Memory<[]>, WillReturn]> {
-  let arguments = (ins value:$scalar, CooperativeMatrixElementType:$elem_type, CooperativeMatrixLayout:$layout);
+  let arguments = (ins value:$scalar, CooperativeMatrixElementType:$elem_type, CooperativeMatrixLayout:$layout, AttrI32:$k_size);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -826,6 +958,7 @@ def CooperativeMatrixFillOp : DivergentLgcOp<"cooperative.matrix.fill", [Memory<
     'scalar' is the value to fill the cooperative matrix.
     'elem_type' is the element type for the cooperative matrix.
     'layout' is the layout of the input cooperative matrix.
+    'k_size' is the matrix K size.
   }];
 }
 
@@ -942,7 +1075,7 @@ def CooperativeMatrixTimesScalarOp : DivergentLgcOp<"cooperative.matrix.times.sc
 def CooperativeMatrixMulAddOp : DivergentLgcOp<"cooperative.matrix.muladd", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix_a, value:$matrix_b, value:$matrix_c, AttrI1:$is_signed_a, AttrI1:$is_signed_b,
                    AttrI1:$is_sat_or_opsel, AttrI1:$is_tied, CooperativeMatrixElementType:$matrix_a_elem_type,
-                   CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type);
+                   CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type, CooperativeMatrixElementType:$matrix_d_elem_type, AttrI32:$k_multiplier);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -968,6 +1101,8 @@ def CooperativeMatrixMulAddOp : DivergentLgcOp<"cooperative.matrix.muladd", [Con
     '$matrix_a_elem_type' is the component type of the matrix A
     '$matrix_b_elem_type' is the component type of the matrix B
     '$matrix_c_elem_type' is the component type of the matrix C
+    '$matrix_d_elem_type' is the component type of the matrix D
+    '$k_multiplier' is the multiplier for the matrix K size.
   }];
 }
 
@@ -1029,7 +1164,7 @@ def SparsityIndexLoadOp : DivergentLgcOp<"sparsityindex.load", [Memory<[(read)]>
 def SparseCooperativeMatrixMulAddOp : DivergentLgcOp<"sparseCooperativeMatrix.muladd", [Convergent, WillReturn]> {
   let arguments = (ins value:$matrix_a, value:$sparse_index, value:$matrix_b, value:$matrix_c, AttrI1:$is_signed_a, AttrI1:$is_signed_b,
                    AttrI1:$is_sat, CooperativeMatrixElementType:$matrix_a_elem_type,
-                   CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type);
+                   CooperativeMatrixElementType:$matrix_b_elem_type, CooperativeMatrixElementType:$matrix_c_elem_type, CooperativeMatrixElementType:$matrix_d_elem_type, AttrI32:$k_multiplier);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -1052,6 +1187,8 @@ def SparseCooperativeMatrixMulAddOp : DivergentLgcOp<"sparseCooperativeMatrix.mu
     '$matrix_a_elem_type' is the component type of the A matrix.
     '$matrix_b_elem_type' is the component type of the B matrix.
     '$matrix_c_elem_type' is the component type of the C matrix.
+    '$matrix_d_elem_type' is the component type of the D matrix.
+    '$k_multiplier' is the multiplier for the matrix K size.
   }];
 }
 

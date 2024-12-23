@@ -4,26 +4,38 @@
 ; TODO: Change this to ISA / assembly output checks once the LLVM backend has settled
 
 ; RUN: amdllpc -gfxip 11.0 -emit-llvm -o - %s | FileCheck -check-prefixes=CHECK %s
+; RUN: amdllpc -gfxip 11.0 -filetype=asm -add-rt-helpers 1 -o - %s | FileCheck -check-prefixes=ASM %s
 
 ; CHECK-LABEL: @_amdgpu_cs_main(
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
 
+; ASM: {{^}}_amdgpu_cs_main:
+
 ; CHECK-LABEL: @_rgen_1(
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
+
+; ASM: {{^}}_rgen_1:
 
 ; CHECK-LABEL: @_rgen_1.resume.0(
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
 ; CHECK:     unreachable
 ; CHECK:     ret void
 
+; ASM: {{^}}_rgen_1.resume.0:
+
 ; CHECK-LABEL: @_chit_2(
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
+
+; ASM: {{^}}_chit_2:
 
 ; CHECK-LABEL: @_cs_(
 ; CHECK:     call <4 x i32> @llvm.amdgcn.image.bvh.intersect.ray.
 ; CHECK-NOT: ret void
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
 ; CHECK-NOT: ret void
+
+; ASM: {{^}}_cs_:
+; ASM:       image_bvh64_intersect_ray
 
 [Version]
 version = 69

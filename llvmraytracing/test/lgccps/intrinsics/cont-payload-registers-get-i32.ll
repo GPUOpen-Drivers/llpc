@@ -5,10 +5,10 @@
 %struct.DispatchSystemData = type { i32 }
 
 ; Need _cont_ReportHit to get system data type
+declare !pointeetys !10 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
 declare !pointeetys !6 i1 @_cont_ReportHit(%struct.AnyHitTraversalData* %data, float %t, i32 %hitKind)
 
-declare !pointeetys !10 <3 x i32> @_cont_DispatchRaysIndex3(%struct.DispatchSystemData*)
-declare !pointeetys !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
+declare !pointeetys !10 void @_cont_ExitRayGen(%struct.DispatchSystemData*)
 
 declare i32 @_AmdContPayloadRegistersGetI32(i32)
 
@@ -16,7 +16,7 @@ declare i32 @_AmdContPayloadRegistersGetI32(i32)
 
 define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal(ptr addrspace(5) %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !3 {
 ; CHECK-LABEL: define dso_local spir_func void @_cont_Traversal(
-; CHECK-SAME: i32 [[RETURNADDR:%.*]], i32 [[SHADER_INDEX:%.*]], { { i32 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [41 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META3:![0-9]+]] !lgc.rt.shaderstage [[META4:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META5:![0-9]+]] !continuation [[META6:![0-9]+]] {
+; CHECK-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { { i32 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [41 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META3:![0-9]+]] !lgc.rt.shaderstage [[META4:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META5:![0-9]+]] !continuation [[META6:![0-9]+]] {
 ; CHECK-NEXT:  .entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { { i32 } }, align 8, addrspace(5)
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [30 x i32], align 4

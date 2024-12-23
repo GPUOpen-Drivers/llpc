@@ -117,8 +117,9 @@ public:
   // Convert the element type enum into the corresponding LLVM type.
   llvm::Type *transCooperativeMatrixElementType(CooperativeMatrixElementType elemType);
 
-  // Get the LGC type of a cooperative matrix with the given element type and layout.
-  llvm::Type *getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
+  // Get the LGC type of a cooperative matrix with the given element type, layout and K size.
+  llvm::Type *getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                     unsigned kSize = 16);
 
   // Whether the type of a cooperative matrix is specified bit width.
   static bool isTypeNCooperativeMatrix(CooperativeMatrixElementType elemType, unsigned bitWidth);

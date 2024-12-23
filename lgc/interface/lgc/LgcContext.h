@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -140,7 +141,7 @@ public:
 
   // Utility method to create a start/stop timer pass and add it to the given
   // pass manager
-  static void createAndAddStartStopTimer(lgc::PassManager &passMgr, llvm::Timer *timer, bool starting);
+  static void createAndAddStartStopTimer(llvm::ModulePassManager &passMgr, llvm::Timer *timer, bool starting);
 
   // Set and get a pointer to the stream used for LLPC_OUTS. This is initially nullptr,
   // signifying no output from LLPC_OUTS. Setting this to a stream means that LLPC_OUTS

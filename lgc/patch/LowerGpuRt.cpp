@@ -325,15 +325,6 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
 void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
-  // Use setReg to set SQ_WAVE_MODE.
-  // hwRegId : SQ related register index.
-  // Offset : register field offset.
-  // Width  : field width.
-  // hwReg : (hwRegId | (Offset << 6) | ((Width - 1) << 11)
-  constexpr uint32_t sqHwRegMode = 1;
-  constexpr uint32_t width = 2;
-  constexpr uint32_t offset = 0;
-
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
   auto func = inst.getCalledFunction();
   auto retType = func->getReturnType();
@@ -342,8 +333,12 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
   uint32_t rm = cast<ConstantInt>(inst.getRoundMode())->getZExtValue();
   uint32_t op = cast<ConstantInt>(inst.getOperation())->getZExtValue();
 
-  // WARNING: This isn't supported robustly by the IR semantics and the backend, but it's the best we can do for now.
-  BuilderBase::get(*m_builder).CreateSetReg(sqHwRegMode, offset, width, m_builder->getInt32(rm));
+  static constexpr RoundingMode rmTable[4] = {RoundingMode::NearestTiesToEven, RoundingMode::TowardPositive,
+                                              RoundingMode::TowardNegative, RoundingMode::TowardZero};
+
+  // Use llvm.set.rounding to modify rounding mode.
+  m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::set_rounding,
+                             {m_builder->getInt32(static_cast<unsigned>(rmTable[rm]))});
 
   Value *result = PoisonValue::get(retType);
   if (op == OperationType::Add)
@@ -353,9 +348,9 @@ void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
   else
     result = m_builder->CreateFMul(src0, src1);
 
-  // set back to RoundTiesToEven.
-  uint32_t roundTiesToEven = 1;
-  BuilderBase::get(*m_builder).CreateSetReg(sqHwRegMode, offset, width, m_builder->getInt32(roundTiesToEven));
+  // Set back to RoundTiesToEven.
+  m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::set_rounding,
+                             {m_builder->getInt32(static_cast<unsigned>(RoundingMode::NearestTiesToEven))});
 
   inst.replaceAllUsesWith(result);
   m_callsToLower.push_back(&inst);

@@ -152,7 +152,6 @@ struct XfbOutputExport {
   unsigned xfbBuffer;   // Transform feedback buffer
   unsigned xfbOffset;   // Transform feedback offset
   unsigned numElements; // Number of output elements, valid range is [1,4]
-  bool is16bit;         // Whether the output is 16-bit
   // For ES only
   unsigned offsetInVertex; // Offset of an output within all transform feedback outputs of a vertex
   // For GS only
@@ -299,14 +298,17 @@ private:
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexIndex);
   llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexIndex);
 
-  void exportVertexAttributeThroughMemory(llvm::Function *&target);
   void appendAttributeThroughMemoryArguments(llvm::SmallVectorImpl<llvm::Value *> &args);
+  void mutateToExportVertex(llvm::Function *&target);
+  void exportPosition(unsigned exportSlot, llvm::ArrayRef<llvm::Value *> exportValues, bool lastExport);
+  void exportAttribute(unsigned exportSlot, llvm::ArrayRef<llvm::Value *> exportValues, llvm::Value *attribRingBufDesc,
+                       llvm::Value *attribRingBaseOffset, llvm::Value *vertexIndex);
 
   void processSwXfb(llvm::ArrayRef<llvm::Argument *> args);
   void processSwXfbWithGs(llvm::ArrayRef<llvm::Argument *> args);
   void prepareSwXfb(llvm::ArrayRef<llvm::Value *> primCountInSubgroup);
   llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
-                              llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
+                              llvm::SmallVectorImpl<XfbOutputExport> &xfbOutputExports);
 
   llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexIndex, unsigned offsetInVertex);
   void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexIndex, unsigned offsetInVertex);

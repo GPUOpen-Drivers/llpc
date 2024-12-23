@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerInvariantLoads.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/LgcLowering.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -59,13 +60,13 @@ enum AddrSpaceBit {
 };
 
 static unsigned findAddressSpaceAccess(const Instruction *inst) {
-  if (const LoadInst *li = dyn_cast<LoadInst>(inst)) {
-    return std::min(li->getPointerAddressSpace(), UNKNOWN_ADDRESS_SPACE);
-  } else if (const StoreInst *si = dyn_cast<StoreInst>(inst)) {
-    return std::min(si->getPointerAddressSpace(), UNKNOWN_ADDRESS_SPACE);
+  if (const LoadInst *load = dyn_cast<LoadInst>(inst)) {
+    return std::min(load->getPointerAddressSpace(), UNKNOWN_ADDRESS_SPACE);
+  } else if (const StoreInst *store = dyn_cast<StoreInst>(inst)) {
+    return std::min(store->getPointerAddressSpace(), UNKNOWN_ADDRESS_SPACE);
   } else {
-    if (const CallInst *ci = dyn_cast<CallInst>(inst)) {
-      auto func = ci->getCalledFunction();
+    if (const CallInst *call = dyn_cast<CallInst>(inst)) {
+      auto func = call->getCalledFunction();
       if (func) {
         // Treat these as buffer address space as they do not overlap with private.
         if (func->getName().starts_with("llvm.amdgcn.image") || func->getName().starts_with("llvm.amdgcn.raw") ||
@@ -154,8 +155,8 @@ PreservedAnalyses LowerInvariantLoads::run(Function &function, FunctionAnalysisM
   for (BasicBlock &block : function) {
     for (Instruction &inst : block) {
       if (!clearInvariants && inst.mayWriteToMemory()) {
-        if (IntrinsicInst *ii = dyn_cast<IntrinsicInst>(&inst)) {
-          switch (ii->getIntrinsicID()) {
+        if (IntrinsicInst *intrinsic = dyn_cast<IntrinsicInst>(&inst)) {
+          switch (intrinsic->getIntrinsicID()) {
           case Intrinsic::amdgcn_exp:
           case Intrinsic::amdgcn_exp_compr:
           case Intrinsic::amdgcn_init_exec:
@@ -167,9 +168,9 @@ PreservedAnalyses LowerInvariantLoads::run(Function &function, FunctionAnalysisM
           default:
             break;
           }
-        } else if (CallInst *ci = dyn_cast<CallInst>(&inst)) {
-          auto func = ci->getCalledFunction();
-          if (func && func->getName().starts_with("lgc.ngg."))
+        } else if (CallInst *call = dyn_cast<CallInst>(&inst)) {
+          if (isa<NggWriteGsOutputOp>(call) || isa<NggExportPositionOp>(call) || isa<NggExportAttributeOp>(call) ||
+              isa<WriteXfbOutputOp>(call))
             continue;
         }
         unsigned addrSpace = findAddressSpaceAccess(&inst);
@@ -179,7 +180,8 @@ PreservedAnalyses LowerInvariantLoads::run(Function &function, FunctionAnalysisM
         }
         writtenAddrSpaces |= aliasMatrix[addrSpace];
       } else if (inst.mayReadFromMemory()) {
-        loads.push_back(&inst);
+        if (!isa<NggReadGsOutputOp>(inst))
+          loads.push_back(&inst);
       }
     }
   }

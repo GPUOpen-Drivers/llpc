@@ -1,0 +1,23 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: fence syncscope("workgroup") acq_rel
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; Check that forceMemoryBarrierScope changes synscope from default "agent" (SPIR-V Device scope) to "workgroup" (SPIR-V Workgroup scope).
+
+[CsGlsl]
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+void main()
+{
+    memoryBarrier();
+}
+
+
+[CsInfo]
+entryPoint = main
+options.forceMemoryBarrierScope = 2

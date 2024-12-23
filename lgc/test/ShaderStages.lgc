@@ -1,7 +1,7 @@
 ; ----------------------------------------------------------------------
 ; Extract 1: CS
 
-; RUN: lgc -extract=1 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK1,CHECK-NGG1 %s
+; RUN: lgc -extract=1 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK1,CHECK-NGG1 %s
 ; CHECK-NGG1: define dllexport amdgpu_cs void @_amdgpu_cs_main{{.*}} !lgc.shaderstage [[cs_stage:![0-9]*]] {
 ; CHECK1: [[cs_stage]] = !{i32 7}
 
@@ -27,7 +27,7 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 2: VS/FS
 
-; RUN: lgc -extract=2 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG2 %s
+; RUN: lgc -extract=2 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG2 %s
 
 ; CHECK-NGG2: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[vert_stage:![0-9]*]] {
 ; CHECK-NGG2: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage [[frag_stage:![0-9]*]] {
@@ -63,7 +63,7 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 3: GS/VS
 
-; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG3 %s
+; RUN: lgc -extract=3 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG3 %s
 
 ; _amdgpu_gs_main must be first, so it can be linked with a potential vertex fetch shader.
 ; CHECK-NGG3: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
@@ -84,8 +84,7 @@ define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !lgc
   call void @lgc.output.export.builtin.PointSize.i32.i32.f32(i32 1, i32 0, float undef) #0
   call void @lgc.output.export.builtin.ClipDistance.i32.i32.a1f32(i32 3, i32 0, [1 x float] undef) #0
   call void @lgc.output.export.builtin.CullDistance.i32.i32.a1f32(i32 4, i32 0, [1 x float] undef) #0
-  %0 = call i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32 268435466) #0
-  call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %0)
+  call void @lgc.gs.emit.stream(i32 0)
   ret void
 }
 
@@ -119,13 +118,11 @@ declare float @lgc.input.import.generic__f32.i32.i32.i32(i32, i32, i32) #1
 ; Function Attrs: nounwind readonly
 declare <4 x double> @lgc.input.import.generic__v4f64.i32.i32.i32(i32, i32, i32) #1
 
-; Function Attrs: nounwind
-declare i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32) #0
-
-; Function Attrs: nounwind
-declare void @llvm.amdgcn.s.sendmsg(i32 immarg, i32) #0
+; Function Attrs: nounwind memory(write)
+declare void @lgc.gs.emit.stream(i32) #2
 
 attributes #0 = { nounwind }
+;attributes #2 = { nounwind memory(write) }
 
 !llpc.geometry.mode = !{!0}
 !lgc.options = !{!1}
@@ -149,7 +146,7 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 4: TCS/TES
 
-; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG4 %s
+; RUN: lgc -extract=4 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG4 %s
 
 ; CHECK-NGG4: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[tc_stage:![0-9]*]] {
 ; CHECK-NGG4: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage [[te_stage:![0-9]*]] {
@@ -220,7 +217,7 @@ attributes #1 = { nounwind readonly }
 ; ----------------------------------------------------------------------
 ; Extract 5: TCS
 
-; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG5 %s
+; RUN: lgc -extract=5 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG5 %s
 
 ; CHECK-NGG5: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage [[tc_stage:![0-9]*]] {
 ; CHECK-NGG5: [[tc_stage]] = !{i32 2}
@@ -273,7 +270,7 @@ attributes #1 = { nounwind readonly }
 ; ----------------------------------------------------------------------
 ; Extract 6: TES
 
-; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG6 %s
+; RUN: lgc -extract=6 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG6 %s
 
 ; CHECK-NGG6: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[te_stage:![0-9]*]] {
 ; CHECK-NGG6: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage [[frag_stage:![0-9]*]] {
@@ -327,7 +324,7 @@ attributes #1 = { nounwind readonly }
 ; ----------------------------------------------------------------------
 ; Extract 7: TCS/TES/GS
 
-; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG7 %s
+; RUN: lgc -extract=7 -print-after=lgc-set-up-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG7 %s
 
 ; When there is are tes and geom shader, _amdgpu_hs_main must be first, so it can be linked with a potential
 ; vertex fetch shader.
@@ -373,8 +370,7 @@ define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !lgc
   call void @lgc.output.export.builtin.PointSize.i32.i32.f32(i32 1, i32 0, float undef) #0
   call void @lgc.output.export.builtin.ClipDistance.i32.i32.a1f32(i32 3, i32 0, [1 x float] undef) #0
   call void @lgc.output.export.builtin.CullDistance.i32.i32.a1f32(i32 4, i32 0, [1 x float] undef) #0
-  %0 = call i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32 268435466) #0
-  call void @llvm.amdgcn.s.sendmsg(i32 34, i32 %0)
+  call void @lgc.gs.emit.stream(i32 0)
   ret void
 }
 
@@ -428,14 +424,12 @@ declare float @lgc.input.import.generic__f32.i32.i32.i32(i32, i32, i32) #1
 ; Function Attrs: nounwind readonly
 declare <4 x double> @lgc.input.import.generic__v4f64.i32.i32.i32(i32, i32, i32) #1
 
-; Function Attrs: nounwind
-declare i32 @lgc.input.import.builtin.GsWaveId.i32.i32(i32) #0
-
-; Function Attrs: nounwind
-declare void @llvm.amdgcn.s.sendmsg(i32 immarg, i32) #0
+; Function Attrs: nounwind memory(write)
+declare void @lgc.gs.emit.stream(i32) #2
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
+attributes #2 = { nounwind memory(write) }
 
 !llpc.tcs.mode = !{!0}
 !llpc.geometry.mode = !{!0}

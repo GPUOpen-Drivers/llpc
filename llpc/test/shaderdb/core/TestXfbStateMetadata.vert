@@ -18,7 +18,7 @@ void main()
     gl_PointSize = pointSize;
 }
 // CHECK-LABEL: define {{[^@]+}}@lgc.shader.VS.main
-// CHECK-SAME: () local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !10 !lgc.shaderstage !1 !lgc.xfb.state !11 {
+// CHECK-SAME: () local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !11 !lgc.shaderstage !1 !lgc.xfb.state !12 {
 // CHECK-NEXT:  .entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call float @lgc.load.vertex.input__f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
 // CHECK-NEXT:    [[TMP1:%.*]] = call <4 x float> @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)

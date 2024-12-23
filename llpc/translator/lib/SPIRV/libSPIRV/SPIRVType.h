@@ -186,7 +186,7 @@ public:
     (void(Encoding)); // Unused
   }
   // Incomplete constructor
-  SPIRVTypeFloat() : SPIRVType(OC), BitWidth(0) {}
+  SPIRVTypeFloat() : SPIRVType(OC), BitWidth(0), Encoding(FPEncodingMax) {}
 
   unsigned getBitWidth() const { return BitWidth; }
 
@@ -194,7 +194,6 @@ public:
     SPIRVCapVec CV;
     if (isTypeFloat(64))
       CV.push_back(CapabilityFloat64);
-
     return CV;
   }
 
@@ -202,7 +201,9 @@ protected:
   _SPIRV_DCL_DECODE
   void validate() const override {
     SPIRVEntry::validate();
-    assert(BitWidth >= 16 && BitWidth <= 64 && "Invalid bit width");
+    assert(BitWidth >= 8 && BitWidth <= 64 && "Invalid bit width");
+    if (WordCount > FixedWC)
+      assert(isValidFPEncoding(static_cast<spv::FPEncoding>(Encoding)) && "Invalid Floating Point Encoding");
   }
 
 private:

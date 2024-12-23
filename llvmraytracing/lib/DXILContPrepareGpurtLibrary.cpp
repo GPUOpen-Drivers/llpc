@@ -36,6 +36,7 @@
 #include "compilerutils/DxilUtils.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
+#include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -133,7 +134,6 @@ static bool isUtilFunction(StringRef Name) {
       "GetCurrentFuncAddr",
       "GetFuncAddr",
       "GetI32",
-      "GetLocalRootIndex",
       "GetResumePointAddr",
       "GetRtip",
       "GetSetting",
@@ -183,6 +183,20 @@ static void handleGetShaderRecordIndex(llvm_dialects::Builder &B, Function &Func
   });
 }
 
+/// Restore the local root index after calls to some function, Func.
+/// Currently, Func is some Await intrinsic, and we iterate over all its call instructions to insert the call to
+/// lgc.ilcps.setLocalRootIndex after it. This has the effect of not running into trouble with a mangled call to
+/// lgc.ilcps.setLocalRootIndex after cross-module inlining and helps us with determining a basic block split point
+/// later. We need that split point to ensure lgc.ilcps.setLocalRootIndex is called before resource accesses that depend
+/// on the local root index occur.
+static void restoreLocalRootIndex(llvm_dialects::Builder &B, Function &Func) {
+  llvm::forEachCall(Func, [&](CallInst &CInst) {
+    B.SetInsertPoint(++CInst.getIterator());
+    auto *ShaderIndexCall = B.create<lgc::rt::ShaderIndexOp>();
+    B.create<lgc::ilcps::SetLocalRootIndexOp>(ShaderIndexCall);
+  });
+}
+
 llvm::PreservedAnalyses DXILContPrepareGpurtLibraryPass::run(llvm::Module &M,
                                                              llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the dxil-cont-prepare-gpurt-library pass\n");
@@ -205,6 +219,8 @@ llvm::PreservedAnalyses DXILContPrepareGpurtLibraryPass::run(llvm::Module &M,
     } else if (Name.contains("_Amd")) {
       if (isUtilFunction(Name)) {
         ShouldTransform = true;
+        if (Name.contains("Await"))
+          restoreLocalRootIndex(B, *F);
       } else if (Name.contains("IsLlpc")) {
         ShouldTransform = false;
         handleIsLlpc(*F);

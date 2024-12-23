@@ -714,6 +714,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.imageSampleDrefReturnsRgba = " << shaderInfo->options.imageSampleDrefReturnsRgba << "\n";
   dumpFile << "options.disableGlPositionOpt = " << shaderInfo->options.disableGlPositionOpt << "\n";
   dumpFile << "options.viewIndexFromDeviceIndex = " << shaderInfo->options.viewIndexFromDeviceIndex << "\n";
+  dumpFile << "options.forceUnderflowPrevention = " << shaderInfo->options.forceUnderflowPrevention << "\n";
+  dumpFile << "options.forceMemoryBarrierScope = " << shaderInfo->options.forceMemoryBarrierScope << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -1320,13 +1322,14 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
   dumpFile << "attributeSizeMaxInLib = " << pipelineInfo->attributeSizeMaxInLib << "\n";
   dumpFile << "hasPipelineLibrary = " << pipelineInfo->hasPipelineLibrary << "\n";
   dumpFile << "pipelineLibStageMask = " << pipelineInfo->pipelineLibStageMask << "\n";
+  dumpFile << "rtIgnoreDeclaredPayloadSize = " << pipelineInfo->rtIgnoreDeclaredPayloadSize << "\n";
 
   for (unsigned i = 0; i < pipelineInfo->gpurtOptionCount; ++i) {
     auto gpurtOption = &pipelineInfo->pGpurtOptions[i];
     dumpFile << "gpurtOptions[" << i << "].nameHash = "
-             << "0x" << std::hex << gpurtOption->nameHash << "\n";
+             << "0x" << std::hex << gpurtOption->nameHash << std::dec << "\n";
     dumpFile << "gpurtOptions[" << i << "].value = "
-             << "0x" << std::hex << gpurtOption->value << "\n";
+             << "0x" << std::hex << gpurtOption->value << std::dec << "\n";
   }
 }
 
@@ -1608,10 +1611,10 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   if (outLocationMaps != nullptr && unlinkedShaderType != UnlinkedStageFragment) {
     for (unsigned i = 0; i < ShaderStageFragment; ++i) {
       if (outLocationMaps[i].count > 0) {
-        hasher.Update(reinterpret_cast<const uint8_t *>(outLocationMaps->oldLocation),
+        hasher.Update(reinterpret_cast<const uint8_t *>(outLocationMaps[i].oldLocation),
                       sizeof(uint32_t) * outLocationMaps->count);
-        hasher.Update(reinterpret_cast<const uint8_t *>(outLocationMaps->newLocation),
-                      sizeof(uint32_t) * outLocationMaps->count);
+        hasher.Update(reinterpret_cast<const uint8_t *>(outLocationMaps[i].newLocation),
+                      sizeof(uint32_t) * outLocationMaps[i].count);
         hasher.Update(outLocationMaps[i].count);
       }
     }
@@ -1677,6 +1680,24 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
     updateHashForUniformConstantMap(pipeline->pUniformMap, &hasher);
   }
 
+  // Hash the graphics state for transform pipeline
+  auto transformPipeline = pipeline->transformGraphicsPipeline;
+  bool enableTransformPipeline = (transformPipeline != nullptr);
+  hasher.Update(enableTransformPipeline);
+
+  if (enableTransformPipeline) {
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &transformPipeline->vs, isCacheHash, &hasher);
+    updateHashForResourceMappingInfo(&transformPipeline->resourceMapping,
+                                     transformPipeline->unlinked ? 0 : transformPipeline->pipelineLayoutApiHash,
+                                     &hasher);
+    hasher.Update(transformPipeline->unlinked);
+    hasher.Update(transformPipeline->dynamicTopology);
+    hasher.Update(transformPipeline->enableInitUndefZero);
+    updateHashForPipelineOptions(&transformPipeline->options, &hasher, isCacheHash, UnlinkedStageVertexProcess);
+    updateHashForVertexInputState(transformPipeline->pVertexInput, transformPipeline->dynamicVertexStride, &hasher);
+    updateHashForNonFragmentState(transformPipeline, isCacheHash, &hasher);
+  }
+
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
@@ -1731,6 +1752,7 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
 
   hasher.Update(pipeline->payloadSizeMaxInLib);
   hasher.Update(pipeline->attributeSizeMaxInLib);
+  hasher.Update(pipeline->rtIgnoreDeclaredPayloadSize);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   if (isCacheHash) {
@@ -2002,6 +2024,18 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().enableRemapLocation);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
   hasher->Update(options->optimizePointSizeWrite);
+  hasher->Update(options->compileConstInfo != nullptr);
+  if (options->compileConstInfo != nullptr) {
+    hasher->Update(options->compileConstInfo->numCompileTimeConstants);
+    for (uint32_t i = 0; i < options->compileConstInfo->numCompileTimeConstants; i++) {
+      auto constItem = options->compileConstInfo->pCompileTimeConstants[i];
+      hasher->Update(constItem.offset);
+      hasher->Update(constItem.set);
+      hasher->Update(constItem.binding);
+      hasher->Update(constItem.validBytes);
+      hasher->Update(constItem.values.u8, constItem.validBytes);
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -2092,6 +2126,8 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.imageSampleDrefReturnsRgba);
       hasher->Update(options.disableGlPositionOpt);
       hasher->Update(options.viewIndexFromDeviceIndex);
+      hasher->Update(options.forceUnderflowPrevention);
+      hasher->Update(options.forceMemoryBarrierScope);
     }
   }
 }

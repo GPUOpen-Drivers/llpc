@@ -243,6 +243,10 @@ protected:
   // Give the pipeline options to the middle-end, and/or hash them.
   virtual lgc::Options computePipelineOptions() const;
 
+  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
+  void setVertexInputDescriptions(lgc::Pipeline *pipeline, const GraphicsPipelineBuildInfo *gfxBuildInfo,
+                                  Util::MetroHash64 *hasher) const;
+
   GfxIpVersion m_gfxIp;                  // Graphics IP version info
   const char *m_apiName;                 // API name from client, "Vulkan" or "OpenGL"
   MetroHash::Hash m_pipelineHash;        // Pipeline hash code

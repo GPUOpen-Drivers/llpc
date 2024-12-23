@@ -8,8 +8,6 @@ declare float @_AmdGetUninitializedF32()
 declare i32 @_AmdGetUninitializedI32()
 declare %struct.AnyHitData @_AmdGetUninitializedStruct()
 
-declare !pointeetys !10 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
-
 define float @discard_f32() {
 ; CHECK-LABEL: define float @discard_f32() {
 ; CHECK-NEXT:  entry:

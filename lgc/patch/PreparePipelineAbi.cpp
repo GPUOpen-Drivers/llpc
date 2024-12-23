@@ -88,7 +88,7 @@ PreservedAnalyses PreparePipelineAbi::run(Module &module, ModuleAnalysisManager 
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   if (auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessControl))
-    storeTessFactors(hsEntryPoint);
+    storeTessFactorsAndHsOutputs(hsEntryPoint);
 
   mergeShader(module);
 
@@ -111,6 +111,8 @@ std::pair<Value *, Value *> PreparePipelineAbi::readTessFactors(PipelineState *p
                                                                 IRBuilder<> &builder) {
   auto func = builder.GetInsertBlock()->getParent();
   auto lds = Patch::getLdsVariable(pipelineState, func);
+
+  const auto &hwConfig = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
 
   // Helper to read value from LDS
   auto readValueFromLds = [&](Type *readTy, Value *ldsOffset) {
@@ -144,8 +146,9 @@ std::pair<Value *, Value *> PreparePipelineAbi::readTessFactors(PipelineState *p
   }
 
   assert(numOuterTfs >= 2 && numOuterTfs <= 4);
-  // ldsOffset = relativeId * MaxTessFactorsPerPatch
-  Value *ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(MaxTessFactorsPerPatch));
+  // ldsOffset = tessFactorStart + relPatchId * tessFactorStride
+  Value *ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.onChip.tessFactorStride));
+  ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(hwConfig.onChip.tessFactorStart));
   Value *outerTf = readValueFromLds(FixedVectorType::get(builder.getFloatTy(), numOuterTfs), ldsOffset);
 
   // NOTE: For isoline, the outer tessellation factors have to be exchanged, which is required by HW.
@@ -157,9 +160,10 @@ std::pair<Value *, Value *> PreparePipelineAbi::readTessFactors(PipelineState *p
   assert(numInnerTfs <= 2);
   Value *innerTf = nullptr;
   if (numInnerTfs > 0) {
-    // ldsOffset = relativeId * MaxTessFactorsPerPatch + 4
-    Value *ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(MaxTessFactorsPerPatch));
-    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(4));
+    // ldsOffset = tessFactorStart + relPatchId * tessFactorStride + numOuterTfs
+    Value *ldsOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.onChip.tessFactorStride));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(hwConfig.onChip.tessFactorStart));
+    ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(numOuterTfs));
     innerTf = readValueFromLds(FixedVectorType::get(builder.getFloatTy(), numInnerTfs), ldsOffset);
   }
 
@@ -177,7 +181,7 @@ std::pair<Value *, Value *> PreparePipelineAbi::readTessFactors(PipelineState *p
 // @param innerTf : Inner tessellation factors to write to TF buffer
 // @param builder : IR builder to insert instructions
 void PreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *tfBufferDesc, Value *tfBufferBase,
-                                          Value *relPatchId, Value *outerTf, Value *innerTf, IRBuilder<> &builder) {
+                                          Value *relPatchId, Value *outerTf, Value *innerTf, BuilderBase &builder) {
   // NOTE: Tessellation factors are from tessellation level array and we have:
   //   Isoline:
   //     TF[0] = outerTF[0]
@@ -194,40 +198,25 @@ void PreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *t
   //     TF[3] = outerTF[3]
   //     TF[4] = innerTF[0]
   //     TF[5] = innerTF[1]
-  const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
-  Value *tfBufferOffset = builder.CreateMul(relPatchId, builder.getInt32(calcFactor.tessFactorStride * sizeof(float)));
+  const auto numOuterTfs = cast<FixedVectorType>(outerTf->getType())->getNumElements();
+  const auto numInnerTfs = innerTf ? cast<FixedVectorType>(innerTf->getType())->getNumElements()
+                                   : 0; // Isoline doesn't have inner tessellation factors
+
+  Value *tfBufferOffset = builder.CreateMul(relPatchId, builder.getInt32((numOuterTfs + numInnerTfs) * sizeof(float)));
 
   CoherentFlag coherent = {};
   if (pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
     coherent.bits.glc = true;
   }
 
-  const auto numOuterTfs = cast<FixedVectorType>(outerTf->getType())->getNumElements();
-  const auto numInnerTfs = innerTf ? cast<FixedVectorType>(innerTf->getType())->getNumElements()
-                                   : 0; // Isoline doesn't have inner tessellation factors
-
-  (void(numOuterTfs)); // Unused
-  (void(numInnerTfs));
-
-  auto bufferFormatX2 = BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32;
-  auto bufferFormatX4 = BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32_32;
-  if (pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-    bufferFormatX2 = BUF_FORMAT_32_32_FLOAT_GFX10;
-    bufferFormatX4 = BUF_FORMAT_32_32_32_32_FLOAT_GFX10;
-  } else if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-    bufferFormatX2 = BUF_FORMAT_32_32_FLOAT_GFX11;
-    bufferFormatX4 = BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
-  }
-
   auto primitiveMode = pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
   if (primitiveMode == PrimitiveMode::Isolines) {
     assert(numOuterTfs == 2 && numInnerTfs == 0);
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                             {outerTf,                             // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
                              tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX2),    // format
                              builder.getInt32(coherent.u32All)}); // glc
 
   } else if (primitiveMode == PrimitiveMode::Triangles) {
@@ -238,33 +227,248 @@ void PreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *t
     tessFactor =
         builder.CreateInsertElement(tessFactor, builder.CreateExtractElement(innerTf, static_cast<uint64_t>(0)), 3);
 
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                             {tessFactor,                          // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
                              tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX4),    // format
                              builder.getInt32(coherent.u32All)}); // glc
   } else {
     assert(primitiveMode == PrimitiveMode::Quads);
     assert(numOuterTfs == 4 && numInnerTfs == 2);
 
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                             {outerTf,                             // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
                              tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX4),    // format
                              builder.getInt32(coherent.u32All)}); // glc
 
     tfBufferOffset = builder.CreateAdd(tfBufferOffset, builder.getInt32(4 * sizeof(float)));
-    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                             {innerTf,                             // vdata
                              tfBufferDesc,                        // rsrc
                              tfBufferOffset,                      // voffset
                              tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX2),    // format
                              builder.getInt32(coherent.u32All)}); // glc
+  }
+}
+
+// =====================================================================================================================
+// Write HS outputs to off-chip LDS buffer.
+//
+// @param pipelineState : Pipeline state
+// @param offChipLdsDesc : Off-chip LDS buffer descriptor
+// @param offChipLdsBase : Off-chip LDS buffer base offset
+// @param relPatchId : Relative patch ID (output patch ID in group)
+// @param vertexIdx : Vertex indexing (output control point ID)
+// @param outerTf : Outer tessellation factors to check (if any one is less than or equal to zero, discard the patch)
+// @param builder : IR builder to insert instructions
+void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *offChipLdsDesc, Value *offChipLdsBase,
+                                        Value *relPatchId, Value *vertexIdx, Value *outerTf, BuilderBase &builder) {
+  IRBuilder<>::InsertPointGuard guard(builder);
+
+  auto func = builder.GetInsertBlock()->getParent();
+  auto lds = Patch::getLdsVariable(pipelineState, func);
+
+  // Helper to read value from LDS
+  auto readValueFromLds = [&](Type *readTy, Value *ldsOffset) {
+    assert(readTy->getScalarSizeInBits() == 32); // Only accept 32-bit data
+
+    Value *readPtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
+    readPtr = builder.CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
+    return builder.CreateAlignedLoad(readTy, readPtr, Align(4));
+  };
+
+  //
+  // Check if this patch could be discarded
+  //
+  Value *minOuterTf = builder.CreateExtractElement(outerTf, static_cast<uint64_t>(0));
+  for (unsigned i = 1; i < cast<FixedVectorType>(outerTf->getType())->getNumElements(); ++i)
+    minOuterTf = builder.CreateBinaryIntrinsic(Intrinsic::minnum, minOuterTf, builder.CreateExtractElement(outerTf, i));
+
+  auto validPatch = builder.CreateFCmpOGT(minOuterTf, ConstantFP::get(builder.getFloatTy(), 0.0)); // minOuterTf > 0.0
+  builder.CreateIf(validPatch, false, ".writeHsOutputs");
+
+  //
+  // Write HS outputs to off-chip LDS buffer if this patch is valid
+  //
+  auto &inOutUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage;
+  const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->builtInUsage.tcs;
+  const auto &hwConfig = inOutUsage.tcs.hwConfig;
+
+  // Check if we don't need to write this built-in to off-chip LDS buffer because it is only accessed by HS
+  auto checkBuiltInNotToWrite = [&](unsigned builtIn) {
+    if (pipelineState->getNextShaderStage(ShaderStage::TessControl) == ShaderStage::TessEval) {
+      auto nextInOutStage = pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->inOutUsage;
+      if (builtIn == BuiltInTessLevelOuter || builtIn == BuiltInTessLevelInner) {
+        if (inOutUsage.perPatchBuiltInOutputLocMap.count(builtIn) > 0 &&
+            nextInOutStage.perPatchBuiltInInputLocMap.count(builtIn) == 0)
+          return true;
+      } else {
+        if (inOutUsage.builtInOutputLocMap.count(builtIn) > 0 && nextInOutStage.builtInInputLocMap.count(builtIn) == 0)
+          return true;
+      }
+    }
+    return false;
+  };
+
+  static const unsigned BufferFormatsGfx10[] = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10,
+                                                BUF_FORMAT_32_32_32_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10};
+  static const unsigned BufferFormatsGfx11[] = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX11,
+                                                BUF_FORMAT_32_32_32_FLOAT_GFX11, BUF_FORMAT_32_32_32_32_FLOAT_GFX11};
+
+  const auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
+  ArrayRef<unsigned> bufferFormats(gfxIp.major == 10 ? BufferFormatsGfx10 : BufferFormatsGfx11);
+  CoherentFlag coherent = {};
+  if (gfxIp.major <= 11) {
+    coherent.bits.glc = true;
+  }
+
+  // Write per-vertex HS outputs to off-chip LDS buffer
+  if (inOutUsage.outputMapLocCount > 0) {
+    SmallDenseSet<unsigned> builtInLocsNotToWrite;
+    SmallDenseMap<unsigned, Type *> builtInLocsToTypes;
+
+    for (const auto &[builtIn, loc] : inOutUsage.builtInOutputLocMap) {
+      if (checkBuiltInNotToWrite(builtIn)) {
+        assert(inOutUsage.builtInOutputLocMap.count(builtIn) > 0);
+        builtInLocsNotToWrite.insert(inOutUsage.builtInOutputLocMap[builtIn]);
+      } else {
+        switch (builtIn) {
+        case BuiltInPosition:
+          builtInLocsToTypes[loc] = FixedVectorType::get(builder.getFloatTy(), 4);
+          break;
+        case BuiltInPointSize:
+          builtInLocsToTypes[loc] = builder.getFloatTy();
+          break;
+        case BuiltInClipDistance:
+        case BuiltInCullDistance: {
+          const unsigned clipOrCullDistance =
+              builtIn == BuiltInClipDistance ? builtInUsage.clipDistance : builtInUsage.cullDistance;
+          assert(clipOrCullDistance > 0 && clipOrCullDistance <= 8);
+
+          builtInLocsToTypes[loc] = clipOrCullDistance == 1
+                                        ? builder.getFloatTy()
+                                        : FixedVectorType::get(builder.getFloatTy(), std::min(clipOrCullDistance, 4U));
+          if (clipOrCullDistance > 4) {
+            builtInLocsToTypes[loc + 1] = clipOrCullDistance == 5
+                                              ? builder.getFloatTy()
+                                              : FixedVectorType::get(builder.getFloatTy(), clipOrCullDistance - 4);
+          }
+
+          break;
+        }
+        case BuiltInViewportIndex:
+        case BuiltInLayer:
+          builtInLocsToTypes[loc] = builder.getInt32Ty();
+          break;
+        default:
+          llvm_unreachable("Unexpected built-in");
+          break;
+        }
+      }
+    }
+
+    // baseOffset = outputPatchStart + (relPatchId * outputVertexCount + vertexIdx) * outputVertexStride +
+    //            = outputPatchStart + relPatchId * outputPatchSize + vertexIdx * outputVertexStride
+    auto onChipLdsBaseOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.onChip.outputPatchSize));
+    onChipLdsBaseOffset = builder.CreateAdd(
+        onChipLdsBaseOffset, builder.CreateMul(vertexIdx, builder.getInt32(hwConfig.onChip.outputVertexStride)));
+    onChipLdsBaseOffset = builder.CreateAdd(onChipLdsBaseOffset, builder.getInt32(hwConfig.onChip.outputPatchStart));
+
+    auto offChipLdsBaseOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.offChip.outputPatchSize));
+    offChipLdsBaseOffset = builder.CreateAdd(
+        offChipLdsBaseOffset, builder.CreateMul(vertexIdx, builder.getInt32(hwConfig.offChip.outputVertexStride)));
+    offChipLdsBaseOffset = builder.CreateAdd(offChipLdsBaseOffset, builder.getInt32(hwConfig.offChip.outputPatchStart));
+
+    for (unsigned loc = 0; loc < inOutUsage.outputMapLocCount; ++loc) {
+      if (builtInLocsNotToWrite.count(loc) > 0)
+        continue;
+
+      Type *outputTy = FixedVectorType::get(builder.getInt32Ty(), 4); // <4 x i32> for generic outputs
+      if (builtInLocsToTypes.count(loc) > 0)
+        outputTy = builtInLocsToTypes[loc]; // Built-in outputs have known types
+
+      const unsigned numComponents = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+
+      // ldsOffset = baseOffset + attribOffset
+      auto attribOffset = builder.getInt32(4 * loc);
+      auto onChipLdsOffset = builder.CreateAdd(onChipLdsBaseOffset, attribOffset);
+      auto output = readValueFromLds(outputTy, onChipLdsOffset);
+
+      auto offChipLdsOffset = builder.CreateAdd(offChipLdsBaseOffset, attribOffset);
+      offChipLdsOffset = builder.CreateMul(offChipLdsOffset, builder.getInt32(4)); // Convert to byte offset
+
+      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+                              {output,                                             // vdata
+                               offChipLdsDesc,                                     // rsrc
+                               offChipLdsOffset,                                   // voffset
+                               offChipLdsBase,                                     // soffset
+                               builder.getInt32(bufferFormats[numComponents - 1]), // format
+                               builder.getInt32(coherent.u32All)});                // glc
+    }
+  }
+
+  // Write per-patch HS outputs to off-chip LDS buffer
+  if (inOutUsage.perPatchOutputMapLocCount > 0) {
+    SmallDenseSet<unsigned> builtInLocsNotToWrite;
+    SmallDenseMap<unsigned, Type *> builtInLocsToTypes;
+
+    for (const auto &[builtIn, loc] : inOutUsage.perPatchBuiltInOutputLocMap) {
+      if (checkBuiltInNotToWrite(builtIn)) {
+        assert(inOutUsage.perPatchBuiltInOutputLocMap.count(builtIn) > 0);
+        builtInLocsNotToWrite.insert(inOutUsage.perPatchBuiltInOutputLocMap[builtIn]);
+      } else {
+        Type *type = nullptr;
+        switch (builtIn) {
+        case BuiltInTessLevelOuter:
+          type = FixedVectorType::get(builder.getFloatTy(), 4);
+          break;
+        case BuiltInTessLevelInner:
+          type = FixedVectorType::get(builder.getFloatTy(), 2);
+          break;
+        default:
+          llvm_unreachable("Unexpected built-in");
+          break;
+        }
+        builtInLocsToTypes[loc] = type;
+      }
+    }
+
+    // baseOffset = patchConstStart + relPatchId * patchConstSize
+    auto onChipLdsBaseOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.onChip.patchConstSize));
+    onChipLdsBaseOffset = builder.CreateAdd(onChipLdsBaseOffset, builder.getInt32(hwConfig.onChip.patchConstStart));
+
+    auto offChipLdsBaseOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.offChip.patchConstSize));
+    offChipLdsBaseOffset = builder.CreateAdd(offChipLdsBaseOffset, builder.getInt32(hwConfig.offChip.patchConstStart));
+
+    for (unsigned loc = 0; loc < inOutUsage.perPatchOutputMapLocCount; ++loc) {
+      if (builtInLocsNotToWrite.count(loc) > 0)
+        continue;
+
+      Type *outputTy = FixedVectorType::get(builder.getInt32Ty(), 4); // <4 x i32> for generic outputs
+      if (builtInLocsToTypes.count(loc) > 0)
+        outputTy = builtInLocsToTypes[loc]; // Built-in outputs have known types
+
+      const unsigned numComponents = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+
+      // ldsOffset = baseOffset + attribOffset
+      auto attribOffset = builder.getInt32(4 * loc);
+      auto onChipLdsOffset = builder.CreateAdd(onChipLdsBaseOffset, attribOffset);
+      auto output = readValueFromLds(outputTy, onChipLdsOffset);
+
+      auto offChipLdsOffset = builder.CreateAdd(offChipLdsBaseOffset, attribOffset);
+      offChipLdsOffset = builder.CreateMul(offChipLdsOffset, builder.getInt32(4)); // Convert to byte offset
+
+      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
+                              {output,                                             // vdata
+                               offChipLdsDesc,                                     // rsrc
+                               offChipLdsOffset,                                   // voffset
+                               offChipLdsBase,                                     // soffset
+                               builder.getInt32(bufferFormats[numComponents - 1]), // format
+                               builder.getInt32(coherent.u32All)});                // glc
+    }
   }
 }
 
@@ -419,10 +623,11 @@ void PreparePipelineAbi::addAbiMetadata(Module &module) {
 }
 
 // =====================================================================================================================
-// Handle the store of tessellation factors.
+// Handle the store of tessellation factors (TFs) and the store of HS outputs to off-chip LDS buffer if the patch is
+// valid (all of its outer TFs are greater than zero).
 //
 // @param entryPoint : Entry-point of tessellation control shader
-void PreparePipelineAbi::storeTessFactors(Function *entryPoint) {
+void PreparePipelineAbi::storeTessFactorsAndHsOutputs(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStage::TessControl); // Must be tessellation control shader
 
   if (m_pipelineState->canOptimizeTessFactor())
@@ -439,21 +644,26 @@ void PreparePipelineAbi::storeTessFactors(Function *entryPoint) {
   }
   assert(retInst); // Must have return instruction
 
-  IRBuilder<> builder(*m_context);
+  BuilderBase builder(*m_context);
   builder.SetInsertPoint(retInst);
 
   PipelineSystemValues pipelineSysValues;
   pipelineSysValues.initialize(m_pipelineState);
 
   const auto tfBufferDesc = pipelineSysValues.get(entryPoint)->getTessFactorBufDesc();
+  const auto offChipLdsDesc = pipelineSysValues.get(entryPoint)->getOffChipLdsDesc();
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::TessControl)->entryArgIdxs.tcs;
   const auto tfBufferBase = getFunctionArgument(entryPoint, entryArgIdxs.tfBufferBase);
+  const auto offChipLdsBase = getFunctionArgument(entryPoint, entryArgIdxs.offChipLdsBase);
   const auto relPatchId = pipelineSysValues.get(entryPoint)->getRelativeId();
+  const auto vertexIdx = pipelineSysValues.get(entryPoint)->getInvocationId();
 
   // Read back tessellation factors and write them to TF buffer
-  auto tessFactors = readTessFactors(m_pipelineState, relPatchId, builder);
-  writeTessFactors(m_pipelineState, tfBufferDesc, tfBufferBase, relPatchId, tessFactors.first, tessFactors.second,
-                   builder);
+  const auto &[outerTf, innerTf] = readTessFactors(m_pipelineState, relPatchId, builder);
+  writeTessFactors(m_pipelineState, tfBufferDesc, tfBufferBase, relPatchId, outerTf, innerTf, builder);
+
+  // Write HS outputs to off-chip LDS buffer
+  writeHsOutputs(m_pipelineState, offChipLdsDesc, offChipLdsBase, relPatchId, vertexIdx, outerTf, builder);
 
   pipelineSysValues.clear();
 }

@@ -266,6 +266,7 @@ Function *LowerMathConstFolding::getEntryPoint() {
 
 bool LowerMathPrecision::adjustExports(Module &module, bool disablePositionOpt) {
   bool changed = false;
+  ShaderStage preFragmentStage = getLastVertexProcessingStage();
   for (auto &func : module.functions()) {
     // Disable fast math for gl_Position.
     // TODO: This requires knowledge of the Builder implementation, which is not ideal.
@@ -291,13 +292,24 @@ bool LowerMathPrecision::adjustExports(Module &module, bool disablePositionOpt) 
         valueWritten = callInst->getOperand(0);
       }
 
-      if (valueWritten && builtIn == lgc::BuiltInPosition) {
+      if (valueWritten && builtIn == lgc::BuiltInPosition && m_shaderStage == preFragmentStage) {
         disableFastMath(valueWritten, disablePositionOpt);
         changed = true;
       }
     }
   }
   return changed;
+}
+
+Vkgc::ShaderStage LowerMathPrecision::getLastVertexProcessingStage() const {
+  auto stageMask = m_context->getShaderStageMask();
+  for (auto stage : {Vkgc::ShaderStageMesh, Vkgc::ShaderStageGeometry, Vkgc::ShaderStageTessEval,
+                     Vkgc::ShaderStageTessControl, Vkgc::ShaderStageVertex}) {
+    unsigned int stageBit = 1 << stage;
+    if (stageMask & stageBit)
+      return stage;
+  }
+  return Vkgc::ShaderStageInvalid;
 }
 
 static bool clearContractFlag(Instruction *inst) {
@@ -576,14 +588,15 @@ void LowerMathFloatOp::visitFPTruncInst(FPTruncInst &fptruncInst) {
     if (srcTy->getScalarType()->isDoubleTy() && destTy->getScalarType()->isHalfTy()) {
       // NOTE: double -> float16 conversion is done in backend compiler with RTE rounding. Thus, we have to split
       // it with two phases to disable such lowering if we need RTZ rounding.
+      IRBuilder<> builder(*m_context);
+      builder.SetInsertPoint(&fptruncInst);
       auto floatTy = srcTy->isVectorTy() ? FixedVectorType::get(Type::getFloatTy(*m_context),
                                                                 cast<FixedVectorType>(srcTy)->getNumElements())
                                          : Type::getFloatTy(*m_context);
-      auto floatValue = new FPTruncInst(src, floatTy, "", &fptruncInst);
-      auto dest = new FPTruncInst(floatValue, destTy, "", &fptruncInst);
+      auto floatValue = builder.CreateFPTrunc(src, floatTy);
+      auto dest = builder.CreateFPTrunc(floatValue, destTy);
 
       fptruncInst.replaceAllUsesWith(dest);
-      fptruncInst.dropAllReferences();
       fptruncInst.eraseFromParent();
 
       m_changed = true;

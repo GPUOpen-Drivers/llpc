@@ -30,8 +30,8 @@
  */
 #include "lgc/PassManager.h"
 #include "compilerutils/MbStandardInstrumentations.h"
+#include "lgc/Debug.h"
 #include "lgc/LgcContext.h"
-#include "lgc/util/Debug.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/PrintPasses.h"
 #include "llvm/IR/Verifier.h"
@@ -127,6 +127,7 @@ public:
   MbPassManagerImpl(TargetMachine *targetMachine);
   void registerPass(StringRef passName, StringRef className) override;
   void run(ModuleBunch &moduleBunch) override;
+  void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
   PassInstrumentationCallbacks &getInstrumentationCallbacks() override { return m_instrumentationCallbacks; }
   bool stopped() const override { return m_stopped; }
 
@@ -140,6 +141,7 @@ private:
   CGSCCAnalysisManager m_cgsccAnalysisManager;             // CGSCC analysis manager used when running the passes.
   PassInstrumentationCallbacks m_instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
   MbStandardInstrumentations m_instrumentationStandard;    // LLVM's Standard instrumentations
+  unsigned *m_passIndex = nullptr;                         // Pass Index.
   bool m_initialized = false;                              // Whether the pass manager is initialized or not
   bool m_stopped = false;
   std::string m_stopAfter;
@@ -373,9 +375,30 @@ void PassManagerImpl::registerCallbacks() {
 // Register LLPC's custom callbacks
 //
 void MbPassManagerImpl::registerCallbacks() {
+  auto beforePass = [this](StringRef passName, Any ir) {
+    if (passName != PrintModuleBunchPass::name() && passName != PrintModulePass::name() && m_passIndex) {
+      unsigned passIndex = (*m_passIndex)++;
+      if (cl::DumpPassName)
+        LLPC_OUTS("Pass[" << passIndex << "] = " << passName << "\n");
+    }
+  };
+  m_instrumentationCallbacks.registerBeforeSkippedPassCallback(beforePass);
+  m_instrumentationCallbacks.registerBeforeNonSkippedPassCallback(beforePass);
+
   m_instrumentationCallbacks.registerShouldRunOptionalPassCallback([this](StringRef className, Any ir) { // NOLINT
     if (m_stopped)
       return false;
+
+    // Check if the user disabled that specific pass index.
+    if (className != PrintModuleBunchPass::name() && className != PrintModulePass::name() && m_passIndex) {
+      unsigned passIndex = *m_passIndex;
+      for (auto disableIndex : cl::DisablePassIndices) {
+        if (disableIndex == passIndex) {
+          LLPC_OUTS("Pass[" << passIndex << "] = " << className << " (disabled)\n");
+          return false;
+        }
+      }
+    }
 
     StringRef passName = m_instrumentationCallbacks.getPassNameForClassName(className);
     if (!m_stopAfter.empty() && passName == m_stopAfter) {

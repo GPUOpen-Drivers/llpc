@@ -76,6 +76,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "cube.face.index";
   case BuilderOpcode::FpTruncWithRounding:
     return "fp.trunc.with.rounding";
+  case BuilderOpcode::Fp8Convert:
+    return "fp8.convert";
   case BuilderOpcode::QuantizeToFp16:
     return "quantize.to.fp16";
   case BuilderOpcode::SMod:
@@ -815,6 +817,18 @@ Value *Builder::CreateFpTruncWithRounding(Value *value, Type *destTy, RoundingMo
                                           const Twine &instName) {
   return record(BuilderOpcode::FpTruncWithRounding, destTy, {value, getInt32(static_cast<unsigned>(roundingMode))},
                 instName);
+}
+
+// =====================================================================================================================
+// The conversion between float8 and float32.
+//
+// @param value : Input value
+// @param destTy : Type to convert to
+// @param isBfloat : Whether float8 type is bfloat8
+// @param instName : Name to give instruction(s)
+llvm::Value *Builder::CreateFp8Convert(llvm::Value *value, llvm::Type *destTy, bool isBfloat /* = false*/,
+                                       const llvm::Twine &instName /* = ""*/) {
+  return record(BuilderOpcode::Fp8Convert, destTy, {value, getInt1(isBfloat)}, instName);
 }
 
 // =====================================================================================================================
@@ -2022,6 +2036,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::FDot2:
     case BuilderOpcode::Fma:
     case BuilderOpcode::FpTruncWithRounding:
+    case BuilderOpcode::Fp8Convert:
     case BuilderOpcode::Fract:
     case BuilderOpcode::GetDescPtr:
     case BuilderOpcode::GetDescStride:

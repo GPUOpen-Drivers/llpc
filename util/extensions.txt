@@ -49,3 +49,4 @@ SPV_KHR_maximal_reconvergence
 SPV_KHR_expect_assume
 SPV_KHR_shader_quad_control
 SPV_KHR_subgroup_rotate
+SPV_EXT_replicated_composites

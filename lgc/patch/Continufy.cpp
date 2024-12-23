@@ -198,7 +198,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
             tailArgs.push_back(retValue);
 
           builder.create<JumpOp>(fnPtr->getArg(1), getReturnedLevels(currentRtStage.value()), poisonI32 /* csp */,
-                                 poisonI32 /* rcr */, tailArgs);
+                                 poisonI32 /* shaderRecIdx */, poisonI32 /* rcr */, tailArgs);
         }
 
         builder.CreateUnreachable();

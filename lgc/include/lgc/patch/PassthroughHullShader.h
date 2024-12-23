@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  PassthroughHullShader.h
- * @brief LLPC header file: contains declaration of class lgc::TcsPassthroughShader.
+ * @brief LLPC header file: contains declaration of class lgc::PassthroughHullShader.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -38,17 +38,17 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to generate tessellation control pass-through shader
-class TcsPassthroughShader : public llvm::PassInfoMixin<TcsPassthroughShader> {
+class PassthroughHullShader : public llvm::PassInfoMixin<PassthroughHullShader> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Pass-through hull shader generation"; }
   void updatePipelineState(llvm::Module &module, PipelineState *pipelineState) const;
-  llvm::Function *generateTcsPassthroughShader(llvm::Module &module, PipelineShadersResult &pipelineShaders,
-                                               PipelineState *pipelineState);
+  llvm::Function *generatePassthroughHullShader(llvm::Module &module, PipelineShadersResult &pipelineShaders,
+                                                PipelineState *pipelineState);
   llvm::Function *generateTcsPassthroughEntryPoint(llvm::Module &module, PipelineState *pipelineState);
-  void generateTcsPassthroughShaderBody(llvm::Module &module, PipelineShadersResult &pipelineShaders,
-                                        PipelineState *pipelineState, llvm::Function *entryPoint);
+  void generatePassthroughHullShaderBody(llvm::Module &module, PipelineShadersResult &pipelineShaders,
+                                         PipelineState *pipelineState, llvm::Function *entryPoint);
 };
 
 } // namespace lgc

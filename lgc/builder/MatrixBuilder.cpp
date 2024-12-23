@@ -378,7 +378,9 @@ Type *BuilderCommon::transCooperativeMatrixElementType(CooperativeMatrixElementT
 //
 // @param elemType : the matrix element type
 // @param layout : the matrix layout
-Type *BuilderCommon::getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout) {
+// @param kSize : the matrix K size
+Type *BuilderCommon::getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                            unsigned kSize) {
   // Note: the layout currently has no influence on the type. In the long run, we should switch to genuinely opaque
   // types at the LGC level, and parameterize the type using both the element type and the layout.
 

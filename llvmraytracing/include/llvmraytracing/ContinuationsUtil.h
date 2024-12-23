@@ -86,8 +86,8 @@ const unsigned GlobalMaxHitAttributeBytes = 32;
 const unsigned MinimumContinuationStateBytes = 8;
 
 struct CpsArgIdx {
-  static constexpr uint32_t ReturnAddr = 0;
-  static constexpr uint32_t ShaderIndex = 1;
+  static constexpr uint32_t ShaderIndex = 0;
+  static constexpr uint32_t ReturnAddr = 1;
   static constexpr uint32_t SystemData = 2;
   static constexpr uint32_t HitAttributes = 3;
   static constexpr uint32_t Padding = 4;
@@ -95,8 +95,8 @@ struct CpsArgIdx {
 };
 
 struct CpsArgIdxWithStackPtr {
-  static constexpr uint32_t ReturnAddr = 0;
-  static constexpr uint32_t ShaderIndex = 1;
+  static constexpr uint32_t ShaderIndex = 0;
+  static constexpr uint32_t ReturnAddr = 1;
   static constexpr uint32_t CspInit = 2;
   static constexpr uint32_t SystemData = 3;
   static constexpr uint32_t HitAttributes = 4;
@@ -428,8 +428,6 @@ public:
 
   static void removeWaitMask(CallInst &CI) { CI.setMetadata(MDWaitMaskName, nullptr); }
 
-  static bool isLgcCpsModule(Module &Mod) { return Mod.getNamedMetadata(MDLgcCpsModuleName) != nullptr; }
-
   /// Returns true if a call to the given function should be rematerialized
   /// in a shader of the specified kind.
   ///
@@ -528,6 +526,7 @@ public:
 
 namespace ContDriverFunc {
 #define DRIVER_FUNC_NAME(KEY) constexpr const char *KEY##Name = "_cont_" #KEY;
+DRIVER_FUNC_NAME(DispatchRaysIndex3)
 DRIVER_FUNC_NAME(GetContinuationStackGlobalMemBase)
 DRIVER_FUNC_NAME(GetTriangleHitAttributes)
 DRIVER_FUNC_NAME(SetTriangleHitAttributes)
@@ -536,8 +535,6 @@ DRIVER_FUNC_NAME(GetCommittedState)
 DRIVER_FUNC_NAME(GetContinuationStackAddr)
 DRIVER_FUNC_NAME(ExitRayGen)
 DRIVER_FUNC_NAME(IsEndSearch)
-DRIVER_FUNC_NAME(GetLocalRootIndex)
-DRIVER_FUNC_NAME(SetLocalRootIndex)
 DRIVER_FUNC_NAME(TraceRay)
 DRIVER_FUNC_NAME(CallShader)
 DRIVER_FUNC_NAME(ReportHit)

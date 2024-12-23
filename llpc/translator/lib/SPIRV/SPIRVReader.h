@@ -77,6 +77,7 @@ enum class LayoutMode : uint8_t {
   Native = 1,   ///< Using native LLVM rules for in-memory layout
   Explicit = 2, ///< Using layout decorations(like offset) from SPIRV
   Std430 = 3,   ///< Using std430 layout rule
+  Scalar = 4,   ///< Using scalar layout
 };
 
 // Describe what parts of image/sampler descriptors are present.
@@ -336,7 +337,6 @@ private:
     SmallVector<llvm::Instruction *, 1> llvmInstructions;
   };
 
-  lgc::CooperativeMatrixElementType mapToBasicType(Type *const ltType);
   lgc::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
   lgc::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
                                                              lgc::CooperativeMatrixElementType elemTy, unsigned rows,
@@ -455,6 +455,10 @@ private:
 
   Value *ConvertingSamplerSelectLadderHelper(Value *result, Value *convertingSamplerIdx,
                                              const std::function<Value *(Value *)> &createImageOp);
+
+  bool isStorageClassExplicitlyLaidOut(SPIRVStorageClassKind storageClass);
+  bool isStorageClassScalarLayout(SPIRVStorageClassKind storageClass);
+  LayoutMode getLayoutModeForStorageClass(SPIRVStorageClassKind storageClass);
 
   bool hasSpirvType(SPIRVType *spvTy, spv::Op ty);
   Value *createTraceRayDialectOp(SPIRVValue *const spvValue);

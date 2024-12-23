@@ -56,6 +56,7 @@ enum BuilderOpcode : unsigned {
   CubeFaceCoord,
   CubeFaceIndex,
   FpTruncWithRounding,
+  Fp8Convert,
   QuantizeToFp16,
   SMod,
   FMod,

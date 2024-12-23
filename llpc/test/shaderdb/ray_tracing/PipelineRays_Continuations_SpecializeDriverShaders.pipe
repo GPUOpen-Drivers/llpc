@@ -192,8 +192,8 @@ entryPoint = main
 // For intersection, do not force the line to end with ARG_SLOTS, as intersection pessimistically preserves
 // payload VGPRs, and thus may see a larger number of args:
 // CHECK-NEXT: [SDS] [[ARG_SLOTS]]
-// Check that intersection pessimistically preserves 32 payload VGPRs:
-// CHECK-NEXT: [SDS] {{[CUDP]+}}PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP{{$}}
+// Check that at least 7 dwords at the end are preserved for the payload:
+// CHECK-NEXT: [SDS] {{[CUDP]+}}PPPPPPP{{$}}
 void main()
 {
     reportIntersectionEXT(0.5, 0u);

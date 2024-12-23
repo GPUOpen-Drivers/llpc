@@ -197,7 +197,7 @@ Value *ShaderSystemValues::getOffChipLdsDesc() {
   if (!m_offChipLdsDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
-    m_offChipLdsDesc = loadDescFromDriverTable(SiDrvTableHsBuffeR0Offs, builder);
+    m_offChipLdsDesc = loadDescFromDriverTable(SiDrvTableHsBufferOffs, builder);
   }
   return m_offChipLdsDesc;
 }
@@ -272,7 +272,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
 
       unsigned streamItemOffset = 0;
       for (int i = 0; i < streamId; ++i)
-        streamItemOffset += resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[i] *
+        streamItemOffset += resUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[i] *
                             m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices;
 
       // streamSize[streamId] = outLocCount[streamId] * 4 * sizeof(unsigned)
@@ -295,7 +295,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
 
       // Calculate and set stride in SRD dword1
       unsigned gsVsStride = m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices *
-                            resUsage->inOutUsage.gs.calcFactor.gsVsVertexItemSize[streamId] * 4;
+                            resUsage->inOutUsage.gs.hwConfig.gsVsVertexItemSize[streamId] * 4;
 
       SqBufRsrcWord1 strideSetValue = {};
       strideSetValue.bits.stride = gsVsStride;
@@ -352,7 +352,7 @@ Value *ShaderSystemValues::getTotalEmitCounterPtr() {
 // Get internal global table pointer as pointer to i8.
 Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
   if (!m_internalGlobalTablePtr) {
-    auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
+    auto ptrTy = PointerType::get(*m_context, ADDR_SPACE_CONST);
     // Global table is always the first function argument (separate shader) or the eighth function argument (merged
     // shader). And mesh shader is actually mapped to ES-GS merged shader.
     m_internalGlobalTablePtr = makePointer(
@@ -386,7 +386,7 @@ Value *ShaderSystemValues::getMeshPipeStatsBufPtr() {
     }
     assert(entryArgIdx != 0);
 
-    auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_GLOBAL);
+    auto ptrTy = PointerType::get(*m_context, ADDR_SPACE_GLOBAL);
     m_meshPipeStatsBufPtr =
         makePointer(getFunctionArgument(m_entryPoint, entryArgIdx, "meshPipeStatsBuf"), ptrTy, InvalidValue);
   }

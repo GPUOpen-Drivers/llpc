@@ -32,6 +32,8 @@
 
 #include "SPIRVInternal.h"
 #include "llpc.h"
+#include "compilerutils/ModuleBunch.h"
+#include "llvm/IR/PassManager.h"
 
 namespace llvm {
 
@@ -75,8 +77,25 @@ void getEntryPoints(llvm::Module *module, llvm::SmallVectorImpl<llvm::Function *
 
 // Clears the empty block
 llvm::BasicBlock *clearBlock(llvm::Function *func);
+
 // Clear non entry external functions
-void clearNonEntryFunctions(llvm::Module *module, llvm::StringRef entryName);
+bool clearNonEntryFunctions(llvm::Module *module, llvm::StringRef entryName);
+
+class ClearNonEntryFunctionsPass : public llvm::PassInfoMixin<ClearNonEntryFunctionsPass> {
+public:
+  ClearNonEntryFunctionsPass(llvm::StringRef entryName) : m_entryName(entryName) {}
+
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+
+private:
+  std::string m_entryName;
+};
+
+// Merge (link) all modules in a ModuleBunch into a single module.
+class MergeModulesPass : public llvm::PassInfoMixin<MergeModulesPass> {
+public:
+  llvm::PreservedAnalyses run(llvm::ModuleBunch &moduleBunch, llvm::ModuleBunchAnalysisManager &analysisManager);
+};
 
 // Get in/out meta data recursively.
 void decodeInOutMetaRecursively(llvm::Type *valueTy, llvm::Constant *mds, llvm::SmallVector<ShaderInOutMetadata> &out);

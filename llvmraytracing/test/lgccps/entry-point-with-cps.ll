@@ -15,7 +15,7 @@ define void @_cont_KernelEntry() #0 !lgc.rt.shaderstage !{i32 7} {
   unreachable
 }
 
-define spir_func void @raygen({} %state, i32 %rcr) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 0} {
+define spir_func void @raygen(i32 %levels, i32 %shaderIndex, i32 %rcr) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 0} {
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 0)
   %fn = load ptr, ptr addrspace(4) %pushconst
   %p8 = getelementptr i8, ptr addrspace(4) %pushconst, i32 8
@@ -25,26 +25,24 @@ define spir_func void @raygen({} %state, i32 %rcr) !lgc.shaderstage !{i32 7} !lg
 
   %cr.0 = ptrtoint ptr %fn to i32
   %cr.1 = or i32 %cr.0, 2
-  %r = call { [2 x i32] } (...) @lgc.cps.await__a2i32(i32 %cr.1, i32 4, i32 %x, ptr addrspace(1) %dst), !continuation.returnedRegistercount !{i32 0}
-  %res = extractvalue { [2 x i32] } %r, 0
-
-  store [2 x i32] %res, ptr addrspace(1) %dst
+  %r = call { i32, [2 x i32] } (...) @lgc.cps.await__i32_a2i32(i32 %cr.1, i32 4, i32 %x, ptr addrspace(1) %dst), !continuation.returnedRegistercount !{i32 0}
+  %r.ret = extractvalue { i32, [2 x i32] } %r, 1
+  store [2 x i32] %r.ret, ptr addrspace(1) %dst
 
   ; Note: RGS returns, meaning end of thread.
   call void @lgc.cps.complete()
   unreachable
 }
 
-define spir_func void @chs({} %state, i32 %rcr, i32 %x) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 1} {
+define spir_func void @chs(i32 %rcr, i32 %x) !lgc.shaderstage !{i32 7} !lgc.cps !{i32 1} {
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 24)
   %fn = load ptr, ptr addrspace(4) %pushconst
 
   %cr.0 = ptrtoint ptr %fn to i32
   %cr.1 = or i32 %cr.0, 1
   %y = call { i32 } (...) @lgc.cps.await__i32(i32 %cr.1, i32 2, i32 %x), !continuation.returnedRegistercount !{i32 0}
-  %res = extractvalue { i32 } %y, 0
-
-  call void (...) @lgc.cps.jump(i32 %rcr, i32 5, i32 %res, i32 poison, i32 poison)
+  %y.ret = extractvalue { i32 } %y, 0
+  call void (...) @lgc.cps.jump(i32 %rcr, i32 5, i32 poison, i32 poison, i32 poison, i32 %y.ret)
   unreachable
 }
 
@@ -60,7 +58,7 @@ main:
   %fn = load ptr, ptr addrspace(4) %pushconst
 
   %cr.0 = ptrtoint ptr %fn to i32
-  call void (...) @lgc.cps.jump(i32 %cr.0, i32 1, i32 5, i32 poison, i32 poison)
+  call void (...) @lgc.cps.jump(i32 %cr.0, i32 1, i32 poison, i32 5, i32 poison, i32 poison)
 
   br label %exit
 
@@ -74,7 +72,7 @@ declare ptr addrspace(4) @lgc.user.data(i32)
 declare <3 x i32> @lgc.shader.input.LocalInvocationId(i32)
 declare void @lgc.cps.await__isVoid(...)
 declare { i32 } @lgc.cps.await__i32(...)
-declare { [2 x i32] } @lgc.cps.await__a2i32(...)
+declare { i32, [2 x i32] } @lgc.cps.await__i32_a2i32(...)
 declare void @lgc.cps.jump(...)
 
 !continuation.stackAddrspace = !{!0}
@@ -88,7 +86,7 @@ declare void @lgc.cps.jump(...)
 ;
 ;
 ; CHECK-LABEL: define spir_func void @raygen(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], {} [[STATE:%.*]], i32 [[RCR:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.state [[META2]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[LEVELS:%.*]], i32 [[SHADERINDEX:%.*]], i32 [[RCR:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.state [[META2]] {
 ; CHECK-NEXT:  AllocaSpillBB:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -103,26 +101,27 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[TMP0:%.*]] = inttoptr i32 [[CR_1]] to ptr
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @raygen.resume.0)
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 4, i32 [[TMP2]], i32 [[TMP1]], i32 [[X]], ptr addrspace(1) [[DST]]), !continuation.returnedRegistercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 4, i32 [[TMP2]], i32 [[X]], i32 [[TMP1]], ptr addrspace(1) [[DST]]), !continuation.returnedRegistercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define dso_local void @raygen.resume.0(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], i32 [[TMP1:%.*]], [2 x i32] [[TMP2:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2]] !continuation [[META3]] !continuation.registercount [[META2]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], [2 x i32] [[TMP1:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2]] !continuation [[META3]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = insertvalue { [2 x i32] } poison, [2 x i32] [[TMP2]], 0
+; CHECK-NEXT:    [[TMP2:%.*]] = insertvalue { i32, [2 x i32] } poison, i32 [[TMP0]], 0
+; CHECK-NEXT:    [[TMP4:%.*]] = insertvalue { i32, [2 x i32] } [[TMP2]], [2 x i32] [[TMP1]], 1
 ; CHECK-NEXT:    [[PUSHCONST3:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 0)
 ; CHECK-NEXT:    [[P162:%.*]] = getelementptr i8, ptr addrspace(4) [[PUSHCONST3]], i32 16
 ; CHECK-NEXT:    [[DST1:%.*]] = load ptr addrspace(1), ptr addrspace(4) [[P162]], align 8
-; CHECK-NEXT:    [[RES1:%.*]] = extractvalue { [2 x i32] } [[TMP3]], 0
-; CHECK-NEXT:    store [2 x i32] [[RES1]], ptr addrspace(1) [[DST1]], align 4
+; CHECK-NEXT:    [[R_RET1:%.*]] = extractvalue { i32, [2 x i32] } [[TMP4]], 1
+; CHECK-NEXT:    store [2 x i32] [[R_RET1]], ptr addrspace(1) [[DST1]], align 4
 ; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define spir_func void @chs(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], {} [[STATE:%.*]], i32 [[RCR:%.*]], i32 [[X:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] !continuation.stacksize [[META6:![0-9]+]] !continuation.state [[META6]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[RCR:%.*]], i32 [[X:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] !continuation.stacksize [[META6:![0-9]+]] !continuation.state [[META6]] {
 ; CHECK-NEXT:  AllocaSpillBB:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -139,18 +138,18 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[TMP0:%.*]] = inttoptr i32 [[CR_1]] to ptr
 ; CHECK-NEXT:    [[TMP1:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @chs.resume.0)
 ; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 2, i32 [[TMP6]], i32 [[TMP1]], i32 [[X]]), !continuation.returnedRegistercount [[META2]]
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 2, i32 [[TMP6]], i32 [[X]], i32 [[TMP1]]), !continuation.returnedRegistercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; CHECK-LABEL: define dso_local void @chs.resume.0(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4]] !continuation [[META5]] !continuation.registercount [[META2]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4]] !continuation [[META5]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -8
-; CHECK-NEXT:    [[TMP10:%.*]] = insertvalue { i32 } poison, i32 [[TMP2]], 0
+; CHECK-NEXT:    [[TMP10:%.*]] = insertvalue { i32 } poison, i32 [[TMP0]], 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = inttoptr i32 [[TMP4]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP5]], i32 0
 ; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(5) [[TMP6]], align 4
@@ -159,7 +158,7 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[TMP8:%.*]] = add i32 [[TMP7]], -8
 ; CHECK-NEXT:    store i32 [[TMP8]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 5, i32 [[TMP9]], i32 poison, i32 poison)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 5, i32 [[TMP9]], i32 poison, i32 poison, i32 [[RES]])
 ; CHECK-NEXT:    unreachable
 ;
 ;
@@ -176,7 +175,7 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; CHECK-NEXT:    [[CR_0:%.*]] = ptrtoint ptr [[FN]] to i32
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_0]], i32 1, i32 [[TMP3]], i32 poison, i32 poison)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_0]], i32 1, i32 [[TMP3]], i32 5, i32 poison, i32 poison)
 ; CHECK-NEXT:    br label [[EXIT]]
 ; CHECK:       exit:
 ; CHECK-NEXT:    ret void
@@ -189,9 +188,9 @@ declare void @lgc.cps.jump(...)
 ;
 ;
 ; LOWER-AWAIT-LABEL: define spir_func { ptr, ptr } @raygen(
-; LOWER-AWAIT-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], ptr [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] {
+; LOWER-AWAIT-SAME: i32 [[LEVELS:%.*]], i32 [[SHADERINDEX:%.*]], i32 [[RCR:%.*]], ptr [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] {
 ; LOWER-AWAIT-NEXT:    [[TMP2:%.*]] = call token @llvm.coro.id.retcon(i32 8, i32 4, ptr [[TMP0]], ptr @continuation.prototype.raygen, ptr @continuation.malloc, ptr @continuation.free)
-; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin(token [[TMP2]], ptr null)
+; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin.custom.abi(token [[TMP2]], ptr null, i32 0)
 ; LOWER-AWAIT-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 0)
 ; LOWER-AWAIT-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; LOWER-AWAIT-NEXT:    [[P8:%.*]] = getelementptr i8, ptr addrspace(4) [[PUSHCONST]], i32 8
@@ -203,17 +202,17 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[CR_1]] to ptr
 ; LOWER-AWAIT-NEXT:    [[TMP5:%.*]] = call ptr [[TMP4]](i32 [[CR_1]], i32 4, i32 [[X]], ptr addrspace(1) [[DST]]), !continuation.returnedRegistercount [[META2]]
 ; LOWER-AWAIT-NEXT:    [[TMP6:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP5]])
-; LOWER-AWAIT-NEXT:    [[TMP8:%.*]] = call { [2 x i32] } @lgc.ilcps.getReturnValue__sl_a2i32s()
-; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = extractvalue { [2 x i32] } [[TMP8]], 0
+; LOWER-AWAIT-NEXT:    [[TMP8:%.*]] = call { i32, [2 x i32] } @lgc.ilcps.getReturnValue__sl_i32a2i32s()
+; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = extractvalue { i32, [2 x i32] } [[TMP8]], 1
 ; LOWER-AWAIT-NEXT:    store [2 x i32] [[TMP7]], ptr addrspace(1) [[DST]], align 4
 ; LOWER-AWAIT-NEXT:    call void @lgc.cps.complete()
 ; LOWER-AWAIT-NEXT:    unreachable
 ;
 ;
 ; LOWER-AWAIT-LABEL: define spir_func { ptr, ptr } @chs(
-; LOWER-AWAIT-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], i32 [[X:%.*]], ptr [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] {
+; LOWER-AWAIT-SAME: i32 [[RCR:%.*]], i32 [[X:%.*]], ptr [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] {
 ; LOWER-AWAIT-NEXT:    [[TMP2:%.*]] = call token @llvm.coro.id.retcon(i32 8, i32 4, ptr [[TMP0]], ptr @continuation.prototype.chs, ptr @continuation.malloc, ptr @continuation.free)
-; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin(token [[TMP2]], ptr null)
+; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin.custom.abi(token [[TMP2]], ptr null, i32 0)
 ; LOWER-AWAIT-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 24)
 ; LOWER-AWAIT-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; LOWER-AWAIT-NEXT:    [[CR_0:%.*]] = ptrtoint ptr [[FN]] to i32
@@ -223,7 +222,7 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[TMP6:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TMP5]])
 ; LOWER-AWAIT-NEXT:    [[TMP8:%.*]] = call { i32 } @lgc.ilcps.getReturnValue__sl_i32s()
 ; LOWER-AWAIT-NEXT:    [[TMP7:%.*]] = extractvalue { i32 } [[TMP8]], 0
-; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 5, i32 [[TMP7]], i32 poison, i32 poison)
+; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR]], i32 5, i32 poison, i32 poison, i32 poison, i32 [[TMP7]])
 ; LOWER-AWAIT-NEXT:    unreachable
 ;
 ;
@@ -238,7 +237,7 @@ declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 32)
 ; LOWER-AWAIT-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; LOWER-AWAIT-NEXT:    [[CR_0:%.*]] = ptrtoint ptr [[FN]] to i32
-; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_0]], i32 1, i32 5, i32 poison, i32 poison)
+; LOWER-AWAIT-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_0]], i32 1, i32 poison, i32 5, i32 poison, i32 poison)
 ; LOWER-AWAIT-NEXT:    br label [[EXIT]]
 ; LOWER-AWAIT:       exit:
 ; LOWER-AWAIT-NEXT:    call void @lgc.cps.complete()

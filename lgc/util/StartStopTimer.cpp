@@ -102,7 +102,7 @@ ModulePass *LgcContext::createStartStopTimer(Timer *timer, bool starting) {
 // @param passMgr : Pass manager to add the pass to
 // @param timer : The timer to start or stop when the pass is run
 // @param starting : True to start the timer, false to stop it
-void LgcContext::createAndAddStartStopTimer(lgc::PassManager &passMgr, Timer *timer, bool starting) {
+void LgcContext::createAndAddStartStopTimer(ModulePassManager &passMgr, Timer *timer, bool starting) {
   passMgr.addPass(StartStopTimer(timer, starting));
 }
 

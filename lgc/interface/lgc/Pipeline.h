@@ -129,7 +129,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[46];
+  unsigned u32All[48];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -205,6 +205,9 @@ union Options {
                                  // eliminating it if the write value is 1.0.
     bool enableMapClipDistMask;  // For OGL only, whether to remap the clip distances.
     unsigned clipPlaneMask;      // For OGL only, defines the bitmask for enabling/disabling clip planes.
+    unsigned reserved24;
+    bool checkRawBufferAccessDescStride; // Check descriptor stride to workaround an issue that a strided buffer desc is
+                                         // used for a raw buffer access instruction.
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -327,6 +330,9 @@ union ShaderOptions {
     /// Specifies that any shader input variables decorated as ViewIndex
     /// will be assigned values as if they were decorated as DeviceIndex.
     bool viewIndexFromDeviceIndex;
+
+    /// Force underflow prevention for log and pow
+    bool forceUnderflowPrevention;
   };
 };
 static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));

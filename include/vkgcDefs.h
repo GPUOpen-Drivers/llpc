@@ -76,7 +76,7 @@
 namespace Vkgc {
 
 static const unsigned Version = LLPC_INTERFACE_MAJOR_VERSION;
-static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
+static const unsigned InternalDescriptorSetId = 0xFFFFFFF0;
 static const unsigned MaxVertexAttribs = 64;
 static const unsigned MaxVertexBindings = 64;
 static const unsigned MaxColorTargets = 8;
@@ -541,6 +541,7 @@ struct PipelineOptions {
   bool optimizePointSizeWrite;        ///< If set, the write of PointSize in the last vertex processing stage will be
                                       ///< eliminated if the write value is 1.0.
   CompileConstInfo *compileConstInfo; ///< Compile time constant data.
+  unsigned reserved22;
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -939,6 +940,15 @@ struct PipelineShaderOptions {
 
   /// Indicate whether the vertex shader is used by transform pipeline
   bool enableTransformShader;
+
+  /// Application workaround: force underflow prevention for log and pow calls
+  /// usually required for shaders that are intolerant of this when valid math
+  /// optimisations are applied.
+  bool forceUnderflowPrevention;
+
+  /// Force scope for memory barrier (0 - do not force, nonzero - value of Scope enumeration from SPIR-V headers with
+  /// the exception of CrossDevice that cannot be set at all).
+  unsigned forceMemoryBarrierScope;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1050,7 +1060,12 @@ constexpr unsigned UberFetchShaderAttribMaskComponent2 = 0x0040000u;
 constexpr unsigned UberFetchShaderAttribMaskComponent3 = 0x0080000u;
 constexpr unsigned UberFetchShaderAttribMaskIsBgra = 0x0100000u;
 
-/// Represents the bit field info of struct BilUberFetchShaderAttribInfo
+// OpenGL internal vertex input rate
+enum VKInternalVertexInputRate {
+  VK_VERTEX_INPUT_RATE_PER_DRAW_PER_VERTEX = 0x10,   // Vertex input rate per draw and per vertex
+  VK_VERTEX_INPUT_RATE_PER_DRAW_PER_INSTANCE = 0x11, // Vertex input rate per draw and per instance
+  VK_VERTEX_INPUT_RATE_PER_DRAW = 0x12,              // Vertex input rate per draw
+};
 
 // OpenGL extended vertex attribute format
 typedef enum VKInternalExtFormat {
@@ -1430,6 +1445,8 @@ struct ComputePipelineBuildInfo {
   const void *pClientMetadata;     ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;       ///< Size (in bytes) of the client-defined data
   UniformConstantMap *pUniformMap; ///< Pointer to the uniform constants map
+  GraphicsPipelineBuildInfo *transformGraphicsPipeline; ///< For OpenGL: Graphics pipeline build info holding a vertex
+                                                        ///< shader that can be invoked by the compute shader
 };
 
 /// Represents output of building a ray tracing pipeline.
@@ -1466,15 +1483,23 @@ struct RayTracingPipelineBuildInfo {
   unsigned pipelineLibStageMask; ///< Pipeline library stage mask
   //@}
 
-  unsigned payloadSizeMaxInLib;   ///< Pipeline library maxPayloadSize
-  unsigned attributeSizeMaxInLib; ///< Pipeline library maxAttributeSize
-  bool isReplay;                  ///< Pipeline is created for replaying
-  const void *pClientMetadata;    ///< Pointer to (optional) client-defined data to be
-                                  ///  stored inside the ELF
-  size_t clientMetadataSize;      ///< Size (in bytes) of the client-defined data
-  unsigned cpsFlags;              ///< Cps feature flags
-  GpurtOption *pGpurtOptions;     ///< Array of GPURT options
-  unsigned gpurtOptionCount;      ///< Number of GPURT options
+  unsigned payloadSizeMaxInLib;     ///< Pipeline library maxPayloadSize
+  unsigned attributeSizeMaxInLib;   ///< Pipeline library maxAttributeSize
+  bool isReplay;                    ///< Pipeline is created for replaying
+  const void *pClientMetadata;      ///< Pointer to (optional) client-defined data to be
+                                    ///  stored inside the ELF
+  size_t clientMetadataSize;        ///< Size (in bytes) of the client-defined data
+  unsigned cpsFlags;                ///< Cps feature flags
+  GpurtOption *pGpurtOptions;       ///< Array of GPURT options
+  unsigned gpurtOptionCount;        ///< Number of GPURT options
+  bool rtIgnoreDeclaredPayloadSize; ///< Ignore the declared payload size in the shader to address issues with Proton.
+                                    ///  Proton games pass a dynamic maxPipelineRayPayloadSize into the API.
+                                    ///  This dynamic size is used by the pipeline instead of the declared payload size
+                                    ///  in the shader, it may be smaller than the declared size.
+                                    ///  This behavior of Proton is incorrect according to the latest clarification in
+                                    ///  the vulkan spec https://gitlab.khronos.org/vulkan/vulkan/-/issues/4080
+                                    ///  However, we need to support this incorrect behavior for Proton before Proton
+                                    ///  fixes it.
 };
 
 /// Ray tracing max shader name length

@@ -16,9 +16,9 @@ void main(void)
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call void @lgc.output.export.xfb{{.*}}v3f32
+; SHADERTEST: call void (...) @lgc.write.xfb.output({{.*}}<3 x float>
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v3f32
-; SHADERTEST: call void @lgc.output.export.xfb{{.*}}v2f32
+; SHADERTEST: call void (...) @lgc.write.xfb.output({{.*}}<2 x float>
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v2f32
 ; SHADERTEST: AMDLLPC SUCCESS
 */

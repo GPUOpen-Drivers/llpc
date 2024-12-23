@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  FragmentColorExport.cpp
- * @brief LLPC source file: contains implementation of class lgc::FragColorExport.
+ * @brief LLPC source file: contains implementation of class lgc::FragmentColorExport.
  ***********************************************************************************************************************
  */
 #include "lgc/patch/FragmentColorExport.h"
@@ -56,11 +56,11 @@ namespace lgc {
 //
 // @param context : LLVM context
 // @param pipelineState : Pipeline state
-FragColorExport::FragColorExport(LgcContext *context) : m_lgcContext(context) {
+FragmentColorExport::FragmentColorExport(LgcContext *context) : m_lgcContext(context) {
 }
 
 // =====================================================================================================================
-LowerFragColorExport::LowerFragColorExport() : m_exportValues(MaxColorTargets + 1, nullptr) {
+LowerFragmentColorExport::LowerFragmentColorExport() : m_exportValues(MaxColorTargets + 1, nullptr) {
 }
 
 // =====================================================================================================================
@@ -95,9 +95,9 @@ static void extractElements(Value *input, BuilderBase &builder, std::array<Value
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
 // @param isDualSource: If it's under dualSourceBlend, it should be true
-Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorExport, BuilderBase &builder,
-                                                      ExportFormat expFmt, const bool signedness,
-                                                      const bool isDualSource) {
+Value *FragmentColorExport::handleColorExportInstructions(Value *output, unsigned hwColorExport, BuilderBase &builder,
+                                                          ExportFormat expFmt, const bool signedness,
+                                                          const bool isDualSource) {
   assert(expFmt != EXP_FORMAT_ZERO);
 
   Type *outputTy = output->getType();
@@ -298,7 +298,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 // @param value : Output value
 // @param signedness : Whether the type is signed (valid for integer type)
 // @param builder : The IR builder for inserting instructions
-Value *FragColorExport::convertToHalf(Value *value, bool signedness, BuilderBase &builder) const {
+Value *FragmentColorExport::convertToHalf(Value *value, bool signedness, BuilderBase &builder) const {
   Type *valueTy = value->getType();
   unsigned numElements = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
   const unsigned bitWidth = valueTy->getScalarSizeInBits();
@@ -331,7 +331,7 @@ Value *FragColorExport::convertToHalf(Value *value, bool signedness, BuilderBase
 // @param value : Output value
 // @param signedness : Whether the type is signed (valid for integer type)
 // @param builder : The IR builder for inserting instructions
-Value *FragColorExport::convertToFloat(Value *value, bool signedness, BuilderBase &builder) const {
+Value *FragmentColorExport::convertToFloat(Value *value, bool signedness, BuilderBase &builder) const {
   Type *valueTy = value->getType();
   const unsigned bitWidth = valueTy->getScalarSizeInBits();
   unsigned numElements = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
@@ -376,7 +376,7 @@ Value *FragColorExport::convertToFloat(Value *value, bool signedness, BuilderBas
 // @param value : Output component value
 // @param signedness : Whether the type is signed (valid for integer type)
 // @param builder : The IR builder for inserting instructions
-Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase &builder) const {
+Value *FragmentColorExport::convertToInt(Value *value, bool signedness, BuilderBase &builder) const {
   Type *valueTy = value->getType();
   const unsigned bitWidth = valueTy->getScalarSizeInBits();
   unsigned numElements = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
@@ -419,7 +419,7 @@ Value *FragColorExport::convertToInt(Value *value, bool signedness, BuilderBase 
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses LowerFragmentColorExport::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
 
@@ -487,10 +487,10 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
     return PreservedAnalyses::none();
   }
 
-  FragColorExport fragColorExport(m_pipelineState->getLgcContext());
+  FragmentColorExport fragColorExport(m_pipelineState->getLgcContext());
   bool dummyExport = m_resUsage->builtInUsage.fs.discard || m_pipelineState->getOptions().forceFragColorDummyExport ||
                      m_pipelineState->getShaderModes()->getFragmentShaderMode().enablePops;
-  FragColorExport::Key key = FragColorExport::computeKey(m_info, m_pipelineState);
+  FragmentColorExport::Key key = FragmentColorExport::computeKey(m_info, m_pipelineState);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
                                              builder, dynamicIsDualSource, key);
   return (!m_info.empty() || dummyExport) ? PreservedAnalyses::none() : PreservedAnalyses::all();
@@ -502,8 +502,8 @@ PreservedAnalyses LowerFragColorExport::run(Module &module, ModuleAnalysisManage
 // @param callInst : An call to the generic output export builtin in a fragment shader.
 // @param [in/out] outFragColors : An array with the current color output information for each color output location.
 // @param builder : builder to use
-void LowerFragColorExport::updateFragColors(CallInst *callInst, MutableArrayRef<ColorOutputValueInfo> outFragColors,
-                                            BuilderBase &builder) {
+void LowerFragmentColorExport::updateFragColors(CallInst *callInst, MutableArrayRef<ColorOutputValueInfo> outFragColors,
+                                                BuilderBase &builder) {
   Value *output = callInst->getOperand(2);
   if (isa<UndefValue>(output))
     return;
@@ -539,8 +539,8 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, MutableArrayRef<
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
-  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(m_pipelineState->getLgcContext()));
+void LowerFragmentColorExport::collectExportInfoForGenericOutputs(Function *fragEntryPoint, BuilderBase &builder) {
+  std::unique_ptr<FragmentColorExport> fragColorExport(new FragmentColorExport(m_pipelineState->getLgcContext()));
   SmallVector<CallInst *, 8> colorExports;
 
   // Collect all of the exports in the fragment shader
@@ -607,7 +607,7 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase &builder, Value *isDualSource) {
+void LowerFragmentColorExport::createTailJump(Function *fragEntryPoint, BuilderBase &builder, Value *isDualSource) {
   // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
   // color format in the metadata.
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
@@ -639,14 +639,13 @@ void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase 
 
   if (m_pipelineState->getOptions().enableColorExportShader) {
     // Build color export function type
-    auto funcTy = FunctionType::get(builder.getVoidTy(), outputTypes, false);
-    // Convert color export shader address to function pointer
-    auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
+    auto funcTyPtr = builder.getPtrTy(ADDR_SPACE_CONST);
     auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
     AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
     auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
     // Jump
+    auto funcTy = FunctionType::get(builder.getVoidTy(), outputTypes, false);
     auto callInst = builder.CreateCall(funcTy, funcPtr, cesArgs);
     callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
     callInst->addParamAttr(returnLocation, Attribute::InReg);
@@ -671,7 +670,7 @@ void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase 
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, BuilderBase &builder) {
+void LowerFragmentColorExport::collectExportInfoForBuiltinOutput(Function *module, BuilderBase &builder) {
   // Collect calls to the builtins
   Value *m_fragDepth = nullptr;
   Value *m_fragStencilRef = nullptr;
@@ -763,7 +762,7 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
 //
 // @param [in/out] exportInst : The export instruction to be updated.
 // @param builder : The builder object that will be used to create new instructions.
-void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
+void FragmentColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
   if (!exportInst)
     return;
 
@@ -784,7 +783,7 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
 // Swizzle the output to MRT0/MRT1 for dual source blend on GFX11+, and return the last export instruction.
 //
 // @param builder : The builder object that will be used to create new instructions.
-Value *FragColorExport::dualSourceSwizzle(unsigned waveSize, BuilderBase &builder) {
+Value *FragmentColorExport::dualSourceSwizzle(unsigned waveSize, BuilderBase &builder) {
   Value *result0[4], *result1[4];
   auto undefFloat = PoisonValue::get(builder.getFloatTy());
 
@@ -865,9 +864,11 @@ Value *FragColorExport::dualSourceSwizzle(unsigned waveSize, BuilderBase &builde
 // @param needMrt0a: The flag to tell MRT0.a is required.
 // @param pCbShaderMask: The cbShaderMask after update color export information
 // @param [out] outExpinfo : The updated color export information when enableFragColor is true.
-void FragColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key, ArrayRef<ColorExportInfo> originExpinfo,
-                                                             bool needMrt0a, SmallVector<ColorExportInfo> &outExpinfo,
-                                                             unsigned *pCbShaderMask) {
+void FragmentColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key,
+                                                                 ArrayRef<ColorExportInfo> originExpinfo,
+                                                                 bool needMrt0a,
+                                                                 SmallVector<ColorExportInfo> &outExpinfo,
+                                                                 unsigned *pCbShaderMask) {
   // As enableFragColor will only be enabled by OGL, so it will not consider on the dualSource cases.
   SmallVector<ColorExportInfo> broadCastInfo;
   if (key.enableFragColor) {
@@ -904,9 +905,9 @@ void FragColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key, Arr
 // @param builder : The builder object that will be used to create new instructions.
 // @param dynamicIsDualSource: Identify whether it's in dynamicDualSourceBlend state
 // @param key: Color export Info
-void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info, ArrayRef<Value *> values,
-                                                 bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
-                                                 Value *dynamicIsDualSource, const Key &key) {
+void FragmentColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info, ArrayRef<Value *> values,
+                                                     bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
+                                                     Value *dynamicIsDualSource, const Key &key) {
   Value *lastExport = nullptr;
   unsigned gfxip = m_lgcContext->getTargetInfo().getGfxIpVersion().major;
 
@@ -1016,7 +1017,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
 
     if (m_blendSourceChannels > 0) {
       lastExport = dualSourceSwizzle(key.waveSize, builder);
-      FragColorExport::setDoneFlag(lastExport, builder);
+      FragmentColorExport::setDoneFlag(lastExport, builder);
     }
     builder.CreateRetVoid();
   }
@@ -1075,7 +1076,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
       }
     }
     if (lastExport)
-      FragColorExport::setDoneFlag(lastExport, builder);
+      FragmentColorExport::setDoneFlag(lastExport, builder);
     builder.CreateRetVoid();
   }
 
@@ -1093,7 +1094,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
 // @param value : The value to be modified.
 // @param outputTy : The type that the value should be converted to.
 // @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::generateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder) {
+Value *LowerFragmentColorExport::generateValueForOutput(Value *value, Type *outputTy, BuilderBase &builder) {
   unsigned originalSize = value->getType()->getPrimitiveSizeInBits();
   unsigned finalSize = outputTy->getPrimitiveSizeInBits();
   if (originalSize < finalSize) {
@@ -1117,8 +1118,8 @@ Value *LowerFragColorExport::generateValueForOutput(Value *value, Type *outputTy
 // @param [in/out] module : The LLVM module in which to add the shader.
 // @param pipelineState : Pipeline state.
 // @returns : the entry point for the null fragment shader.
-Function *FragColorExport::generateNullFragmentShader(Module &module, PipelineState *pipelineState,
-                                                      StringRef entryPointName) {
+Function *FragmentColorExport::generateNullFragmentShader(Module &module, PipelineState *pipelineState,
+                                                          StringRef entryPointName) {
   Function *entryPoint = generateNullFragmentEntryPoint(module, pipelineState, entryPointName);
   generateNullFragmentShaderBody(entryPoint);
   return entryPoint;
@@ -1130,8 +1131,8 @@ Function *FragColorExport::generateNullFragmentShader(Module &module, PipelineSt
 // @param [in/out] module : The LLVM module in which to add the entry point.
 // @param pipelineState : Pipeline state.
 // @returns : The new entry point.
-Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, PipelineState *pipelineState,
-                                                          StringRef entryPointName) {
+Function *FragmentColorExport::generateNullFragmentEntryPoint(Module &module, PipelineState *pipelineState,
+                                                              StringRef entryPointName) {
   FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, entryPointName, &module);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
@@ -1146,7 +1147,7 @@ Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, Pipeli
 // Generate the body of the null fragment shader.
 //
 // @param [in/out] entryPoint : The function in which the code will be inserted.
-void FragColorExport::generateNullFragmentShaderBody(llvm::Function *entryPoint) {
+void FragmentColorExport::generateNullFragmentShaderBody(llvm::Function *entryPoint) {
   BasicBlock *block = BasicBlock::Create(entryPoint->getContext(), "", entryPoint);
   BuilderBase builder(block);
   builder.CreateRetVoid();
@@ -1158,8 +1159,9 @@ void FragColorExport::generateNullFragmentShaderBody(llvm::Function *entryPoint)
 // @param info : The color export information for each color export in no particular order.
 // @param pipelineState : Pipeline state
 // @returns : Color export info.
-FragColorExport::Key FragColorExport::computeKey(ArrayRef<ColorExportInfo> infos, PipelineState *pipelineState) {
-  FragColorExport::Key key = {};
+FragmentColorExport::Key FragmentColorExport::computeKey(ArrayRef<ColorExportInfo> infos,
+                                                         PipelineState *pipelineState) {
+  FragmentColorExport::Key key = {};
   key.enableFragColor = pipelineState->getOptions().enableFragColor;
   key.colorExportState = pipelineState->getColorExportState();
   key.waveSize = pipelineState->getShaderWaveSize(ShaderStage::Fragment);

@@ -30,8 +30,6 @@
  */
 #pragma once
 
-#include "lgc/util/Internal.h"
-#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
@@ -45,19 +43,11 @@ namespace lgc {
 //
 // - Change log2 ( const +/- x ) -> log2 ( max ( 0.0, const +/- x ) ) to avoid application underflow.
 //
-class PeepholeOptimization final : public llvm::InstVisitor<PeepholeOptimization>,
-                                   public llvm::PassInfoMixin<PeepholeOptimization> {
+class PeepholeOptimization final : public llvm::PassInfoMixin<PeepholeOptimization> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Peephole optimizations"; }
-
-  void visitIntToPtr(llvm::IntToPtrInst &intToPtr);
-  void visitCallInst(llvm::CallInst &callInst);
-
-private:
-  bool m_changed;
-  llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
 };
 
 } // namespace lgc
