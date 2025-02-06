@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -36,14 +36,14 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations for removing the instruction metadata.
+// Represents the pass of FE lowering operations for removing the instruction metadata.
 class LowerInstMetaRemove : public SpirvLower, public llvm::PassInfoMixin<LowerInstMetaRemove> {
 public:
   LowerInstMetaRemove();
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V instruction metadata by removing those targeted"; }
+  static llvm::StringRef name() { return "Lower instruction metadata by removing those targeted"; }
 };
 
 } // namespace Llpc

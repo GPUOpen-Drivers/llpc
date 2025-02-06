@@ -13,7 +13,7 @@ declare !pointeetys !{%struct.DispatchSystemData poison} void @_cont_DispatchRay
 
 define void @main() !lgc.rt.shaderstage !10 {
 ; CHECK-LABEL: define void @main(
-; CHECK-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META6:![0-9]+]] {
+; CHECK-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [8 x i32] [[PADDING:%.*]], [30 x i32] [[PAYLOAD:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !continuation [[META7:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [30 x i32], align 4
@@ -63,5 +63,6 @@ entry:
 ; CHECK: [[META0]] = !{i32 30}
 ; CHECK: [[META4]] = !{%struct.DispatchSystemData poison}
 ; CHECK: [[META5]] = !{i32 1}
-; CHECK: [[META6]] = !{ptr @main}
+; CHECK: [[META6]] = !{i32 5}
+; CHECK: [[META7]] = !{ptr @main}
 ;.

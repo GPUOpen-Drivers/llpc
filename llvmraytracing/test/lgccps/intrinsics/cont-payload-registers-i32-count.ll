@@ -14,14 +14,14 @@ declare i32 @_AmdContPayloadRegistersI32Count()
 
 @debug_global = external global i32
 
-define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal(ptr addrspace(5) %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !3 {
+define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal({ i32 } %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !3 {
 ; CHECK-LABEL: define dso_local spir_func void @_cont_Traversal(
-; CHECK-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { { i32 } } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [41 x i32] [[PADDING:%.*]], [11 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META4:![0-9]+]] !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META1:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation [[META7:![0-9]+]] {
+; CHECK-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [41 x i32] [[PADDING:%.*]], [11 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META4:![0-9]+]] !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META1:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation [[META7:![0-9]+]] {
 ; CHECK-NEXT:  .entry:
-; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { { i32 } }, align 8, addrspace(5)
+; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [11 x i32], align 4
 ; CHECK-NEXT:    store [11 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-NEXT:    store { { i32 } } [[SYSTEM_DATA]], ptr addrspace(5) [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    store { i32 } [[SYSTEM_DATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    store i32 11, ptr @debug_global, align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = load [11 x i32], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 4, i32 -1, i32 poison, i32 poison, i32 5, [42 x i32] poison, [11 x i32] [[TMP0]]), !continuation.registercount [[META1]]
@@ -36,7 +36,6 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 
 declare void @lgc.cps.jump(...) local_unnamed_addr
 
-!lgc.cps.module = !{}
 !continuation.maxPayloadRegisterCount = !{!11}
 !continuation.maxUsedPayloadRegisterCount = !{!12}
 

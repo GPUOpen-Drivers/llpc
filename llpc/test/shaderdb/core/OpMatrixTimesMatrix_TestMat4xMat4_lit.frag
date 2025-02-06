@@ -28,10 +28,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: [4 x <4 x float>] (...) @lgc.create.matrix.times.matrix.a4v4f32
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: fmul {{.*}}contract {{.*}}float
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: fmul {{.*}}float %{{[^, ]*}}, %{{[^, ]*}}
 ; SHADERTEST: fadd {{.*}}float %{{[^, ]*}}, %{{[^, ]*}}
 

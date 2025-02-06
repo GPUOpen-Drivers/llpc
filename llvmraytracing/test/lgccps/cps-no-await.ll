@@ -9,8 +9,6 @@ define void @_cont_Traversal() !lgc.cps !{i32 2} !continuation !{ptr @_cont_Trav
   unreachable
 }
 
-!lgc.cps.module = !{}
-
 declare ptr addrspace(4) @lgc.user.data(i32)
 declare void @lgc.cps.jump(...)
 ; LOWER-AWAIT-LABEL: define { ptr, ptr } @_cont_Traversal(

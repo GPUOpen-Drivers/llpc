@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -38,7 +38,7 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// SPIR-V lowering operations for math transformation.
+// FE lowering operations for math transformation.
 class LowerMath : public SpirvLower {
 public:
   LowerMath();
@@ -55,13 +55,13 @@ protected:
 };
 
 // =====================================================================================================================
-// SPIR-V lowering operations for math constant folding.
+// FE lowering operations for math constant folding.
 class LowerMathConstFolding : public LowerMath, public llvm::PassInfoMixin<LowerMathConstFolding> {
 
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V math constant folding"; }
+  static llvm::StringRef name() { return "Lower math constant folding"; }
 
   // NOTE: This function is only used by the legacy pass manager wrapper class to retrieve the
   // entry point. The function can be removed once the switch to the new pass manager is completed.
@@ -69,13 +69,13 @@ public:
 };
 
 // =====================================================================================================================
-// SPIR-V lowering operations to adjust fast math flags.
+// FE lowering operations to adjust fast math flags.
 class LowerMathPrecision : public SpirvLower, public llvm::PassInfoMixin<LowerMathPrecision> {
 
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V for precision (fast math flags)"; }
+  static llvm::StringRef name() { return "Lower math precision (fast math flags)"; }
 
   bool adjustExports(llvm::Module &module, bool clearAll);
   bool propagateNoContract(llvm::Module &module, bool forward, bool backward);
@@ -83,7 +83,7 @@ public:
 };
 
 // =====================================================================================================================
-// SPIR-V lowering operations for math floating point optimisation.
+// FE lowering operations for math FP operations.
 class LowerMathFloatOp : public LowerMath,
                          public llvm::PassInfoMixin<LowerMathFloatOp>,
                          public llvm::InstVisitor<LowerMathFloatOp> {
@@ -93,7 +93,7 @@ public:
   virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
   virtual void visitCallInst(llvm::CallInst &callInst);
   virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
-  static llvm::StringRef name() { return "Lower SPIR-V math floating point optimisation"; }
+  static llvm::StringRef name() { return "Lower math FP operations"; }
 };
 
 } // namespace Llpc

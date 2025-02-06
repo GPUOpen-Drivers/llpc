@@ -1,9 +1,9 @@
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call void (...) @lgc.create.demote.to.helper.invocation()
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.wqm.demote(i1 false)
 ; SHADERTEST: AMDLLPC SUCCESS
 */

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -139,13 +139,8 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
   if (m_sections[SectionTypeVertexInputState].size() > 0) {
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])->getSubState(m_vertexInputState);
     m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
-    reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])
-        ->getvbAddressLowBits(m_pipelineState.gfxPipelineInfo.vbAddressLowBits);
-#else
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])
         ->getvbAddressLowBits(m_pipelineState.gfxPipelineInfo.glState.vbAddressLowBits);
-#endif
   }
 
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||

@@ -40,7 +40,7 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> @llvm.log2.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.sqrt.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.inverse.sqrt.v3f16(<3 x half>
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

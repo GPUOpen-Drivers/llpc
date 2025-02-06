@@ -19,7 +19,7 @@ void main()
 // BEGIN_SHADERTEST
 //
 // RUN: amdllpc -vgpr-limit=64 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-// SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+// SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 // SHADERTEST: call i32 @llvm.amdgcn.waterfall.begin.i32
 // SHADERTEST-NOT: call i32 @llvm.amdgcn.waterfall.begin.i32
 // SHADERTEST: call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32

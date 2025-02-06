@@ -16,7 +16,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: load <3 x i32>,
 
 ; SHADERTEST: AMDLLPC SUCCESS

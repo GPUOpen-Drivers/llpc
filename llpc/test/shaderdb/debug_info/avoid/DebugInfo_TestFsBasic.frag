@@ -40,7 +40,7 @@ void main()
 ; SHADERTEST: [[D3]] = !{i32 4}
 ; SHADERTEST: [[D4]] = !DILocation(line: 11, scope: [[D12]])
 ; SHADERTEST: [[D15:![0-9]*]] = !DILocation(line: 12, scope: [[D12]])
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -44,12 +44,12 @@ using namespace Llpc;
 namespace Llpc {
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
+// Executes this FE lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses LowerPostInline::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-ray-query-post-inline\n");
+  LLVM_DEBUG(dbgs() << "Run the pass Lower-Post-Inline\n");
 
   for (Function &func : module) {
     MDNode *execModelNode = func.getMetadata(gSPIRVMD::ExecutionModel);

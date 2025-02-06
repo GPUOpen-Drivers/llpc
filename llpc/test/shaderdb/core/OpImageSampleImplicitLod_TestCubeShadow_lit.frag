@@ -18,11 +18,11 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.f32(i32 3, i32 512, {{.*}}, {{.*}}, i32 513, {{.*}}, {{.*}})
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.f32(i32 3, i32 512, {{.*}}, {{.*}}, i32 513, {{.*}}, {{.*}})
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}
 ; SHADERTEST: load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}
 ; SHADERTEST: call {{.*}} float @llvm.amdgcn.cubesc

@@ -13,7 +13,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call void (...) @lgc.write.xfb.output(i32 0, i32 16, i32 0, <4 x float> {{(splat \(float 2\.000000e\+00\))|(<float 2\.000000e\+00, float 2\.000000e\+00, float 2\.000000e\+00, float 2\.000000e\+00>)}}
 
 ; SHADERTEST: AMDLLPC SUCCESS

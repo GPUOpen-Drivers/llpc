@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -56,6 +56,22 @@ def JumpOp : LgcCpsOp<"jump", [NoReturn]> {
               target shader, if it is the entry function of an app shader and poison otherwise.
             * rcr, a continuation reference the called function can potentially return to
             * an arbitrary set of arguments appended to the tail of the argument list.
+    }];
+}
+
+// =====================================================================================================================
+def JumpUniformOp : LgcCpsOp<"jump.uniform", [NoReturn]> {
+    let arguments = (ins PointerType:$target, (or I32, I64):$exec, value:$vgprs, AttrI32:$flags, varargs:$tail);
+    let results = (outs);
+
+    let summary = "Uniform jump to a CPS function.";
+    let description = [{
+        Uniformly jump to a CPS function via:
+            * target, the target function
+            * exec, the exec mask for the next function
+            * vgprs, a struct consisting of arguments to be passed as VGPRs
+            * flags: whether additional arguments should be passed
+            * Additional arguments as described by flags.
     }];
 }
 

@@ -3,7 +3,7 @@
 
 ; Test that branch after a kill is correctly replaced with a return.
 
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.kill
 ; SHADERTEST-NEXT: call {{.*}} @lgc.create.write.generic.output
 ; SHADERTEST-NEXT: ret void

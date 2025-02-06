@@ -26,7 +26,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call <2 x i32> (...) @lgc.create.subgroup.swizzle.quad.v2i32(<2 x i32> %{{[0-9]*}}, <4 x i32> <i32 0, i32 1, i32 2, i32 3>)
 ; SHADERTEST: call <3 x i32> (...) @lgc.create.subgroup.swizzle.quad.v3i32(<3 x i32> %{{[0-9]*}}, <4 x i32> <i32 3, i32 2, i32 1, i32 0>)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.subgroup.swizzle.quad.v4f32(<4 x float> %{{[0-9]*}}, <4 x i32> <i32 1, i32 0, i32 3, i32 2>)

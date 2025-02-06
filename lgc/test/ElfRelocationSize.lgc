@@ -143,9 +143,9 @@ target triple = "amdgcn--amdpal"
 define dllexport void @lgc.shader.VS.main() !lgc.shaderstage !22 {
 entry:
   %TEXCOORD1 = alloca <2 x float>, align 8, addrspace(5)
-  %TEXCOORD = call <2 x float> (...) @lgc.load.vertex.input__v2f32(i1 false, i32 1, i32 0, i32 0, i32 1, i32 16, i32 poison)
+  %TEXCOORD = call <2 x float> (...) @lgc.load.vertex.input__v2f32(i1 false, i32 1, i32 0, i32 0, i32 1, i32 16, i32 poison, i32 poison, i32 poison, i32 poison)
   %SV_Position = alloca <4 x float>, align 16, addrspace(5)
-  %POSITION = call <3 x float> (...) @lgc.load.vertex.input__v3f32(i1 false, i32 0, i32 0, i32 0, i32 1, i32 16, i32 poison)
+  %POSITION = call <3 x float> (...) @lgc.load.vertex.input__v3f32(i1 false, i32 0, i32 0, i32 0, i32 1, i32 16, i32 poison, i32 poison, i32 poison, i32 poison)
 
   %posx = extractelement <3 x float> %POSITION, i32 0
   %posxi = fptoui float %posx to i32

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -324,7 +324,7 @@ public:
     ImageFlagNotAliased = 0x200,                  // Whether the image is known not to alias any other memory object
     ImageFlagInvariant = 0x400,                   // Invariant load
     ImageFlagSamplePatternOffset = 0x800,         // Retrieving sample pattern offset in dwords for specified image
-    ImageFlagNoAlloc = 0x1000,                    //
+    ImageFlagLlcNoAlloc = 0x1000,                 // LLC uses NoAlloc behavior.
   };
 
   // Address array indices for image sample and gather methods. Where an optional entry is missing (either

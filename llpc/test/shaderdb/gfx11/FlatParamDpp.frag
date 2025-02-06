@@ -3,7 +3,7 @@
 // RUN: amdllpc %gfxip --v %s |\
 // RUN:   FileCheck %s --check-prefix=CHECK
 //
-// CHECK-LABEL: {{^}}// LLPC pipeline patching results
+// CHECK-LABEL: {{^}}// LLPC LGC lowering results
 // CHECK:       call void @llvm.amdgcn.kill(i1 false)
 // CHECK:       [[P0:%.*]] = call float @llvm.amdgcn.lds.param.load(i32 2, i32 2, i32 %PrimMask)
 // CHECK:       [[P1:%.*]] = bitcast float [[P0]] to i32

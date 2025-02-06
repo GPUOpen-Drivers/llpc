@@ -3,10 +3,10 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: store float -0.000000e+00, ptr addrspace(7) %{{[0-9]*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: store float -0.000000e+00, ptr addrspace(7) %{{[0-9]*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32
 
 ; SHADERTEST: AMDLLPC SUCCESS

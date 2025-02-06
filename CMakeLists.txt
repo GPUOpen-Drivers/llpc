@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -33,12 +33,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(LLPC_IS_STANDALONE ON)
 endif()
 
-### Find LLVM (needed by llpc_version.cmake).
-include("cmake/findllvm.cmake")
-
-### Version info ###
+### Version info #######################################################################################################
+# Also runs findllvm.cmake.
 include(cmake/llpc_version.cmake)
-
 add_llpc_version_projects()
 
 ### Cached Project Options #############################################################################################

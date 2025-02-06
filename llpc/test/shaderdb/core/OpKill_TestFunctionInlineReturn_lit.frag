@@ -4,7 +4,7 @@
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; Test that after SPIR-V lowering there are only two kills and
+; Test that after FE lowering there are only two kills and
 ; both branch directly to the return block.
 
 ; Check that the selection of constants is correctly preserved
@@ -12,7 +12,7 @@
 ; correctly lowering a PHI, in a manner that can fail if
 ; PHIs are not updated correctly.
 
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
 ; SHADERTEST-NEXT: br label %[[LABEL:[0-9]*]]
 

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -37,7 +37,7 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations for access chain.
+// Represents the pass of FE lowering operations for access chain.
 class LowerAccessChain : public SpirvLower,
                          public llvm::InstVisitor<LowerAccessChain>,
                          public llvm::PassInfoMixin<LowerAccessChain> {
@@ -48,7 +48,7 @@ public:
   virtual void visitStoreInst(llvm::StoreInst &storeInst);
   virtual void visitCallInst(llvm::CallInst &callInst);
 
-  static llvm::StringRef name() { return "Lower SPIR-V access chain"; }
+  static llvm::StringRef name() { return "Lower access chain"; }
 
 private:
   llvm::Instruction *tryToCoalesceChain(llvm::Instruction *getElemPtr);

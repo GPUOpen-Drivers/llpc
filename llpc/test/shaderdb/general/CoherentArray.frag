@@ -12,7 +12,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v --verify-ir %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1109917696, <4 x i32> %5, i32 0, i32 0, i32 1)
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1109917696, <4 x i32> %5, i32 4, i32 0, i32 1)
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 1109917696, <4 x i32> %5, i32 8, i32 0, i32 1)

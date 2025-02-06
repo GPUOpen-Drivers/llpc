@@ -2,8 +2,6 @@
 ; RUN: opt --verify-each -S  -o - -passes='lower-await,coro-early,lgc-coro-split,coro-cleanup,cleanup-continuations' %s | FileCheck --check-prefixes=CHECK %s
 ; RUN: opt --verify-each -S  -o - -passes='lower-await' %s | FileCheck --check-prefixes=LOWER-AWAIT %s
 
-!lgc.cps.module = !{}
-
 declare !lgc.cps !0 void @callee({}, i32, float)
 
 define void @test(i32 %shaderIndex, i32 %rcr, float %arg) !lgc.cps !0 {

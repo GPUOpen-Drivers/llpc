@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -1874,10 +1874,12 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       context->ensureGfxRuntimeLibrary();
 
     bool isTransformPipeline = false;
-    auto computePipelineInfo =
-        static_cast<const ComputePipelineBuildInfo *>(context->getPipelineContext()->getPipelineBuildInfo());
-    if (computePipelineInfo != nullptr && computePipelineInfo->transformGraphicsPipeline != nullptr)
-      isTransformPipeline = true;
+    if (context->getPipelineContext()->getPipelineType() == PipelineType::Compute) {
+      auto computePipelineInfo =
+          static_cast<const ComputePipelineBuildInfo *>(context->getPipelineContext()->getPipelineBuildInfo());
+      if (computePipelineInfo != nullptr && computePipelineInfo->transformGraphicsPipeline != nullptr)
+        isTransformPipeline = true;
+    }
 
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
@@ -1975,7 +1977,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
     SmallVector<std::unique_ptr<Module>, ShaderStageGfxCount> modulesToLink;
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
-      // Per-shader SPIR-V lowering passes.
+      // Per-shader FE lowering passes.
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData)
@@ -1997,7 +1999,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       flag.isRayQuery = moduleData->usage.enableRayQuery;
       flag.isInternalRtShader = moduleData->usage.isInternalRtShader;
       flag.usesAdvancedBlend = enableAdvancedBlend;
-      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower), flag);
+      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerFeLowering), flag);
       // Run the passes.
       lowerPassMgr->run(*modules[shaderIndex]);
 
@@ -2050,7 +2052,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   if (result == Result::Success) {
     Timer *timers[] = {
-        timerProfiler.getTimer(TimerPatch),
+        timerProfiler.getTimer(TimerLgcLowering),
         timerProfiler.getTimer(TimerOpt),
         timerProfiler.getTimer(TimerCodeGen),
     };
@@ -2111,6 +2113,9 @@ Result Compiler::buildTransformVertexShader(Context *context, const PipelineShad
                                 "===============================================================================\n"
                                 "// LLPC SPIRV-to-LLVM translation results for transform vertex shader\n"));
   }
+
+  // Lower SPIR-V CFG merges before inlining
+  lowerPassMgr->addPass(LowerCfgMerges());
 
   // Function inlining. Use the "always inline" pass, since we want to inline all functions, and
   // we marked (non-entrypoint) functions as "always inline" just after SPIR-V reading.
@@ -3049,7 +3054,7 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
   raw_svector_ostream elfStream(pipelineElf);
 
   Timer *timers[] = {
-      timerProfiler.getTimer(TimerPatch),
+      timerProfiler.getTimer(TimerLgcLowering),
       timerProfiler.getTimer(TimerOpt),
       timerProfiler.getTimer(TimerCodeGen),
   };
@@ -3204,7 +3209,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // - Run lower passes on all modules
   // - Merge all modules and inline if necessary
   {
-    Timer *lowerTimer = timerProfiler.getTimer(TimerLower);
+    Timer *lowerTimer = timerProfiler.getTimer(TimerFeLowering);
     auto passMgr = lgc::MbPassManager::Create(builderContext->getTargetMachine());
     passMgr->setPassIndex(&passIndex);
     SpirvLower::registerLoweringPasses(*passMgr);

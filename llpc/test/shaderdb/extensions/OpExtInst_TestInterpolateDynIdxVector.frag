@@ -19,7 +19,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-COUNT-2: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @interpolateAtSample.f32.p64.i32(ptr addrspace(64) %{{.*}}, i32 %{{.*}})
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> (...) @lgc.input.import.interpolated__v2f32(i1 false, i32 0
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(i1 false, i32 1
 : SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.input.import.interpolated__f32(i1 false, i32 2

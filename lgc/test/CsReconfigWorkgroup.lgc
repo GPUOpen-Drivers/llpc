@@ -40,9 +40,9 @@ attributes #0 = { nounwind }
 ; RUN: lgc -extract=2 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK2 %s
 ; CHECK2-LABEL: _amdgpu_cs_main:
 ; CHECK2: .threadgroup_dimensions:
-; CHECK2:   - 0x50
+; CHECK2:   - 0x8
+; CHECK2:   - 0xa
 ; CHECK2:   - 0x6
-; CHECK2:   - 0x7
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
@@ -87,9 +87,9 @@ attributes #0 = { nounwind }
 ; RUN: lgc -extract=3 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK3 %s
 ; CHECK3-LABEL: _amdgpu_cs_main:
 ; CHECK3: .threadgroup_dimensions:
-; CHECK3:   - 0x24
+; CHECK3:   - 0x6
+; CHECK3:   - 0x6
 ; CHECK3:   - 0x5
-; CHECK3:   - 0x1
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:

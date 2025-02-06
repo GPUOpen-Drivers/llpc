@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -637,14 +637,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
     args.push_back(imageDesc);
     args.push_back(getInt32(tfe));
 
-    // glc/dlc bits
-    CoherentFlag coherent = {};
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-      if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
-        coherent.bits.glc = true;
-        coherent.bits.dlc = true;
-      }
-    }
+    CoherentFlag coherent = getImageCoherentFlag(flags, true);
 
     args.push_back(getInt32(coherent.u32All));
 
@@ -860,13 +853,7 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
     args.push_back(imageDesc);
     args.push_back(getInt32(0)); // tfe/lwe
 
-    // glc bit
-    CoherentFlag coherent = {};
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-      if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
-        coherent.bits.glc = true;
-      }
-    }
+    CoherentFlag coherent = getImageCoherentFlag(flags, false);
 
     args.push_back(getInt32(coherent.u32All));
 
@@ -1231,14 +1218,7 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   bool tfe = isa<StructType>(resultTy);
   args.push_back(getInt32(tfe));
 
-  // glc/dlc bits
-  CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
-      coherent.bits.glc = true;
-      coherent.bits.dlc = true;
-    }
-  }
+  CoherentFlag coherent = getImageCoherentFlag(flags, true);
 
   args.push_back(getInt32(coherent.u32All));
 
@@ -2342,4 +2322,33 @@ bool BuilderImpl::isUniformDescriptor(Value *descPtr, unsigned flags, bool isIma
     ++loopId;
   }
   return worklist.empty();
+}
+
+// =====================================================================================================================
+// Get CoherentFlag for image read/write operations.
+//
+// @param flags : Image flags
+// @param isRead : Whether is a image read operation
+CoherentFlag BuilderImpl::getImageCoherentFlag(unsigned flags, bool isRead) {
+  CoherentFlag coherent = {};
+
+  // Images declared as volatile are automatically treated as coherent.
+  if (flags & ImageFlagVolatile)
+    flags |= ImageFlagCoherent;
+
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
+    if (flags & ImageFlagCoherent) {
+      coherent.bits.glc = true;
+      coherent.bits.dlc = isRead;
+    }
+  } else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 11) {
+    // On gfx11 glc is only used for load operations.
+    if (isRead && (flags & ImageFlagCoherent))
+      coherent.bits.glc = true;
+
+    if (flags & ImageFlagLlcNoAlloc)
+      coherent.bits.dlc = true;
+  }
+
+  return coherent;
 }

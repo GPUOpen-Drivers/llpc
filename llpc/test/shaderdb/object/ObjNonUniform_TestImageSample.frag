@@ -27,16 +27,16 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512,
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512,
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 512,
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 896,
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.v4f32(i32 1, i32 536,
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: call <8 x i32> @llvm.amdgcn.readfirstlane.v8i32
 ; SHADERTEST: call <4 x i32> @llvm.amdgcn.readfirstlane.v4i32
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: {{%[0-9]*}} = call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: AMDLLPC SUCCESS
 */

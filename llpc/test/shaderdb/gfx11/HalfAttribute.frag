@@ -3,7 +3,7 @@
 // RUN: amdllpc %gfxip --v %s |\
 // RUN:   FileCheck %s --check-prefix=CHECK
 //
-// CHECK-LABEL: {{^}}// LLPC pipeline patching results
+// CHECK-LABEL: {{^}}// LLPC LGC lowering results
 // CHECK:  [[P:%.*]] = call float @llvm.amdgcn.lds.param.load(i32 0, i32 0, i32 %PrimMask)
 // CHECK:  [[P1:%.*]] = call float @llvm.amdgcn.interp.p10.rtz.f16(float [[P]], float %PerspInterpCenter.i0, float [[P]], i1 false)
 // CHECK:  [[P2:%.*]]  = call half @llvm.amdgcn.interp.p2.rtz.f16(float [[P]], float %PerspInterpCenter.i1, float [[P1]], i1 false)

@@ -5,7 +5,7 @@
 ; SHADERTEST: {{![0-9]*}} = !{i32 {{[0-9]*}}, !"Debug Info Version", i32 3}
 ; SHADERTEST: {{![0-9]*}} = distinct !DICompileUnit(language: DW_LANG_Cobol74, file: [[D1:![0-9]*]], producer: "spirv", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
 ; SHADERTEST: [[D1]] = !DIFile(filename: "simple.hlsl", directory: ".")
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

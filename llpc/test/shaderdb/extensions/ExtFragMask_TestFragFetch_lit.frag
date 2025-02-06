@@ -32,13 +32,13 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 6, i32 512,
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 2, i32 512,
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 7, i32 512,
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 1, i32 544,
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.image.load.v4i32(i32 6, i32 544,
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.image.load.2d.i32.i16{{(\.v8i32)?}}(i32 1, i16 2, i16 3, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2dmsaa.v4f32.i32{{(\.v8i32)?}}(i32 15, i32 2, i32 3, i32
 ; SHADERTEST: call i32 @llvm.amdgcn.image.load.3d.i32.i16{{(\.v8i32)?}}(i32 1, i16 2, i16 3, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)

@@ -6,8 +6,6 @@
 ; Details of the output are likely to differ from the final production pass,
 ; especially instruction order and value names.
 
-!lgc.cps.module = !{}
-
 declare void @lgc.cps.complete()
 
 define void @_cont_KernelEntry() #0 !lgc.rt.shaderstage !{i32 7} {

@@ -3,7 +3,7 @@
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST-COUNT-2: call void (...) @lgc.create.emit.vertex(i32 0)
 ; SHADERTEST-LABEL: _amdgpu_gs_main:
 ; SHADERTEST-COUNT-2: s_sendmsg sendmsg(MSG_GS, GS_OP_EMIT, 0)

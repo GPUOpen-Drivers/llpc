@@ -38,7 +38,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.subgroup.ballot.v4i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.i32(
@@ -52,7 +52,7 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.first.i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.first.i32(
 
-; SHADERTEST-LABEL: {{^// LLPC.*}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC.*}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: call i32 @llvm.amdgcn.readfirstlane{{(.i32)?}}(i32 %{{.*}})
 ; SHADERTEST-COUNT-5: call i32 @llvm.amdgcn.readlane{{(.i32)?}}(i32 %{{.*}}, i32 %{{.*}})

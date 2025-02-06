@@ -1,8 +1,8 @@
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call void (...) @lgc.create.image.store(<4 x i64>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST:  call void @llvm.amdgcn.image.store.2d.v2f32.i16{{(\.v8i32)?}}(<2 x float> %{{.*}}, i32 3, i16 3, i16 3, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 

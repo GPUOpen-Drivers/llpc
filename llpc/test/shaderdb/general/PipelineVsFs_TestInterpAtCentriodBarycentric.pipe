@@ -7,11 +7,11 @@
 ; SHADERTEST: @[[BaryCoord:[^ ]*]] = external addrspace(64) global <3 x float>
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> @interpolateAtCentroid.v3f32.p64(ptr addrspace(64) @[[BaryCoord]])
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; The second argument (i32 32) respects that interpLoc is InterpLocCentroid.
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.read.bary.coord.v3f32(i32 5287, i32 35,
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %[[InterpCenter0:[^ ]*]] = extractelement <2 x float> %LinearInterpCenter, i64 0
 ; SHADERTEST: %[[InterpCentroid0:[^ ]*]] = extractelement <2 x float> %LinearInterpCentroid, i64 0
 ; SHADERTEST: %[[InterpCenter1:[^ ]*]] = extractelement <2 x float> %LinearInterpCenter, i64 1

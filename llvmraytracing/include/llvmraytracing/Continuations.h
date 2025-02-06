@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -138,11 +138,23 @@ Value *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemDat
                             CallInst *Call, Module *GpurtLibrary, CompilerUtils::CrossModuleInliner &Inliner,
                             bool KeepBuilderPos = false);
 
+/// Promote pointer arguments of a GPURT function @Func to by-value if appropriate (e. g. depending on pointeetys
+/// metadata).
+///
+/// Changes pointer types to their value types for non-struct types.
+/// Handle _Amd*Await* and _Amd*Enqueue*.
+/// For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
+// For Traversal, promote the system data argument so it is of struct type.
+///
+/// Returns a pointer to the promoted function or nullptr.
+Function *tryGpurtPointerArgPromotion(Function *Func);
+
 /// Transformations that run early on the driver/gpurt module.
 ///
+/// Promote arguments of the functions residing in @PromotableFunctions.
 /// Replace intrinsics called by gpurt code that can be replaced early.
 /// Returns whether something changed.
-bool earlyGpurtTransform(Module &M);
+bool earlyGpurtTransform(Module &M, SmallVector<Function *> &PromotableFunctions, bool PreserveWaitMasks = true);
 
 /// Given a number NumI32s of 4-byte values and the number of reserved
 /// registers, return the amount of dynamic storage required to store that many
@@ -239,10 +251,6 @@ public:
   static llvm::StringRef name() { return "DXIL continuation post hook pass"; }
 };
 
-// Rematerializable callback specific to DXIL - mainly used to extend what's
-// considered rematerializable for continuations
-bool DXILMaterializable(Instruction &I);
-
 // Define a wrapper pass that is used for testing using opt (dxil-coro-split vs
 // coro-split)
 class DXILCoroSplitPass : public CoroSplitPass {
@@ -251,14 +259,6 @@ public:
 
   static llvm::StringRef name() { return "DXIL continuations coro split pass wrapper"; }
 };
-
-// Helper function to query whether an instruction is rematerializable, which is
-// shared between both DX and Vulkan path.
-bool commonMaterializable(Instruction &I);
-
-// Rematerializable callback specific to LgcCps - mainly used to extend what's
-// considered rematerializable for continuations
-bool LgcMaterializable(Instruction &I);
 
 // Define a wrapper pass that is used for testing using opt (lgc-coro-split vs
 // coro-split)

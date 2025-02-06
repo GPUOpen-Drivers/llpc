@@ -27,7 +27,7 @@ void main()
 ; SHADERTEST: = call i32 (...) @lgc.create.extract.exponent.i32(double
 ; SHADERTEST: = call <3 x double> (...) @lgc.create.extract.significand.v3f64(<3 x double>
 ; SHADERTEST: = call <3 x i32> (...) @lgc.create.extract.exponent.v3i32(<3 x double>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call double @llvm.amdgcn.frexp.mant.f64(double %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %{{.*}})

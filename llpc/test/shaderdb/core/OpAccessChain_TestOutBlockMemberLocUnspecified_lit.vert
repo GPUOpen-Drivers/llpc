@@ -26,7 +26,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 1
 ; SHADERTEST: select i1 %{{[0-9]*}}, ptr addrspace({{.*}}) %{{.*}}, ptr addrspace({{.*}}) %{{.*}}
 ; SHADERTEST: store <3 x double> {{(splat \(double 5\.000000e\-01\))|(<double 5\.000000e\-01, double 5\.000000e\-01, double 5\.000000e\-01>)}}, ptr addrspace({{.*}}) %{{[0-9]*}}

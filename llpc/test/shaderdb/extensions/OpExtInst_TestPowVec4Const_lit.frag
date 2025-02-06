@@ -16,9 +16,9 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.power.v4f32(<4 x float>
 ; SHADERTEST: store float 1.200000e+01, ptr addrspace(5) %{{.*}}
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.pow.v4f32(<4 x float>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: [[mul1:%.i[0-9]*]] = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
 ; SHADERTEST: [[mul2:%.i[0-9]*]] = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float
 ; SHADERTEST: [[mul3:%.i[0-9]*]] = call reassoc nnan nsz arcp contract afn float @llvm.pow.f32(float

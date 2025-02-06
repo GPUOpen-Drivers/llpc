@@ -13,7 +13,7 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.tanh.f32(float
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.fabs.f32(float %{{[0-9]*}})
 ; SHADERTEST: %{{[0-9]*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0xC007154760000000
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.exp2.f32(float %{{.*}})

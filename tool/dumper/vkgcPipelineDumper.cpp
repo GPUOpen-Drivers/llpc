@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -941,11 +941,8 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 73
-  const char *glStatePrefix = "options.";
-#else
+
   const char *glStatePrefix = "options.glState.";
-#endif
   dumpFile << glStatePrefix << "replaceSetWithResourceType = " << options->getGlState().replaceSetWithResourceType
            << "\n";
   dumpFile << glStatePrefix << "disableSampleMask = " << options->getGlState().disableSampleMask << "\n";
@@ -1859,9 +1856,10 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   updateHashFromRs |= (enableNgg && !passthroughMode);
 
   if (updateHashFromRs) {
-    hasher->Update(rsState->usrClipPlaneMask);
     hasher->Update(rsState->rasterStream);
   }
+
+  hasher->Update(rsState->usrClipPlaneMask);
 
   if (isCacheHash) {
     hasher->Update(nggState->enableNgg);

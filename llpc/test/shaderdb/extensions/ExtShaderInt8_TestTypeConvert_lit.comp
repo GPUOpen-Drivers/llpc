@@ -81,7 +81,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: fptosi half %{{[0-9]*}} to i8
 ; SHADERTEST: fptosi float %{{[0-9]*}} to i8
 ; SHADERTEST: fptosi double %{{[0-9]*}} to i8
@@ -94,7 +94,7 @@ void main()
 ; SHADERTEST: uitofp i8 %{{[0-9]*}} to half
 ; SHADERTEST: uitofp i8 %{{[0-9]*}} to float
 ; SHADERTEST: uitofp i8 %{{[0-9]*}} to double
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

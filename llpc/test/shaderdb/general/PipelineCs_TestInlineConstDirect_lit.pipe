@@ -3,12 +3,12 @@
 ; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: %{{.*}} = call {{.*}} {{.*}}@lgc.load.buffer.desc(i64 0, i32 1, i32 0,
 ; SHADERTEST: getelementptr inbounds {{.*}}, ptr addrspace(7) %{{.*}}, i64 0, i32 2
 ; SHADERTEST: load <2 x double>, ptr addrspace(7) %{{.*}}, align 16
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %{{.*}} = insertelement <4 x i32> <i32 poison, i32 poison, i32 -1, i32 151468>, i32 %{{.*}}, i64 0
 ; SHADERTEST: %{{.*}} = insertelement <4 x i32> %{{.*}}, i32 %{{.*}}, i64 1
 ; SHADERTEST: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %{{.*}}, i32 64, i32 0)

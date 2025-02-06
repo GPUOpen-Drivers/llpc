@@ -5,7 +5,7 @@
 ; RUN: amdllpc -v %gfxip %s,main_vs \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_VS %s
 ;
-; SHADERTEST_VS-LABEL: {{^//}} LLPC pipeline before-patching results
+; SHADERTEST_VS-LABEL: {{^//}} LLPC LGC before-lowering results
 ; SHADERTEST_VS-LABEL: define dllexport spir_func void @lgc.shader.VS.main()
 ; SHADERTEST_VS-NOT:   define dllexport spir_func void @lgc.shader.FS.main()
 ; SHADERTEST_VS-LABEL: {{^=====}} AMDLLPC SUCCESS =====
@@ -15,7 +15,7 @@
 ; RUN: amdllpc -v %gfxip %s,main_fs \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_FS %s
 ;
-; SHADERTEST_FS-LABEL: {{^//}} LLPC pipeline before-patching results
+; SHADERTEST_FS-LABEL: {{^//}} LLPC LGC before-lowering results
 ; SHADERTEST_FS-LABEL: define dllexport spir_func void @lgc.shader.FS.main()
 ; SHADERTEST_FS-NOT:   define dllexport spir_func void @lgc.shader.VS.main()
 ; SHADERTEST_FS-LABEL: {{^=====}} AMDLLPC SUCCESS =====

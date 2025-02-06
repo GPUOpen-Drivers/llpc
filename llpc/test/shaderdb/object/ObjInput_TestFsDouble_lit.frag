@@ -23,12 +23,12 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST-DAG: call <4 x double> (...) @lgc.input.import.interpolated__v4f64
 ; SHADERTEST-DAG: call <4 x double> (...) @lgc.input.import.interpolated__v4f64
 ; SHADERTEST-DAG: call <3 x double> (...) @lgc.input.import.interpolated__v3f64
 ; SHADERTEST-DAG: call <3 x double> (...) @lgc.input.import.interpolated__v3f64
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST-COUNT-28: call float @llvm.amdgcn.interp.mov
 ; SHADERTEST: AMDLLPC SUCCESS
 */

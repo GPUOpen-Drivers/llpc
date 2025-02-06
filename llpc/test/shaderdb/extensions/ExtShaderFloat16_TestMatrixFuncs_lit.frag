@@ -47,8 +47,8 @@ void main()
 ; SHADERTEST: = call {{.*}}[2 x <2 x half>] (...) @lgc.create.matrix.inverse.a2v2f16([2 x <2 x half>] %
 ; SHADERTEST: = call {{.*}}[3 x <3 x half>] (...) @lgc.create.matrix.inverse.a3v3f16([3 x <3 x half>] %
 ; SHADERTEST: = call {{.*}}[4 x <4 x half>] (...) @lgc.create.matrix.inverse.a4v4f16([4 x <4 x half>] %
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

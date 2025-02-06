@@ -6,12 +6,12 @@
 ; SHADERTEST: getelementptr{{.*}}<{ [8 x [4 x float]], i32 }>, ptr addrspace({{.*}}) @{{.*}}, i32 0,
 ; SHADERTEST: getelementptr [4 x float], ptr addrspace({{.*}}) %{{[0-9]*}}, i32 0, i32 1
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: @lgc.load.buffer.desc(i64 0, i32 0, i32 0,
 ; SHADERTEST: load i32, ptr addrspace({{.*}}) {{.*}}
 ; SHADERTEST: load float, ptr addrspace({{.*}}) {{.*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

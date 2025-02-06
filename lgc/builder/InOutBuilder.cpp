@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -31,7 +31,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
-#include "lgc/patch/ShaderInputs.h"
+#include "lgc/lowering/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"

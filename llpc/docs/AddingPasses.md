@@ -29,4 +29,4 @@ To register a front-end pass, you need to add an entry to the LLPC front-end pas
 
 ## Register a middle-end pass
 
-The process to register a middle-end pass is the same. The middle-end pass registry file is `lgc/patch/PassRegistry.inc`.
+The process to register a middle-end pass is the same. The middle-end pass registry file is `lgc/lowering/PassRegistry.inc`.

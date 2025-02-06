@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -194,7 +194,7 @@ static void disableFastMath(Value *value, bool clearAll) {
 #define DEBUG_TYPE DEBUG_TYPE_CONST_FOLDING
 
 // =====================================================================================================================
-// Executes constant folding SPIR-V lowering pass on the specified LLVM module.
+// Executes constant folding FElowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
@@ -391,7 +391,7 @@ bool LowerMathPrecision::propagateNoContract(Module &module, bool forward, bool 
 }
 
 // =====================================================================================================================
-// Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
+// Run precision (fast math flag) adjustment FE lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
@@ -460,7 +460,7 @@ PreservedAnalyses LowerMathPrecision::run(Module &module, ModuleAnalysisManager 
 #define DEBUG_TYPE DEBUG_TYPE_FLOAT_OP
 
 // =====================================================================================================================
-// Executes floating point optimisation SPIR-V lowering pass on the specified LLVM module.
+// Executes floating point optimisation FE lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation

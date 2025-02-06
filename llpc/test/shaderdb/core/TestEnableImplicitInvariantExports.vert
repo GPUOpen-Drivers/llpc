@@ -20,7 +20,7 @@ void main()
 // BEGIN_WITHOUT_IIE
 /*
 ; RUN: amdllpc -v --enable-implicit-invariant-exports=1 %gfxip %s | FileCheck -check-prefix=WITHOUT_IIE %s
-; WITHOUT_IIE-LABEL: {{^// LLPC}} pipeline before-patching results
+; WITHOUT_IIE-LABEL: {{^// LLPC}} LGC before-lowering results
 ; WITHOUT_IIE: %[[val:.*]] = extractvalue [4 x <4 x float>] %{{.*}}, 3
 ; WITHOUT_IIE: %[[mul:.*]] = fmul nnan nsz afn <4 x float> %[[val]], %{{.*}}
 ; WITHOUT_IIE: %[[arg:.*]] = fadd nnan nsz afn <4 x float> %{{.*}}, %[[mul]]
@@ -32,7 +32,7 @@ void main()
 // BEGIN_WITH_IIE
 /*
 ; RUN: amdllpc -v --enable-implicit-invariant-exports=0 %s | FileCheck -check-prefix=WITH_IIE %s
-; WITH_IIE-LABEL: {{^// LLPC}} pipeline before-patching results
+; WITH_IIE-LABEL: {{^// LLPC}} LGC before-lowering results
 ; WITH_IIE: %[[val:.*]] = extractvalue [4 x <4 x float>] %{{.*}}, 3
 ; WITH_IIE: %[[mul:.*]] = fmul reassoc nnan nsz arcp contract afn <4 x float> %[[val]], %{{.*}}
 ; WITH_IIE: %[[arg:.*]] = fadd reassoc nnan nsz arcp contract afn <4 x float> %{{.*}}, %[[mul]]

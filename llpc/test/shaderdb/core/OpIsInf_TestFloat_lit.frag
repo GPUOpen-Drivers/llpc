@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call i1 (...) @lgc.create.isinf.i1(float
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %[[FABS:[0-9]+]] = call float @llvm.fabs.f32(float %{{[0-9]*}})
 ; SHADERTEST: = fcmp oeq float %[[FABS]], 0x7FF0000000000000
 

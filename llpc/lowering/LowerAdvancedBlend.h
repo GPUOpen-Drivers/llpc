@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -36,13 +36,13 @@
 
 namespace Llpc {
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering advanced blend shader
+// Represents the pass of FE lowering advanced blend shader
 class LowerAdvancedBlend : public SpirvLower, public llvm::PassInfoMixin<LowerAdvancedBlend> {
 
 public:
   LowerAdvancedBlend(unsigned binding, bool enableRov);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  static llvm::StringRef name() { return "Lower SPIR-V advanced blend shader"; }
+  static llvm::StringRef name() { return "Lower advanced blend shader"; }
 
 private:
   typedef void (LowerAdvancedBlend::*LibraryFuncPtr)(llvm::Function *, unsigned);

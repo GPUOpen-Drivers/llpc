@@ -23,7 +23,7 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = sub <3 x i32> %{{[0-9]*}}, %{{[0-9]*}}
 ; SHADERTEST: %{{[0-9]*}} = sub <2 x i32> %{{[0-9]*}}, %{{[0-9]*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: sub i32 %{{.*}}, %{{.*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS

@@ -22,7 +22,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.kill
 
 ; SHADERTEST: AMDLLPC SUCCESS

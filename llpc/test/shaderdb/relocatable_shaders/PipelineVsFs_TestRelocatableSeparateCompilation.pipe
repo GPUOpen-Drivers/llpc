@@ -1,13 +1,13 @@
-; This test checks that pipeline patching is done for each shader separately.
+; This test checks that LGC lowering is done for each shader separately.
 ; It shows that the shaders were compiled individually and then linked.
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST-EMPTY:
 ; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'
 ; SHADERTEST-NEXT: source_filename = "llpc_vertex
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST-EMPTY:
 ; SHADERTEST-NEXT: ; ModuleID = 'lgcPipeline'
 ; SHADERTEST-NEXT: source_filename = "llpc_fragment

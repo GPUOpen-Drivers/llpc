@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -66,7 +66,7 @@ union LowerFlag {
 };
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations, as the base class.
+// Represents the pass of FE lowering operations, as the base class.
 class SpirvLower {
 public:
   explicit SpirvLower() {}

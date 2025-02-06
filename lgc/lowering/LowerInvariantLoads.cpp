@@ -1,0 +1,221 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
+ *
+ **********************************************************************************************************************/
+/**
+ ***********************************************************************************************************************
+ * @file  LowerInvariantLoads.cpp
+ * @brief LLPC source file: contains implementation of class lgc::LowerInvariantLoads.
+ ***********************************************************************************************************************
+ */
+#include "lgc/lowering/LowerInvariantLoads.h"
+#include "lgc/LgcDialect.h"
+#include "lgc/lowering/LgcLowering.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "lgc-lower-invariant-loads"
+
+using namespace llvm;
+using namespace lgc;
+
+namespace lgc {
+
+static const unsigned UNKNOWN_ADDRESS_SPACE = ADDR_SPACE_MAX + 1;
+
+enum AddrSpaceBit {
+  ADDR_SPACE_FLAT_BIT = 1 << ADDR_SPACE_FLAT,
+  ADDR_SPACE_GLOBAL_BIT = 1 << ADDR_SPACE_GLOBAL,
+  ADDR_SPACE_REGION_BIT = 1 << ADDR_SPACE_REGION,
+  ADDR_SPACE_LOCAL_BIT = 1 << ADDR_SPACE_LOCAL,
+  ADDR_SPACE_CONST_BIT = 1 << ADDR_SPACE_CONST,
+  ADDR_SPACE_PRIVATE_BIT = 1 << ADDR_SPACE_PRIVATE,
+  ADDR_SPACE_CONST_32BIT_BIT = 1 << ADDR_SPACE_CONST_32BIT,
+  ADDR_SPACE_BUFFER_FAT_POINTER_BIT = 1 << ADDR_SPACE_BUFFER_FAT_POINTER,
+  ADDR_SPACE_UNKNOWN_BIT = 1 << UNKNOWN_ADDRESS_SPACE
+};
+
+static unsigned findAddressSpaceAccess(const Instruction *inst) {
+  if (const LoadInst *load = dyn_cast<LoadInst>(inst)) {
+    return std::min(load->getPointerAddressSpace(), UNKNOWN_ADDRESS_SPACE);
+  } else if (const StoreInst *store = dyn_cast<StoreInst>(inst)) {
+    return std::min(store->getPointerAddressSpace(), UNKNOWN_ADDRESS_SPACE);
+  } else {
+    if (const CallInst *call = dyn_cast<CallInst>(inst)) {
+      auto func = call->getCalledFunction();
+      if (func) {
+        // Treat these as buffer address space as they do not overlap with private.
+        if (func->getName().starts_with("llvm.amdgcn.image") || func->getName().starts_with("llvm.amdgcn.raw") ||
+            func->getName().starts_with("llvm.amdgcn.struct"))
+          return ADDR_SPACE_BUFFER_FAT_POINTER;
+      }
+    }
+  }
+  return UNKNOWN_ADDRESS_SPACE;
+}
+
+// =====================================================================================================================
+// Executes this LLVM pass on the specified LLVM function.
+//
+// @param [in/out] function : Function that we will patch.
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses LowerInvariantLoads::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
+  PipelineState *pipelineState =
+      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+
+  LLVM_DEBUG(dbgs() << "Run the pass Lower-Invariant-Loads\n");
+
+  auto shaderStage = lgc::getShaderStage(&function);
+  if (!shaderStage)
+    return PreservedAnalyses::all();
+
+  auto &options = pipelineState->getShaderOptions(shaderStage.value());
+  bool clearInvariants = options.aggressiveInvariantLoads == ClearInvariants;
+  bool aggressiveInvariants = options.aggressiveInvariantLoads == EnableOptimization;
+
+  if (options.aggressiveInvariantLoads == Auto) {
+    switch (function.getCallingConv()) {
+    case CallingConv::AMDGPU_HS:
+    case CallingConv::AMDGPU_LS:
+    case CallingConv::AMDGPU_GS:
+    case CallingConv::AMDGPU_VS:
+      LLVM_DEBUG(dbgs() << "Heuristically enable aggressive invariant load optimization\n");
+      aggressiveInvariants = true;
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (!(clearInvariants || aggressiveInvariants))
+    return PreservedAnalyses::all();
+
+  LLVM_DEBUG(dbgs() << (clearInvariants ? "Removing invariant load flags"
+                                        : "Attempting aggressive invariant load optimization")
+                    << "\n");
+
+  // This mirrors AMDGPUAliasAnalysis
+  static const unsigned aliasMatrix[] = {
+      /* Flat     */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_GLOBAL_BIT | ADDR_SPACE_LOCAL_BIT | ADDR_SPACE_CONST_BIT |
+          ADDR_SPACE_PRIVATE_BIT | ADDR_SPACE_CONST_32BIT_BIT | ADDR_SPACE_BUFFER_FAT_POINTER_BIT |
+          ADDR_SPACE_UNKNOWN_BIT,
+      /* Global   */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_GLOBAL_BIT | ADDR_SPACE_CONST_BIT | ADDR_SPACE_CONST_32BIT_BIT |
+          ADDR_SPACE_BUFFER_FAT_POINTER_BIT | ADDR_SPACE_UNKNOWN_BIT,
+      /* Region   */
+      ADDR_SPACE_REGION_BIT | ADDR_SPACE_UNKNOWN_BIT,
+      /* Local    */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_LOCAL_BIT | ADDR_SPACE_UNKNOWN_BIT,
+      /* Constant */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_GLOBAL_BIT | ADDR_SPACE_CONST_32BIT_BIT | ADDR_SPACE_BUFFER_FAT_POINTER_BIT |
+          ADDR_SPACE_UNKNOWN_BIT,
+      /* Private  */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_PRIVATE_BIT | ADDR_SPACE_UNKNOWN_BIT,
+      /* Const32  */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_GLOBAL_BIT | ADDR_SPACE_CONST_BIT | ADDR_SPACE_BUFFER_FAT_POINTER_BIT |
+          ADDR_SPACE_UNKNOWN_BIT,
+      /* Buffer   */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_GLOBAL_BIT | ADDR_SPACE_CONST_BIT | ADDR_SPACE_CONST_32BIT_BIT |
+          ADDR_SPACE_BUFFER_FAT_POINTER_BIT | ADDR_SPACE_UNKNOWN_BIT,
+      /* Unknown */
+      ADDR_SPACE_FLAT_BIT | ADDR_SPACE_GLOBAL_BIT | ADDR_SPACE_LOCAL_BIT | ADDR_SPACE_REGION_BIT |
+          ADDR_SPACE_CONST_BIT | ADDR_SPACE_PRIVATE_BIT | ADDR_SPACE_CONST_32BIT_BIT |
+          ADDR_SPACE_BUFFER_FAT_POINTER_BIT | ADDR_SPACE_UNKNOWN_BIT};
+
+  unsigned writtenAddrSpaces = 0;
+  std::vector<Instruction *> loads;
+
+  for (BasicBlock &block : function) {
+    for (Instruction &inst : block) {
+      if (!clearInvariants && inst.mayWriteToMemory()) {
+        if (IntrinsicInst *intrinsic = dyn_cast<IntrinsicInst>(&inst)) {
+          switch (intrinsic->getIntrinsicID()) {
+          case Intrinsic::amdgcn_exp:
+          case Intrinsic::amdgcn_exp_compr:
+          case Intrinsic::amdgcn_init_exec:
+          case Intrinsic::amdgcn_init_exec_from_input:
+          case Intrinsic::invariant_start:
+          case Intrinsic::invariant_end:
+          case Intrinsic::assume:
+            continue;
+          default:
+            break;
+          }
+        } else if (CallInst *call = dyn_cast<CallInst>(&inst)) {
+          if (isa<NggWriteGsOutputOp>(call) || isa<NggExportPositionOp>(call) || isa<NggExportAttributeOp>(call) ||
+              isa<WriteXfbOutputOp>(call))
+            continue;
+        }
+        unsigned addrSpace = findAddressSpaceAccess(&inst);
+        if (addrSpace == UNKNOWN_ADDRESS_SPACE) {
+          LLVM_DEBUG(dbgs() << "Write to unknown memory found, aborting aggressive invariant load optimization\n");
+          return PreservedAnalyses::all();
+        }
+        writtenAddrSpaces |= aliasMatrix[addrSpace];
+      } else if (inst.mayReadFromMemory()) {
+        if (!isa<NggReadGsOutputOp>(inst))
+          loads.push_back(&inst);
+      }
+    }
+  }
+
+  if (loads.empty()) {
+    LLVM_DEBUG(dbgs() << "Shader has no memory loads\n");
+    return PreservedAnalyses::all();
+  }
+
+  bool changed = false;
+  if (clearInvariants) {
+    for (Instruction *inst : loads) {
+      if (!inst->hasMetadata(LLVMContext::MD_invariant_load))
+        continue;
+
+      LLVM_DEBUG(dbgs() << "Removing invariant metadata: " << *inst << "\n");
+      inst->setMetadata(LLVMContext::MD_invariant_load, nullptr);
+      changed = true;
+    }
+  } else {
+    auto &context = function.getContext();
+    for (Instruction *inst : loads) {
+      if (inst->hasMetadata(LLVMContext::MD_invariant_load))
+        continue;
+      if (writtenAddrSpaces && (writtenAddrSpaces & (1 << findAddressSpaceAccess(inst))))
+        continue;
+
+      LLVM_DEBUG(dbgs() << "Marking load invariant: " << *inst << "\n");
+      inst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(context, {}));
+      changed = true;
+    }
+  }
+
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+}
+
+} // namespace lgc

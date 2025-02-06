@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -131,33 +131,27 @@ Value *lgc::reconfigWorkgroupLayout(Value *localInvocationId, PipelineState *pip
                                     WorkgroupLayout macroLayout, WorkgroupLayout microLayout, unsigned workgroupSizeX,
                                     unsigned workgroupSizeY, unsigned workgroupSizeZ, bool isHwLocalInvocationId,
                                     BuilderBase &builder) {
-  Value *apiX = builder.getInt32(0);
-  Value *apiY = builder.getInt32(0);
   Value *newLocalInvocationId = PoisonValue::get(localInvocationId->getType());
   unsigned bitsX = 0;
   unsigned bitsY = 0;
-  ResourceUsage *resUsage = pipelineState->getShaderResourceUsage(shaderStage);
-  if (shaderStage == ShaderStage::Mesh) {
-    resUsage->builtInUsage.mesh.foldWorkgroupXY = true;
-  } else if (shaderStage == ShaderStage::Task) {
-    resUsage->builtInUsage.task.foldWorkgroupXY = true;
-  } else {
-    assert(shaderStage == ShaderStage::Compute);
-    resUsage->builtInUsage.cs.foldWorkgroupXY = true;
-  }
-  Value *tidXY = builder.CreateExtractElement(localInvocationId, builder.getInt32(0), "tidXY");
+
+  Value *tidX = builder.CreateExtractElement(localInvocationId, builder.getInt32(0), "tidX");
+  Value *tidY = builder.CreateExtractElement(localInvocationId, builder.getInt32(1), "tidY");
+
+  Value *apiX = builder.getInt32(0);
+  Value *apiY = builder.getInt32(0);
   Value *apiZ = builder.getInt32(0);
   if (workgroupSizeZ > 1) {
-    apiZ = builder.CreateExtractElement(localInvocationId, builder.getInt32(1), "tidZ");
+    apiZ = builder.CreateExtractElement(localInvocationId, builder.getInt32(2), "tidZ");
   }
-  // For BuiltInUnswizzledLocalInvocationId, it shouldn't swizzle and return the localInvocation<apiX,apiY,apiZ> without
-  // foldXY.
+
   if (isHwLocalInvocationId) {
-    apiX = builder.CreateURem(tidXY, builder.getInt32(workgroupSizeX));
-    apiY = builder.CreateUDiv(tidXY, builder.getInt32(workgroupSizeX));
+    apiX = tidX;
+    apiY = tidY;
   } else {
     // Micro-tiling with quad:2x2, the thread-id will be marked as {<0,0>,<1,0>,<0,1>,<1,1>}
     // for each quad. Each 4 threads will be wrapped in the same tid.
+    Value *tidXY = builder.CreateAdd(builder.CreateMul(tidY, builder.getInt32(workgroupSizeX)), tidX);
     if (microLayout == WorkgroupLayout::Quads) {
       apiX = builder.CreateAnd(tidXY, builder.getInt32(1));
       apiY = builder.CreateAnd(builder.CreateLShr(tidXY, builder.getInt32(1)), builder.getInt32(1));

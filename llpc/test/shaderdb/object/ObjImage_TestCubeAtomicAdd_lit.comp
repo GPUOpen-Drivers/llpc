@@ -18,7 +18,7 @@ void main (void)
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 8, i32 513, i32 0, ptr addrspace(4)
 
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 8, i32 513, i32 0, ptr addrspace(4)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info

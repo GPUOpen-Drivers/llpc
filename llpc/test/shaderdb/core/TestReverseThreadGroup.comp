@@ -14,7 +14,7 @@ void main()
 
 // BEGIN_REVERSETEST
 // RUN: amdllpc -v %gfxip %s --reverse-thread-group=1 --print-after=lgc-lower-desc 2>&1 | FileCheck -check-prefix=REVERSETEST %s
-// REVERSETEST-LABEL: {{^// LLPC}} pipeline before-patching results
+// REVERSETEST-LABEL: {{^// LLPC}} LGC before-lowering results
 // There should be a calls to:
 //  - get the descriptor table containing the buffer descriptor
 //  - get the gl_NumWorkGroups
@@ -29,7 +29,7 @@ void main()
 // END_REVERSETEST
 // BEGIN_NOTREVERSETEST
 // RUN: amdllpc -v %gfxip %s --reverse-thread-group=0 | FileCheck -check-prefix=NOTREVERSETEST %s
-// NOTREVERSETEST-LABEL: {{^// LLPC}} pipeline before-patching results
+// NOTREVERSETEST-LABEL: {{^// LLPC}} LGC before-lowering results
 // There should not be a call to get the gl_NumWorkGroups
 // NOTREVERSETEST-NOT: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
 // There should not be a call to get the internal buffer descriptor

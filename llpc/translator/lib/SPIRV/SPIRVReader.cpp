@@ -5,7 +5,7 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -1455,6 +1455,10 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
   if (!bv->hasType())
     return {};
   SPIRVType *ty = bv->getType();
+  if (bv->isExtInst(SPIRVEIS_GLSL, GLSLstd450ModfStruct)) {
+    assert(ty->isTypeStruct());
+    ty = ty->getStructMemberType(0);
+  }
   if (ty->isTypeVector())
     ty = ty->getVectorComponentType();
   else if (ty->isTypeMatrix())
@@ -3342,8 +3346,9 @@ Value *SPIRVToLLVM::transArrayLength(SPIRVValue *const spvValue) {
 
   const StructLayout *const structLayout = m_m->getDataLayout().getStructLayout(structType);
   const unsigned offset = static_cast<unsigned>(structLayout->getElementOffset(remappedMemberIndex));
-  Value *const offsetVal = getBuilder()->getInt32(offset);
-  Value *const arrayBytes = getBuilder()->create<BufferLengthOp>(structurePtr, offsetVal);
+  Value *const offsetVal = getBuilder()->getInt64(offset);
+  Value *arrayBytes = getBuilder()->create<BufferLengthOp>(structurePtr, offsetVal);
+  arrayBytes = getBuilder()->CreateTrunc(arrayBytes, getBuilder()->getInt32Ty());
 
   Type *const memberType = structType->getStructElementType(remappedMemberIndex)->getArrayElementType();
   const unsigned stride = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(memberType) / 8);
@@ -4499,6 +4504,8 @@ Value *SPIRVToLLVM::transGroupArithOp(Builder::GroupArithOp groupArithOp, SPIRVV
     return getBuilder()->CreateSubgroupClusteredExclusive(groupArithOp, value, clusterSize);
   case GroupOperationClusteredReduce:
     return getBuilder()->CreateSubgroupClusteredReduction(groupArithOp, value, clusterSize);
+  case GroupOperationPartitionedExclusiveScanNV:
+    return getBuilder()->CreateSubgroupClusteredMultiExclusive(groupArithOp, value, clusterSize);
   default:
     llvm_unreachable("Should never be called!");
     return nullptr;
@@ -5764,9 +5771,9 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     case OpTypeFloat: {
       const llvm::fltSemantics *fs = nullptr;
       switch (bt->getFloatBitWidth()) {
-      case 16:
+      case 16: {
         fs = &APFloat::IEEEhalf();
-        break;
+      } break;
       case 32:
         fs = &APFloat::IEEEsingle();
         break;
@@ -11112,7 +11119,7 @@ void SPIRVToLLVM::insertScratchBoundsChecks(SPIRVValue *memOp, const ScratchBoun
 
   auto insertOutOfBoundsGuard = [&](SPIRVValue *accessChainIndex, uint64_t upperBound) {
     Value *comparisonValue = transValue(accessChainIndex, checkBlock->getParent(), checkBlock);
-    ConstantInt *arrayUpperBound = getBuilder()->getInt32(upperBound);
+    auto *arrayUpperBound = ConstantInt::get(comparisonValue->getType(), upperBound);
     auto cmpResult = getBuilder()->CreateICmpULT(comparisonValue, arrayUpperBound);
 
     if (finalCmpResult)

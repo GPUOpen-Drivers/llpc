@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = icmp ne i32 %{{[0-9a-zA-Z.]*}}, 0
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: icmp eq i32 %{{[0-9a-zA-Z.]*}}, 0
 
 ; SHADERTEST: AMDLLPC SUCCESS

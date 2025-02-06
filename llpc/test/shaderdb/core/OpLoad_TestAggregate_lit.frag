@@ -41,11 +41,11 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: load
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: load <4 x float>,
 ; SHADERTEST: load i32,
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32
 ; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32
 

@@ -30,8 +30,8 @@
  */
 
 #include "NullFragmentShader.h"
-#include "lgc/patch/FragmentColorExport.h"
-#include "lgc/patch/LgcLowering.h"
+#include "lgc/lowering/FragmentColorExport.h"
+#include "lgc/lowering/LgcLowering.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/Target/TargetMachine.h"
 

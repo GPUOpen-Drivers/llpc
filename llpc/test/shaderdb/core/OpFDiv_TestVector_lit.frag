@@ -24,7 +24,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-COUNT-1: fdiv reassoc nnan nsz arcp contract afn <4 x float>
 ; SHADERTEST-COUNT-1: fdiv reassoc nnan nsz arcp contract <2 x double>
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}}  LGC lowering results
 ; SHADERTEST: fdiv reassoc nnan nsz arcp contract double
 ; SHADERTEST-COUNT-2: fdiv reassoc nnan nsz arcp contract double
 ; SHADERTEST: AMDLLPC SUCCESS

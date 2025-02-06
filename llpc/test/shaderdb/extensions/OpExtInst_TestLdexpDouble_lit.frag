@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract double (...) @lgc.create.ldexp.f64(double
 ; SHADERTEST: = call reassoc nnan nsz arcp contract <3 x double> (...) @lgc.create.ldexp.v3f64(<3 x double>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.ldexp.f64.i32(double %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract double @llvm.ldexp.f64.i32(double %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS

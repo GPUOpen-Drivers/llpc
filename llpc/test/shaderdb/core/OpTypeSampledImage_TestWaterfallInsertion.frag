@@ -21,7 +21,7 @@ void main()
 // RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 // Make sure that the begin indices chosen are the non-uniform offsets rather than the whole resource desc
 // Make sure that there's a waterfall.readfirstlane for both the image resource desc and sample desc
-// SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+// SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 // SHADERTEST: %[[mul:[0-9]+]] = mul i32 %{{.*}}, 48
 // SHADERTEST-NEXT: %[[begin:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul]])
 // SHADERTEST-NEXT: %[[readfirstlane:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %[[begin]], i32 %[[mul]])

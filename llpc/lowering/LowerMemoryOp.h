@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -51,14 +51,14 @@ struct StoreExpandInfo {
 };
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering memory operations.
+// Represents the pass of FE lowering memory operations.
 class LowerMemoryOp : public SpirvLower,
                       public llvm::InstVisitor<LowerMemoryOp>,
                       public llvm::PassInfoMixin<LowerMemoryOp> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V memory operations"; }
+  static llvm::StringRef name() { return "Lower memory operations"; }
 
   virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElementPtrInst);
   virtual void visitExtractElementInst(llvm::ExtractElementInst &extractElementInst);

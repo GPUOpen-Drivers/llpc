@@ -7,7 +7,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: unreachable
 
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
 ; SHADERTEST-NEXT: br label %[[LABEL:[0-9]*]]
 ; SHADERTEST: [[LABEL]]:

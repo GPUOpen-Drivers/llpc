@@ -47,7 +47,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 2, i32 0, i32 512, i32 0, ptr addrspace(4)
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 4, i32 1, i32 512, i32 0, ptr addrspace(4)
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 6, i32 1, i32 640, i32 0, ptr addrspace(4)
@@ -66,7 +66,7 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.compare.swap.i32(i32 3, i32 512, i32 0, ptr addrspace(4)
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.image.atomic.f32(i32 0, i32 9, i32 512, i32 0, ptr addrspace(4)
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.add.1d.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.smin.2d.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 2, i16 2, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.smax.2d.i32.i16{{(\.v8i32)?}}(i32 %{{.*}}, i16 2, i16 2, <8 x i32> %{{.*}}, i32 0, i32 0)

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -129,7 +129,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[48];
+  unsigned u32All[50];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -208,6 +208,8 @@ union Options {
     unsigned reserved24;
     bool checkRawBufferAccessDescStride; // Check descriptor stride to workaround an issue that a strided buffer desc is
                                          // used for a raw buffer access instruction.
+
+    unsigned reserved26[2];
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -453,8 +455,11 @@ enum BufNumFormat : unsigned {
 
 // Rate of vertex input
 enum VertexInputRate {
-  VertexInputRateVertex = 0,   // Vertex buffer has one element per vertex
-  VertexInputRateInstance = 1, // Vertex buffer has one element per instance
+  VertexInputRateVertex = 0,             // Vertex buffer has one element per vertex
+  VertexInputRateInstance = 1,           // Vertex buffer has one element per instance
+  VertexInputRatePerDrawPerVertex = 2,   // Vertex buffer has one element per draw per vertex
+  VertexInputRatePerDrawPerInstance = 3, // Vertex buffer has one element per draw per instance
+  VertexInputRatePerDraw = 4,            // Vertex buffer has one element per draw
 };
 
 // Structure for a vertex input

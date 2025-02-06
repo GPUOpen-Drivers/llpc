@@ -9,7 +9,7 @@
 ; SHADERTEST: [[D6:![0-9]*]] = !DICompositeType(tag: DW_TAG_enumeration_type, name: "enum2", file: !{{[0-9]*}}, line: 1, size: 32, elements: [[D3]])
 ; SHADERTEST: [[D7:![0-9]*]] = !DICompositeType(tag: DW_TAG_enumeration_type, name: "enum3", file: !{{[0-9]*}}, line: 1, size: 32, elements: [[D8:![0-9]*]])
 ; SHADERTEST: [[D8]] = !{}
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

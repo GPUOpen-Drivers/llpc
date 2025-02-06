@@ -1,6 +1,6 @@
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: load <4 x i32>, ptr addrspace(4) %4, align 16, !invariant.load
 ; SHADERTEST: load <4 x float>, ptr addrspace(4) %4, align 16, !invariant.load
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info

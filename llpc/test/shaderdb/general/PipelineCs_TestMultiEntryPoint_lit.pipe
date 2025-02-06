@@ -2,10 +2,10 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: !llpc.compute.mode = !{![[COMPUTEMODE:[0-9]+]]}
 ; SHADERTEST: ![[COMPUTEMODE]] = !{i32 1, i32 1, i32 1}
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: define {{.*}} void @_amdgpu_cs_main(i32 inreg noundef %globalTable, i32 inreg noundef %userdata0, <3 x i32> inreg noundef %WorkgroupId, i32 inreg noundef %MultiDispatchInfo, <3 x i32> noundef %LocalInvocationId)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -31,7 +31,7 @@
 #include "llvmraytracing/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
-#include "lgc/patch/LgcLowering.h"
+#include "lgc/lowering/LgcLowering.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/Analysis/TargetTransformInfo.h"

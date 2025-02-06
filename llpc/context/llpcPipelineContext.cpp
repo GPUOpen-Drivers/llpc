@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -361,6 +361,15 @@ void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline, const Graph
       bindings[idx].inputRate = VertexInputRateInstance;
       bindings[idx].divisor = 1; // Set default divisor
       break;
+    case VK_VERTEX_INPUT_RATE_PER_DRAW_PER_VERTEX:
+      bindings[idx].inputRate = VertexInputRatePerDrawPerVertex;
+      break;
+    case VK_VERTEX_INPUT_RATE_PER_DRAW_PER_INSTANCE:
+      bindings[idx].inputRate = VertexInputRatePerDrawPerInstance;
+      break;
+    case VK_VERTEX_INPUT_RATE_PER_DRAW:
+      bindings[idx].inputRate = VertexInputRatePerDraw;
+      break;
     default:
       llvm_unreachable("Should never be called!");
     }
@@ -698,7 +707,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
 
   shaderOptions.waveSize = shaderInfo.options.waveSize;
   shaderOptions.wgpMode = shaderInfo.options.wgpMode;
-
   // If subgroupSize is specified, we should use the specified value.
   if (shaderInfo.options.subgroupSize != 0)
     shaderOptions.subgroupSize = shaderInfo.options.subgroupSize;

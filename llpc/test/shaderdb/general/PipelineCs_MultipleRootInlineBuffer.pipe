@@ -2,12 +2,12 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -o %t.elf %gfxip %s -v --print-after=lgc-lower-desc 2>&1 | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^//}} LLPC SPIR-V lowering result
+; SHADERTEST-LABEL: {{^//}} LLPC FE lowering result
 ; SHADERTEST: define dllexport spir_func void @main()
 ; SHADERTEST-DAG: call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
 ; SHADERTEST-DAG: call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 0)
 ; SHADERTEST: ret void
-; SHADERTEST-LABEL: {{^//}} LLPC pipeline before-patching results
+; SHADERTEST-LABEL: {{^//}} LLPC LGC before-lowering results
 ; SHADERTEST: define dllexport spir_func void @lgc.shader.CS.main()
 
 ; Get a pointer to the second inline buffer. Offset 40 comes from the user data nodes
@@ -21,7 +21,7 @@
 ; SHADERTEST: [[buf_addr0:%[0-9]*]] = call ptr addrspace(4) @lgc.user.data(i32 4)
 
 ; SHADERTEST: ret void
-; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results
+; SHADERTEST-LABEL: {{^//}} LLPC LGC lowering results
 ; END_SHADERTEST
 
 ; Test the use of InlineBuffer with relocatable shaders.  This is currently not supported, and we

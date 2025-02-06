@@ -5,7 +5,7 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -46,6 +46,7 @@
 #include "SPIRVOpCode.h"
 #include "SPIRVStream.h"
 #include "SPIRVValue.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cassert>
 #include <cstdint>
 #include <functional>
@@ -1676,11 +1677,16 @@ protected:
     switch (getValueType(this->getId())->getOpCode()) {
     case OpTypeVector:
       assert(getConstituents().size() > 1 && "There must be at least two Constituent operands in vector");
+      break;
+    case OpTypeMatrix:
+      assert(getConstituents().size() == getValueType(this->getId())->getMatrixColumnCount() &&
+             "There must be equal to Constituent operands in matrix");
     case OpTypeArray:
     case OpTypeStruct:
+    case OpTypeCooperativeMatrixKHR:
       break;
     default:
-      static_assert("Invalid type", "");
+      llvm_unreachable("Invalid type");
     }
   }
   std::vector<SPIRVId> Constituents;
@@ -1720,7 +1726,7 @@ protected:
     case OpTypeCooperativeMatrixKHR:
       break;
     default:
-      static_assert("Invalid type", "");
+      llvm_unreachable("Invalid type");
     }
   }
   std::vector<SPIRVId> Constituents;

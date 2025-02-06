@@ -43,8 +43,6 @@ declare void @lgc.rt.call.callable.shader(...) #1
 attributes #0 = { alwaysinline }
 attributes #1 = { nounwind willreturn memory(argmem: readwrite, inaccessiblemem: readwrite) }
 
-!lgc.cps.module = !{}
-
 !0 = !{i32 0, %struct.DispatchSystemData poison}
 !1 = !{%struct.DispatchSystemData poison}
 !2 = !{%struct.DispatchSystemData poison}

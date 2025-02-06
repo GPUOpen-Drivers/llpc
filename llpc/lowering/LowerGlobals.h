@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -44,7 +44,7 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations for globals (global variables, inputs, and outputs).
+// Represents the pass of FE lowering operations for globals (global variables, inputs, and outputs).
 class LowerGlobals : public SpirvLower, public llvm::PassInfoMixin<LowerGlobals> {
 public:
   LowerGlobals();
@@ -58,10 +58,10 @@ public:
   void handleStoreInst();
   void handleStoreInstGEP(GlobalVariable *output, ArrayRef<Value *> indexOperands, StoreInst &storeInst);
 
-  static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs)"; }
+  static llvm::StringRef name() { return "Lower globals (global variables, inputs, and outputs)"; }
 
 private:
-  void mapGlobalVariableToProxy(llvm::GlobalVariable *globalVar);
+  void mapGlobalVariableToProxy(llvm::GlobalVariable *globalVar, llvm::Constant *initializer = nullptr);
   void lowerInOut(llvm::GlobalVariable *globalVar);
   void lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, llvm::Value *current,
                               SmallVectorImpl<llvm::Value *> &indexStack);

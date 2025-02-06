@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -139,8 +139,8 @@ def BufferIndexOp : LgcOp<"buffer.index", [Memory<[]>, WillReturn]> {
 }
 
 def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
-  let arguments = (ins BufferPointer:$pointer, I32:$offset);
-  let results = (outs I32:$result);
+  let arguments = (ins BufferPointer:$pointer, I64:$offset);
+  let results = (outs I64:$result);
 
   let summary = "return the size of a buffer";
   let description = [{
@@ -480,7 +480,7 @@ def InputImportGenericOp : DivergentLgcOp<"input.import.generic", [Memory<[]>, W
 def LoadVertexInputOp : DivergentLgcOp<"load.vertex.input", [Memory<[]>, WillReturn]> {
   let superclass = GenericLocationOp;
 
-  let arguments = (ins GenericLocationOp, I32:$vertex_index, I32:$instance_index);
+  let arguments = (ins GenericLocationOp, I32:$vertex_id, I32:$instance_id, I32:$draw_id, I32:$base_vertex, I32:$base_instance);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;

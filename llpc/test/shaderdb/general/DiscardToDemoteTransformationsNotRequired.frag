@@ -7,9 +7,9 @@
 // CHECK:             OpImageSampleImplicitLod
 // CHECK:       {{^}} {{OpKill|OpTerminateInvocation}}
 // CHECK:             OpImageRead
-// CHECK-LABEL: {{^}}// LLPC SPIR-V lowering results
+// CHECK-LABEL: {{^}}// LLPC FE lowering results
 // CHECK:       call void (...) @lgc.create.kill()
-// CHECK-LABEL: {{^}}// LLPC pipeline patching results
+// CHECK-LABEL: {{^}}// LLPC LGC lowering results
 // CHECK:       call void @llvm.amdgcn.kill(i1 false)
 // CHECK-NOT:   "amdgpu-transform-discard-to-demote"
 // CHECK-LABEL: {{^}}// LLPC final ELF info

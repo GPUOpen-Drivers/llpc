@@ -14,10 +14,10 @@ void main (void)
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call <2 x float> (...) @lgc.input.import.interpolated__v2f32{{.*}}
 ; SHADERTEST: call float (...) @lgc.input.import.interpolated__f32{{.*}}
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 1, i32 0, i32 %PrimMask)
 ; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[^,]*}}, float %{{[^,]*}}, i32 1, i32 0, i32 %PrimMask)
 ; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 3, i32 0, i32 %PrimMask)

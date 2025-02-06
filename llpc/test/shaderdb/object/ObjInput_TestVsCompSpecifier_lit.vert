@@ -14,10 +14,10 @@ void main()
 /*
 ; RUN: amdllpc -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call <2 x float> @lgc.load.vertex.input__v2f32(i1 false, i32 0, i32 0, i32 1, i32 poison, i32 poison, i32 poison)
-; SHADERTEST: call float @lgc.load.vertex.input__f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
+; SHADERTEST: call <2 x float> @lgc.load.vertex.input__v2f32(i1 false, i32 0, i32 0, i32 1, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
+; SHADERTEST: call float @lgc.load.vertex.input__f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call {{.*}} @llvm.amdgcn.struct.tbuffer.load
 ; SHADERTEST: AMDLLPC SUCCESS
 */

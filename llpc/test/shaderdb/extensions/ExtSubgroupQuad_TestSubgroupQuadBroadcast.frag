@@ -1,12 +1,12 @@
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.quad.broadcast.f32
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.quad.broadcast.f32
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.quad.broadcast.f32
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.quad.broadcast.f32
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32
 ; SHADERTEST: call i32 @llvm.amdgcn.wqm
 ; SHADERTEST: call i32 @llvm.amdgcn.mov.dpp.i32

@@ -14,7 +14,7 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call { i32, i1 } @llvm.uadd.with.overflow.i32(i32
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}}  LGC lowering results
 ; SHADERTEST: call { i32, i1 } @llvm.uadd.with.overflow.i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */

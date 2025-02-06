@@ -22,7 +22,7 @@
 ; SHADERTEST: (GS) Output: stream = 1,  [location, component] = [3, 2]  =>  Mapped = [0, 2]
 ; SHADERTEST: (GS) Output: stream = 1,  [location, component] = [3, 3]  =>  Mapped = [0, 3]
 ; SHADERTEST: (GS) Output: stream = 1,  [location, component] = [4, 3]  =>  Mapped = [1, 0]
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 32, i32 15
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 33, i32 15
 ; SHADERTEST: AMDLLPC SUCCESS

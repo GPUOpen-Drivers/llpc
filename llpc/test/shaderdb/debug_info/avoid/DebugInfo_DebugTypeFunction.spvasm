@@ -14,7 +14,7 @@
 ; SHADERTEST: [[D12:![0-9]*]] = !DILocalVariable(name: "foo4", scope: !{{[0-9*]}}, file: !{{[0-9*]}}, line: 4, type: [[D13:![0-9]*]])
 ; SHADERTEST: [[D13]] = !DISubroutineType(types: [[D14:![0-9]*]])
 ; SHADERTEST: [[D14]] = !{null, [[D7]], [[D7]]}
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

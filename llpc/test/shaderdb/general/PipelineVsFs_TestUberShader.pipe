@@ -2,7 +2,7 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; Load input descriptor
 
 ; SHADERTEST: [[PTR0:%[.a-z0-9]+]] = insertelement <2 x i32> poison, i32 %userdata2, i64 0

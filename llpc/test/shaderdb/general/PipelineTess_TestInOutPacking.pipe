@@ -1,6 +1,6 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
-; SHADERTEST_PP0-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST_PP0-LABEL: {{^// LLPC}} LGC lowering results
 
 ; SHADERTEST_PP0: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %{{[0-9]*}}, 196
 ; SHADERTEST_PP0: [[P0:%[0-9a-zA-Z.]+]] = getelementptr {{i8|i32}}, ptr addrspace(3) {{.*}}, i32 [[VERTEX_BASE]]
@@ -45,7 +45,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
 ; Fragment shader part-pipeline:
-; SHADERTEST_PP1-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST_PP1-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST_PP1: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 1, i32 1, i32 %PrimMask)
 ; SHADERTEST_PP1: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 2, i32 0, i32 %PrimMask)
 ; SHADERTEST_PP1: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 3, i32 0, i32 %PrimMask)
@@ -53,7 +53,7 @@
 ; SHADERTEST_PP1: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 0, i32 0, i32 %PrimMask)
 ; SHADERTEST_PP1: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 1, i32 0, i32 %PrimMask)
 ; Pre-rasterization part-pipeline:
-; SHADERTEST_PP1-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST_PP1-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST_PP1: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %{{[0-9]*}}, 196
 ; SHADERTEST_PP1: [[P0:%[0-9a-zA-Z.]+]] = getelementptr i8, ptr addrspace(3) {{.*}}, i32 [[VERTEX_BASE]]
 ; SHADERTEST_PP1: %{{[0-9]*}} = getelementptr {{i8}}, ptr addrspace(3) [[P0]], i32 5120

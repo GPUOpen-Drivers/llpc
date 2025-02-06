@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -215,7 +215,9 @@ const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
   const unsigned *code = reinterpret_cast<const unsigned *>(spvBin->pCode);
   const unsigned *end = code + spvBin->codeSize / sizeof(unsigned);
 
-  if (isSpirvBinary(spvBin)) {
+  const bool isSpvBinary = isSpirvBinary(spvBin);
+
+  if (isSpvBinary) {
     // Skip SPIR-V header
     const unsigned *codePos = code + sizeof(SpirvHeader) / sizeof(unsigned);
 
@@ -224,7 +226,7 @@ const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
       unsigned wordCount = (codePos[0] >> WordCountShift);
 
       if (wordCount == 0 || codePos + wordCount > end) {
-        assert("Invalid SPIR-V binary\n");
+        assert(wordCount != 0 && codePos + wordCount <= end && "Invalid SPIR-V binary");
         break;
       }
 
@@ -244,11 +246,11 @@ const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
     }
 
     if (!entryName) {
-      assert("Entry-point not found\n");
+      assert(entryName && "Entry-point not found");
       entryName = "";
     }
   } else {
-    assert("Invalid SPIR-V binary\n");
+    assert(isSpvBinary && "Invalid SPIR-V binary");
     entryName = "";
   }
 

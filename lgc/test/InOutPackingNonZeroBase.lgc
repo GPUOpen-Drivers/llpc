@@ -39,7 +39,7 @@ target triple = "amdgcn--amdpal"
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !9 !lgc.shaderstage !10 {
 ; IR-LABEL: @lgc.shader.VS.main(
 ; IR-NEXT:  .entry:
-; IR-NEXT:    [[TMP0:%.*]] = call <3 x float> (...) @lgc.load.vertex.input__v3f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+; IR-NEXT:    [[TMP0:%.*]] = call <3 x float> (...) @lgc.load.vertex.input__v3f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
 ; IR-NEXT:    [[TMP1:%.*]] = extractelement <3 x float> [[TMP0]], i64 0
 ; IR-NEXT:    [[TMP2:%.*]] = extractelement <3 x float> [[TMP0]], i64 1
 ; IR-NEXT:    [[TMP3:%.*]] = extractelement <3 x float> [[TMP0]], i64 2
@@ -50,7 +50,7 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spi
 ; IR-NEXT:    ret void
 ;
 .entry:
-  %0 = call <3 x float> (...) @lgc.load.vertex.input__v3f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+  %0 = call <3 x float> (...) @lgc.load.vertex.input__v3f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
 
   %1 = extractelement <3 x float> %0, i64 0
   %2 = extractelement <3 x float> %0, i64 1

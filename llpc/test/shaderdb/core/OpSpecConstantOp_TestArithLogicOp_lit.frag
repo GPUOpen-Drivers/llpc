@@ -257,7 +257,7 @@ void main()
 ; SHADERTEST: add i32 %{{[0-9]*}}, -6
 
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: float 0x4034E66680000000, float 0x4034E66680000000, float 0x4034E66680000000, float 0x4034E66680000000
 
 ; SHADERTEST: AMDLLPC SUCCESS

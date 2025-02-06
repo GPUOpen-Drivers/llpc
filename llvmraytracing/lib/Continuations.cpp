@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -31,8 +31,11 @@
 
 #include "llvmraytracing/Continuations.h"
 #include "ContStateBuilder.h"
+#include "RematSupport.h"
+#include "compilerutils/ArgPromotion.h"
 #include "compilerutils/CompilerUtils.h"
 #include "compilerutils/DxilToLlvm.h"
+#include "compilerutils/TypesMetadata.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/GpurtContext.h"
 #include "llvmraytracing/SpecializeDriverShaders.h"
@@ -41,11 +44,11 @@
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
-#include "llvm-dialects/Dialect/OpSet.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntervalTree.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Instructions.h"
@@ -58,10 +61,10 @@
 #include "llvm/Transforms/Coroutines/CoroEarly.h"
 #include "llvm/Transforms/Coroutines/CoroElide.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/SROA.h"
+#include "llvm/Transforms/Scalar/Scalarizer.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/FixIrreducible.h"
@@ -104,7 +107,9 @@ const llvm_dialects::OpMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {{
 
 #undef GPURTMAP_ENTRY
 
-void llvm::replaceCallsToFunction(Function &F, Value &Replacement) {
+bool llvm::replaceCallsToFunction(Function &F, Value &Replacement) {
+  bool Changed = false;
+
   llvm::forEachCall(F, [&](CallInst &CInst) {
     // Basic sanity check. We should also check for dominance.
     assert((!isa<Instruction>(&Replacement) || cast<Instruction>(&Replacement)->getFunction() == CInst.getFunction()) &&
@@ -112,7 +117,11 @@ void llvm::replaceCallsToFunction(Function &F, Value &Replacement) {
            "reside in the same function as CallInst to replace!");
     CInst.replaceAllUsesWith(&Replacement);
     CInst.eraseFromParent();
+
+    Changed = true;
   });
+
+  return Changed;
 }
 
 void llvm::moveFunctionBody(Function &OldFunc, Function &NewFunc) {
@@ -147,35 +156,6 @@ bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
   }
 
   return DidChange;
-}
-
-bool ContHelper::isRematerializableLgcRtOp(CallInst &CInst, std::optional<lgc::rt::RayTracingShaderStage> Kind) {
-  using namespace lgc::rt;
-  Function *Callee = CInst.getCalledFunction();
-  if (!LgcRtDialect::isDialectOp(*Callee))
-    return false;
-
-  // Always rematerialize
-  static const llvm_dialects::OpSet RematerializableDialectOps =
-      llvm_dialects::OpSet::get<DispatchRaysDimensionsOp, DispatchRaysIndexOp>();
-  if (RematerializableDialectOps.contains(*Callee))
-    return true;
-
-  // Rematerialize for Intersection that can only call ReportHit, which keeps
-  // the largest system data struct. These cannot be rematerialized in
-  // ClosestHit, because if ClosestHit calls TraceRay or CallShader, that
-  // information is lost from the system data struct. Also exclude rayTCurrent
-  // because ReportHit calls can change that.
-  if (!Kind || *Kind == RayTracingShaderStage::Intersection) {
-    static const llvm_dialects::OpSet RematerializableIntersectionDialectOps =
-        llvm_dialects::OpSet::get<InstanceIdOp, InstanceIndexOp, GeometryIndexOp, ObjectRayDirectionOp,
-                                  ObjectRayOriginOp, ObjectToWorldOp, PrimitiveIndexOp, RayFlagsOp, RayTminOp,
-                                  WorldRayDirectionOp, WorldRayOriginOp, WorldToObjectOp, InstanceInclusionMaskOp>();
-    if (RematerializableIntersectionDialectOps.contains(*Callee))
-      return true;
-  }
-
-  return false;
 }
 
 Type *ContHelper::getPaddingType(const DataLayout &DL, LLVMContext &Context, ArrayRef<Type *> Types,
@@ -928,8 +908,8 @@ static bool replaceEnqueueIntrinsic(Function &F) {
   return Changed;
 }
 
-/// Remove wait mask from WaitAwait intrinsic calls and set waitmask metadata
-static bool replaceAwaitIntrinsic(Function &F) {
+/// Remove wait mask from WaitAwait intrinsic calls and set waitmask metadata if PreserveWaitMasks is set to true
+static bool replaceAwaitIntrinsic(Function &F, bool PreserveWaitMasks = true) {
   StringRef FuncName = F.getName();
 
   if (FuncName.contains("AmdAwait"))
@@ -951,7 +931,8 @@ static bool replaceAwaitIntrinsic(Function &F) {
     B.SetInsertPoint(&CInst);
     auto *NewCall = CompilerUtils::createNamedCall(B, "_AmdAwait", CInst.getType(), NewArgs, {});
     CInst.replaceAllUsesWith(NewCall);
-    ContHelper::setWaitMask(*NewCall);
+    if (PreserveWaitMasks)
+      ContHelper::setWaitMask(*NewCall);
 
     ErasableAwaits.push_back(&CInst);
   });
@@ -1118,7 +1099,50 @@ void ContHelper::handleValueSetI32(Function &F, IRBuilder<> &Builder) {
   });
 }
 
-bool llvm::earlyGpurtTransform(Module &M) {
+Function *llvm::tryGpurtPointerArgPromotion(Function *Func) {
+  StringRef FuncName = Func->getName();
+
+  if (!Func->hasMetadata(TypedFuncTy::MDTypesName) && !Func->arg_empty())
+    return nullptr;
+
+  SmallBitVector PromotionMask(Func->arg_size());
+  for (auto [Index, Arg] : llvm::enumerate(Func->args())) {
+    TypedArgTy ArgTy = TypedArgTy::get(&Arg);
+    if (!ArgTy.isPointerTy())
+      continue;
+
+    // Change the pointer type to its value type for non-struct types.
+    // _Amd*Await use value types for all arguments.
+    // For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
+    // Include Traversal, since we want the system data to be of struct type.
+    if (!isa<StructType>(ArgTy.getPointerElementType()) || FuncName.contains("Enqueue") || FuncName.contains("Await") ||
+        FuncName == ContDriverFunc::TraversalName ||
+        (FuncName == ContDriverFunc::SetTriangleHitAttributesName && Index == 1))
+      PromotionMask.set(Index);
+  }
+
+  // promotePointerArguments returns the input if no argument was promoted.
+  auto *NewFunc = CompilerUtils::promotePointerArguments(Func, PromotionMask);
+
+  // This function is provided by the compiler to GPURT. It will be substituted by LowerRaytracingPipeline.
+  // NOTE: GPURT now preserves all function names started with "_Amd", but some of them are not intrinsics, e.g.,
+  // "_AmdSystemData.IsTraversal", which are methods of system data structs. Skip those to let them be inlined
+  // automatically.
+  if (NewFunc->getName().contains("_Amd") && !NewFunc->getName().contains(".")) {
+    // Metadata can be cleared by the call to deleteBody, so ensure the prototypes still have it, since we
+    // later rely on it.
+    auto *ClonedMD = NewFunc->getMetadata(TypedFuncTy::MDTypesName);
+    NewFunc->deleteBody();
+    NewFunc->setMetadata(TypedFuncTy::MDTypesName, ClonedMD);
+  }
+
+  if (PromotionMask.any())
+    return NewFunc;
+
+  return nullptr;
+}
+
+bool llvm::earlyGpurtTransform(Module &M, SmallVector<Function *> &PromotableFunctions, bool PreserveWaitMasks) {
   // Import StackAddrspace from metadata if set, otherwise from default
   auto StackAddrspaceMD = ContHelper::tryGetStackAddrspace(M);
   auto StackAddrspace = StackAddrspaceMD.value_or(ContHelper::DefaultStackAddrspace);
@@ -1129,6 +1153,14 @@ bool llvm::earlyGpurtTransform(Module &M) {
   ContHelper::getGpurtSettings(M, GpurtSettings);
 
   bool Changed = false;
+
+  // Try the argument promotion
+  for (Function *PromotableFunc : PromotableFunctions) {
+    Function *PromotedFunc = tryGpurtPointerArgPromotion(PromotableFunc);
+    if (PromotedFunc)
+      Changed = true;
+  }
+
   // Replace Enqueue and Complete intrinsics
   for (auto &F : M) {
     auto Name = F.getName();
@@ -1136,7 +1168,7 @@ bool llvm::earlyGpurtTransform(Module &M) {
     if (Name.contains("Enqueue")) {
       Changed = replaceEnqueueIntrinsic(F);
     } else if (Name.contains("Await")) {
-      Changed = replaceAwaitIntrinsic(F);
+      Changed = replaceAwaitIntrinsic(F, PreserveWaitMasks);
     }
 
     if (Name.starts_with("_AmdContinuationStackIsGlobal")) {
@@ -1171,93 +1203,19 @@ uint64_t llvm::computePayloadSpillSize(uint64_t NumI32s, uint64_t NumReservedReg
 }
 
 DXILCoroSplitPass::DXILCoroSplitPass()
-    : CoroSplitPass(std::function<bool(Instruction &)>(&DXILMaterializable), {[](Function &F, coro::Shape &S) {
-                      return std::make_unique<llvmraytracing::ContStateBuilder>(F, S, DXILMaterializable);
+    : CoroSplitPass(std::function<bool(Instruction &)>(&rematsupport::DXILMaterializable),
+                    {[](Function &F, coro::Shape &S) {
+                      return std::make_unique<llvmraytracing::ContStateBuilder>(F, S, rematsupport::DXILMaterializable);
                     }},
                     /*OptimizeFrame*/ true) {
 }
 
 LgcCoroSplitPass::LgcCoroSplitPass()
-    : CoroSplitPass(std::function<bool(Instruction &)>(&LgcMaterializable), {[](Function &F, coro::Shape &S) {
-                      return std::make_unique<llvmraytracing::ContStateBuilder>(F, S, LgcMaterializable);
+    : CoroSplitPass(std::function<bool(Instruction &)>(&rematsupport::LgcMaterializable),
+                    {[](Function &F, coro::Shape &S) {
+                      return std::make_unique<llvmraytracing::ContStateBuilder>(F, S, rematsupport::LgcMaterializable);
                     }},
                     /*OptimizeFrame*/ true) {
-}
-
-bool llvm::commonMaterializable(Instruction &Inst) {
-  if (coro::isTriviallyMaterializable(Inst))
-    return true;
-
-  // Insert into constant.
-  if (isa<InsertElementInst, InsertValueInst>(Inst) && isa<Constant>(Inst.getOperand(0))) {
-    return true;
-  }
-
-  if (auto *Shuffle = dyn_cast<ShuffleVectorInst>(&Inst); Shuffle && Shuffle->isSingleSource())
-    return true;
-
-  return false;
-}
-
-bool llvm::LgcMaterializable(Instruction &OrigI) {
-  Instruction *V = &OrigI;
-
-  // extract instructions are rematerializable, but increases the size of the
-  // continuation state, so as a heuristic only rematerialize this if the source
-  // can be rematerialized as well.
-  while (true) {
-    Instruction *NewInst = nullptr;
-    if (auto *Val = dyn_cast<ExtractElementInst>(V))
-      NewInst = dyn_cast<Instruction>(Val->getVectorOperand());
-    else if (auto *Val = dyn_cast<ExtractValueInst>(V))
-      NewInst = dyn_cast<Instruction>(Val->getAggregateOperand());
-
-    if (NewInst)
-      V = NewInst;
-    else
-      break;
-  }
-
-  if (commonMaterializable(*V))
-    return true;
-
-  if (auto *LI = dyn_cast<LoadInst>(V)) {
-    // load from constant address space
-    if (LI->getPointerAddressSpace() == 4)
-      return true;
-  }
-
-  if (auto *CInst = dyn_cast<CallInst>(V)) {
-    if (auto *CalledFunc = CInst->getCalledFunction()) {
-      // Before rematerialization happens, lgc.rt dialect operations that cannot
-      // be rematerialized are replaced by their implementation, so that the
-      // necessary values can be put into the coroutine frame. Therefore, we
-      // can assume all left-over intrinsics can be rematerialized.
-      if (ContHelper::isRematerializableLgcRtOp(*CInst))
-        return true;
-
-      if (auto *Intrinsic = dyn_cast<IntrinsicInst>(CInst)) {
-        switch (Intrinsic->getIntrinsicID()) {
-        // Note: s_getpc will return a different value if rematerialized into a
-        // different place, but assuming we only care about the high 32bit for
-        // all the use cases we have now, it should be ok to do so.
-        case Intrinsic::amdgcn_s_getpc:
-          return true;
-        default:
-          break;
-        }
-      }
-
-      auto CalledName = CalledFunc->getName();
-      // FIXME: switch to dialectOp check.
-      if (CalledName.starts_with("lgc.user.data") || CalledName.starts_with("lgc.shader.input") ||
-          CalledName.starts_with("lgc.create.get.desc.ptr") || CalledName.starts_with("lgc.load.buffer.desc") ||
-          CalledName.starts_with("lgc.load.strided.buffer.desc") || CalledName.starts_with("lgc.load.user.data"))
-        return true;
-    }
-  }
-
-  return false;
 }
 
 std::optional<CallInst *> llvm::findDominatedContinueCall(CallInst *GetResPointAddr) {
@@ -1328,7 +1286,11 @@ void addLgcContinuationTransform(ModulePassManager &MPM) {
 
   MPM.addPass(LowerAwaitPass());
 
-  MPM.addPass(createModuleToFunctionPassAdaptor(InstCombinePass()));
+  // Scalarizer pass could break down system data structure (and possibly other data) which would help to reduce size of
+  // continuations state.
+  ScalarizerPassOptions scalarizerOptions;
+  scalarizerOptions.ScalarizeMinBits = 32;
+  MPM.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass(scalarizerOptions)));
 
   MPM.addPass(CoroEarlyPass());
   CGSCCPassManager CGPM;

@@ -23,7 +23,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: <2 x double> (...) @lgc.create.matrix.times.vector.v2f64
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: fmul reassoc nnan nsz arcp contract double
 ; SHADERTEST: fadd reassoc nnan nsz arcp contract double
 

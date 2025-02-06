@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -96,8 +96,9 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
   if (!node)
     report_fatal_error("Resource node not found");
 
-  const bool isCompact = (node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
-                                   node->concreteType == ResourceNodeType::DescriptorConstBufferCompact));
+  const bool isCompact = node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
+                                  node->concreteType == ResourceNodeType::DescriptorConstBufferCompact);
+  const bool globallyCoherent = flags & BufferFlagCoherent;
 
   if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
     // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
@@ -119,7 +120,6 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     if (return64Address)
       return desc;
     assert(convertFatPointer);
-    bool globallyCoherent = flags & BufferFlagCoherent;
     if (isCompact) {
       desc = CreateBitCast(desc, getInt64Ty());
       if (stride == 0)
@@ -140,9 +140,9 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     assert(convertFatPointer);
     desc = CreatePtrToInt(descPtr, getInt64Ty());
     if (stride == 0)
-      desc = create<BufferAddrToPtrOp>(desc, false);
+      desc = create<BufferAddrToPtrOp>(desc, globallyCoherent);
     else
-      desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride), false);
+      desc = create<StridedBufferAddrAndStrideToPtrOp>(desc, getInt32(stride), globallyCoherent);
   } else {
     ResourceNodeType resType = node->concreteType;
     ResourceNodeType abstractType = node->abstractType;
@@ -171,7 +171,6 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
     descPtr = CreateBitCast(descPtr, getDescPtrTy());
     if (convertFatPointer) {
       bool forceRawView = flags & BufferFlagForceRawView;
-      bool globallyCoherent = flags & BufferFlagCoherent;
       if (stride == 0)
         desc = create<BufferLoadDescToPtrOp>(descPtr, forceRawView, isCompact, globallyCoherent);
       else

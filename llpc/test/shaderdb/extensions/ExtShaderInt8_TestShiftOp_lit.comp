@@ -22,11 +22,11 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: %{{[0-9]*}} = ashr i8 %{{[0-9]*}}, 3
 ; SHADERTEST: %{{[0-9]*}} = lshr i8 %{{[0-9]*}}, 3
 ; SHADERTEST: %{{[0-9]*}} = shl i8 %{{[0-9]*}}, 3
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

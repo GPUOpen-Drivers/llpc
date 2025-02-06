@@ -80,7 +80,7 @@ void main ()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: atomicrmw umin ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
 ; SHADERTEST: atomicrmw umax ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
 ; SHADERTEST: atomicrmw and ptr addrspace({{.*}}) %{{[0-9]*}}, i64 %{{[0-9]*}} syncscope("agent") monotonic
@@ -106,7 +106,7 @@ void main ()
 ; SHADERTEST: atomicrmw add ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 80), i64 %{{[0-9]*}} syncscope("agent") monotonic
 ; SHADERTEST: cmpxchg ptr addrspace(3) getelementptr inbounds {{(nuw )?}}(i8, ptr addrspace(3) @{{.*}}, i32 96), i64 78187493520, i64 %{{[0-9]*}} syncscope("agent") monotonic
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.umin.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.umax.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 8, i32 0, i32 0)
 ; SHADERTEST: call i64 @llvm.amdgcn.raw.buffer.atomic.and.i64{{(\.v4i32)?}}(i64 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 16, i32 0, i32 0)

@@ -14,11 +14,11 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}}  FE lowering results
 ; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 1)
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v2i32(i32 1, i32 512, {{.*}}, i32 0)
 
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}}  LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

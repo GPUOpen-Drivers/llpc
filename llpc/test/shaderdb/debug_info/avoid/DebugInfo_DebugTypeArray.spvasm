@@ -5,7 +5,7 @@
 ; SHADERTEST: [[D2]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
 ; SHADERTEST: [[D3]] = !{[[D4:![0-9]*]]}
 ; SHADERTEST: [[D4]] = !DISubrange(count: 32, lowerBound: 0)
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

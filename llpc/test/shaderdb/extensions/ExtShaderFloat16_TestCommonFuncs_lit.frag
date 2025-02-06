@@ -68,9 +68,9 @@ void main()
 ; SHADERTEST: = call <3 x i16> (...) @lgc.create.extract.exponent.v3i16(<3 x half>
 ; SHADERTEST: = call reassoc nsz arcp contract afn <3 x half> (...) @lgc.create.ldexp.v3f16(<3 x half>
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x half> (...) @lgc.create.fmax.v3f16(<3 x half>
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

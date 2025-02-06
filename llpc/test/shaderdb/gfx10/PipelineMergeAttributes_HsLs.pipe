@@ -1,7 +1,7 @@
 ; RUN: amdllpc -v --gfxip=10.3.0 %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; Check the merged HS has acquired HS amdgpu-nsa-threshold, LS amdgpu-num-vgpr.
-; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results
+; SHADERTEST-LABEL: {{^//}} LLPC LGC lowering results
 ; SHADERTEST: amdgpu_hs void @_amdgpu_hs_main{{.*}} #0
 ; SHADERTEST: attributes #0 = {{.*}} "amdgpu-nsa-threshold"="16"{{.*}} "amdgpu-num-vgpr"="42"
 ; SHADERTEST: {{^//}} LLPC final pipeline module info

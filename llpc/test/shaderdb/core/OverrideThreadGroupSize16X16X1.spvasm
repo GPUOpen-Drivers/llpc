@@ -2,7 +2,7 @@
 ; RUN: amdllpc -v %gfxip %s \ 
 ; RUN:   --override-threadGroupSizeX=16 --override-threadGroupSizeY=16 --override-threadGroupSizeZ=1 \
 ; RUN: | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: !llpc.compute.mode = !{!0}
 ; SHADERTEST: !0 = !{i32 16, i32 16, i32 1}
 ; SHADERTEST: AMDLLPC SUCCESS

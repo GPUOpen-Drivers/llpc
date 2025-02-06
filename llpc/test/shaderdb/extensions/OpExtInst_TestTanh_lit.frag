@@ -22,7 +22,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.tanh.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.tanh.v3f32(<3 x float>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: %{{.*}} = call reassoc nnan nsz arcp contract afn float @llvm.fabs.f32(float %{{[0-9]*}})
 ; SHADERTEST: %{{.*}} = fmul reassoc nnan nsz arcp contract afn float %{{.*}}, 0xC007154760000000
 ; SHADERTEST: %{{.*}} = call reassoc nnan nsz arcp contract afn float @llvm.exp2.f32(float %{{.*}})

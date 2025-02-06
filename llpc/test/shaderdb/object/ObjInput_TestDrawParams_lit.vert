@@ -17,7 +17,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 
 ; SHADERTEST-DAG: [[BASEINSTANCE:%.*]] = call i32 @lgc.special.user.data.BaseInstance(
 ; SHADERTEST-DAG: [[INSTANCEID:%.*]] = call i32 @lgc.shader.input.InstanceId(

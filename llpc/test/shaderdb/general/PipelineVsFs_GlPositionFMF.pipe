@@ -4,7 +4,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc --gfxip=10.3.0 -v %s | FileCheck -check-prefixes=SHADERTEST,OPT %s
 ; RUN: amdllpc --gfxip=10.3.0 --disable-gl-position-opt=1 -v %s | FileCheck -check-prefixes=SHADERTEST,NOOPT %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; OPT: fsub nnan nsz afn float 1.000000e+00, %__llpc_input_proxy_in_Pos.0.vec.extract
 ; OPT: call nnan nsz afn <4 x float> (...) @lgc.create.sqrt.v4f32
 ; NOOPT: fsub float 1.000000e+00, %__llpc_input_proxy_in_Pos.0.vec.extract

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  PassRegistry.inc
- * @brief LLPC header file: used as the registry of LLPC lowering passes
+ * @brief LLPC header file: used as the registry of LLPC FE lowering passes
  ***********************************************************************************************************************
  */
 
@@ -46,7 +46,7 @@ LLPC_MODULE_PASS("lower-gl-compatibility", LowerGlCompatibility)
 LLPC_MODULE_PASS("lower-access-chain", LowerAccessChain)
 LLPC_MODULE_PASS("lower-cfg-merges", LowerCfgMerges)
 LLPC_MODULE_PASS("lower-const-immediate-store", LowerConstImmediateStore)
-LLPC_MODULE_PASS("lower-cooperative-matrix", LowerCooperativeMatrixProxy)
+LLPC_MODULE_PASS("lower-cooperative-matrix-proxy", LowerCooperativeMatrixProxy)
 LLPC_MODULE_PASS("lower-inst-meta-remove", LowerInstMetaRemove)
 LLPC_MODULE_PASS("lower-terminator", LowerTerminator)
 LLPC_MODULE_PASS("lower-globals", LowerGlobals)
@@ -54,7 +54,7 @@ LLPC_MODULE_PASS("lower-math-const-folding", LowerMathConstFolding)
 LLPC_MODULE_PASS("lower-math-precision", LowerMathPrecision)
 LLPC_MODULE_PASS("lower-math-float-op", LowerMathFloatOp)
 LLPC_MODULE_PASS("lower-memory-op", LowerMemoryOp)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
+LLPC_MODULE_PASS("lower-ray-tracing", SpirvLowerRayTracing)
 LLPC_MODULE_PASS("lower-post-inline", LowerPostInline)
 
 #undef LLPC_PASS

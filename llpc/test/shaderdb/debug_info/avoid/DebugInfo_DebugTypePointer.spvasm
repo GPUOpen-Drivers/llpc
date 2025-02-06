@@ -3,7 +3,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: [[D1:![0-9]*]] = !DIDerivedType(tag: DW_TAG_pointer_type, baseType: [[D2:![0-9]*]], dwarfAddressSpace: 5)
 ; SHADERTEST: [[D2]] = !DIBasicType(name: "float", size: 32, encoding: DW_ATE_float)
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

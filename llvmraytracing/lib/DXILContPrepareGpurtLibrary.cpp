@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -41,6 +41,7 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Analysis.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include <cassert>
@@ -85,22 +86,6 @@ static Function *transformFunction(Function &F) {
   // Lower `StructRet` argument.
   if (NewFn->hasStructRetAttr())
     NewFn = CompilerUtils::lowerStructRetArgument(NewFn);
-
-  SmallBitVector PromotionMask(NewFn->arg_size());
-
-  StringRef NameStr = NewFn->getName();
-  for (unsigned ArgNo = 0; ArgNo < NewFn->arg_size(); ArgNo++) {
-    auto *Arg = NewFn->getArg(ArgNo);
-    TypedArgTy ArgTy = TypedArgTy::get(Arg);
-    if (!ArgTy.isPointerTy())
-      continue;
-
-    if ((NameStr.contains("Await") || NameStr.contains("Enqueue") || NameStr.contains("Traversal") ||
-         (NameStr == ContDriverFunc::SetTriangleHitAttributesName && ArgNo != 0)))
-      PromotionMask.set(ArgNo);
-  }
-  // Promote pointer arguments to their pointee value types.
-  NewFn = CompilerUtils::promotePointerArguments(NewFn, PromotionMask);
 
   NewFn->addFnAttr(Attribute::AlwaysInline);
   // Set external linkage, so the functions don't get removed, even if they are
@@ -161,26 +146,32 @@ static bool isUtilFunction(StringRef Name) {
   return false;
 }
 
-static void handleIsLlpc(Function &Func) {
+static bool handleIsLlpc(Function &Func) {
   assert(Func.arg_empty()
          // bool
          && Func.getFunctionType()->getReturnType()->isIntegerTy(1));
 
   auto *FalseConst = ConstantInt::getFalse(Func.getContext());
-  llvm::replaceCallsToFunction(Func, *FalseConst);
+  return llvm::replaceCallsToFunction(Func, *FalseConst);
 }
 
-static void handleGetShaderRecordIndex(llvm_dialects::Builder &B, Function &Func) {
+static bool handleGetShaderRecordIndex(llvm_dialects::Builder &B, Function &Func) {
   assert(Func.arg_empty()
          // bool
          && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
+
+  bool Changed = false;
 
   llvm::forEachCall(Func, [&](CallInst &CInst) {
     B.SetInsertPoint(&CInst);
     auto *ShaderIndexCall = B.create<lgc::rt::ShaderIndexOp>();
     CInst.replaceAllUsesWith(ShaderIndexCall);
     CInst.eraseFromParent();
+
+    Changed = true;
   });
+
+  return Changed;
 }
 
 /// Restore the local root index after calls to some function, Func.
@@ -189,12 +180,17 @@ static void handleGetShaderRecordIndex(llvm_dialects::Builder &B, Function &Func
 /// lgc.ilcps.setLocalRootIndex after cross-module inlining and helps us with determining a basic block split point
 /// later. We need that split point to ensure lgc.ilcps.setLocalRootIndex is called before resource accesses that depend
 /// on the local root index occur.
-static void restoreLocalRootIndex(llvm_dialects::Builder &B, Function &Func) {
+/// Returns whether something has changed.
+static bool restoreLocalRootIndex(llvm_dialects::Builder &B, Function &Func) {
+  bool Changed = false;
   llvm::forEachCall(Func, [&](CallInst &CInst) {
     B.SetInsertPoint(++CInst.getIterator());
     auto *ShaderIndexCall = B.create<lgc::rt::ShaderIndexOp>();
     B.create<lgc::ilcps::SetLocalRootIndexOp>(ShaderIndexCall);
+    Changed = true;
   });
+
+  return Changed;
 }
 
 llvm::PreservedAnalyses DXILContPrepareGpurtLibraryPass::run(llvm::Module &M,
@@ -206,7 +202,9 @@ llvm::PreservedAnalyses DXILContPrepareGpurtLibraryPass::run(llvm::Module &M,
   SmallVector<Function *> Funcs(make_pointer_range(M.functions()));
 
   llvm_dialects::Builder B{M.getContext()};
+  bool Changed = false;
 
+  SmallVector<Function *> PromotableFunctions;
   for (auto *F : Funcs) {
     auto Name = F->getName();
     bool ShouldTransform = false;
@@ -220,23 +218,26 @@ llvm::PreservedAnalyses DXILContPrepareGpurtLibraryPass::run(llvm::Module &M,
       if (isUtilFunction(Name)) {
         ShouldTransform = true;
         if (Name.contains("Await"))
-          restoreLocalRootIndex(B, *F);
+          Changed |= restoreLocalRootIndex(B, *F);
       } else if (Name.contains("IsLlpc")) {
         ShouldTransform = false;
-        handleIsLlpc(*F);
+        Changed |= handleIsLlpc(*F);
       } else if (Name.contains("GetShaderRecordIndex")) {
         ShouldTransform = false;
-        handleGetShaderRecordIndex(B, *F);
+        Changed |= handleGetShaderRecordIndex(B, *F);
       }
     }
 
-    if (ShouldTransform)
-      transformFunction(*F);
+    if (ShouldTransform) {
+      Function *NewFunc = transformFunction(*F);
+      PromotableFunctions.push_back(NewFunc);
+    }
+
+    Changed |= ShouldTransform;
   }
 
-  fixupDxilMetadata(M);
+  Changed |= fixupDxilMetadata(M);
+  Changed |= earlyGpurtTransform(M, PromotableFunctions);
 
-  earlyGpurtTransform(M);
-
-  return PreservedAnalyses::none();
+  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -32,7 +32,7 @@
 #include "lgc/CommonDefs.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
-#include "lgc/patch/FragmentColorExport.h"
+#include "lgc/lowering/FragmentColorExport.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/TargetInfo.h"
@@ -1344,9 +1344,9 @@ void PipelineState::determineShaderWaveSize(Module *module) {
     defaultWaveSize[stage] = m_waveSize[stage];
   }
 
-  for (unsigned stage = 0; stage < ShaderStage::Count; ++stage) {
-    unsigned waveSize = hasShaderStage(static_cast<ShaderStageEnum>(stage)) ? defaultWaveSize[stage] : 0;
-    auto mergingStage = getMergingShaderStage(static_cast<ShaderStageEnum>(stage));
+  for (auto stage : ShaderStagesNative) {
+    unsigned waveSize = hasShaderStage(stage) ? defaultWaveSize[stage] : 0;
+    auto mergingStage = getMergingShaderStage(stage);
     unsigned mergingWaveSize = hasShaderStage(mergingStage) ? defaultWaveSize[mergingStage] : 0;
     // Just use default wave size when neither stage is present.
     if (waveSize == 0 && mergingWaveSize == 0)

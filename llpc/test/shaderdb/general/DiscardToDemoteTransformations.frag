@@ -8,9 +8,9 @@
 // DISABLED-LABEL: {{^}}SPIR-V disassembly
 // DISABLED:       {{^}} {{OpKill|OpTerminateInvocation}}
 // DISABLED:             OpImageSampleImplicitLod
-// DISABLED-LABEL: {{^}}// LLPC SPIR-V lowering results
+// DISABLED-LABEL: {{^}}// LLPC FE lowering results
 // DISABLED:       call void (...) @lgc.create.kill()
-// DISABLED-LABEL: {{^}}// LLPC pipeline patching results
+// DISABLED-LABEL: {{^}}// LLPC LGC lowering results
 // DISABLED:       call void @llvm.amdgcn.kill(i1 false)
 // DISABLED-LABEL: {{^}}// LLPC final ELF info
 // DISABLED:       _amdgpu_ps_main:
@@ -24,9 +24,9 @@
 // ENABLED-LABEL: {{^}}SPIR-V disassembly
 // ENABLED:       {{^}} {{OpKill|OpTerminateInvocation}}
 // ENABLED:             OpImageSampleImplicitLod
-// ENABLED-LABEL: {{^}}// LLPC SPIR-V lowering results
+// ENABLED-LABEL: {{^}}// LLPC FE lowering results
 // ENABLED:       call void (...) @lgc.create.kill()
-// ENABLED-LABEL: {{^}}// LLPC pipeline patching results
+// ENABLED-LABEL: {{^}}// LLPC LGC lowering results
 // ENABLED:       call void @llvm.amdgcn.kill(i1 false)
 // ENABLED-LABEL: {{^}}// LLPC final ELF info
 // ENABLED:       _amdgpu_ps_main:

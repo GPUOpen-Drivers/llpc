@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -30,8 +30,8 @@
  */
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/LgcContext.h"
-#include "lgc/patch/IncludeLlvmIr.h"
-#include "lgc/patch/SetupTargetFeatures.h"
+#include "lgc/lowering/IncludeLlvmIr.h"
+#include "lgc/lowering/SetupTargetFeatures.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/Target/TargetMachine.h"

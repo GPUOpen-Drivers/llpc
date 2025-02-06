@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -51,7 +51,8 @@
 using namespace llvm;
 using namespace llvmraytracing;
 
-static cl::opt<bool> ReportContStateAccessCounts(
+namespace {
+cl::opt<bool> ReportContStateAccessCounts(
     "report-cont-state-access-counts",
     cl::desc("Report on the number of spills (stores) and reloads (loads) from the cont state."), cl::init(false),
     cl::Hidden);
@@ -59,12 +60,10 @@ static cl::opt<bool> ReportContStateAccessCounts(
 #ifndef NDEBUG
 // When debugging a potential issue with the cont-state-builder try setting
 // this option to verify the issue resides within the builder.
-static cl::opt<bool> UseLLVMContStateBuilder("use-llvm-cont-state-builder",
-                                             cl::desc("Use LLVM's built-in continuation state builder."),
-                                             cl::init(false), cl::Hidden);
+cl::opt<bool> UseLLVMContStateBuilder("use-llvm-cont-state-builder",
+                                      cl::desc("Use LLVM's built-in continuation state builder."), cl::init(false),
+                                      cl::Hidden);
 #endif
-
-namespace {
 
 // Representation of a row in the frame-table.
 struct CoroFrameRow {
@@ -141,6 +140,13 @@ struct CoroFrameRow {
   // suspend are not currently recorded.
 
   void dump() const;
+
+  // Compares the row's range with the test offset and size (test range) and
+  // returns the signed distance value of:
+  //  0 -> Row's range overlaps with the test range,
+  //  positive -> Row's range follows the test range,
+  //  negative -> Row's range precedes the test range.
+  int64_t compareRanges(uint64_t TestOffset, uint64_t TestSize) const;
 };
 
 using CoroFrameTableTy = std::vector<CoroFrameRow>;
@@ -264,13 +270,13 @@ public:
 };
 
 /// Return true if Def is an Arg with the ByVal attribute.
-[[maybe_unused]] static bool isArgByVal(Value *Def) {
+[[maybe_unused]] bool isArgByVal(Value *Def) {
   if (auto *Arg = dyn_cast<Argument>(Def))
     return Arg->hasByValAttr();
   return false;
 }
 
-static std::string getLabel(Function *F) {
+std::string getLabel(Function *F) {
   if (F->hasName())
     return F->getName().str();
   ModuleSlotTracker MST(F->getParent());
@@ -279,7 +285,7 @@ static std::string getLabel(Function *F) {
   return std::to_string(MST.getLocalSlot(F));
 }
 
-static std::string getLabel(BasicBlock *BB) {
+std::string getLabel(BasicBlock *BB) {
   if (BB->hasName())
     return BB->getName().str();
 
@@ -291,7 +297,7 @@ static std::string getLabel(BasicBlock *BB) {
   return std::to_string(MST.getLocalSlot(BB));
 }
 
-static std::string getLabel(Value *V) {
+std::string getLabel(Value *V) {
   if (V->hasName())
     return V->getName().str();
 
@@ -307,7 +313,7 @@ static std::string getLabel(Value *V) {
   return std::to_string(MST.getLocalSlot(V));
 }
 
-static std::string getAllNames(const SmallSet<BasicBlock *, 2> &List) {
+std::string getAllNames(const SmallSet<BasicBlock *, 2> &List) {
   std::string S;
   if (List.empty())
     return "<empty>";
@@ -347,8 +353,37 @@ void CoroFrameRow::dump() const {
   }
 }
 
+int64_t CoroFrameRow::compareRanges(uint64_t TestOffset, uint64_t TestSize) const {
+  assert(Offset != OptimizedStructLayoutField::FlexibleOffset);
+
+  // Stop if the start addr of the Row exceeds the test range's end addr.
+  // Row's range comes after the test range.
+  if (Offset >= TestOffset + TestSize) {
+    int64_t Diff = Offset - (int64_t)(TestOffset + TestSize - 1); // Positive value
+    assert(Diff > 0);
+    return Diff;
+  }
+
+  // Stop if the test range's start addr exceeds the end addr of the Row.
+  // Row's range comes before the test ranges.
+  if (Offset + Size <= TestOffset) {
+    int64_t Diff = (Offset + Size - 1) - (int64_t)TestOffset; // Negative value
+    assert(Diff < 0);
+    return Diff;
+  }
+
+  // Row's range overlaps with test range, 3 cases:
+  //  Row starts at the same addr as test range
+  //  Row starts at an earlier addr but ends after test ranges' start addr
+  //  Row starts at a later addr but before the end of test ranges' end addr
+  assert((Offset == TestOffset) || (Offset < TestOffset && Offset + Size > TestOffset) ||
+         (Offset > TestOffset && Offset < TestOffset + TestSize));
+
+  return 0;
+}
+
 void CoroFrameStruct::dumpField(const OptimizedStructLayoutField &F, const CoroFrameTableTy &FrameTable) const {
-  auto Idx = reinterpret_cast<long int>(F.Id);
+  auto Idx = reinterpret_cast<size_t>(F.Id);
   const CoroFrameRow *Row = &FrameTable[Idx];
   dbgs() << " Frame Table Row " << std::to_string(Idx);
   if (isa<AllocaInst>(Row->Def))
@@ -475,8 +510,8 @@ void ContStateBuilderImpl::makeRowsResideInSuspendFrame(DefRowMapTy &FrameValues
 // Check if Def value crosses the suspend. Note this check is used instead of
 // checking the ResidesInSuspendFrame set because if eviction is not enabled
 // then the ResidesInSuspendFrame set will include all suspends.
-static bool isSuspendCrossingValue(Value *Def, const coro::SpillInfo &CandidateSpills,
-                                   const SmallVector<coro::AllocaInfo, 8> &CandidateAllocas) {
+bool isSuspendCrossingValue(Value *Def, const coro::SpillInfo &CandidateSpills,
+                            const SmallVector<coro::AllocaInfo, 8> &CandidateAllocas) {
   if (auto *DefAlloca = dyn_cast<AllocaInst>(Def)) {
     auto II = std::find_if(CandidateAllocas.begin(), CandidateAllocas.end(),
                            [DefAlloca](const coro::AllocaInfo &AI) { return AI.Alloca == DefAlloca; });
@@ -486,7 +521,7 @@ static bool isSuspendCrossingValue(Value *Def, const coro::SpillInfo &CandidateS
   return CandidateSpills.contains(Def);
 }
 
-static void fitNewField(Value *Val, OptimizedStructLayoutField &NewField, CoroFrameStruct &Struct) {
+void fitNewField(Value *Val, OptimizedStructLayoutField &NewField, CoroFrameStruct &Struct) {
   NewField.Offset = 0; // If Fields is empty, start at offset 0
   if (!Struct.Fields.empty()) {
     NewField.Offset = alignTo(Struct.Size, NewField.Alignment);
@@ -637,7 +672,7 @@ void ContStateBuilderImpl::insertSpills(coro::Shape &Shape, DominatorTree &DT) {
     // Visit each field in the struct and create spills as needed. Visit fields
     // in reverse order to cause the spills to occur in-order after creation.
     for (auto &Field : llvm::reverse(Struct.Fields)) {
-      auto Idx = reinterpret_cast<long int>(Field.Id);
+      auto Idx = reinterpret_cast<size_t>(Field.Id);
       CoroFrameRow &Row = FrameTable[Idx];
       Value *Def = Row.Def;
 
@@ -699,7 +734,7 @@ void ContStateBuilderImpl::insertReloads() {
     // Visit each field in the struct and create reloads as needed. Visit the
     // in reverse order to cause the reloads to occur in-order after creation.
     for (auto &Field : llvm::reverse(Struct.Fields)) {
-      auto Idx = reinterpret_cast<long int>(Field.Id);
+      auto Idx = reinterpret_cast<size_t>(Field.Id);
       CoroFrameRow &Row = FrameTable[Idx];
       Value *Def = Row.Def;
 
@@ -864,7 +899,7 @@ void ContStateBuilderImpl::createFrameGEPs(SmallVector<Instruction *, 4> &DeadIn
     // fields in reverse order to cause the reloads to occur in-order after
     // creation.
     for (auto &Field : llvm::reverse(Struct.Fields)) {
-      auto Idx = reinterpret_cast<long int>(Field.Id);
+      auto Idx = reinterpret_cast<size_t>(Field.Id);
       CoroFrameRow &Row = FrameTable[Idx];
 
       assert(Row.ResidesInSuspendFrame.contains(Suspend));
@@ -996,7 +1031,32 @@ void ContStateBuilderImpl::removeUnusedReloads() {
   }
 }
 
-static bool hasPoisonOperand(Instruction *I) {
+void checkForValidLayout(const CoroFrameTableTy &FrameTable, const ArrayRef<OptimizedStructLayoutField> &StructFields) {
+  for (auto Itr = StructFields.begin(); Itr != StructFields.end(); Itr++) {
+    auto &Field = *Itr;
+    if (Field.Offset == OptimizedStructLayoutField::FlexibleOffset)
+      llvm_unreachable("Field must have an offset at this point.");
+
+    auto Idx = reinterpret_cast<size_t>(Field.Id);
+    auto &Row = FrameTable[Idx];
+
+    // Check all other fields in this frame for overlap.
+
+    for (auto OtherItr = std::next(Itr); OtherItr != StructFields.end(); OtherItr++) {
+      auto &OtherField = *OtherItr;
+
+      auto OtherIdx = reinterpret_cast<size_t>(OtherField.Id);
+      assert(Idx != OtherIdx);
+
+      if (Row.compareRanges(OtherField.Offset, OtherField.Size) == 0) {
+        LLVM_DEBUG(dbgs() << "Error: Overlapping fields Row " << Idx << " and Row " << OtherIdx << "\n");
+        llvm_unreachable("Fields in a struct must not overlap");
+      }
+    }
+  }
+}
+
+bool hasPoisonOperand(Instruction *I) {
   // Check GetElementPtrInst
   if (auto *GEP = dyn_cast<GetElementPtrInst>(I)) {
     for (auto &Op : GEP->operands())
@@ -1023,7 +1083,7 @@ static bool hasPoisonOperand(Instruction *I) {
   return false;
 }
 
-[[maybe_unused]] static void collectInstWithPoison(Function &F, SmallSet<Instruction *, 16> &PoisonInstructions) {
+[[maybe_unused]] void collectInstWithPoison(Function &F, SmallSet<Instruction *, 16> &PoisonInstructions) {
   for (auto &BB : F) {
     for (auto &I : BB) {
       // Record the instruction if it has a poison operand
@@ -1034,7 +1094,7 @@ static bool hasPoisonOperand(Instruction *I) {
   }
 }
 
-[[maybe_unused]] static bool hasNewPoisonOperand(Function &F, const SmallSet<Instruction *, 16> &PoisonInstructions) {
+[[maybe_unused]] bool hasNewPoisonOperand(Function &F, const SmallSet<Instruction *, 16> &PoisonInstructions) {
   bool foundNewPoison = false;
 
   for (auto &BB : F) {
@@ -1092,8 +1152,7 @@ template <typename InstType> static unsigned countInstrs(const Function &F) {
 
 // Report absolute number of new geps, spills and reloads inserted by the
 // continuation state builder.
-static void reportGepsSpillsAndReloads(Function &F, unsigned NonFrameGeps, unsigned NonSpillStores,
-                                       unsigned NonReloadLoads) {
+void reportGepsSpillsAndReloads(Function &F, unsigned NonFrameGeps, unsigned NonSpillStores, unsigned NonReloadLoads) {
   if (ReportContStateAccessCounts) {
     unsigned FrameGeps = countInstrs<GetElementPtrInst>(F);
     assert(FrameGeps >= NonFrameGeps);
@@ -1327,8 +1386,16 @@ void ContStateBuilderImpl::buildCoroutineFrame() {
     }
   });
 
-  // ======== Poison instructions ========
 #ifndef NDEBUG
+  // ======== Sanity Checks ========
+  // Verify all fields in the frame are valid. Invalid fields do not have a
+  // valid offset, or have a range that overlaps with other fields.
+  for (auto &I : FrameStructs) {
+    auto &Struct = I.second;
+    checkForValidLayout(FrameTable, Struct.Fields);
+  }
+
+  // ======== Poison instructions ========
   // Verify no new poisons are left in the IR
   if (hasNewPoisonOperand(F, PoisonInstructions)) {
     llvm_unreachable("Error: Found poison");

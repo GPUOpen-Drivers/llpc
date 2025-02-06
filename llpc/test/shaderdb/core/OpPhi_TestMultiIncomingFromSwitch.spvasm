@@ -9,7 +9,7 @@
 ; SHADERTEST-NEXT: ]
 ; SHADERTEST: [[SUCCESSOR]]:
 ; SHADERTEST-NEXT: %{{.*}} = phi float [ 5.000000e-01, %[[PREDECESSOR]] ], [ %{{.*}}, %{{.*}} ], [ 5.000000e-01, %[[PREDECESSOR]] ]
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

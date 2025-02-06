@@ -2,12 +2,12 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: [[Desc:%[0-9]*]] = call ptr addrspace(4) (...) @lgc.create.load.push.constants.ptr.p4()
 ; SHADERTEST: [[Value:%[0-9]*]] = load <4 x float>, ptr addrspace(4) [[Desc]], align 16
 ; SHADERTEST: call void (...) @lgc.create.write.generic.output(<4 x float> [[Value]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: [[DescLo:%[0-9]*]] = call i32 @lgc.load.user.data__i32(i32 4)
 ; SHADERTEST: [[DescVec:%[0-9]*]] = insertelement <2 x i32> %{{[^,]*}}, i32 [[DescLo]], i64 0
 ; SHADERTEST: [[Desc64:%[0-9]*]] = bitcast <2 x i32> [[DescVec]] to i64
@@ -15,7 +15,7 @@
 ; SHADERTEST: [[Value:%[0-9]*]] = load <4 x float>, ptr addrspace(4) [[Desc]], align 16
 ; SHADERTEST: call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[Value]])
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: define dllexport amdgpu_ps void @_amdgpu_ps_main(i32 inreg noundef %{{[^,]*}}, i32 inreg noundef %userdata1,
 ; SHADERTEST: [[Addr0:%[0-9]*]] = zext i32 %userdata1 to i64
 ; SHADERTEST: [[Addr1:%[0-9]*]] = or {{(disjoint )?}}i64 %{{[0-9]*}}, [[Addr0]]

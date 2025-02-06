@@ -12,7 +12,7 @@
 ; SHADERTEST: [[D7]] = !DICompositeType(tag: DW_TAG_structure_type, name: "struct VS_OUTPUT", file: !{{[0-9]*}}, line: 1, size: 128, elements: [[D8:![0-9]*]], identifier: "VS_OUTPUT")
 ; SHADERTEST: [[D8]] = !{[[D9:![0-9]*]], [[D10]], [[D1]]}
 ; SHADERTEST: [[D9]] = !DIDerivedType(tag: DW_TAG_member, name: "pos : SV_POSITION", scope: [[D7]], file: !{{[0-9]*}}, line: 2, baseType: [[D2]], size: 128, flags: DIFlagPublic)
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

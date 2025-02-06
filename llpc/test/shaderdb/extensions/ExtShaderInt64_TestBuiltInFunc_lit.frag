@@ -63,8 +63,8 @@ void main()
 
 ; SHADERTEST: bitcast <3 x double> %{{[0-9]*}} to <3 x i64>
 ; SHADERTEST: bitcast <3 x i64> %{{[0-9]*}} to <3 x double>
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

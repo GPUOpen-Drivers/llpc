@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -57,7 +57,7 @@ ProcessGpuRtLibrary::ProcessGpuRtLibrary(const GpurtKey &key) : m_gpurtKey(key) 
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
+// Executes this FE lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
@@ -137,11 +137,16 @@ PreservedAnalyses ProcessGpuRtLibrary::run(Module &module, ModuleAnalysisManager
 
   // Process ray-tracing (i.e. non-rayQuery) functions in a separate loop; processLibraryFunction() may do
   // arg promotion, so we cannot do it in the same loop.
-  for (Function *func : maybeRtFuncs)
-    processLibraryFunction(func);
+  // Skip the processed functions so the leftover can be argument-promoted by earlyGpurtTransform.
+  SmallVector<Function *> promotableFunctions;
+  for (Function *func : maybeRtFuncs) {
+    if (!processLibraryFunction(func))
+      promotableFunctions.push_back(func);
+  }
 
   // Implement builtins whose implementation is generic, i.e. not specific to LGC.
-  earlyGpurtTransform(module);
+  // Do not use the return value of `earlyGpurtTransform` since "Changed" would be trivially true in this pass.
+  earlyGpurtTransform(module, promotableFunctions, /*PreserveWaitMasks = */ false);
 
   return PreservedAnalyses::none();
 }
@@ -210,29 +215,38 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 }
 
 // =====================================================================================================================
-// Clear the block before patching the function
+// Clear the block before lowering the function
 //
 // @param func : The function to process
-void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
+// @ret: Returns whether the function has been processed.
+bool ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   auto funcName = func->getName();
 
   // Special handling for _AmdContStackStore* and _AmdContStackLoad* to accept arbitrary type
   if (funcName.starts_with("_AmdContStackStore")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackStore(func);
-    return;
-  } else if (funcName.starts_with("_AmdContStackLoad")) {
+    return true;
+  }
+
+  if (funcName.starts_with("_AmdContStackLoad")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackLoad(func);
-    return;
-  } else if (funcName.starts_with("_AmdEnqueue") || funcName.starts_with("_AmdWaitEnqueue")) {
+    return true;
+  }
+
+  if (funcName.starts_with("_AmdEnqueue") || funcName.starts_with("_AmdWaitEnqueue")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createEnqueue(func);
-    return;
-  } else if (funcName.starts_with("_AmdValueI32Count")) {
+    return true;
+  }
+
+  if (funcName.starts_with("_AmdValueI32Count")) {
     ContHelper::handleValueI32Count(*func, *m_builder);
-    return;
-  } else if (funcName.starts_with("_AmdValueGetI32") || funcName.starts_with("_AmdValueSetI32")) {
+    return true;
+  }
+
+  if (funcName.starts_with("_AmdValueGetI32") || funcName.starts_with("_AmdValueSetI32")) {
     // The intrinsic handling require first argument to be a pointer, the rest to be values.
     SmallBitVector promotionMask(func->arg_size(), true);
     promotionMask.reset(0);
@@ -241,7 +255,7 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
       ContHelper::handleValueGetI32(*newFunc, *m_builder);
     else
       ContHelper::handleValueSetI32(*newFunc, *m_builder);
-    return;
+    return true;
   }
 
   // Create implementation for intrinsic functions.
@@ -251,7 +265,7 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     auto funcPtr = gpurtFuncIt->second;
     m_builder->SetInsertPoint(clearBlock(func));
     (this->*funcPtr)(func);
-    return;
+    return true;
   }
 
   auto &commonFuncTable = InternalLibraryIntrinsicUtil::LibraryFunctionTable::get().m_libFuncPtrs;
@@ -260,65 +274,21 @@ void ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     auto funcPtr = commonFuncIt->second;
     m_builder->SetInsertPoint(clearBlock(func));
     (*funcPtr)(func, m_builder);
-    return;
+    return true;
   }
 
   // NOTE: GPURT now preserves all function names started with "_Amd", but some of them are not intrinsics, e.g.,
   // "_AmdSystemData.IsTraversal", which are methods of system data structs. Skip those to let them be inlined
   // automatically.
-  bool isAmdIntrinsic = funcName.starts_with("_Amd") && !funcName.contains(".");
-  if (funcName.starts_with("_cont_") || isAmdIntrinsic) {
-    // TODO: Once we remove createEnqueue, also handle _AmdEnqueue* and _AmdWaitEnqueue* here.
-    bool isAmdAwaitLike =
-        isAmdIntrinsic && (funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait"));
-
-    // This function is provided by GPURT to the compiler.
+  const bool isAmdIntrinsic = funcName.starts_with("_Amd") && !funcName.contains(".");
+  if (funcName.contains("_cont_") || isAmdIntrinsic) {
     if (!isAmdIntrinsic)
       func->setLinkage(GlobalValue::WeakAnyLinkage);
 
-    // Skip _AmdAwaitTraversal function resulting from calls to _AmdWaitAwaitTraversal.
-    if (!func->hasMetadata(TypedFuncTy::MDTypesName) && !func->arg_empty())
-      return;
-
-    SmallBitVector promotionMask(func->arg_size());
-    for (unsigned argNo = 0; argNo < func->arg_size(); argNo++) {
-      auto *arg = func->getArg(argNo);
-      TypedArgTy argTy = TypedArgTy::get(arg);
-      auto funcName = func->getName();
-
-      if (!argTy.isPointerTy())
-        continue;
-
-      // Change the pointer type to its value type for non-struct types.
-      // Amd*Await use value types for all arguments.
-      // For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
-      if (!isa<StructType>(argTy.getPointerElementType()) || isAmdAwaitLike ||
-          (funcName == ContDriverFunc::SetTriangleHitAttributesName && argNo == 1))
-        promotionMask.set(argNo);
-    }
-
-    auto *newFunc = CompilerUtils::promotePointerArguments(func, promotionMask);
-
-    // This function is provided by the compiler to GPURT. It will be substituted by LowerRaytracingPipeline.
-    if (isAmdIntrinsic)
-      newFunc->deleteBody();
-
-    // Fixup WaitAwait by removing the wait mask.
-    if (newFunc->getName().starts_with("_AmdWaitAwait")) {
-      llvm::forEachCall(*newFunc, [&](CallInst &CInst) {
-        SmallVector<Value *> args(CInst.args());
-        // Remove wait mask
-        args.erase(args.begin() + 1);
-
-        m_builder->SetInsertPoint(&CInst);
-        auto *newValue = m_builder->CreateNamedCall("_AmdAwait", CInst.getType(), args, {});
-        CInst.replaceAllUsesWith(newValue);
-        CInst.eraseFromParent();
-      });
-    }
-
-    return;
+    return false;
   }
+
+  return true;
 }
 
 // =====================================================================================================================

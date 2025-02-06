@@ -18,7 +18,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
+; SHADERTEST-LABEL: {{^// LLPC.*}} LGC lowering results
 ; SHADERTEST: @llvm.amdgcn.s.barrier()
 ; SHADERTEST: AMDLLPC SUCCESS
 */

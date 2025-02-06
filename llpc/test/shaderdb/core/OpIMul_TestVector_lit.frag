@@ -22,7 +22,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]*}} = mul <3 x i32> %{{[0-9]*}}, %{{[0-9]*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: mul i32 %{{.*}}, %{{.*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS

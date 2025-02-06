@@ -3,7 +3,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} HW tessellation configurations
 ; SHADERTEST: PatchConstants = 0, Size = [0, 0] dwords
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4f32
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

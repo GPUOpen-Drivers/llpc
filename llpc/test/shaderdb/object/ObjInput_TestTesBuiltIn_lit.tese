@@ -26,7 +26,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call <3 x float> @lgc.input.import.builtin.TessCoord.v3f32{{.*}}
 ; SHADERTEST: call <4 x float> @lgc.input.import.builtin.Position.v4f32{{.*}}
 ; SHADERTEST: call float @lgc.input.import.builtin.PointSize.f32{{.*}}

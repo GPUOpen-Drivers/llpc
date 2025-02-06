@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -156,90 +156,90 @@ target_sources(LLVMlgc PRIVATE
     elfLinker/NullFragmentShader.h
 )
 
-# lgc/patch
+# lgc/lowering
 target_sources(LLVMlgc PRIVATE
-    patch/ConfigBuilderBase.cpp
-    patch/Continufy.cpp
-    patch/FragmentColorExport.cpp
-    patch/LowerDebugPrintf.cpp
-    patch/LowerDesc.cpp
-    patch/LowerPopsInterlock.cpp
-    patch/LowerSubgroupOps.cpp
-    patch/MeshTaskShader.cpp
-    patch/NggPrimShader.cpp
-    patch/LgcLowering.cpp
-    patch/StructurizeBuffers.cpp
-    patch/LowerBufferOperations.cpp
-    patch/CheckShaderCache.cpp
-    patch/GenerateCopyShader.cpp
-    patch/MutateEntryPoint.cpp
-    patch/LowerImageDerivatives.cpp
-    patch/LowerInOut.cpp
-    patch/LowerInvariantLoads.cpp
-    patch/IncludeLlvmIr.cpp
-    patch/InitializeWorkgroupMemory.cpp
-    patch/ScalarizeLoads.cpp
-    patch/LowerMulDx9Zero.cpp
-    patch/AddLoopMetadata.cpp
-    patch/GenerateNullFragmentShader.cpp
-    patch/PeepholeOptimization.cpp
-    patch/PreparePipelineAbi.cpp
-    patch/LowerReadFirstLane.cpp
-    patch/CollectResourceUsage.cpp
-    patch/SetupTargetFeatures.cpp
-    patch/PassthroughHullShader.cpp
-    patch/ApplyWorkarounds.cpp
-    patch/ShaderInputs.cpp
-    patch/ShaderMerger.cpp
-    patch/SystemValues.cpp
-    patch/VertexFetch.cpp
-    patch/CollectImageOperations.cpp
-    patch/RegisterMetadataBuilder.cpp
+    lowering/ConfigBuilderBase.cpp
+    lowering/Continufy.cpp
+    lowering/FragmentColorExport.cpp
+    lowering/LowerDebugPrintf.cpp
+    lowering/LowerDesc.cpp
+    lowering/LowerPopsInterlock.cpp
+    lowering/LowerSubgroupOps.cpp
+    lowering/MeshTaskShader.cpp
+    lowering/NggPrimShader.cpp
+    lowering/LgcLowering.cpp
+    lowering/StructurizeBuffers.cpp
+    lowering/LowerBufferOperations.cpp
+    lowering/CheckShaderCache.cpp
+    lowering/GenerateCopyShader.cpp
+    lowering/MutateEntryPoint.cpp
+    lowering/LowerImageDerivatives.cpp
+    lowering/LowerInOut.cpp
+    lowering/LowerInvariantLoads.cpp
+    lowering/IncludeLlvmIr.cpp
+    lowering/InitializeWorkgroupMemory.cpp
+    lowering/ScalarizeLoads.cpp
+    lowering/LowerMulDx9Zero.cpp
+    lowering/AddLoopMetadata.cpp
+    lowering/GenerateNullFragmentShader.cpp
+    lowering/PeepholeOptimization.cpp
+    lowering/PreparePipelineAbi.cpp
+    lowering/LowerReadFirstLane.cpp
+    lowering/CollectResourceUsage.cpp
+    lowering/SetupTargetFeatures.cpp
+    lowering/PassthroughHullShader.cpp
+    lowering/ApplyWorkarounds.cpp
+    lowering/ShaderInputs.cpp
+    lowering/ShaderMerger.cpp
+    lowering/SystemValues.cpp
+    lowering/VertexFetch.cpp
+    lowering/CollectImageOperations.cpp
+    lowering/RegisterMetadataBuilder.cpp
 #if LLPC_BUILD_STRIX1
-    patch/WorkaroundDsSubdwordWrite.cpp
+    lowering/WorkaroundDsSubdwordWrite.cpp
 #endif
-    patch/CombineCooperativeMatrix.cpp
-    patch/LowerCooperativeMatrix.cpp
-    patch/LowerGpuRt.cpp
-    patch/LowerRayQueryWrapper.cpp
+    lowering/CombineCooperativeMatrix.cpp
+    lowering/LowerCooperativeMatrix.cpp
+    lowering/LowerGpuRt.cpp
+    lowering/LowerRayQueryWrapper.cpp
 )
 
-# include/lgc/patch
+# include/lgc/lowering
 target_sources(LLVMlgc PRIVATE
-    include/lgc/patch/AddLoopMetadata.h
-    include/lgc/patch/ApplyWorkarounds.h
-    include/lgc/patch/CheckShaderCache.h
-    include/lgc/patch/CollectImageOperations.h
-    include/lgc/patch/CollectResourceUsage.h
-    include/lgc/patch/CombineCooperativeMatrix.h
-    include/lgc/patch/Continufy.h
-    include/lgc/patch/FragmentColorExport.h
-    include/lgc/patch/GenerateCopyShader.h
-    include/lgc/patch/IncludeLlvmIr.h
-    include/lgc/patch/InitializeWorkgroupMemory.h
-    include/lgc/patch/LgcLowering.h
-    include/lgc/patch/LowerBufferOperations.h
-    include/lgc/patch/LowerCooperativeMatrix.h
-    include/lgc/patch/LowerDebugPrintf.h
-    include/lgc/patch/LowerDesc.h
-    include/lgc/patch/LowerGpuRt.h
-    include/lgc/patch/LowerImageDerivatives.h
-    include/lgc/patch/LowerInOut.h
-    include/lgc/patch/LowerInvariantLoads.h
-    include/lgc/patch/LowerMulDx9Zero.h
-    include/lgc/patch/LowerReadFirstLane.h
-    include/lgc/patch/LowerSubgroupOps.h
-    include/lgc/patch/MutateEntryPoint.h
-    include/lgc/patch/PassthroughHullShader.h
-    include/lgc/patch/PeepholeOptimization.h
-    include/lgc/patch/PreparePipelineAbi.h
-    include/lgc/patch/ScalarizeLoads.h
-    include/lgc/patch/SetupTargetFeatures.h
-    include/lgc/patch/ShaderInputs.h
-    include/lgc/patch/StructurizeBuffers.h
-    include/lgc/patch/SystemValues.h
-    include/lgc/patch/VertexFetch.h
-    include/lgc/patch/WorkaroundDsSubdwordWrite.h
+    include/lgc/lowering/AddLoopMetadata.h
+    include/lgc/lowering/ApplyWorkarounds.h
+    include/lgc/lowering/CheckShaderCache.h
+    include/lgc/lowering/CollectImageOperations.h
+    include/lgc/lowering/CollectResourceUsage.h
+    include/lgc/lowering/CombineCooperativeMatrix.h
+    include/lgc/lowering/Continufy.h
+    include/lgc/lowering/FragmentColorExport.h
+    include/lgc/lowering/GenerateCopyShader.h
+    include/lgc/lowering/IncludeLlvmIr.h
+    include/lgc/lowering/InitializeWorkgroupMemory.h
+    include/lgc/lowering/LgcLowering.h
+    include/lgc/lowering/LowerBufferOperations.h
+    include/lgc/lowering/LowerCooperativeMatrix.h
+    include/lgc/lowering/LowerDebugPrintf.h
+    include/lgc/lowering/LowerDesc.h
+    include/lgc/lowering/LowerGpuRt.h
+    include/lgc/lowering/LowerImageDerivatives.h
+    include/lgc/lowering/LowerInOut.h
+    include/lgc/lowering/LowerInvariantLoads.h
+    include/lgc/lowering/LowerMulDx9Zero.h
+    include/lgc/lowering/LowerReadFirstLane.h
+    include/lgc/lowering/LowerSubgroupOps.h
+    include/lgc/lowering/MutateEntryPoint.h
+    include/lgc/lowering/PassthroughHullShader.h
+    include/lgc/lowering/PeepholeOptimization.h
+    include/lgc/lowering/PreparePipelineAbi.h
+    include/lgc/lowering/ScalarizeLoads.h
+    include/lgc/lowering/SetupTargetFeatures.h
+    include/lgc/lowering/ShaderInputs.h
+    include/lgc/lowering/StructurizeBuffers.h
+    include/lgc/lowering/SystemValues.h
+    include/lgc/lowering/VertexFetch.h
+    include/lgc/lowering/WorkaroundDsSubdwordWrite.h
 )
 
 # lgc/state

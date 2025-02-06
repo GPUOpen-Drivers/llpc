@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -40,12 +40,12 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray query post inline.
+// Represents the pass of FE lowering ray query post inline.
 class LowerGlCompatibility : public SpirvLower, public llvm::PassInfoMixin<LowerGlCompatibility> {
 public:
   LowerGlCompatibility();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  static llvm::StringRef name() { return "Lower GLSL compatibility variables and operations"; }
+  static llvm::StringRef name() { return "Lower GL compatibility variables and operations"; }
 
 private:
   bool needRun();

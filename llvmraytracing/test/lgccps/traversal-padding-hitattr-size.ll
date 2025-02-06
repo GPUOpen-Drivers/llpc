@@ -14,15 +14,15 @@ declare !pointeetys !6 void @_cont_ExitRayGen(%struct.DispatchSystemData*)
 
 declare i32 @_AmdGetCurrentFuncAddr()
 
-define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal(ptr addrspace(5) %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !2 {
+define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal({ i32 } %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !2 {
 ; CHECK-ATTRSIZE-16-LABEL: define dso_local spir_func void @_cont_Traversal(
 ; CHECK-ATTRSIZE-16-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [4 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META5:![0-9]+]] !lgc.rt.shaderstage [[META6:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META7:![0-9]+]] !continuation [[META8:![0-9]+]] {
 ; CHECK-ATTRSIZE-16-NEXT:  [[_ENTRY:.*:]]
-; CHECK-ATTRSIZE-16-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8, addrspace(5)
+; CHECK-ATTRSIZE-16-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8
 ; CHECK-ATTRSIZE-16-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [8 x i32], align 4
 ; CHECK-ATTRSIZE-16-NEXT:    store [8 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-16-NEXT:    store { i32 } [[SYSTEM_DATA]], ptr addrspace(5) [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-ATTRSIZE-16-NEXT:    [[TMP0:%.*]] = load i32, ptr addrspace(5) [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-ATTRSIZE-16-NEXT:    store { i32 } [[SYSTEM_DATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-ATTRSIZE-16-NEXT:    [[TMP0:%.*]] = extractvalue { i32 } [[SYSTEM_DATA]], 0
 ; CHECK-ATTRSIZE-16-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], -3
 ; CHECK-ATTRSIZE-16-NEXT:    br i1 [[TMP1]], label %[[BB2:.*]], label %[[BB4:.*]]
 ; CHECK-ATTRSIZE-16:       [[BB2]]:
@@ -46,11 +46,11 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-8-LABEL: define dso_local spir_func void @_cont_Traversal(
 ; CHECK-ATTRSIZE-8-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [2 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META4:![0-9]+]] !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation [[META7:![0-9]+]] {
 ; CHECK-ATTRSIZE-8-NEXT:  [[_ENTRY:.*:]]
-; CHECK-ATTRSIZE-8-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8, addrspace(5)
+; CHECK-ATTRSIZE-8-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8
 ; CHECK-ATTRSIZE-8-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [8 x i32], align 4
 ; CHECK-ATTRSIZE-8-NEXT:    store [8 x i32] [[PAYLOAD]], ptr [[PAYLOAD_SERIALIZATION_ALLOCA]], align 4
-; CHECK-ATTRSIZE-8-NEXT:    store { i32 } [[SYSTEM_DATA]], ptr addrspace(5) [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-ATTRSIZE-8-NEXT:    [[TMP0:%.*]] = load i32, ptr addrspace(5) [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-ATTRSIZE-8-NEXT:    store { i32 } [[SYSTEM_DATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-ATTRSIZE-8-NEXT:    [[TMP0:%.*]] = extractvalue { i32 } [[SYSTEM_DATA]], 0
 ; CHECK-ATTRSIZE-8-NEXT:    [[TMP1:%.*]] = icmp ugt i32 [[TMP0]], -3
 ; CHECK-ATTRSIZE-8-NEXT:    br i1 [[TMP1]], label %[[BB2:.*]], label %[[BB4:.*]]
 ; CHECK-ATTRSIZE-8:       [[BB2]]:
@@ -72,7 +72,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-8-NEXT:    unreachable
 ;
 .entry:
-  %1 = load i32, ptr addrspace(5) %0, align 4
+  %1 = extractvalue { i32 } %0, 0
   %2 = icmp ugt i32 %1, -3
   br i1 %2, label %3, label %4
 
@@ -98,7 +98,6 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 declare void @lgc.cps.jump(...) local_unnamed_addr
 
 !continuation.maxUsedPayloadRegisterCount = !{!5}
-!lgc.cps.module = !{}
 !lgc.rt.max.attribute.size = !{!3}
 
 !0 = !{i32 7}

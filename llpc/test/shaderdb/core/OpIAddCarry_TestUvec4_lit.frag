@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call { i32, i1 } @llvm.uadd.with.overflow.i32(i32
 ; SHADERTEST: = call { <4 x i32>, <4 x i1> } @llvm.uadd.with.overflow.v4i32(<4 x i32>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: call { <4 x i32>, <4 x i1> } @llvm.uadd.with.overflow.v4i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */

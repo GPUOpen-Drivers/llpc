@@ -4,10 +4,10 @@
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; Test that after SPIR-V lowering all operations after first kill have been
+; Test that after FE lowering all operations after first kill have been
 ; replaced with a branch to the return block.
 
-; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC.*}} FE lowering results
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
 ; SHADERTEST-NEXT: br label %[[LABEL:[0-9]*]]
 ; SHADERTEST-NOT: call void{{.*}} @lgc.create.kill

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -493,8 +493,7 @@ struct FunctionData {
   // Stores an outgoing jump.
   SmallVector<lgc::cps::JumpOp *> Jumps;
 
-  // Handle lgc.cps.await.
-  // lgc.cps uses a single await call, like:
+  // Handle lgc.cps.await, like:
   //   %result = call @lgc.cps.await(i32 %target, i32 %levels, args...)
   SmallVector<lgc::cps::AwaitOp *> Awaits;
 };

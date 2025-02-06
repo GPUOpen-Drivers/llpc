@@ -44,7 +44,7 @@ void main()
 ; SHADERTEST: [[ptoi:%[0-9]*]] = ptrtoint ptr addrspace(1) [[ld2]] to i64
 
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -37,6 +37,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.10| Add temporalHintShaderControl to PipelineShaderOptions                                                |
 //  |     75.9 | Add rtIgnoreDeclaredPayloadSize to RayTracingPipelineBuildInfo.                                       |
 //  |     75.8 | Add forceMemoryBarrierScope to PipelineShaderOptions.                                                 |
 //  |     75.6 | Add enableRemapLocation to PipelineOptions. Add outLocationMaps to GraphicsPipelineBuildInfo.         |
@@ -200,7 +201,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 9
+#define LLPC_INTERFACE_MINOR_VERSION 10
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

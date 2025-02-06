@@ -45,7 +45,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: atomicrmw add ptr {{.*}} monotonic
 ; SHADERTEST: atomicrmw min ptr {{.*}} monotonic
 ; SHADERTEST: atomicrmw max ptr {{.*}} monotonic
@@ -63,7 +63,7 @@ void main()
 ; SHADERTEST: atomicrmw xchg ptr {{.*}} monotonic
 ; SHADERTEST: cmpxchg ptr {{.*}} monotonic monotonic
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.add.i32{{(\.v4i32)?}}(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.smin.i32{{(\.v4i32)?}}(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.atomic.smax.i32{{(\.v4i32)?}}(i32 %{{[0-9]*}}, <4 x i32> %{{[0-9]*}}, i32 0, i32 0, i32 0)

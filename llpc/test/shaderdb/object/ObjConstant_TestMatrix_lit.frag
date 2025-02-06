@@ -23,7 +23,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: @{{.*}} = {{.*}} addrspace(4) constant [4 x <4 x float>] [<4 x float> zeroinitializer,
 ; SHADERTEST: getelementptr [4 x <4 x float>], ptr addrspace(4) @{{.*}}, i64 0, i64 %{{[0-9]*}}
 ; SHADERTEST: AMDLLPC SUCCESS

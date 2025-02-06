@@ -28,7 +28,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.subgroup.ballot.v4i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.mbcnt.i32(
 ; SHADERTEST: call <2 x i32> (...) @lgc.create.subgroup.write.invocation.v2i32(

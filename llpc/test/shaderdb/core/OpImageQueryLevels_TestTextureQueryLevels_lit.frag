@@ -25,7 +25,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}}  FE lowering results
 ; SHADERTEST: ptr addrspace(4) (...) @lgc.create.get.desc.ptr.p4{{.*}}(i32 1, i32 1, i64 2, i32 0)
 ; SHADERTEST: ptr addrspace(4) (...) @lgc.create.get.desc.ptr.p4{{.*}}(i32 1, i32 1, i64 0, i32 1)
 ; SHADERTEST: ptr addrspace(4) (...) @lgc.create.get.desc.ptr.p4{{.*}}(i32 1, i32 1, i64 1, i32 0)
@@ -35,7 +35,7 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 512, ptr addrspace(4) {{.*}})
 ; SHADERTEST: call i32 (...) @lgc.create.image.query.levels.i32(i32 8, i32 640, ptr addrspace(4) {{.*}})
 
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}}  LGC lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

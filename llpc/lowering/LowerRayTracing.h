@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -190,12 +190,12 @@ enum RayFlag : unsigned {
 };
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray tracing.
+// Represents the pass of FE lowering ray tracing.
 class SpirvLowerRayTracing : public llvm::PassInfoMixin<SpirvLowerRayTracing> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V RayTracing operations"; }
+  static llvm::StringRef name() { return "Lower ray tracing operations"; }
 };
 
 } // namespace Llpc

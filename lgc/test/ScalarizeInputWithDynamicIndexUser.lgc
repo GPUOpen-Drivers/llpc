@@ -10,9 +10,9 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !15 {
 .entry:
-  %0 = call <4 x float> (...) @lgc.load.vertex.input__v4f32(i1 false, i32 2, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
-  %1 = call <4 x float> (...) @lgc.load.vertex.input__v4f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
-  %2 = call <4 x float> (...) @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+  %0 = call <4 x float> (...) @lgc.load.vertex.input__v4f32(i1 false, i32 2, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
+  %1 = call <4 x float> (...) @lgc.load.vertex.input__v4f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
+  %2 = call <4 x float> (...) @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
   call void (...) @lgc.create.write.generic.output(<4 x float> %2, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
   call void (...) @lgc.create.write.generic.output(<4 x float> %1, i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
   call void (...) @lgc.create.write.generic.output(<4 x float> %0, i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)

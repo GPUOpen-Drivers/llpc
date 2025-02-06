@@ -1,6 +1,6 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
-; SHADERTEST_PP0-LABEL: LLPC pipeline before-patching results
+; SHADERTEST_PP0-LABEL: LLPC LGC before-lowering results
 ; SHADERTEST_PP0-LABEL: LLPC location input/output mapping results (FS)
 ; SHADERTEST_PP0: (FS) Input:  [location, component] = [7, 0]  =>  Mapped = [0, 0]
 ; SHADERTEST_PP0: (FS) Input:  [location, component] = [7, 1]  =>  Mapped = [0, 1]
@@ -83,7 +83,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
 ; Fragment shader part-pipeline:
-; SHADERTEST_PP1-LABEL: LLPC pipeline before-patching results
+; SHADERTEST_PP1-LABEL: LLPC LGC before-lowering results
 ; SHADERTEST_PP1-LABEL: LLPC location input/output mapping results (FS)
 ; SHADERTEST_PP1: (FS) Input:  [location, component] = [7, 0]  =>  Mapped = [0, 0]
 ; SHADERTEST_PP1: (FS) Input:  [location, component] = [7, 1]  =>  Mapped = [0, 1]
@@ -116,7 +116,7 @@
 ; SHADERTEST_PP1: (FS) Input:  [location, component] = [17, 1]  =>  Mapped = [5, 1]
 ; SHADERTEST_PP1: (FS) Input:  [location, component] = [17, 2]  =>  Mapped = [5, 2]
 ; Pre-rasterization part-pipeline:
-; SHADERTEST_PP1-LABEL: LLPC pipeline before-patching results
+; SHADERTEST_PP1-LABEL: LLPC LGC before-lowering results
 ; SHADERTEST_PP1-LABEL: LLPC location input/output mapping results (VS)
 ; SHADERTEST_PP1: (VS) Output: [location, component] = [0, 0]  =>  Mapped = [6, 0]
 ; SHADERTEST_PP1: (VS) Output: [location, component] = [0, 1]  =>  Mapped = [6, 1]

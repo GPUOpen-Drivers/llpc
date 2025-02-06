@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -233,6 +233,9 @@ enum InternalBinding : unsigned {
   SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
   ConstantBuffer0Binding = 24, ///< Binding ID of default uniform block
   ConstantBuffer0BindingEnd = ConstantBuffer0Binding + ShaderStageGfxCount,
+  DescHeapBufferBindingId = 32,  ///< Binding ID of internal buffer for buffer descriptor heap.
+  DescHeapImageBindingId = 33,   ///< Binding ID of internal buffer for image descriptor heap.
+  DescHeapSamplerBindingId = 34, ///< Binding ID of internal buffer for sampler descriptor heap.
 };
 
 /// Internal vertex attribute location start from 0.
@@ -494,26 +497,7 @@ struct PipelineOptions {
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 73
-  bool replaceSetWithResourceType;        ///< For OGL only, replace 'set' with resource type during spirv translate
-  bool disableSampleMask;                 ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
-  bool buildResourcesDataForShaderModule; ///< For OGL only, build resources usage data while building shader module
-  bool disableTruncCoordForGather;        ///< If set, trunc_coord of sampler srd is disabled for gather4
-  bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
-                                          ///< for sampled images and samplers
-  bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
-  bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
-  bool disableBaseVertex;                 ///< For OGL only, force the BaseVertex builtin to 0 instead of
-                                          ///  loading it from userdata
-  bool bindlessTextureMode;               ///< For OGL only, true if bindless textures are used
-  bool bindlessImageMode;                 ///< For OGL only, true if bindless images are used
-  bool enablePolygonStipple;              ///< For OGL only, enable polygon stipple pattern.
-  bool enableLineSmooth;                  ///< For OGL only, enable line smooth mode.
-  bool emulateWideLineStipple;            ///< For OGL only, enable line AA stipple.
-  bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
-  bool enableRemapLocation;               ///< For OGL only, enables location remapping.
-  const auto &getGlState() const { return *this; }
-#else
+
   struct GLState {
     bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
     bool disableSampleMask;          ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
@@ -533,7 +517,7 @@ struct PipelineOptions {
     bool enableRemapLocation;               ///< For OGL only, enables location remapping.
   } glState;
   const auto &getGlState() const { return glState; }
-#endif
+
   unsigned reserved20;
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
   bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
@@ -1386,15 +1370,7 @@ struct GraphicsPipelineBuildInfo {
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif
   RtState rtState; ///< Ray tracing state
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
-  bool originUpperLeft;                        ///< Whether origin coordinate of framebuffer is upper-left.
-  unsigned numUniformConstantMaps;             ///< Number of uniform constant maps
-  UniformConstantMap **ppUniformMaps;          ///< Pointers to array of pointers for the uniform constant map.
-  ApiXfbOutData apiXfbOutData;                 ///< Transform feedback data specified by API interface.
-  bool vbAddressLowBitsKnown;                  ///< Whether vbAddressLowBits is valid
-  uint8_t vbAddressLowBits[MaxVertexBindings]; ///< Lowest two bits of vertex buffer addresses
-  const auto &getGlState() const { return *this; }
-#else
+
   struct {
     bool originUpperLeft;                         ///< Whether origin coordinate of framebuffer is upper-left.
     bool vbAddressLowBitsKnown;                   ///< Whether vbAddressLowBits is valid
@@ -1417,7 +1393,7 @@ struct GraphicsPipelineBuildInfo {
     AlphaTestFunc alphaTestFunc;                  ///< AlphaTestFunc type
   } glState;
   const auto &getGlState() const { return glState; }
-#endif
+
   const void *pClientMetadata;         ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;           ///< Size (in bytes) of the client-defined data
   AdvancedBlendInfo advancedBlendInfo; ///< The info of advanced blend

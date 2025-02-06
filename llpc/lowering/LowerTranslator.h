@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -49,7 +49,7 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "LLPC translate SPIR-V binary to LLVM IR"; }
+  static llvm::StringRef name() { return "LLPC translate SPIR-V to LLVM IR"; }
 
 private:
   void translateSpirvToLlvm(const PipelineShaderInfo *shaderInfo, llvm::Module *module);

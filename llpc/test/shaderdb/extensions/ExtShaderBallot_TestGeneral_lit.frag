@@ -34,13 +34,13 @@ void main(void)
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call <4 x i32> (...) @lgc.create.subgroup.ballot.v4i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.i32(
 ; SHADERTEST: call i32 (...) @lgc.create.subgroup.broadcast.first.i32(
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.broadcast.f32(
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.subgroup.broadcast.first.f32(
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: mbcnt_lo
 
 ; SHADERTEST: AMDLLPC SUCCESS

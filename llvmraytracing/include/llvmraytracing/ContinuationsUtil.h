@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -245,12 +245,10 @@ private:
 
 public:
   // Public metadata node names
-  static constexpr const char *MDEntryName = "continuation.entry";
   static constexpr const char *MDStackSizeName = "continuation.stacksize";
   static constexpr const char *MDStateName = "continuation.state";
   static constexpr const char *MDContinuationName = "continuation";
   static constexpr const char *MDContPayloadTyName = "cont.payload.type";
-  static constexpr const char *MDLgcCpsModuleName = "lgc.cps.module";
   static constexpr const char *MDGpurtSettingsName = "gpurt.settings";
   static constexpr const char *MDWaitMaskName = "waitmask";
 
@@ -428,15 +426,6 @@ public:
 
   static void removeWaitMask(CallInst &CI) { CI.setMetadata(MDWaitMaskName, nullptr); }
 
-  /// Returns true if a call to the given function should be rematerialized
-  /// in a shader of the specified kind.
-  ///
-  /// If no shader kind is specified, return false.
-  static bool isRematerializableLgcRtOp(CallInst &CInst,
-                                        std::optional<lgc::rt::RayTracingShaderStage> Kind = std::nullopt);
-
-  static bool isLegacyEntryFunction(Function *Func) { return Func->hasMetadata(MDEntryName); }
-
   // Given a list of types, get a type that makes the list of types
   // occupy a specific number of dwords including it.
   static Type *getPaddingType(const DataLayout &DL, LLVMContext &Context, ArrayRef<Type *> Types,
@@ -546,6 +535,7 @@ DRIVER_FUNC_NAME(Traversal)
 DRIVER_FUNC_NAME(KernelEntry)
 DRIVER_FUNC_NAME(GpurtVersionFlags)
 DRIVER_FUNC_NAME(ShaderStart)
+DRIVER_FUNC_NAME(Scheduler)
 
 #undef DRIVER_FUNC_NAME
 } // namespace ContDriverFunc
@@ -554,7 +544,8 @@ DRIVER_FUNC_NAME(ShaderStart)
 
 // Replace all calls to a given function with some value.
 // Removes the original call.
-void replaceCallsToFunction(llvm::Function &F, llvm::Value &Replacement);
+// Returns whether something has changed.
+bool replaceCallsToFunction(llvm::Function &F, llvm::Value &Replacement);
 
 // Move all basic blocks of OldFunc to NewFunc.
 void moveFunctionBody(Function &OldFunc, Function &NewFunc);

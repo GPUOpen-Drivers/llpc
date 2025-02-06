@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -78,17 +78,17 @@ TimerProfiler::TimerProfiler(uint64_t hash64, const char *descriptionPrefix, uns
           "llpc-translate", (Twine(descriptionPrefix) + Twine(" Translate ") + hashString).str(), m_phases);
     }
 
-    if (enableMask & (1 << TimerLower)) {
-      m_phaseTimers[TimerLower].init("llpc-lower", (Twine(descriptionPrefix) + Twine(" Lower ") + hashString).str(),
-                                     m_phases);
+    if (enableMask & (1 << TimerFeLowering)) {
+      m_phaseTimers[TimerFeLowering].init(
+          "llpc-fe-lowering", (Twine(descriptionPrefix) + Twine(" FE-Lowering ") + hashString).str(), m_phases);
     }
     if (enableMask & (1 << TimerLoadBc)) {
       m_phaseTimers[TimerLoadBc].init("llpc-load", (Twine(descriptionPrefix) + Twine(" Load ") + hashString).str(),
                                       m_phases);
     }
-    if (enableMask & (1 << TimerPatch)) {
-      m_phaseTimers[TimerPatch].init("llpc-patch", (Twine(descriptionPrefix) + Twine(" Patch ") + hashString).str(),
-                                     m_phases);
+    if (enableMask & (1 << TimerLgcLowering)) {
+      m_phaseTimers[TimerLgcLowering].init(
+          "llpc-lgc-lowering", (Twine(descriptionPrefix) + Twine(" LGC-Lowering ") + hashString).str(), m_phases);
     }
     if (enableMask & (1 << TimerOpt)) {
       m_phaseTimers[TimerOpt].init("llpc-opt", (Twine(descriptionPrefix) + Twine(" Optimization ") + hashString).str(),

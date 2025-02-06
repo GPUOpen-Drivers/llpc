@@ -2,6 +2,8 @@
 
 #extension GL_ARB_gpu_shader_int64: enable
 #extension GL_AMD_shader_ballot: enable
+#extension GL_NV_shader_subgroup_partitioned: enable
+#extension GL_EXT_shader_subgroup_extended_types_int64: enable
 
 layout(location = 0) out vec4 fv4Out;
 
@@ -178,6 +180,8 @@ void main()
 
     fv4.xy  += vec2(maxInvocationsExclusiveScanNonUniformAMD(i64v2In));
     fv4.xy  += vec2(maxInvocationsExclusiveScanNonUniformAMD(u64v2In));
+
+    fv4.xy  += vec2(subgroupPartitionedExclusiveXorNV(u64v2In, uvec4(0xff, 0, 0, 0)));
 
     fv4Out = fv4;
 }
@@ -454,6 +458,7 @@ void main()
 ; SHADERTEST: call i64 (...) @lgc.create.subgroup.clustered.exclusive.i64(i32 7,
 ; SHADERTEST: call i64 (...) @lgc.create.subgroup.clustered.exclusive.i64(i32 8,
 ; SHADERTEST: call i64 (...) @lgc.create.subgroup.clustered.exclusive.i64(i32 8,
+; SHADERTEST: call <2 x i64> (...) @lgc.create.subgroup.clustered.multi.exclusive.v2i64(i32 12,
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

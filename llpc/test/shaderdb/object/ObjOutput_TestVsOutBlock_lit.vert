@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v3f32
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v4f32
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call void @llvm.amdgcn.exp.f32
 ; SHADERTEST: AMDLLPC SUCCESS
 */

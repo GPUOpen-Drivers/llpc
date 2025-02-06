@@ -20,7 +20,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: %{{[0-9]*}} = call ptr addrspace(7) @lgc.load.buffer.desc(i64 1, i32 0, i32 0,
 ; SHADERTEST: %{{[0-9]*}} = load atomic float, ptr addrspace(7) %{{[0-9]*}} unordered, align 4
 ; SHADERTEST: store atomic float %{{[0-9a-z.]*}}, ptr addrspace(7) %{{[0-9]*}} unordered, align 4

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -46,12 +46,12 @@ namespace Llpc {
 // =====================================================================================================================
 // Enumerates the kinds of timer used to do profiling for LLPC compilation phases.
 enum TimerKind : unsigned {
-  TimerTranslate, // Timer for translator
-  TimerLower,     // Timer for SPIR-V lowering
-  TimerLoadBc,    // Timer for loading LLVM bitcode
-  TimerPatch,     // Timer for LLVM patching
-  TimerOpt,       // Timer for LLVM optimization
-  TimerCodeGen,   // Timer for backend code generation
+  TimerTranslate,   // Timer for translator
+  TimerFeLowering,  // Timer for FE lowering
+  TimerLoadBc,      // Timer for loading LLVM bitcode
+  TimerLgcLowering, // Timer for LGC lowering
+  TimerOpt,         // Timer for LLVM optimization
+  TimerCodeGen,     // Timer for backend code generation
 
   TimerCount
 };
@@ -73,7 +73,7 @@ public:
   static const llvm::StringMap<llvm::TimeRecord> &getDummyTimeRecords();
 
   static const unsigned PipelineTimerEnableMask = ((1 << TimerCount) - 1);
-  static const unsigned ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerLower));
+  static const unsigned ShaderModuleTimerEnableMask = ((1 << TimerTranslate) | (1 << TimerFeLowering));
 
 private:
   TimerProfiler(const TimerProfiler &) = delete;

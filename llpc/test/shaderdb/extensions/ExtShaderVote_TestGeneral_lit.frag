@@ -33,7 +33,7 @@ void main(void)
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: call i1 @lgc.subgroup.any(
 ; SHADERTEST: call i1 @lgc.subgroup.all(
 ; SHADERTEST: call i1 (...) @lgc.subgroup.all.equal(

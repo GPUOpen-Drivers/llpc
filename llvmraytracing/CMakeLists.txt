@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -47,7 +47,6 @@ add_llvm_library(LLVMRaytracing
   lib/DXILContPrepareGpurtLibrary.cpp
   lib/DXILContLgcRtOpConverter.cpp
   lib/DXILContPostProcess.cpp
-  lib/DXILSupport.cpp
   lib/GpurtContext.cpp
   lib/GpurtDialect.cpp
   lib/ContinuationsStatsReport.cpp
@@ -62,6 +61,7 @@ add_llvm_library(LLVMRaytracing
   lib/PassRegistry.inc
   lib/PipelineState.cpp
   lib/PayloadAccessQualifiers.cpp
+  lib/RematSupport.cpp
   lib/RemoveTypesMetadata.cpp
   lib/SpecializeDriverShaders.cpp
 

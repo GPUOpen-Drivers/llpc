@@ -2,7 +2,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -142,9 +142,9 @@ do_clang_tidy() {
   mkdir -p $build/fixes/llpc/context &&
   mkdir -p $build/fixes/llpc/imported/metrohash/src &&
   mkdir -p $build/fixes/llpc/lower &&
-  mkdir -p $build/fixes/lgc/patch &&
-  mkdir -p $build/fixes/lgc/patch/gfx9 &&
-  mkdir -p $build/fixes/lgc/patch/gfx9/chip &&
+  mkdir -p $build/fixes/lgc/lowering &&
+  mkdir -p $build/fixes/lgc/lowering/gfx9 &&
+  mkdir -p $build/fixes/lgc/lowering/gfx9/chip &&
   mkdir -p $build/fixes/llpc/tool &&
   mkdir -p $build/fixes/llpc/tool/vfx &&
   mkdir -p $build/fixes/llpc/translator/lib/SPIRV &&

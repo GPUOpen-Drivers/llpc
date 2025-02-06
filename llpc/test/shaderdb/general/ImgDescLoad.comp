@@ -4,7 +4,7 @@
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: [[IMG_DESC:%[0-9]*]] = load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 4, !invariant.load !{{.*}}
 ; SHADERTEST: [[SMP_DESC:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 4, !invariant.load !{{.*}}
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.l.2d.v4f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}(i32 15, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[IMG_DESC]], <4 x i32> [[SMP_DESC]], i1 false, i32 0, i32 0)

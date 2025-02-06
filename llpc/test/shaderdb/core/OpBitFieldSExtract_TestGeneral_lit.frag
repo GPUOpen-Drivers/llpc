@@ -25,7 +25,7 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.extract.bit.field.i32(i32 {{.*}}, i1 true)
 ; SHADERTEST: call <3 x i32> (...) @lgc.create.extract.bit.field.v3i32(<3 x i32> {{.*}}, i1 true)
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST-CONUT-2: call i32 @llvm.amdgcn.sbfe.i32
 
 ; SHADERTEST: AMDLLPC SUCCESS

@@ -110,7 +110,7 @@ and the `.vertexInputs` metadata to load all of the vertex input attributes into
 registers. See the `FetchShader` class in
 [GlueShader.cpp](../lgc/elfLinker/GlueShader.cpp) for the generation of the
 prologue. To see how the unlinked shader handles vertex inputs see the
-`LowerVertexFetch` pass in [VertexFetch.cpp](../lgc/patch/VertexFetch.cpp).
+`LowerVertexFetch` pass in [VertexFetch.cpp](../lgc/lowering/VertexFetch.cpp).
 
 A fragment shader will require a epilogue to export its outputs. The unlinked
 fragment shader will have the standard name for the fragment shader. Instead of
@@ -122,7 +122,7 @@ appended to the end of the unlinked shader. See the `ColorExportShader` class in
 [GlueShader.cpp](../lgc/elfLinker/GlueShader.cpp) for the generation of the
 epilogue. To see how the unlinked shader handles color export see the
 `LowerFragmentColorExport` pass in
-[FragmentColorExport.cpp](../lgc/patch/FragmentColorExport.cpp).
+[FragmentColorExport.cpp](../lgc/lowering/FragmentColorExport.cpp).
 
 These epilogues and prologues mean that unlinked shaders do not have to depend
 on the format of the vertex input attributes and color exports.

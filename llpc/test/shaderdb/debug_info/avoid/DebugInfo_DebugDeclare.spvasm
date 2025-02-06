@@ -12,7 +12,7 @@
 ; SHADERTEST: [[D5]] = !{}
 ; SHADERTEST: [[D6:![0-9]*]] = !{i32 0}
 ; SHADERTEST: [[D13:![0-9]*]] = !DILocation(line: 1, scope: [[D8]])
-; SHADERTEST: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

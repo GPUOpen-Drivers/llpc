@@ -22,10 +22,10 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.log2.v3f32(<3 x float>
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: = call reassoc nsz arcp contract afn float @llvm.log2.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> @llvm.log2.v3f32(<3 x float>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float @llvm.log2.f32(float
 ; SHADERTEST: AMDLLPC SUCCESS

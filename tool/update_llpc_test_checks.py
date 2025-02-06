@@ -2,7 +2,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -23,8 +23,6 @@
  #  IN THE SOFTWARE.
  #
  #######################################################################################################################
-
-
 
 # This script is based on the LLVM Project's update_test_checks.py, which is
 # licensed under the Apache License v2.0 with LLVM Exceptions; see the file

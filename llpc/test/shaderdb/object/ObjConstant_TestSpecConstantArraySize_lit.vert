@@ -19,7 +19,7 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i32 (...) @lgc.create.smod.i32(i32
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: srem i32 %{{.*}}, 6
 ; SHADERTEST-DAG: icmp slt i32 %{{[0-9]*}}, 0
 ; SHADERTEST-DAG: icmp ne i32 %{{[0-9]*}}, 0

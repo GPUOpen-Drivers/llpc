@@ -18,7 +18,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: add i32 %{{[0-9]*}}, 1
 ; SHADERTEST: getelementptr [4 x <4 x float>], ptr addrspace({{.*}}) %{{.*}}, i32 0, i32 %{{[0-9]*}}, i32 %{{[0-9]*}}
 ; SHADERTEST: load i32, ptr addrspace({{.*}}) %{{[0-9]*}}

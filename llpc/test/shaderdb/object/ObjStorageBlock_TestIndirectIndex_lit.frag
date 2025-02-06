@@ -34,7 +34,7 @@ void main()
 ; SHADERTEST: %{{[0-9]*}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 %{{[0-9]*}}, i32 2
 ; SHADERTEST: %{{[0-9]*}} = getelementptr [2 x <{ i32, [12 x i8], [4 x float], [2 x [4 x float]] }>], ptr addrspace(7) @{{[a-z0-9]+}}, i32 0, i32 %{{[0-9]*}}, i32 3, i32 %{{[0-9]*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST-COUNT-3: call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 %{{[0-9]*}},
 
 ; SHADERTEST: AMDLLPC SUCCESS

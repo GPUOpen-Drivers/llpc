@@ -17,7 +17,7 @@ define void @_cont_ExitRayGen(ptr nocapture readonly %data) alwaysinline nounwin
 
 define { i32, i32 } @main() !lgc.rt.shaderstage !10 {
 ; CHECK-LABEL: define void @main
-; CHECK-SAME: (i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.entry [[META10:![0-9]+]] !continuation.registercount [[META5]] !continuation [[META11:![0-9]+]] {
+; CHECK-SAME: (i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META5:![0-9]+]] !lgc.cps [[META10:![0-9]+]] !continuation.registercount [[META5]] !continuation [[META11:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [0 x i32], align 4

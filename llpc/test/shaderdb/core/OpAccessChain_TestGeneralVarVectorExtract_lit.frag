@@ -31,7 +31,7 @@ void main()
 ; SHADERTEST: getelementptr <3 x float>, ptr addrspace({{.*}}) %{{.*}}, i32 0, i32 %{{[0-9]*}}
 ; SHADERTEST: getelementptr <3 x float>, ptr addrspace({{.*}}) %{{.*}}, i32 0, i32 %{{[0-9]*}}
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: %[[cmp1:.*]] = icmp eq i32 %{{[0-9]*}}, 1
 ; SHADERTEST: select i1 %[[cmp1]], i32 {{.*}}, i32 {{.*}}
 ; SHADERTEST: %[[cmp2:.*]] = icmp eq i32 %{{[0-9]*}}, 2

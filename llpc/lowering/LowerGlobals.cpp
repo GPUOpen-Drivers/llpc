@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -204,12 +204,12 @@ LowerGlobals::LowerGlobals() : m_lastVertexProcessingStage(ShaderStageInvalid) {
 }
 
 // =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
+// Executes this FE lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses LowerGlobals::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
+  LLVM_DEBUG(dbgs() << "Run the pass Lower-Globals\n");
 
   SpirvLower::init(&module);
 
@@ -317,11 +317,11 @@ void LowerGlobals::lowerEdgeFlag() {
     if (binding->binding == edgeflagInputLocation) {
       Type *int32Ty = Type::getInt32Ty(*m_context);
       Value *zeroValue = m_builder->getInt32(0);
-
+      Value *poisonValue = PoisonValue::get(int32Ty);
       lgc::InOutInfo inOutInfo;
-      Value *edgeflagValue = m_builder->create<lgc::LoadVertexInputOp>(
-          int32Ty, false, edgeflagInputLocation, zeroValue, zeroValue, PoisonValue::get(int32Ty),
-          PoisonValue::get(int32Ty), PoisonValue::get(int32Ty));
+      Value *edgeflagValue = m_builder->create<lgc::LoadVertexInputOp>(int32Ty, false, edgeflagInputLocation, zeroValue,
+                                                                       zeroValue, poisonValue, poisonValue, poisonValue,
+                                                                       poisonValue, poisonValue, poisonValue);
       m_builder->CreateWriteBuiltInOutput(edgeflagValue, lgc::BuiltInEdgeFlag, inOutInfo, nullptr, nullptr);
       return;
     }
@@ -450,7 +450,8 @@ static bool hasPrimitiveIdx(const Constant &metaVal) {
 // Maps the specified global variable to proxy variable.
 //
 // @param globalVar : Global variable to be mapped
-void LowerGlobals::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
+// @param initializer: an optional initializer for the proxy.
+void LowerGlobals::mapGlobalVariableToProxy(GlobalVariable *globalVar, Constant *initializer) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
 
@@ -467,10 +468,9 @@ void LowerGlobals::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
     proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
                                     Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
-    if (globalVar->hasInitializer()) {
-      auto initializer = globalVar->getInitializer();
-      m_builder->CreateStore(initializer, proxy);
-    }
+    if (globalVar->hasInitializer() || initializer)
+      m_builder->CreateStore(initializer ? initializer : globalVar->getInitializer(), proxy);
+
     globalVar->mutateType(proxy->getType());
     globalVar->replaceUsesWithIf(proxy, [func](Use &U) {
       Instruction *userInst = cast<Instruction>(U.getUser());
@@ -972,17 +972,20 @@ Value *LowerGlobals::addCallInstForInOutImport(Type *inOutTy, unsigned addrSpace
                                                            inOutInfo, vertexIdx);
         } else {
           if (m_shaderStage == ShaderStageVertex) {
-            if (vertexIdx == nullptr)
-              vertexIdx = PoisonValue::get(m_builder->getInt32Ty());
-            Value *instanceIdx = PoisonValue::get(m_builder->getInt32Ty());
             Value *arrayIdx = PoisonValue::get(m_builder->getInt32Ty());
+            Value *vertexId = PoisonValue::get(m_builder->getInt32Ty());
+            Value *instanceId = PoisonValue::get(m_builder->getInt32Ty());
+            Value *drawId = PoisonValue::get(m_builder->getInt32Ty());
+            Value *baseVertex = PoisonValue::get(m_builder->getInt32Ty());
+            Value *baseInstance = PoisonValue::get(m_builder->getInt32Ty());
 
             if (m_transformVertex) {
               assert(TransformParamCount == m_entryPoint->arg_size());
-              vertexIdx = m_builder->CreateAdd(m_entryPoint->getArg(TransformVertexId),
-                                               m_entryPoint->getArg(TransformBaseVertex));
-              instanceIdx = m_builder->CreateAdd(m_entryPoint->getArg(TransformInstanceId),
-                                                 m_entryPoint->getArg(TransformBaseInstance));
+              vertexId = m_entryPoint->getArg(TransformVertexId);
+              instanceId = m_entryPoint->getArg(TransformInstanceId);
+              drawId = m_entryPoint->getArg(TransformDrawId);
+              baseVertex = m_entryPoint->getArg(TransformBaseVertex);
+              baseInstance = m_entryPoint->getArg(TransformBaseInstance);
             }
 
             // Fold constant locationOffset into location.
@@ -992,7 +995,8 @@ Value *LowerGlobals::addCallInstForInOutImport(Type *inOutTy, unsigned addrSpace
               location += vtxLocOffset;
             }
             inOutValue = m_builder->create<lgc::LoadVertexInputOp>(inOutTy, false, location, m_builder->getInt32(0),
-                                                                   elemIdx, arrayIdx, vertexIdx, instanceIdx);
+                                                                   elemIdx, arrayIdx, vertexId, instanceId, drawId,
+                                                                   baseVertex, baseInstance);
           } else {
             inOutValue = m_builder->CreateReadGenericInput(inOutTy, inOutMeta.Value, locOffset, elemIdx, maxLocOffset,
                                                            inOutInfo, vertexIdx);
@@ -1988,7 +1992,7 @@ void LowerGlobals::lowerPushConsts() {
 void LowerGlobals::lowerUniformConstants() {
   SmallVector<GlobalVariable *, 1> globalsToRemove;
 
-  for (GlobalVariable &global : m_module->globals()) {
+  for (GlobalVariable &global : llvm::make_early_inc_range(m_module->globals())) {
     // Skip anything that is not a default uniform.
     if (global.getAddressSpace() != SPIRAS_Uniform || !global.hasMetadata(gSPIRVMD::UniformConstant))
       continue;
@@ -1998,90 +2002,80 @@ void LowerGlobals::lowerUniformConstants() {
     // A map from the function to the instructions inside it which access the global variable.
     SmallMapVector<Function *, SmallVector<Instruction *>, 8> globalUsers;
 
+    // Replace uniform constant variable with a compile time constants if it is set from driver side.
+    Vkgc::CompileConstInfo *compileTimeConstsInfo =
+        m_context->getPipelineContext()->getPipelineOptions()->compileConstInfo;
+
+    MDNode *metaNode = global.getMetadata(gSPIRVMD::UniformConstant);
+    auto uniformConstantsSet = mdconst::extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
+    auto uniformConstantsBinding = mdconst::extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
+    auto uniformConstantsOffset = mdconst::extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
+
+    if (compileTimeConstsInfo && compileTimeConstsInfo->numCompileTimeConstants > 0) {
+      auto *pCompileTimeConstant = compileTimeConstsInfo->pCompileTimeConstants;
+      unsigned count = compileTimeConstsInfo->numCompileTimeConstants;
+      // Get the matching compile time constant info entry.
+      Vkgc::CompileTimeConst *specializeUniformInfo =
+          std::find_if(pCompileTimeConstant, pCompileTimeConstant + count, [&](const Vkgc::CompileTimeConst &item) {
+            return item.offset == uniformConstantsOffset && item.set == uniformConstantsSet &&
+                   item.binding == uniformConstantsBinding;
+          });
+
+      // Specialize the uniform constant if we found a compile time constant entry.
+      if (specializeUniformInfo != pCompileTimeConstant + count) {
+        uint32_t elemCount = 1;
+        Type *uniformTy = global.getValueType();
+        assert(!uniformTy->isStructTy());
+        Type *elemTy = uniformTy;
+
+        if (auto *vectorUniformTy = dyn_cast<FixedVectorType>(uniformTy)) {
+          elemTy = vectorUniformTy->getElementType();
+          elemCount = vectorUniformTy->getElementCount().getFixedValue();
+        } else {
+          assert(uniformTy->isIntegerTy());
+        }
+
+        assert(elemTy->getScalarSizeInBits() % 8 == 0);
+        uint32_t elemBytes = elemTy->getScalarSizeInBits() / 8;
+
+        // Don't support partial replacement now (like vector component partial replacement).
+        assert(elemBytes * elemCount == specializeUniformInfo->validBytes);
+
+        // Construct constants
+        Constant *constData[16] = {};
+        for (uint32_t i = 0; i < elemCount; i++) {
+          if (elemTy->isFloatTy()) {
+            float data = 0.0;
+            assert(specializeUniformInfo->validBytes == 4);
+            memcpy(&data, specializeUniformInfo->values.u8 + i * 4, 4);
+            constData[i] = ConstantFP::get(elemTy, data);
+          } else if (elemTy->isDoubleTy()) {
+            double data = 0.0;
+            assert(specializeUniformInfo->validBytes == 8);
+            memcpy(&data, specializeUniformInfo->values.u8 + i * 8, 8);
+            constData[i] = ConstantFP::get(elemTy, data);
+          } else {
+            uint64_t data = 0;
+            assert(elemTy->isIntegerTy());
+            memcpy(&data, specializeUniformInfo->values.u8 + i * elemBytes, elemBytes);
+            constData[i] = ConstantInt::get(elemTy, data);
+          }
+        }
+
+        // Replace current uniform with known compile time constants.
+        Constant *initializer = elemCount > 1 ? ConstantVector::get(constData) : constData[0];
+
+        mapGlobalVariableToProxy(&global, initializer);
+        continue;
+      }
+    }
+
     for (User *const user : global.users()) {
       Instruction *inst = cast<Instruction>(user);
       globalUsers[inst->getFunction()].push_back(inst);
     }
 
-    // Replace uniform constant variable with a compile time constants if it is set from driver side.
-    Vkgc::CompileConstInfo *compileTimeConstsInfo =
-        m_context->getPipelineContext()->getPipelineOptions()->compileConstInfo;
-
-    if (compileTimeConstsInfo && compileTimeConstsInfo->numCompileTimeConstants > 0) {
-      GlobalVariable *compileTimeConstVal = nullptr;
-      bool foundGlobal = false;
-      MDNode *metaNode = global.getMetadata(gSPIRVMD::UniformConstant);
-      auto uniformConstantsSet = mdconst::extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
-      auto uniformConstantsBinding = mdconst::extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
-      auto uniformConstantsOffset = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
-      for (uint32_t i = 0; i < compileTimeConstsInfo->numCompileTimeConstants; i++) {
-        auto specializeUniformInfo = compileTimeConstsInfo->pCompileTimeConstants[i];
-        if (specializeUniformInfo.offset == uniformConstantsOffset &&
-            specializeUniformInfo.set == uniformConstantsSet &&
-            specializeUniformInfo.binding == uniformConstantsBinding) {
-          // determine result constant type.
-          foundGlobal = true;
-          uint32_t uniformChannelCount = 1;
-          uint32_t uniformChannelBytesCount = 1;
-          Type *uniformTy = global.getValueType();
-          assert(!uniformTy->isStructTy());
-          Type *constTy = uniformTy;
-
-          if (auto *vectorUniformTy = dyn_cast<FixedVectorType>(uniformTy)) {
-            constTy = vectorUniformTy->getElementType();
-            uniformChannelCount = vectorUniformTy->getElementCount().getFixedValue();
-          }
-          uniformChannelBytesCount = constTy->getScalarSizeInBits() / (sizeof(uint8_t) * 8);
-
-          if (uniformChannelBytesCount * uniformChannelCount != specializeUniformInfo.validBytes) {
-            // Don't support partial replacement now (like vector component partial replacement).
-            continue;
-          }
-
-          // Construct constants
-          Constant *constData[16] = {};
-          compileTimeConstVal = new GlobalVariable(uniformTy, true, global.getLinkage(), nullptr, "",
-                                                   GlobalValue::NotThreadLocal, SPIRAS_Private);
-          for (uint32_t i = 0; i < uniformChannelCount; i++) {
-            if (uniformTy->isFloatingPointTy()) {
-              double data = 0.0;
-              memcpy(&data, specializeUniformInfo.values.u8 + i * uniformChannelBytesCount, uniformChannelBytesCount);
-              constData[i] = ConstantFP::get(constTy, data);
-            } else {
-              uint64_t data = 0;
-              memcpy(&data, specializeUniformInfo.values.u8 + i * uniformChannelBytesCount, uniformChannelBytesCount);
-              constData[i] = ConstantInt::get(constTy, data);
-            }
-          }
-
-          // Replace current uniform with known compile time constants.
-          Constant *initializer = uniformChannelCount > 1 ? ConstantVector::get(constData) : constData[0];
-          compileTimeConstVal->setInitializer(initializer);
-          for (auto &eachFunc : globalUsers) {
-            for (auto *inst : eachFunc.second) {
-              inst->replaceUsesOfWith(&global, compileTimeConstVal);
-            }
-          }
-
-          // Insert new global to list and remove replaced global variable.
-          global.getParent()->insertGlobalVariable(compileTimeConstVal);
-          mapGlobalVariableToProxy(compileTimeConstVal);
-          globalsToRemove.push_back(&global);
-          break;
-        }
-      }
-      // If replacement happens, skip following buffer load convert.
-      if (foundGlobal) {
-        continue;
-      }
-    }
-
     for (auto &eachFunc : globalUsers) {
-      MDNode *metaNode = global.getMetadata(gSPIRVMD::UniformConstant);
-      auto uniformConstantsSet = mdconst::extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
-      auto uniformConstantsBinding = mdconst::extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
-      auto uniformConstantsOffset = mdconst::extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
-
       m_builder->SetInsertPointPastAllocas(eachFunc.first);
       Value *bufferDesc = m_builder->create<lgc::LoadBufferDescOp>(
           uniformConstantsSet, uniformConstantsBinding, m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);

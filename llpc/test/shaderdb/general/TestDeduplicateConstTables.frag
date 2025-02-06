@@ -14,7 +14,7 @@
 // SHADERTEST: getelementptr [28 x <4 x i32>], ptr addrspace(5) [[VAR5]], i32
 // SHADERTEST: getelementptr [28 x <4 x i32>], ptr addrspace(5) [[VAR6]], i32
 //
-// SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+// SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 // SHADERTEST: [[VAR:@.*]] = internal unnamed_addr addrspace(4) constant [28 x <4 x i32>] [<4 x i32> <i32 1059055552, i32 1057692236, i32 1062465857, i32 0
 // SHADERTEST: getelementptr [28 x <4 x i32>], ptr addrspace(4) [[VAR]], i64
 // SHADERTEST: getelementptr [28 x <4 x i32>], ptr addrspace(4) [[VAR]], i64

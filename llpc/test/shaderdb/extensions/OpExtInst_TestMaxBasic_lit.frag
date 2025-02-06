@@ -17,7 +17,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.maxnum.v4f32(<4 x float>
 ; SHADERTEST: = call <4 x i32> @llvm.smax.v4i32(<4 x i32> %{{[0-9]*}}, <4 x i32> %{{[0-9]*}})
 ; SHADERTEST: = call <4 x i32> @llvm.umax.v4i32(<4 x i32> %{{[0-9]*}}, <4 x i32> %{{[0-9]*}})

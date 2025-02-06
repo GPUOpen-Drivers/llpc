@@ -20,7 +20,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call i32 (...) @lgc.create.smod.i32(i32
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: srem i32
 ; SHADERTEST: insertelement <4 x float> <float {{undef|poison}}, float 2.000000e+00, float 0.000000e+00, float 1.000000e+00>, float %{{.*}}, i{{32|64}} 0
 

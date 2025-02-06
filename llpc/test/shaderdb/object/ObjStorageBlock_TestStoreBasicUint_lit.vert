@@ -21,7 +21,7 @@ void main()
 /*
 ; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.raw.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> {{%[^,]+}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.i32{{(\.v4i32)?}}(i32 {{%[^,]+}}, <4 x i32> {{%[^,]+}}, i32 0, i32 0, i32 0)
 ; SHADERTEST: call <2 x i32> @llvm.amdgcn.raw.buffer.load.v2i32{{(\.v4i32)?}}(<4 x i32> {{%[^,]+}}, i32 8, i32 0, i32 0)

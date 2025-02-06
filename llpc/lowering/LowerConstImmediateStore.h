@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -42,12 +42,12 @@ class Value;
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering operations for constant immediate store
+// Represents the pass of FE lowering operations for constant immediate store
 class LowerConstImmediateStore : public SpirvLower, public llvm::PassInfoMixin<LowerConstImmediateStore> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V constant immediate store"; }
+  static llvm::StringRef name() { return "Lower constant immediate store"; }
 
 private:
   bool processAllocaInsts(llvm::Function *func);

@@ -18,7 +18,7 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: {{fsub|fneg}} reassoc nnan nsz arcp contract afn <3 x float> {{(<float -0.000000e\+00, float -0.000000e\+00, float -0.000000e\+00>, )?}}%
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}}  LGC lowering results
 ; SHADERTEST-COUNT-3: {{fsub|fneg}} reassoc nnan nsz arcp contract afn float {{(-0.000000e\+00, )?}}%
 ; SHADERTEST: AMDLLPC SUCCESS
 */

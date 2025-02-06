@@ -6,7 +6,7 @@
 ; SHADERTEST: [[D5]] = !{null}
 ; SHADERTEST: [[D4]] = !DISubprogram(name: "main", linkageName: "v4f_main_f", scope: null, file: !{{[0-9]*}}, line: 12, type: [[D3]], flags: DIFlagPublic, spFlags: 0, templateParams: [[D1]])
 ; SHADERTEST: [[D1]] = !{}
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

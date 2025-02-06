@@ -22,7 +22,7 @@ colorExport=PipelineLibCes_TestColorExport.pipe
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(7) [[TMP0]], i32 4
 ; SHADERTEST-NEXT:    [[DOT0_IN:%.*]] = select i1 [[TMP4]], ptr addrspace(7) [[TMP0]], ptr addrspace(7) [[TMP5]]
 ; SHADERTEST-NEXT:    [[DOT0:%.*]] = load float, ptr addrspace(7) [[DOT0_IN]], align 4
-; SHADERTEST-NEXT:    [[TMP6:%.*]] = call <4 x float> @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+; SHADERTEST-NEXT:    [[TMP6:%.*]] = call <4 x float> @lgc.load.vertex.input__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
 ; SHADERTEST-NEXT:    [[TMP7:%.*]] = insertelement <4 x float> [[TMP6]], float 1.000000e+00, i64 3
 ; SHADERTEST-NEXT:    [[TMP8:%.*]] = insertelement <4 x float> [[TMP7]], float [[DOT0]], i64 2
 ; SHADERTEST-NEXT:    call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> [[TMP8]]) #[[ATTR5:[0-9]+]]

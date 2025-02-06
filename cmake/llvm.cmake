@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -45,7 +45,7 @@ set(LLVM_INCLUDE_UTILS ON CACHE BOOL "LLVM include utils")
 set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "LLVM enable terminfo")
 set(LLVM_RAM_PER_TABLEGEN_JOB 4000 CACHE STRING "LLVM RAM per tablegen job")
 set(LLVM_RAM_PER_LINK_JOB 5000 CACHE STRING "LLVM RAM per link job")
-if(CMAKE_BUILD_TYPE_DEBUG)
+if("${CMAKE_BUILD_TYPE}" STREQUAL Debug)
     # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
     set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "Build optimized llvm-tblgen")
 #if _WIN32

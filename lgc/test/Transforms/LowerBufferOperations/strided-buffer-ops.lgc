@@ -279,9 +279,14 @@ define amdgpu_kernel void @constant_strided_buffer_desc_to_ptr_index(<4 x i32> i
 ; GFX11-NEXT:    [[TMP13:%.*]] = insertelement <4 x i32> [[TMP11]], i32 [[TMP12]], i64 1
 ; GFX11-NEXT:    [[TMP14:%.*]] = insertelement <4 x i32> [[TMP13]], i32 -1, i64 2
 ; GFX11-NEXT:    [[TMP15:%.*]] = insertelement <4 x i32> [[TMP14]], i32 805392300, i64 3
-; GFX11-NEXT:    [[TMP16:%.*]] = call i32 @llvm.amdgcn.struct.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[TMP15]], i32 24, i32 0, i32 0, i32 0)
-; GFX11-NEXT:    [[TMP17:%.*]] = bitcast i32 [[TMP16]] to float
-; GFX11-NEXT:    store float [[TMP17]], ptr [[OUT]], align 4
+; GFX11-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP15]], i64 1
+; GFX11-NEXT:    [[TMP17:%.*]] = lshr i32 [[TMP16]], 16
+; GFX11-NEXT:    [[TMP18:%.*]] = and i32 [[TMP17]], 16383
+; GFX11-NEXT:    [[TMP19:%.*]] = mul i32 24, [[TMP18]]
+; GFX11-NEXT:    [[TMP20:%.*]] = add i32 0, [[TMP19]]
+; GFX11-NEXT:    [[TMP21:%.*]] = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> [[TMP15]], i32 [[TMP20]], i32 0), !invariant.load [[META8:![0-9]+]]
+; GFX11-NEXT:    [[TMP22:%.*]] = bitcast i32 [[TMP21]] to float
+; GFX11-NEXT:    store float [[TMP22]], ptr [[OUT]], align 4
 ; GFX11-NEXT:    ret void
 ;
 entry:
@@ -313,9 +318,14 @@ define amdgpu_kernel void @strided_buffer_uniform_strided_load(<4 x i32> %desc, 
 ; GFX11-NEXT:    [[TMP13:%.*]] = insertelement <4 x i32> [[TMP11]], i32 [[TMP12]], i64 1
 ; GFX11-NEXT:    [[TMP14:%.*]] = insertelement <4 x i32> [[TMP13]], i32 -1, i64 2
 ; GFX11-NEXT:    [[TMP15:%.*]] = insertelement <4 x i32> [[TMP14]], i32 805392300, i64 3
-; GFX11-NEXT:    [[TMP16:%.*]] = call i32 @llvm.amdgcn.struct.buffer.load.i32{{(\.v4i32)?}}(<4 x i32> [[TMP15]], i32 24, i32 0, i32 0, i32 0)
-; GFX11-NEXT:    [[TMP17:%.*]] = bitcast i32 [[TMP16]] to float
-; GFX11-NEXT:    store float [[TMP17]], ptr [[OUT]], align 4
+; GFX11-NEXT:    [[TMP16:%.*]] = extractelement <4 x i32> [[TMP15]], i64 1
+; GFX11-NEXT:    [[TMP17:%.*]] = lshr i32 [[TMP16]], 16
+; GFX11-NEXT:    [[TMP18:%.*]] = and i32 [[TMP17]], 16383
+; GFX11-NEXT:    [[TMP19:%.*]] = mul i32 24, [[TMP18]]
+; GFX11-NEXT:    [[TMP20:%.*]] = add i32 0, [[TMP19]]
+; GFX11-NEXT:    [[TMP21:%.*]] = call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> [[TMP15]], i32 %20, i32 0), !invariant.load [[META8:![0-9]+]]
+; GFX11-NEXT:    [[TMP22:%.*]] = bitcast i32 [[TMP21]] to float
+; GFX11-NEXT:    store float [[TMP22]], ptr [[OUT]], align 4
 ; GFX11-NEXT:    ret void
 ;
 entry:

@@ -13,7 +13,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i32 (...) @lgc.create.extract.bit.field.i32(i32 {{.*}}, i1 false)
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: call i32 @llvm.amdgcn.ubfe.i32
 
 ; SHADERTEST: AMDLLPC SUCCESS

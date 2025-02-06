@@ -73,7 +73,7 @@ attribute[0].offset = 0
 
 ; SHADERTEST-LABEL: @lgc.shader.VS.main(
 ; SHADERTEST-NEXT:  .entry:
-; SHADERTEST-NEXT:    [[TMP0:%.*]] = call <2 x float> @lgc.load.vertex.input__v2f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison)
+; SHADERTEST-NEXT:    [[TMP0:%.*]] = call <2 x float> @lgc.load.vertex.input__v2f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison, i32 poison)
 ; SHADERTEST-NEXT:    call void @lgc.output.export.generic.i32.i32.v2f32(i32 0, i32 0, <2 x float> [[TMP0]]) #[[ATTR2:[0-9]+]]
 ; SHADERTEST-NEXT:    ret void
 ;

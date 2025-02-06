@@ -23,7 +23,7 @@ void main()
 // Make sure that both the image resource desc and sample desc have the same index and there is only one
 // waterfall.readfirstlane for both of them
 
-// SHADERTEST-GFX-LABEL: {{^// LLPC}} pipeline patching results
+// SHADERTEST-GFX-LABEL: {{^// LLPC}} LGC lowering results
 // SHADERTEST-GFX: %[[mul1:[0-9]+]] = mul i32 %{{.*}}, 48
 // SHADERTEST-GFX-NEXT: %[[begin1:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul1]])
 // SHADERTEST-GFX-NEXT: %[[readfirstlane1:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %[[begin1]], i32 %[[mul1]])
@@ -58,7 +58,7 @@ void main()
 // SHADERTEST-GFX-NEXT: %[[end2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin2]], <4 x float> %[[image_call2]])
 // SHADERTEST-GFX: AMDLLPC SUCCESS
 
-// SHADERTEST-GFX_10_3_0-LABEL: {{^// LLPC}} pipeline patching results
+// SHADERTEST-GFX_10_3_0-LABEL: {{^// LLPC}} LGC lowering results
 // SHADERTEST-GFX_10_3_0: %[[mul1:[0-9]+]] = mul i32 %{{.*}}, 48
 // SHADERTEST-GFX_10_3_0-NEXT: %[[begin1:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul1]])
 // SHADERTEST-GFX_10_3_0-NEXT: %[[readfirstlane1:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %[[begin1]], i32 %[[mul1]])
@@ -81,7 +81,7 @@ void main()
 // SHADERTEST-GFX_10_3_0-NEXT: %[[end2:[0-9]+]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 %[[begin2]], <4 x float> %[[image_call2]])
 // SHADERTEST-GFX_10_3_0: AMDLLPC SUCCESS
 
-// SHADERTEST-GFX_10_3_2-LABEL: {{^// LLPC}} pipeline patching results
+// SHADERTEST-GFX_10_3_2-LABEL: {{^// LLPC}} LGC lowering results
 // SHADERTEST-GFX_10_3_2: %[[mul1:[0-9]+]] = mul i32 %{{.*}}, 48
 // SHADERTEST-GFX_10_3_2-NEXT: %[[begin1:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 %[[mul1]])
 // SHADERTEST-GFX_10_3_2-NEXT: %[[readfirstlane1:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 %[[begin1]], i32 %[[mul1]])

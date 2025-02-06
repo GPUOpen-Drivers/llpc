@@ -17,7 +17,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call <4 x float> (...) @lgc.create.extract.significand.v4f32(<4 x float>
 ; SHADERTEST: = call <4 x i32> (...) @lgc.create.extract.exponent.v4i32(<4 x float>
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST-DAG: = call float @llvm.amdgcn.frexp.mant.f32(float
 ; SHADERTEST-DAG: = call i32 @llvm.amdgcn.frexp.exp.i32.f32(float
 ; SHADERTEST-DAG: = call float @llvm.amdgcn.frexp.mant.f32(float

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -589,25 +589,8 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableInterpModePatch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, pageMigrationEnabled, MemberTypeBool, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 73
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, replaceSetWithResourceType, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableSampleMask, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, buildResourcesDataForShaderModule, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableTruncCoordForGather, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableCombinedTexture, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, vertex64BitsAttribSingleLoc, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableFragColor, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableBaseVertex, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, bindlessTextureMode, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, bindlessImageMode, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePolygonStipple, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableLineSmooth, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, emulateWideLineStipple, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePointSmooth, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableRemapLocation, MemberTypeBool, false);
-#else
+
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_glState, MemberTypeGlState, true);
-#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizePointSizeWrite, MemberTypeBool, false);
@@ -977,11 +960,7 @@ public:
     m_tessLevelOuter[3] = -1.0f;
     m_clientMetadata = &m_clientMetadataBufMem;
     m_forceDisableStreamOut = false;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
-    m_state.ppUniformMaps = &m_pUniformMaps[0];
-#else
     m_state.glState.ppUniformMaps = &m_pUniformMaps[0];
-#endif
   }
 
   static StrToMemberAddrArrayRef getAddrTable() {
@@ -1039,13 +1018,9 @@ public:
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_clientMetadata, MemberTypeU8Array, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_uniformConstantMaps, MemberTypeUniformConstantMap,
                                      Vkgc::ShaderStageGfxCount, true);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, originUpperLeft, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, vbAddressLowBitsKnown, MemberTypeBool, false);
-#else
+
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, originUpperLeft, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, vbAddressLowBitsKnown, MemberTypeBool, false);
-#endif
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_forceDisableStreamOut, MemberTypeBool, false);
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionGraphicsState, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_advancedBlendInfo, MemberTypeAdvancedBlendInfo, true);
@@ -1068,11 +1043,8 @@ public:
     m_advancedBlendInfo.getSubState(m_state.advancedBlendInfo);
     m_options.getSubState(m_state.options);
     m_nggState.getSubState(m_state.nggState);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
-    auto pGlState = &m_state;
-#else
+
     auto pGlState = &m_state.glState;
-#endif
     for (unsigned i = 0; i < Vkgc::ShaderStageGfxCount; i++) {
       m_uniformConstantMaps[i].getSubState(m_uniformMaps[i]);
       if (m_uniformMaps[i].numUniformConstants > 0) {

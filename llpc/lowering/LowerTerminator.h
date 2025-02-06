@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -37,14 +37,14 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering terminators.
+// Represents the pass of FE lowering terminators.
 class LowerTerminator : public SpirvLower,
                         public llvm::PassInfoMixin<LowerTerminator>,
                         public llvm::InstVisitor<LowerTerminator> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Lower SPIR-V terminator"; }
+  static llvm::StringRef name() { return "Lower terminator"; }
 
   virtual void visitCallInst(llvm::CallInst &callInst);
 

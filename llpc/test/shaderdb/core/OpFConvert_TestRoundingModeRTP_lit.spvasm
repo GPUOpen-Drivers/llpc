@@ -1,6 +1,6 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -verify-ir -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching
+; SHADERTEST-LABEL: {{^// LLPC}} LGC before-lowering results
 ; SHADERTEST: %{{.*}} = call {{.*}} @llvm.fptrunc.round.f16.f32(float %{{.*}}, metadata !"round.upward")
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

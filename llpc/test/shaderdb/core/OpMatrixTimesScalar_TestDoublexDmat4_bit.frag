@@ -19,7 +19,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: [4 x <4 x double>] (...) @lgc.create.matrix.times.scalar.a4v4f64
 
-; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: fmul {{.*}}double %{{[^, ]*}}, %{{[^, ]*}}
 
 ; SHADERTEST: AMDLLPC SUCCESS
