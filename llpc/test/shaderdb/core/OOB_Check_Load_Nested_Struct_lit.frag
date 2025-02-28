@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if load access to an array of nested structs which use arrays using some runtime indices
 // will be transformed to an out of bounds checks against all accessed elements, moving the load into a conditionally executed BB.
 // The OOB check will possibly zero out the load results.

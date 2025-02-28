@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -350,6 +350,12 @@ LlpcRaytracingModeSetting("llpc-raytracing-mode", cl::init(LlpcRaytracingMode::L
 cl::opt<bool> EnableColorExportShader("enable-color-export-shader",
                                       cl::desc("Enable color export shader, only compile each stage of the pipeline without linking"),
                                       cl::init(false));
+
+// -pad-buffer-size-to-next-dword
+cl::opt<unsigned> PadBufferSizeToNextDWORD("pad-buffer-size-to-next-dword",
+                                                        cl::desc("Pad buffer size to next DWORD"),
+                                                        cl::init(true));
+
 } // namespace
 // clang-format on
 namespace llvm {
@@ -579,6 +585,10 @@ static void initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxPipelineInfo.options.forceNonUniformResourceIndexStageMask = ForceNonUniformResourceIndexStageMask;
   compileInfo->rayTracePipelineInfo.options.forceNonUniformResourceIndexStageMask =
       ForceNonUniformResourceIndexStageMask;
+
+  compileInfo->compPipelineInfo.options.padBufferSizeToNextDword = PadBufferSizeToNextDWORD;
+  compileInfo->gfxPipelineInfo.options.padBufferSizeToNextDword = PadBufferSizeToNextDWORD;
+  compileInfo->rayTracePipelineInfo.options.padBufferSizeToNextDword = PadBufferSizeToNextDWORD;
 
   // Set NGG control settings
   auto &nggState = compileInfo->gfxPipelineInfo.nggState;

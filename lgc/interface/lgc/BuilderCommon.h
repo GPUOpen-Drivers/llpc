@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -31,15 +31,10 @@
 #pragma once
 
 #include "llvm-dialects/Dialect/Builder.h"
-#include "llvm/IR/IRBuilder.h"
 
 namespace lgc {
 
 enum class ResourceNodeType : unsigned;
-enum class CooperativeMatrixMemoryAccess : unsigned;
-enum class CooperativeMatrixElementType : unsigned;
-enum class CooperativeMatrixLayout : unsigned;
-enum class CooperativeMatrixArithOp : unsigned;
 
 // =====================================================================================================================
 // BuilderCommon extends llvm_dialects::Builder, which extends llvm::IRBuilder<>, and provides a few utility methods
@@ -110,22 +105,6 @@ public:
   //
   // @param instName : Name to give instruction(s)
   llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "");
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Cooperative matrix operation.
-
-  // Convert the element type enum into the corresponding LLVM type.
-  llvm::Type *transCooperativeMatrixElementType(CooperativeMatrixElementType elemType);
-
-  // Get the LGC type of a cooperative matrix with the given element type, layout and K size.
-  llvm::Type *getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                     unsigned kSize = 16);
-
-  // Whether the type of a cooperative matrix is specified bit width.
-  static bool isTypeNCooperativeMatrix(CooperativeMatrixElementType elemType, unsigned bitWidth);
-
-  // Get the bit width of the cooperative matrix element.
-  static unsigned getBitWidthOfCooperativeMatrixElement(CooperativeMatrixElementType elemType);
 };
 
 } // namespace lgc

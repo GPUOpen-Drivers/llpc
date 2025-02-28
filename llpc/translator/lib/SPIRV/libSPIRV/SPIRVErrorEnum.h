@@ -1,3 +1,5 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 #ifndef SPIRV_LIBSPIRV_SPIRVERRORENUM_H
 #define SPIRV_LIBSPIRV_SPIRVERRORENUM_H
 

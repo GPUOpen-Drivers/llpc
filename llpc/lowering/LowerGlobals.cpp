@@ -233,7 +233,7 @@ PreservedAnalyses LowerGlobals::run(Module &module, ModuleAnalysisManager &analy
     // Collect "emit" calls
     handleCallInst(true, false);
   } else if (m_shaderStage < ShaderStageGfxCount) {
-    m_unifiedReturn = CompilerUtils::unifyReturns(*m_entryPoint, *m_builder);
+    m_unifiedReturn = compilerutils::unifyReturns(*m_entryPoint, *m_builder);
   }
 
   // Preparations for XFB handling
@@ -571,7 +571,7 @@ void LowerGlobals::lowerInOut(llvm::GlobalVariable *globalVar) {
     }
 
     SmallVector<Instruction *> toErase;
-    CompilerUtils::replaceAllPointerUses(globalVar, proxy, toErase);
+    compilerutils::replaceAllPointerUses(globalVar, proxy, toErase);
     for (auto inst : toErase)
       inst->eraseFromParent();
   } else {
@@ -2080,6 +2080,9 @@ void LowerGlobals::lowerUniformConstants() {
       Value *bufferDesc = m_builder->create<lgc::LoadBufferDescOp>(
           uniformConstantsSet, uniformConstantsBinding, m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
       Value *newPtr = m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, uniformConstantsOffset);
+      // Default uniform variables are always initialized by driver, and shader never writes to it. So it is invariant
+      // during shader execution.
+      m_builder->CreateInvariantStart(newPtr);
       for (auto *inst : eachFunc.second)
         inst->replaceUsesOfWith(&global, newPtr);
     }

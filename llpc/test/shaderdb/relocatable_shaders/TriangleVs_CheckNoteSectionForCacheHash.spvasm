@@ -1,3 +1,11 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ; This test case checks that the 128-bit cache hash is correctly added to the PAL metadata.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -gfxip=10.1 -unlinked -enable-relocatable-shader-elf -v -o %t.elf %s | FileCheck --check-prefix=CHECK %s

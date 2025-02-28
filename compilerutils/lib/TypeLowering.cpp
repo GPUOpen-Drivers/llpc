@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -29,7 +29,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 
-using namespace CompilerUtils;
+using namespace compilerutils;
 using namespace llvm;
 
 namespace {
@@ -161,7 +161,7 @@ Function *TypeLowering::lowerFunctionArguments(Function &fn) {
   if (remappedArgs.empty())
     return &fn;
 
-  auto *newFn = CompilerUtils::mutateFunctionArguments(fn, fn.getReturnType(), newArgTys, fn.getAttributes());
+  auto *newFn = compilerutils::mutateFunctionArguments(fn, fn.getReturnType(), newArgTys, fn.getAttributes());
   fn.replaceAllUsesWith(newFn);
   for (unsigned argIdx : remappedArgs)
     recordValue(fn.getArg(argIdx), {newFn->getArg(argIdx)});
@@ -175,6 +175,33 @@ Function *TypeLowering::lowerFunctionArguments(Function &fn) {
   }
   m_functionsToErase.push_back(&fn);
   return newFn;
+}
+
+// =====================================================================================================================
+// Lower global variable based on the registered rules.
+//
+// @param rule : the rule
+void TypeLowering::lowerGlobalVariable(llvm::GlobalVariable &oldGV) {
+  auto convertedTy = convertType(oldGV.getValueType());
+
+  // Do not replace the global if its type hasn't changed
+  if (convertedTy.size() == 1 && convertedTy[0] == oldGV.getValueType())
+    return;
+
+  assert(convertedTy.size() == 1 && "Only 1:1 type remapping supported now");
+
+  GlobalVariable *newGV =
+      new GlobalVariable(*oldGV.getParent(), convertedTy[0], oldGV.isConstant(), oldGV.getLinkage(),
+                         oldGV.hasInitializer() ? oldGV.getInitializer() : nullptr, oldGV.getName(), &oldGV);
+
+  // Copy attributes from the old global variable
+  newGV->copyAttributesFrom(&oldGV);
+
+  // Replace uses of oldGV with newGV
+  oldGV.replaceAllUsesWith(newGV);
+
+  // Erase the old global variable
+  m_gvToErase.push_back(&oldGV);
 }
 
 // =====================================================================================================================
@@ -428,6 +455,10 @@ bool TypeLowering::finishCleanup() {
   for (Function *fn : m_functionsToErase)
     fn->eraseFromParent();
   m_functionsToErase.clear();
+
+  for (GlobalVariable *gv : m_gvToErase)
+    gv->eraseFromParent();
+  m_gvToErase.clear();
 
   m_valueMap.clear();
 

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -28,7 +28,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
-namespace CompilerUtils {
+namespace compilerutils {
 
 // Helper pass to enable lit tests of ValueOriginTracker.
 // Calls to a function called "analyze" triggers an analysis its arguments and outputs the analysis to stdout.
@@ -39,4 +39,4 @@ public:
   static llvm::StringRef name() { return "Test ValueOriginTracking"; }
 };
 
-} // namespace CompilerUtils
+} // namespace compilerutils

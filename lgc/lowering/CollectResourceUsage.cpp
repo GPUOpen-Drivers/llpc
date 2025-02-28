@@ -2075,176 +2075,97 @@ void CollectResourceUsage::mapBuiltInToGenericInOut() {
 
     // Map built-in outputs to generic ones
     if (nextStage == ShaderStage::TessEval) {
-      const auto &nextBuiltInUsage = nextResUsage->builtInUsage.tes;
-      auto &nextInOutUsage = nextResUsage->inOutUsage;
-
       // NOTE: For tessellation control shader, those built-in outputs that involve in output import have to
       // be mapped to generic ones even if they do not have corresponding built-in inputs used in next shader
       // stage.
+      const auto &nextBuiltInUsage = nextResUsage->builtInUsage.tes;
+
       if (nextBuiltInUsage.positionIn) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPosition) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
-        inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
-        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+        builtInUsage.tcs.position = true;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInPosition) != m_importedOutputBuiltIns.end())
-          inOutUsage.builtInOutputLocMap[BuiltInPosition] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInPosition) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.position = false;
       }
 
       if (nextBuiltInUsage.pointSizeIn) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
-        inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
-        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+        builtInUsage.tcs.pointSize = true;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInPointSize) != m_importedOutputBuiltIns.end())
-          inOutUsage.builtInOutputLocMap[BuiltInPointSize] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInPointSize) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.pointSize = false;
       }
 
       if (nextBuiltInUsage.clipDistanceIn > 0) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
-        inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
-        availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
+        builtInUsage.tcs.clipDistance = nextBuiltInUsage.clipDistanceIn;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInClipDistance) != m_importedOutputBuiltIns.end())
-          inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInClipDistance) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.clipDistance = 0;
       }
 
       if (nextBuiltInUsage.cullDistanceIn > 0) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
-        inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
-        availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
+        builtInUsage.tcs.cullDistance = nextBuiltInUsage.cullDistanceIn;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInCullDistance) != m_importedOutputBuiltIns.end())
-          inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInCullDistance) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.cullDistance = 0;
       }
 
       if (nextBuiltInUsage.layerIn) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
-        inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
-        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+        builtInUsage.tcs.layer = true;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInLayer) != m_importedOutputBuiltIns.end())
-          inOutUsage.builtInOutputLocMap[BuiltInLayer] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInLayer) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.layer = false;
       }
 
       if (nextBuiltInUsage.viewportIndexIn) {
-        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
-        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
-        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+        builtInUsage.tcs.viewportIndex = true;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInViewportIndex) != m_importedOutputBuiltIns.end())
-          inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInViewportIndex) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.viewportIndex = false;
       }
 
       if (nextBuiltInUsage.tessLevelOuter) {
-        assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelOuter) !=
-               nextInOutUsage.perPatchBuiltInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter];
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = mapLoc;
-        availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
+        builtInUsage.tcs.tessLevelOuter = true;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInTessLevelOuter) != m_importedOutputBuiltIns.end())
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInTessLevelOuter) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.tessLevelOuter = false;
       }
 
       if (nextBuiltInUsage.tessLevelInner) {
-        assert(nextInOutUsage.perPatchBuiltInInputLocMap.find(BuiltInTessLevelInner) !=
-               nextInOutUsage.perPatchBuiltInInputLocMap.end());
-        const unsigned mapLoc = nextInOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelInner];
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = mapLoc;
-        availPerPatchOutMapLoc = std::max(availPerPatchOutMapLoc, mapLoc + 1);
+        builtInUsage.tcs.tessLevelInner = true;
       } else {
-        if (m_importedOutputBuiltIns.find(BuiltInTessLevelInner) != m_importedOutputBuiltIns.end())
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = InvalidValue;
-        else
+        if (m_importedOutputBuiltIns.find(BuiltInTessLevelInner) == m_importedOutputBuiltIns.end())
           builtInUsage.tcs.tessLevelInner = false;
       }
-
-      // Revisit built-in outputs and map those unmapped to generic ones
-      if (inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end() &&
-          inOutUsage.builtInOutputLocMap[BuiltInPosition] == InvalidValue)
-        inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
-
-      if (inOutUsage.builtInOutputLocMap.find(BuiltInPointSize) != inOutUsage.builtInOutputLocMap.end() &&
-          inOutUsage.builtInOutputLocMap[BuiltInPointSize] == InvalidValue)
-        inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
-
-      if (inOutUsage.builtInOutputLocMap.find(BuiltInClipDistance) != inOutUsage.builtInOutputLocMap.end() &&
-          inOutUsage.builtInOutputLocMap[BuiltInClipDistance] == InvalidValue)
-        inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
-
-      if (inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end() &&
-          inOutUsage.builtInOutputLocMap[BuiltInCullDistance] == InvalidValue)
-        inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
-
-      if (inOutUsage.builtInOutputLocMap.find(BuiltInLayer) != inOutUsage.builtInOutputLocMap.end() &&
-          inOutUsage.builtInOutputLocMap[BuiltInLayer] == InvalidValue)
-        inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
-
-      if (inOutUsage.builtInOutputLocMap.find(BuiltInViewportIndex) != inOutUsage.builtInOutputLocMap.end() &&
-          inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] == InvalidValue)
-        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = availOutMapLoc++;
-
-      if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelOuter) !=
-              inOutUsage.perPatchBuiltInOutputLocMap.end() &&
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] == InvalidValue)
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
-
-      if (inOutUsage.perPatchBuiltInOutputLocMap.find(BuiltInTessLevelInner) !=
-              inOutUsage.perPatchBuiltInOutputLocMap.end() &&
-          inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] == InvalidValue)
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
-    } else if (!nextStage) {
-      // TCS only
-      if (builtInUsage.tcs.position)
-        inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
-
-      if (builtInUsage.tcs.pointSize)
-        inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
-
-      if (builtInUsage.tcs.clipDistance > 0) {
-        inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
-        if (builtInUsage.tcs.clipDistance > 4)
-          ++availOutMapLoc;
-      }
-
-      if (builtInUsage.tcs.cullDistance > 0) {
-        inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
-        if (builtInUsage.tcs.cullDistance > 4)
-          ++availOutMapLoc;
-      }
-
-      if (builtInUsage.tcs.layerIn)
-        inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
-
-      if (builtInUsage.tcs.viewportIndexIn)
-        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = availOutMapLoc++;
-
-      if (builtInUsage.tcs.tessLevelOuter)
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
-
-      if (builtInUsage.tcs.tessLevelInner)
-        inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
     }
+
+    if (builtInUsage.tcs.position)
+      inOutUsage.builtInOutputLocMap[BuiltInPosition] = availOutMapLoc++;
+
+    if (builtInUsage.tcs.pointSize)
+      inOutUsage.builtInOutputLocMap[BuiltInPointSize] = availOutMapLoc++;
+
+    if (builtInUsage.tcs.clipDistance > 0) {
+      inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = availOutMapLoc++;
+      if (builtInUsage.tcs.clipDistance > 4)
+        ++availOutMapLoc;
+    }
+
+    if (builtInUsage.tcs.cullDistance > 0) {
+      inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = availOutMapLoc++;
+      if (builtInUsage.tcs.cullDistance > 4)
+        ++availOutMapLoc;
+    }
+
+    if (builtInUsage.tcs.layerIn)
+      inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
+
+    if (builtInUsage.tcs.viewportIndexIn)
+      inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = availOutMapLoc++;
+
+    if (builtInUsage.tcs.tessLevelOuter)
+      inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
+
+    if (builtInUsage.tcs.tessLevelInner)
+      inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelInner] = availPerPatchOutMapLoc++;
 
     inOutUsage.inputMapLocCount = std::max(inOutUsage.inputMapLocCount, availInMapLoc);
     inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, availOutMapLoc);
@@ -2949,22 +2870,25 @@ void CollectResourceUsage::clearUnusedOutput() {
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   if (nextStage) {
     // Collect the locations of TCS's imported outputs
-    DenseSet<unsigned> importOutputLocs;
+    DenseSet<unsigned> importedOutputLocs;
     if (m_shaderStage == ShaderStage::TessControl) {
       // Imported output calls
-      for (auto &outputImport : m_importedOutputCalls) {
-        unsigned loc = outputImport->getLocation();
-        Value *const locOffset = outputImport->getLocOffset();
-        Value *const compIdx = outputImport->getElemIdx();
-        importOutputLocs.insert(loc);
+      for (auto &importedOutputCall : m_importedOutputCalls) {
+        unsigned loc = importedOutputCall->getLocation();
+        Value *const locOffset = importedOutputCall->getLocOffset();
+        Value *const compIdx = importedOutputCall->getElemIdx();
+        importedOutputLocs.insert(loc);
+
         // Location offset and component index are both constant
         if (isa<ConstantInt>(locOffset) && isa<ConstantInt>(compIdx)) {
-          loc += cast<ConstantInt>(locOffset)->getZExtValue();
-          auto bitWidth = outputImport->getType()->getScalarSizeInBits();
-          if (bitWidth == 64 && cast<ConstantInt>(compIdx)->getZExtValue() >= 2) {
-            // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
-            // occupied locations are two.
-            importOutputLocs.insert(loc + 1);
+          const unsigned constLocOffset = cast<ConstantInt>(locOffset)->getZExtValue();
+          const unsigned constCompIdx = cast<ConstantInt>(compIdx)->getZExtValue();
+
+          loc += constLocOffset;
+          const auto &outputTy = importedOutputCall->getType();
+          if (constCompIdx * outputTy->getScalarSizeInBits() + outputTy->getPrimitiveSizeInBits() > 128) {
+            // Access bits that are greater than 128 (vec4), need the next location.
+            importedOutputLocs.insert(loc + 1);
           }
         }
       }
@@ -3003,12 +2927,13 @@ void CollectResourceUsage::clearUnusedOutput() {
 
         if (!isOutputXfb && !foundInNextStage) {
           // NOTE: If the output is used as an imported one in TCS, mark it as active to avoid its removal.
-          const bool isActiveLoc = m_shaderStage == ShaderStage::TessControl && importOutputLocs.count(origLoc) > 0;
+          const bool isActiveLoc = m_shaderStage == ShaderStage::TessControl && importedOutputLocs.count(origLoc) > 0;
           if (!isActiveLoc)
             unusedLocInfos.push_back(locInfoPair.first);
         }
       }
     }
+
     // Remove those collected InOutLocationInfos
     for (auto &locInfo : unusedLocInfos)
       outputLocInfoMap.erase(locInfo);
@@ -3024,12 +2949,13 @@ void CollectResourceUsage::clearUnusedOutput() {
       for (auto &locPair : perPatchOutputLocMap) {
         const unsigned loc = locPair.first;
         if (nextPerPatchInLocMap.find(loc) == nextPerPatchInLocMap.end()) {
-          if (importOutputLocs.find(loc) != importOutputLocs.end())
+          if (importedOutputLocs.find(loc) != importedOutputLocs.end())
             locPair.second = availPerPatchInMapLoc++;
           else
             unusedLocs.push_back(loc);
         }
       }
+
       // Remove those collected locations
       for (auto loc : unusedLocs)
         perPatchOutputLocMap.erase(loc);
@@ -3039,19 +2965,15 @@ void CollectResourceUsage::clearUnusedOutput() {
     if (m_shaderStage == ShaderStage::Mesh) {
       auto &perPrimitiveOutputLocMap = inOutUsage.perPrimitiveOutputLocMap;
       const auto &nextPerPrimitiveInLocMap = nextResUsage->inOutUsage.perPrimitiveInputLocMap;
-      unsigned availPerPrimitiveInMapLoc = nextResUsage->inOutUsage.perPrimitiveInputMapLocCount;
 
       // Collect locations of those outputs that are not used by next shader stage
       SmallVector<unsigned, 4> unusedLocs;
       for (auto &locPair : perPrimitiveOutputLocMap) {
         const unsigned loc = locPair.first;
-        if (nextPerPrimitiveInLocMap.find(loc) == nextPerPrimitiveInLocMap.end()) {
-          if (importOutputLocs.find(loc) != importOutputLocs.end())
-            locPair.second = availPerPrimitiveInMapLoc++;
-          else
-            unusedLocs.push_back(loc);
-        }
+        if (nextPerPrimitiveInLocMap.find(loc) == nextPerPrimitiveInLocMap.end())
+          unusedLocs.push_back(loc);
       }
+
       // Remove those collected locations
       for (auto loc : unusedLocs)
         perPrimitiveOutputLocMap.erase(loc);
@@ -3210,6 +3132,9 @@ void CollectResourceUsage::updateOutputLocInfoMapWithUnpack() {
         inOutUsage.mesh.vertexOutputComponents[newLocation] = vertexOutputComponents[location];
       }
     }
+  } else {
+    if (m_shaderStage == ShaderStage::Mesh)
+      inOutUsage.mesh.vertexOutputComponents.clear();
   }
 
   //
@@ -3321,6 +3246,9 @@ void CollectResourceUsage::updateOutputLocInfoMapWithUnpack() {
         inOutUsage.mesh.primitiveOutputComponents[newLocation] = primitiveOutputComponents[location];
       }
     }
+  } else {
+    if (m_shaderStage == ShaderStage::Mesh)
+      inOutUsage.mesh.primitiveOutputComponents.clear();
   }
 
   m_outputCalls.clear();
@@ -3394,7 +3322,7 @@ void CollectResourceUsage::updateOutputLocInfoMapWithPack() {
     return;
 
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
-         m_shaderStage == ShaderStage::Geometry); // Possible stages
+         m_shaderStage == ShaderStage::Geometry || m_shaderStage == ShaderStage::Mesh); // Possible stages
   auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage.value());
   auto &nextStageInputLocInfoMap =
       m_pipelineState->getShaderResourceUsage(nextStage.value())->inOutUsage.inputLocInfoMap;

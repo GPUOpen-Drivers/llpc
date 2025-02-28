@@ -1,3 +1,5 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 // This test is to verify we calculate correct component counts for the outputs when the component
 // accessing is from large component indices to small ones. Make sure we use the max value to finally
 // determine the correct component count for an output.

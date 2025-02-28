@@ -33,13 +33,10 @@
 #include "compilerutils/CompilerUtils.h"
 #include "compilerutils/IRSerializationUtils.h"
 #include "llvmraytracing/ContinuationsUtil.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/IR/ModuleSlotTracker.h"
 #include "llvm/IR/NoFolder.h"
-#include "llvm/IR/TypedPointerType.h"
 #include "llvm/Support/OptimizedStructLayout.h"
 #include "llvm/Transforms/Coroutines/SpillUtils.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
@@ -276,62 +273,14 @@ public:
   return false;
 }
 
-std::string getLabel(Function *F) {
-  if (F->hasName())
-    return F->getName().str();
-  ModuleSlotTracker MST(F->getParent());
-  MST.incorporateFunction(*F);
-
-  return std::to_string(MST.getLocalSlot(F));
-}
-
-std::string getLabel(BasicBlock *BB) {
-  if (BB->hasName())
-    return BB->getName().str();
-
-  Function *F = BB->getParent();
-
-  ModuleSlotTracker MST(F->getParent());
-  MST.incorporateFunction(*F);
-
-  return std::to_string(MST.getLocalSlot(BB));
-}
-
-std::string getLabel(Value *V) {
-  if (V->hasName())
-    return V->getName().str();
-
-  if (!isa<Instruction>(V))
-    return "";
-
-  BasicBlock *BB = dyn_cast<Instruction>(V)->getParent();
-  Function *F = BB->getParent();
-
-  ModuleSlotTracker MST(F->getParent());
-  MST.incorporateFunction(*F);
-
-  return std::to_string(MST.getLocalSlot(V));
-}
-
-std::string getAllNames(const SmallSet<BasicBlock *, 2> &List) {
-  std::string S;
-  if (List.empty())
-    return "<empty>";
-
-  for (BasicBlock *BB : List)
-    S = S + " %" + getLabel(BB);
-
-  return S;
-}
-
 void CoroFrameRow::dump() const {
   if (Def) {
     dbgs() << "\tDef: ";
     LLVM_DEBUG(Def->dump());
     if (isa<Instruction>(Def))
-      dbgs() << "\tDefBB: %" << getLabel(cast<Instruction>(Def)->getParent()) << "\n";
+      dbgs() << "\tDefBB: %" << compilerutils::bb::getLabel(cast<Instruction>(Def)->getParent()) << "\n";
     else if (isa<Argument>(Def))
-      dbgs() << "\tDefBB: %" << getLabel(cast<Argument>(Def)->getParent()) << "\n";
+      dbgs() << "\tDefBB: %" << compilerutils::bb::getLabel(cast<Argument>(Def)->getParent()) << "\n";
     else
       dbgs() << "\tDefBB: Unknown Value Type\n";
   } else {
@@ -347,7 +296,7 @@ void CoroFrameRow::dump() const {
   dbgs() << "\tResidesInSuspendFrames: " << ResidesInSuspendFrame.size() << "\n";
   if (!isa<AllocaInst>(Def)) {
     dbgs() << "\tSpilledOnDef: " << (SpilledOnDef ? "true" : "false") << "\n";
-    dbgs() << "\tReloadedOnBB: " << getAllNames(ReloadedOnBB) << "\n";
+    dbgs() << "\tReloadedOnBB: " << compilerutils::bb::getNamesForBasicBlocks(ReloadedOnBB) << "\n";
     dbgs() << "\tSpills: " << Spills.size() << "\n";
     dbgs() << "\tReloads: " << Reloads.size() << "\n";
   }
@@ -387,11 +336,11 @@ void CoroFrameStruct::dumpField(const OptimizedStructLayoutField &F, const CoroF
   const CoroFrameRow *Row = &FrameTable[Idx];
   dbgs() << " Frame Table Row " << std::to_string(Idx);
   if (isa<AllocaInst>(Row->Def))
-    dbgs() << " -- Alloca for %" << getLabel(Row->Def);
+    dbgs() << " -- Alloca for %" << compilerutils::bb::getLabel(Row->Def);
   else if (isa<Argument>(Row->Def))
-    dbgs() << " -- Spill of Argument %" << getLabel(Row->Def);
+    dbgs() << " -- Spill of Argument %" << compilerutils::bb::getLabel(Row->Def);
   else
-    dbgs() << " -- Spill of Inst %" << getLabel(Row->Def);
+    dbgs() << " -- Spill of Inst %" << compilerutils::bb::getLabel(Row->Def);
 
   // Determine if value is a spill or alloca
   if (auto *DefAlloca = dyn_cast<AllocaInst>(Row->Def)) {
@@ -425,9 +374,9 @@ void CoroFrameStruct::dump(const CoroFrameTableTy &FrameTable) const {
   }
   dbgs() << "\tFrameStruct Size: " << Size << " bytes, ";
   dbgs() << "Align: " << Alignment.value() << " bytes\n";
-  std::string SuspendBBName = SuspendBB ? getLabel(SuspendBB) : "nullptr";
+  std::string SuspendBBName = SuspendBB ? compilerutils::bb::getLabel(SuspendBB) : "nullptr";
   dbgs() << "\tSuspendBB: %" << SuspendBBName << "\n";
-  std::string ResumeBBName = ResumeBB ? getLabel(ResumeBB) : "nullptr";
+  std::string ResumeBBName = ResumeBB ? compilerutils::bb::getLabel(ResumeBB) : "nullptr";
   dbgs() << "\tResumeBB: %" << ResumeBBName << "\n";
 }
 
@@ -953,7 +902,7 @@ void ContStateBuilderImpl::createFrameGEPs(SmallVector<Instruction *, 4> &DeadIn
         // the alloca. The GEP is put into the SpillBlock. The SpillBlock is
         // the entry point of each continuation, so any instrs put there will
         // be available to all continuations after the main function is split.
-        CompilerUtils::replaceAllPointerUses(Alloca, GepInst, DeadInstructions);
+        compilerutils::replaceAllPointerUses(Alloca, GepInst, DeadInstructions);
 
         // Alloca is dead, we may visit this Row more than once, so we need to
         // check if the value is in the DeadInstructions list already.
@@ -1262,7 +1211,7 @@ void ContStateBuilderImpl::buildCoroutineFrame() {
     auto &Struct = R.value().second;
     LLVM_DEBUG(dbgs() << "Suspend " << R.index() << "\n");
     LLVM_DEBUG(dbgs() << "\tSuspendInst: "; Suspend->dump());
-    LLVM_DEBUG(dbgs() << "\tSuspendBB: %" << getLabel(Suspend->getParent()) << "\n");
+    LLVM_DEBUG(dbgs() << "\tSuspendBB: %" << compilerutils::bb::getLabel(Suspend->getParent()) << "\n");
 
     // Sink spill uses. This will move all uses of allocas to after the
     // CoroBegin ensuring that all access to the alloca ptr occur after

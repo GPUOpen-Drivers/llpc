@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -63,4 +63,14 @@ enum class RayTracingIpLevel : uint32_t {
   _None = 0,
   RtIp1_1 = 11,
   RtIp2_0 = 20,
+};
+
+// CPS Scheduling levels.
+enum class CpsSchedulingLevel : uint32_t {
+  RayGen = 1,
+  ClosestHit_Miss_Callable,
+  Traversal,
+  AnyHit_CombinedIntersection_AnyHit,
+  Intersection,
+  Count,
 };

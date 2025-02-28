@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -50,3 +50,4 @@ add_lit_testsuites(LLVMRAYTRACING ${CMAKE_CURRENT_SOURCE_DIR}
   ${exclude_from_check_all}
   DEPENDS ${LLVMRAYTRACING_TEST_DEPENDS}
 )
+

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -2081,6 +2081,8 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
       func->setDoesNotAccessMemory();
       break;
     case BuilderOpcode::ImageSample:
+      func->addFnAttr(Attribute::Convergent);
+      LLVM_FALLTHROUGH;
     case BuilderOpcode::ImageSampleConvert:
       // Function read and write memory if return is void.
       if (!resultTy || resultTy->isVoidTy())

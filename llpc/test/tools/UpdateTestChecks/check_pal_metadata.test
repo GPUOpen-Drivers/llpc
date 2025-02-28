@@ -1,0 +1,3 @@
+# REQUIRES: do-not-run-me
+# RUN: cp -f %S/Inputs/check_pal_metadata.pipe %t.pipe && %update_llpc_test_checks %t.pipe --check-pal-metadata
+# RUN: diff -u %t.pipe %S/Inputs/check_pal_metadata.pipe.expected

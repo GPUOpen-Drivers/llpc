@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -71,7 +71,7 @@ Value *BuilderCommon::CreatePtrDiff(Type *ty, Value *lhs, Value *rhs, const Twin
 // @param instName : Name to give instruction
 CallInst *BuilderCommon::CreateNamedCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args,
                                          ArrayRef<Attribute::AttrKind> attribs, const Twine &instName) {
-  return CompilerUtils::createNamedCall(*this, funcName, retTy, args, attribs, instName);
+  return compilerutils::createNamedCall(*this, funcName, retTy, args, attribs, instName);
 }
 
 // Create an llvm.assume call to annotate the dereferenceable and alignment attributes of the pointer. We only insert

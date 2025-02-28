@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "llpc/GpurtEnums.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/IRBuilder.h"
@@ -47,14 +48,6 @@ enum class RayTracingShaderStage;
 } // namespace lgc::rt
 
 namespace lgc::cps {
-enum class CpsLevel : uint8_t {
-  RayGen = 1,
-  ClosestHit_Miss_Callable,
-  Traversal,
-  AnyHit_CombinedIntersection_AnyHit,
-  Intersection,
-  Count,
-};
 
 constexpr unsigned stackAddrSpace = 32;
 
@@ -71,10 +64,13 @@ unsigned getArgumentDwordCount(const llvm::DataLayout &DL, llvm::Type *type);
 unsigned getArgumentDwordCount(const llvm::DataLayout &DL, llvm::ArrayRef<llvm::Type *> types);
 std::optional<unsigned> getRemainingArgumentDwords(const llvm::DataLayout &DL, llvm::ArrayRef<llvm::Type *> arguments);
 
+std::optional<unsigned> getMaxArgumentVgprs(const llvm::Module &m);
+void setMaxArgumentVgprs(llvm::Module &m, unsigned bound);
+
 bool isCpsFunction(const llvm::Function &fn);
-void setCpsFunctionLevel(llvm::Function &fn, CpsLevel level);
-CpsLevel getCpsLevelFromFunction(const llvm::Function &fn);
-CpsLevel getCpsLevelForShaderStage(lgc::rt::RayTracingShaderStage stage);
+void setCpsFunctionLevel(llvm::Function &fn, CpsSchedulingLevel level);
+CpsSchedulingLevel getCpsLevelFromFunction(const llvm::Function &fn);
+CpsSchedulingLevel getCpsLevelForShaderStage(lgc::rt::RayTracingShaderStage stage);
 uint8_t getPotentialCpsReturnLevels(lgc::rt::RayTracingShaderStage stage);
 llvm::Value *lowerAsContinuationReference(llvm::IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCROp,
                                           llvm::Value *Relocation = nullptr);

@@ -1,3 +1,11 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ; Test to check that the optimization of tessellation factors store are handled as expected
 ; RUN: amdllpc %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: @_amdgpu_hs_main(
@@ -104,7 +112,7 @@
 ; SHADERTEST-LABEL: .endHandleMultiWave:
 ; SHADERTEST-NEXT: %isAllOnesTf = phi i1 [ %isAllOnesTfInWave, %.endCheckSpecialTfInWave ], [ true, %.handleMultiWave ], [ %[[ALL_ONES_IN_GROUP]], %.checkSpecialTfInGroup ]
 ; SHADERTEST-NEXT: %isAllZerosTf = phi i1 [ %isAllZerosTfInWave, %.endCheckSpecialTfInWave ], [ true, %.handleMultiWave ], [ %[[ALL_ZEROS_IN_GROUP]], %.checkSpecialTfInGroup ]
-; SHADERTEST-NEXT: br i1 %validHsPatch, label %.tryStoreTf, label %.endTryStoreHsOutputs
+; SHADERTEST-NEXT: br i1 %validHsPatch, label %.tryStoreTf, label %.endTryStoreTf
 
 ; SHADERTEST-LABEL: .tryStoreTf:
 ; SHADERTEST-NEXT: %isSpecialTf = or i1 %isAllOnesTf, %isAllZerosTf
@@ -112,20 +120,30 @@
 
 ; SHADERTEST-LABEL: .checkSendTfMessage:
 ; SHADERTEST-NEXT: %[[FIRST_WAVE:[^ ,]*]] = icmp eq i32 %waveIdInGroup, 0
-; SHADERTEST-NEXT: br i1 %[[FIRST_WAVE]], label %.sendTfMessage, label %.endTryStoreHsOutputs
+; SHADERTEST-NEXT: br i1 %[[FIRST_WAVE]], label %.sendTfMessage, label %.endTryStoreTf
 
 ; SHADERTEST-LABEL: .sendTfMessage:
 ; SHADERTEST-NEXT: %[[IS_ALL_ONES_TF:[^ ,]*]] = zext i1 %isAllOnesTf to i32
 ; SHADERTEST-NEXT: call void @llvm.amdgcn.s.sendmsg(i32 2, i32 %[[IS_ALL_ONES_TF]])
-; SHADERTEST-NEXT: br label %.endTryStoreHsOutputs
+; SHADERTEST-NEXT: br label %.endTryStoreTf
 
 ; SHADERTEST-LABEL: .storeTf:
-; SHADERTEST: %tfBufferDescPtr = getelementptr i8, ptr addrspace(4) %globalTablePtr, i64 144
+; SHADERTEST-NEXT: %tfBufferDescPtr = getelementptr i8, ptr addrspace(4) %globalTablePtr, i64 144
 ; SHADERTEST-NEXT: %tfBufferDesc = load <4 x i32>, ptr addrspace(4) %tfBufferDescPtr, align 16
 ; SHADERTEST-NEXT: %[[OUTER_TF_OFFSET:[^ ,]*]] = mul i32 %threadIdInGroup, 24
 ; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.buffer.store.v4f32{{(.v4i32)?}}(<4 x float> %outerTf, <4 x i32> %tfBufferDesc, i32 %[[OUTER_TF_OFFSET]], i32 %tfBufferBase, i32 1)
 ; SHADERTEST-NEXT: %[[INNER_TF_OFFSET:[^ ,]*]] = add i32 %[[OUTER_TF_OFFSET]], 16
 ; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.buffer.store.v2f32{{(.v4i32)?}}(<2 x float> %innerTf, <4 x i32> %tfBufferDesc, i32 %[[INNER_TF_OFFSET]], i32 %tfBufferBase, i32 1)
+; SHADERTEST-NEXT: br label %.endTryStoreTf
+
+; SHADERTEST-LABEL: .endTryStoreTf:
+; SHADERTEST-NEXT: %[[HS_VERTEX_COUNT:[^ ,]*]] = lshr i32 %mergeWaveInfo, 8
+; SHADERTEST-NEXT: %hsVertexCount = and i32 %[[HS_VERTEX_COUNT]], 255
+; SHADERTEST-NEXT: %validHsVertex = icmp ult i32 %threadIdInWave, %hsVertexCount
+; SHADERTEST-NEXT: br i1 %validHsVertex, label %.tryStoreHsOutputs, label %.endTryStoreHsOutputs
+
+; SHADERTEST-LABEL: .tryStoreHsOutputs:
+; SHADERTEST-NEXT: call void @llvm.amdgcn.s.setreg(i32 6401, i32 3)
 ; SHADERTEST-NEXT: br label %.endTryStoreHsOutputs
 
 ; SHADERTEST-LABEL: .endTryStoreHsOutputs:

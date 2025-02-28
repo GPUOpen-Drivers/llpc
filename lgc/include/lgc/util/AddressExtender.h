@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -47,7 +47,14 @@ namespace lgc {
 class AddressExtender {
 public:
   // Constructor
-  AddressExtender(llvm::Function *func) : m_func(func) {}
+  //
+  // @param func: The function that we're inserting into
+  // @param insertInto: The basic block to insert into. This will usually be the
+  //                    entry block, but can be overridden in special cases (e.g.
+  //                    if the function is using the llvm.amdgcn.init.whole.wave
+  //                    intrinsic)
+  AddressExtender(llvm::Function *func, llvm::BasicBlock *insertInto = nullptr)
+      : m_func(func), m_insertInto(insertInto ? insertInto : &func->front()) {}
 
   // Get first insertion point in the function, after PC-getting code if already inserted.
   llvm::Instruction *getFirstInsertionPt();
@@ -74,6 +81,7 @@ private:
   llvm::Instruction *getPc();
 
   llvm::Function *m_func;
+  llvm::BasicBlock *m_insertInto;
   llvm::Instruction *m_pc = nullptr;
 };
 

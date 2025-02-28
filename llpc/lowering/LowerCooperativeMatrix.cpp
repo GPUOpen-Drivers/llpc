@@ -34,8 +34,10 @@
 
 #include "LowerCooperativeMatrix.h"
 #include "llpcDialect.h"
+#include "xdl/util/ElementType.h"
 #include "lgc/BuilderCommon.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcXdlDialect.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 
@@ -43,6 +45,7 @@
 
 using namespace llvm;
 using namespace lgc;
+using namespace lgc::xdl;
 using namespace Llpc;
 
 namespace {
@@ -98,7 +101,7 @@ PreservedAnalyses LowerCooperativeMatrix::run() {
 void LowerCooperativeMatrix::visitProxy(CallInst &call) {
   Value *ptr = call.getArgOperand(0);
   auto elemTypeEnum = (CooperativeMatrixElementType)(cast<ConstantInt>(call.getArgOperand(1))->getZExtValue());
-  Type *elemType = m_builder.transCooperativeMatrixElementType(elemTypeEnum);
+  Type *elemType = transCooperativeMatrixElementType(m_builder, elemTypeEnum);
   auto layout = (CooperativeMatrixLayout)(cast<ConstantInt>(call.getArgOperand(2))->getZExtValue());
 
   m_toDelete.push_back(&call);
@@ -126,16 +129,16 @@ void LowerCooperativeMatrix::visitPointerUsers(Value *ptr, CooperativeMatrixElem
       assert(load->getPointerOperand() == ptr);
       assert(load->getType() == elemType);
 
-      Type *matrixType = m_builder.getCooperativeMatrixTy(elemTypeEnum, layout);
+      Type *matrixType = getCooperativeMatrixTy(m_builder, elemTypeEnum, layout);
       Value *matrix = m_builder.CreateLoad(matrixType, matrixPtr);
-      Type *elemTy = m_builder.transCooperativeMatrixElementType(elemTypeEnum);
+      Type *elemTy = transCooperativeMatrixElementType(m_builder, elemTypeEnum);
       Value *element = m_builder.create<CooperativeMatrixExtractOp>(elemTy, matrix, index, elemTypeEnum, layout);
       load->replaceAllUsesWith(element);
     } else if (auto *store = dyn_cast<StoreInst>(inst)) {
       assert(store->getPointerOperand() == ptr);
       assert(store->getValueOperand()->getType() == elemType);
 
-      Type *matrixType = m_builder.getCooperativeMatrixTy(elemTypeEnum, layout);
+      Type *matrixType = getCooperativeMatrixTy(m_builder, elemTypeEnum, layout);
       Value *matrix = m_builder.CreateLoad(matrixType, matrixPtr);
       matrix = m_builder.create<CooperativeMatrixInsertOp>(matrix->getType(), matrix, store->getValueOperand(), index,
                                                            elemTypeEnum, layout);

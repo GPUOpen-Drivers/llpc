@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -87,7 +87,9 @@ int main(int argc, char **argv) {
       errs() << "\n";
       return 1;
     }
-    disassembleObject((*fileOrErr)->getMemBufferRef(), ostream);
+    Error err = disassembleObject((*fileOrErr)->getMemBufferRef(), ostream);
+    if (err)
+      report_fatal_error(Twine((*fileOrErr)->getBufferIdentifier()) + ": " + toString(std::move(err)));
   }
 
   return 0;

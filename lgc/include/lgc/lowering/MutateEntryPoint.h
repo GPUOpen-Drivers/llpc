@@ -31,6 +31,7 @@
 #pragma once
 
 #include "compilerutils/TypeLowering.h"
+#include "llpc/GpurtEnums.h"
 #include "llvmraytracing/CpsStackLowering.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
@@ -157,7 +158,7 @@ private:
                                    llvm::ArrayRef<std::string> argNames);
 
   llvm::Value *takeLevel(llvm::Value *level, llvm::IRBuilder<> &builder, llvm::Type *waveMaskTy,
-                         llvm::ArrayRef<lgc::cps::CpsLevel> priorities);
+                         llvm::ArrayRef<CpsSchedulingLevel> priorities);
 
   void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
                     llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
@@ -176,6 +177,8 @@ private:
 
   void processDriverTableLoad(llvm::Module &module);
   void lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp);
+
+  bool useInitWholeWave() const;
 
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
@@ -210,7 +213,11 @@ private:
   };
   CpsShaderInputCache m_cpsShaderInputCache;
   llvm::Intrinsic::ID m_setInactiveChainArgId;
+  llvm::Intrinsic::ID m_initWholeWaveId;
+
   unsigned m_cpsStackAddrspace;
+  // Map from a cps function to the original entry block, in case we're using llvm.amdgcn.init.whole.wave.
+  llvm::DenseMap<llvm::Function *, llvm::BasicBlock *> m_funcOldEntryBlock;
 };
 
 } // namespace lgc

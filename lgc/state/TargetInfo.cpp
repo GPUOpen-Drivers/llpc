@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -373,6 +373,20 @@ static void setGfx115FInfo(TargetInfo *targetInfo) {
 }
 #endif
 
+#if LLPC_BUILD_STRIX_HALO
+// gfx1151
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1151Info(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
+
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 10;
+}
+#endif
+
 // Represents device infos.
 struct GpuNameStringMap {
   const char *gpuName;
@@ -398,6 +412,9 @@ static const GpuNameStringMap GpuNameMap[] = {
 #if LLPC_BUILD_STRIX1
     {"gfx1150", "Strix1", &setGfx1150Info},    // gfx1150
     {"gfx115F", "Strix1 A0", &setGfx115FInfo}, // gfx115F
+#endif
+#if LLPC_BUILD_STRIX_HALO
+    {"gfx1151", "Strix_halo", &setGfx1151Info}, // gfx1151
 #endif
 };
 

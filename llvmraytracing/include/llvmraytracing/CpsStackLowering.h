@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -75,10 +75,10 @@ public:
 
   static unsigned getContinuationStackAlignment() { return ContinuationStackAlignment; }
 
-  CompilerUtils::TypeLowering TypeLower;
+  compilerutils::TypeLowering TypeLower;
 
 private:
-  llvm::SmallVector<llvm::Type *> convertStackPtrToI32(CompilerUtils::TypeLowering &, llvm::Type *);
+  llvm::SmallVector<llvm::Type *> convertStackPtrToI32(compilerutils::TypeLowering &, llvm::Type *);
   void visitCpsAlloc(lgc::cps::AllocOp &);
   void visitCpsFree(lgc::cps::FreeOp &);
   void visitCpsPeek(lgc::cps::PeekOp &);

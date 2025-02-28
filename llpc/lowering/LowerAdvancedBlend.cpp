@@ -134,7 +134,7 @@ void LowerAdvancedBlend::processFsOutputs(Module &module) {
   auto *advancedBlendFunc =
       (*gfxRuntimeContext.theModule).getFunction(m_enableRov ? AdvancedBlendInternalRov : AdvancedBlendInternal);
 
-  CompilerUtils::CrossModuleInliner inliner;
+  compilerutils::CrossModuleInliner inliner;
 
   // Call AmdAdvancedBlendInternal() for each output
   for (auto [i, outCol] : llvm::enumerate(outputs)) {

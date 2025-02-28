@@ -181,6 +181,7 @@ public:
     BufferFlagAttachedCounter = 128, // Flag to return the counter buffer descriptor attached to the main buffer.
     BufferFlagForceRawView = 256,    // Flag to convert the buffer descriptor to raw view.
     BufferFlagCoherent = 512,        // Coherent memory access
+    BufferFlagLLcNoAlloc = 1024,     // Disable Mall cache
   };
 
   // Get the type of a built-in -- static edition of the method below, so you can use it without a BuilderDefs object.

@@ -294,8 +294,8 @@ void LowerInOut::processShader() {
 
   // Initialize HW configurations for tessellation shaders
   if (m_shaderStage == ShaderStage::TessControl || m_shaderStage == ShaderStage::TessEval) {
-    const auto stageMask = m_pipelineState->getShaderStageMask();
-    const bool hasTcs = stageMask.contains(ShaderStage::TessControl);
+    const bool hasTcs = m_pipelineState->hasShaderStage(ShaderStage::TessControl);
+    const bool hasTes = m_pipelineState->hasShaderStage(ShaderStage::TessEval);
 
     auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
     if (!hwConfig.initialized) {
@@ -320,9 +320,10 @@ void LowerInOut::processShader() {
       const auto &tcsInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage;
       const auto &tesInOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->inOutUsage;
 
-      const unsigned inputLocCount = std::max(tcsInOutUsage.inputMapLocCount, 1u);
-      const unsigned outputLocCount =
-          hasTcs ? std::max(tcsInOutUsage.outputMapLocCount, 1u) : std::max(tesInOutUsage.inputMapLocCount, 1u);
+      const unsigned inputLocCount = std::max(tcsInOutUsage.inputMapLocCount, 1U);
+      const unsigned onChipOutputLocCount = std::max(tcsInOutUsage.outputMapLocCount, 1U);
+      const unsigned offChipOutputLocCount =
+          std::max(hasTes ? tesInOutUsage.inputMapLocCount : tcsInOutUsage.outputMapLocCount, 1U);
 
       const unsigned inputVertexCount = m_pipelineState->getNumPatchControlPoints();
       const unsigned outputVertexCount =
@@ -351,21 +352,23 @@ void LowerInOut::processShader() {
       hwConfig.onChip.inputVertexStride = (inputLocCount * 4) | 1;
       hwConfig.onChip.inputPatchSize = inputVertexCount * hwConfig.onChip.inputVertexStride;
 
-      hwConfig.onChip.outputVertexStride = (outputLocCount * 4) | 1;
+      hwConfig.onChip.outputVertexStride = (onChipOutputLocCount * 4) | 1;
       hwConfig.onChip.outputPatchSize = outputVertexCount * hwConfig.onChip.outputVertexStride;
 
-      hwConfig.offChip.outputVertexStride = outputLocCount * 4;
+      hwConfig.offChip.outputVertexStride = offChipOutputLocCount * 4;
       hwConfig.offChip.outputPatchSize = outputVertexCount * hwConfig.offChip.outputVertexStride;
 
-      const unsigned patchConstCount =
-          hasTcs ? tcsInOutUsage.perPatchOutputMapLocCount : tesInOutUsage.perPatchInputMapLocCount;
+      const unsigned onChipPatchConstCount = tcsInOutUsage.perPatchOutputMapLocCount;
+      const unsigned offChipPatchConstCount =
+          hasTes ? tesInOutUsage.perPatchInputMapLocCount : tcsInOutUsage.perPatchOutputMapLocCount;
       // Use odd-dword stride to avoid LDS bank conflict
       hwConfig.onChip.patchConstSize = 0;
+      if (onChipPatchConstCount > 0)
+        hwConfig.onChip.patchConstSize = (onChipPatchConstCount * 4) | 1;
+
       hwConfig.offChip.patchConstSize = 0;
-      if (patchConstCount > 0) {
-        hwConfig.onChip.patchConstSize = (patchConstCount * 4) | 1;
-        hwConfig.offChip.patchConstSize = patchConstCount * 4;
-      }
+      if (offChipPatchConstCount > 0)
+        hwConfig.offChip.patchConstSize = offChipPatchConstCount * 4;
 
       const unsigned ldsSizePerPatch = hwConfig.onChip.outputPatchSize + hwConfig.onChip.patchConstSize +
                                        hwConfig.onChip.tessFactorStride + hwConfig.onChip.inputPatchSize;
@@ -454,15 +457,16 @@ void LowerInOut::processShader() {
       LLPC_OUTS(" (HW TFs = " << tessFactorCount << " dwords)\n");
       LLPC_OUTS("TF0/TF1 Messaging = " << (m_pipelineState->canOptimizeTessFactor() ? "true" : "false") << "\n");
       LLPC_OUTS("\n");
-      LLPC_OUTS("Tessellator Patch:\n");
+      LLPC_OUTS("Tessellator Patch [OnChip, OffChip]:\n");
       LLPC_OUTS("InputVertices = " << inputVertexCount << ", VertexStride = " << hwConfig.onChip.inputVertexStride
                                    << " dwords, Size = " << hwConfig.onChip.inputPatchSize << " dwords\n");
       LLPC_OUTS("OutputVertices = " << outputVertexCount << ", VertexStride = [" << hwConfig.onChip.outputVertexStride
                                     << ", " << hwConfig.offChip.outputVertexStride << "] dwords, Size = ["
                                     << hwConfig.onChip.outputPatchSize << ", " << hwConfig.offChip.outputPatchSize
                                     << "] dwords\n");
-      LLPC_OUTS("PatchConstants = " << patchConstCount << ", Size = [" << hwConfig.onChip.patchConstSize << ", "
-                                    << hwConfig.offChip.patchConstSize << "] dwords\n");
+      LLPC_OUTS("PatchConstants = "
+                << "[" << onChipPatchConstCount << ", " << offChipPatchConstCount << "], Size = ["
+                << hwConfig.onChip.patchConstSize << ", " << hwConfig.offChip.patchConstSize << "] dwords\n");
 
       LLPC_OUTS("\n");
       LLPC_OUTS("Onchip LDS Layout (in dwords):\n");
@@ -2927,9 +2931,10 @@ Value *LowerInOut::patchTcsBuiltInOutputImport(Type *outputTy, unsigned builtInI
 
     if (outputTy->isArrayTy()) {
       // Handle the whole array
+      auto elemTy = outputTy->getArrayElementType();
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
-        auto elem = readValueFromLds(false, builder.getFloatTy(), ldsOffset, builder);
+        auto ldsOffset = calcLdsOffsetForTcsOutput(elemTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
+        auto elem = readValueFromLds(false, elemTy, ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
@@ -3187,8 +3192,9 @@ void LowerInOut::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, 
       if (outputTy->isArrayTy()) {
         // Handle the whole array
         for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-          auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
           auto elem = builder.CreateExtractValue(output, {i});
+          auto ldsOffset =
+              calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, builder.getInt32(i), nullptr, builder);
           writeValueToLds(false, elem, ldsOffset, builder);
         }
       } else {

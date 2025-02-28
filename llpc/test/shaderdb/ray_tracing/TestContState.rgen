@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 // Test that payload is not put into continuations state.
 // RUN: amdllpc %gfxip --llpc-raytracing-mode=continuations --report-cont-state-sizes %s 2>&1 | FileCheck -check-prefix=CHECK %s

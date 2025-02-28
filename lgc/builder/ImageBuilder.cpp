@@ -649,11 +649,12 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
     imageInst = CreateIntrinsic(intrinsicDataTy, intrinsicId, args, nullptr, instName);
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
+    Value *sOffset = getInt32(0);
     imageDescArgIndex = args.size();
     args.push_back(imageDesc);
     args.push_back(coords[0]);
     args.push_back(getInt32(0));
-    args.push_back(getInt32(0));
+    args.push_back(sOffset);
     args.push_back(getInt32(0));
     imageInst = CreateIntrinsic(intrinsicDataTy, Intrinsic::amdgcn_struct_buffer_load_format, args, nullptr, instName);
   }
@@ -874,12 +875,13 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
       texel = CreateInsertElement(Constant::getNullValue(FixedVectorType::get(texelTy, 4)), texel, uint64_t(0));
 
     // Do the buffer store.
+    Value *sOffset = getInt32(0);
     args.push_back(texel);
     imageDescArgIndex = args.size();
     args.push_back(imageDesc);
     args.push_back(coords[0]);
     args.push_back(getInt32(0));
-    args.push_back(getInt32(0));
+    args.push_back(sOffset);
     args.push_back(getInt32(0));
     imageStore = CreateIntrinsic(getVoidTy(), Intrinsic::amdgcn_struct_buffer_store_format, args, nullptr, instName);
   }
@@ -2186,8 +2188,9 @@ Value *BuilderImpl::transformImageDesc(Value *imageDesc, bool mustLoad, bool isT
   if (isa<FixedVectorType>(imageDesc->getType()))
     return imageDesc;
 
+  unsigned texBufSrdSize = 4;
   // Explicitly load the descriptor from the descriptor pointer
-  Type *descType = FixedVectorType::get(getInt32Ty(), isTexelBuffer ? 4 : 8);
+  Type *descType = FixedVectorType::get(getInt32Ty(), isTexelBuffer ? texBufSrdSize : 8);
   // Use smaller alignment for better load speculation.
   Value *desc = CreateAlignedLoad(descType, imageDesc, Align(4));
   cast<Instruction>(desc)->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(getContext(), {}));

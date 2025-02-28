@@ -49,13 +49,12 @@ struct MeshPipeStatsEntry {
 
 // Enumerates the LDS regions used by mesh shader
 enum class MeshLdsRegion : unsigned {
-  VertexCount = 0,   // Vertex count set by SetMeshOutputs
-  PrimitiveCount,    // Primitive count set by SetMeshOutputs
-  BarrierCompletion, // Barrier completion flag
-  FlatWorkgroupId,   // Flat workgroup ID
-  PrimitiveIndices,  // Primitive indices set by SetPrimitiveIndices
-  VertexOutput,      // Per-vertex outputs
-  PrimitiveOutput,   // Per-primitive outputsr
+  MeshOutputCounts = 0, // Mesh output counts (vertexCount, primitiveCount) set by SetMeshOutputs
+  BarrierCompletion,    // Barrier completion flag
+  FlatWorkgroupId,      // Flat workgroup ID
+  PrimitiveIndices,     // Primitive indices set by SetPrimitiveIndices
+  VertexOutput,         // Per-vertex outputs
+  PrimitiveOutput,      // Per-primitive outputsr
 };
 
 // Map: LDS Region -> <Region Offset, Region Size>
@@ -66,17 +65,22 @@ struct MeshOutputsLayout {
   std::map<BuiltInKind, unsigned> vertexBuiltInExports; // Map from vertex built-in output ID to export slot
   std::map<unsigned, unsigned> vertexGenericExports;    // Map from vertex output location to export slot
                                                         // (exported as vertex attributes)
-  unsigned vertexExportCount;                           // Vertex export count
+  unsigned vertexExportCount = 0;                       // Vertex export count
 
   std::map<BuiltInKind, unsigned> primitiveBuiltInExports; // Map from primitive built-in output ID to export slot
                                                            // (exported as primitive attributes)
   std::map<unsigned, unsigned> primitiveGenericExports;    // Map from primitive output location to export slot
-  unsigned primitiveExportCount;                           // Primitive export count
+  unsigned primitiveExportCount = 0;                       // Primitive export count
 
-  unsigned vertexStride;                        // Vertex stride (in dwords)
+  bool outputsToAllocas = false;                                 // Write outputs to allocas
+  llvm::AllocaInst *primitiveDataAlloca = nullptr;               // Primitive connectivity data alloca
+  std::map<unsigned, llvm::AllocaInst *> vertexOutputAllocas;    // Map from vertex output location to output alloca
+  std::map<unsigned, llvm::AllocaInst *> primitiveOutputAllocas; // Map from primitive output location to output alloca
+
+  unsigned vertexStride = 0;                    // Vertex stride (in dwords)
   std::map<unsigned, unsigned> offsetsInVertex; // Map from output location to output offset within a vertex (in dwords)
 
-  unsigned primitiveStride;                        // Primitive stride (in dwords)
+  unsigned primitiveStride = 0;                    // Primitive stride (in dwords)
   std::map<unsigned, unsigned> offsetsInPrimitive; // Map from output location to output offset within a primitive
                                                    // (in dwords)
 };
@@ -95,6 +99,8 @@ public:
 private:
   static llvm::GlobalVariable *getOrCreateMeshLds(llvm::Module *module, unsigned meshLdsSizeInDwords = 0);
   static unsigned useFlatWorkgroupId(PipelineState *pipelineState);
+  static bool usesRowExport(PipelineState *pipelineState);
+  static bool meshOutputsToAllocas(PipelineState *pipelineState, llvm::Function *entryPoint);
 
   void processTaskShader(llvm::Function *entryPoint);
   void processMeshShader(llvm::Function *entryPoint);
@@ -120,15 +126,17 @@ private:
   void lowerMeshShaderBody(llvm::BasicBlock *apiMeshEntryBlock, llvm::BasicBlock *apiMeshExitBlock);
 
   void exportPrimitive();
-  void exportVertex();
+  void exportPositions();
+  void exportPrimitiveAttributes();
+  void exportVertexAttributes();
   void collectMeshStatsInfo(llvm::Function *entryPoint, llvm::Value *numMeshPrimitives);
 
   // Export kind
   enum class ExportKind : unsigned {
-    Pos = 0,
-    Prim = 1,
-    VertAttr = 2,
-    PrimAttr = 3,
+    Position = 0,
+    Primitive = 1,
+    VertexAttribute = 2,
+    PrimitiveAttribute = 3,
   };
   // Export info of a single entry
   struct ExportInfo {
@@ -146,7 +154,8 @@ private:
   llvm::Value *getMeshLocalInvocationIndex();
   llvm::Value *getMeshGlobalInvocationId();
 
-  llvm::Value *readMeshBuiltInFromLds(BuiltInKind builtIn);
+  llvm::Value *readBackMeshBuiltInOutput(BuiltInKind builtIn);
+  llvm::Value *readBackMeshGenericOutput(unsigned location, bool primitive);
   llvm::Value *convertToHwShadingRate(llvm::Value *primitiveShadingRate);
   void updateMeshShaderInOutUsage();
 
@@ -191,8 +200,21 @@ private:
     return InvalidValue; // Not exist
   }
 
-  llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset);
-  void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset);
+  llvm::Value *getOutputAlloca(unsigned location, bool primitive) {
+    assert(m_outputsLayout.outputsToAllocas);
+    if (primitive) {
+      if (m_outputsLayout.primitiveOutputAllocas.count(location) > 0)
+        return m_outputsLayout.primitiveOutputAllocas[location];
+      return nullptr;
+    }
+
+    if (m_outputsLayout.vertexOutputAllocas.count(location) > 0)
+      return m_outputsLayout.vertexOutputAllocas[location];
+    return nullptr;
+  }
+
+  llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, unsigned alignment = 4);
+  void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, unsigned alignment = 4);
   void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *atomicValue, llvm::Value *ldsOffset);
   void createFenceAndBarrier();
   void createBarrier();

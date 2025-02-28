@@ -1,4 +1,11 @@
 #version 450 core
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
 
@@ -21,7 +28,7 @@ void main (void)
 ; SHADERTEST: call void @lgc.output.export.generic.i32.i32.i8(i32 0, i32 0, i8 %{{[0-9]*}})
 ; SHADERTEST: call void @lgc.output.export.generic.i32.i32.v3i8(i32 1, i32 0, <3 x i8> %{{[0-9]*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
-; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}1, float %{{[0-9]*}}, float poison, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}1, float %{{[0-9]*}}, float undef, float undef, float undef, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

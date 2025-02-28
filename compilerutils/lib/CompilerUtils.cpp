@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -27,13 +27,13 @@
 #include "ValueOriginTrackingTestPass.h"
 #include "ValueSpecializationTestPass.h"
 #include "compilerutils/DxilToLlvm.h"
-#include "compilerutils/DxilUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/ModuleSlotTracker.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -45,7 +45,7 @@
 #define DEBUG_TYPE "compilerutils"
 
 using namespace llvm;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 // Whether this is a load instruction that should translate to a last_use
 // load.
@@ -60,7 +60,7 @@ static constexpr const char *MDIsLastUseName = "amdgpu.last.use";
 // @param args : Arguments to pass to the callee
 // @param attribs : Function attributes
 // @param instName : Name to give instruction
-CallInst *CompilerUtils::createNamedCall(IRBuilder<> &builder, StringRef funcName, Type *retTy, ArrayRef<Value *> args,
+CallInst *compilerutils::createNamedCall(IRBuilder<> &builder, StringRef funcName, Type *retTy, ArrayRef<Value *> args,
                                          ArrayRef<Attribute::AttrKind> attribs, const Twine &instName) {
   assert(!funcName.empty());
   Module *mod = builder.GetInsertBlock()->getParent()->getParent();
@@ -105,7 +105,7 @@ CallInst *CompilerUtils::createNamedCall(IRBuilder<> &builder, StringRef funcNam
 // Modify the function argument types, and return the new function. NOTE: the
 // function does not do any uses replacement, so the caller should call
 // replaceAllUsesWith() for the function and arguments afterwards.
-Function *CompilerUtils::mutateFunctionArguments(Function &fn, Type *retTy, const ArrayRef<Type *> argTys,
+Function *compilerutils::mutateFunctionArguments(Function &fn, Type *retTy, const ArrayRef<Type *> argTys,
                                                  AttributeList attributes) {
   FunctionType *newFnTy = FunctionType::get(retTy, argTys, false);
   auto *newFn = cloneFunctionHeader(fn, newFnTy, attributes);
@@ -114,7 +114,7 @@ Function *CompilerUtils::mutateFunctionArguments(Function &fn, Type *retTy, cons
   return newFn;
 }
 
-Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType, AttributeList attributes,
+Function *compilerutils::cloneFunctionHeader(Function &f, FunctionType *newType, AttributeList attributes,
                                              Module *targetModule) {
   LLVM_DEBUG(dbgs() << "Cloning function " << f.getName() << " with new type " << *newType << "\n");
   Function *newFunc = Function::Create(newType, f.getLinkage(), "", targetModule);
@@ -136,7 +136,7 @@ Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType,
   return newFunc;
 }
 
-Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType, ArrayRef<AttributeSet> argAttrs,
+Function *compilerutils::cloneFunctionHeader(Function &f, FunctionType *newType, ArrayRef<AttributeSet> argAttrs,
                                              Module *targetModule) {
   const AttributeList fAttrs = f.getAttributes();
   const AttributeList attributes =
@@ -144,7 +144,7 @@ Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType,
   return cloneFunctionHeader(f, newType, attributes, targetModule);
 }
 
-void CompilerUtils::createUnreachable(llvm::IRBuilder<> &b) {
+void compilerutils::createUnreachable(llvm::IRBuilder<> &b) {
   auto *unreachable = b.CreateUnreachable();
   auto it = ++unreachable->getIterator();
   auto *bb = unreachable->getParent();
@@ -158,7 +158,7 @@ void CompilerUtils::createUnreachable(llvm::IRBuilder<> &b) {
   DeleteDeadBlock(oldCode);
 }
 
-void CompilerUtils::setIsLastUseLoad(llvm::LoadInst &Load) {
+void compilerutils::setIsLastUseLoad(llvm::LoadInst &Load) {
   Load.setMetadata(MDIsLastUseName, MDTuple::get(Load.getContext(), {}));
 }
 
@@ -169,7 +169,7 @@ void CompilerUtils::setIsLastUseLoad(llvm::LoadInst &Load) {
 // @param function: The Function to modify
 // @param builder: An IRBuilder instance used for inserting new instructions
 // @param blockName: The name to give to the new unified return block
-llvm::ReturnInst *CompilerUtils::unifyReturns(Function &function, llvm::IRBuilder<> &builder, const Twine &blockName) {
+llvm::ReturnInst *compilerutils::unifyReturns(Function &function, llvm::IRBuilder<> &builder, const Twine &blockName) {
   SmallVector<ReturnInst *> retInsts;
 
   for (BasicBlock &block : function) {
@@ -321,7 +321,7 @@ CrossModuleInliner &CrossModuleInliner::operator=(CrossModuleInliner &&inliner) 
 
 CrossModuleInliner::~CrossModuleInliner() = default;
 
-iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall(CallBase &cb) {
+iterator_range<Function::iterator> compilerutils::CrossModuleInliner::inlineCall(CallBase &cb) {
   auto *calleeFunc = cb.getCalledFunction();
   assert(calleeFunc && "Cannot find called function");
   checkTargetModule(*cb.getFunction()->getParent());
@@ -402,8 +402,8 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
   return make_range(firstNewBb, lastNewBb);
 }
 
-CompilerUtils::CrossModuleInlinerResult
-CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *callee,
+compilerutils::CrossModuleInlinerResult
+compilerutils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *callee,
                                               llvm::ArrayRef<llvm::Value *> args) {
   auto *call = b.CreateCall(callee, args);
   // Create a fake use, so we can get the result of the inlined function.
@@ -441,7 +441,7 @@ CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *ca
   return {result, newBBs};
 }
 
-GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &sourceGv, Module &targetModule) {
+GlobalValue *compilerutils::CrossModuleInliner::findCopiedGlobal(GlobalValue &sourceGv, Module &targetModule) {
   checkTargetModule(targetModule);
 
   if (auto found = impl->map.find(&sourceGv); found != impl->map.end()) {
@@ -461,7 +461,7 @@ llvm::GlobalValue &CrossModuleInliner::defaultGetGlobalInModuleFunc(CrossModuleI
   assert(inliner.impl && "Called GetGlobalInModule, but the inliner is currently not inlining anything");
 
   // Try to find by name
-  if (auto *existing = targetModule.getNamedValue(CompilerUtils::CrossModuleInliner::getCrossModuleName(sourceGv)))
+  if (auto *existing = targetModule.getNamedValue(compilerutils::CrossModuleInliner::getCrossModuleName(sourceGv)))
     return *existing;
 
   auto &mappedTypes = inliner.impl->typeRemapper.mappedTypes;
@@ -492,7 +492,7 @@ llvm::GlobalValue &CrossModuleInliner::defaultGetGlobalInModuleFunc(CrossModuleI
 
     // Create a function declaration
     FunctionType *targetFuncTy = FunctionType::get(mappedTy, params, sourceFuncTy->isVarArg());
-    auto *newGv = CompilerUtils::cloneFunctionHeader(*callee, targetFuncTy, callee->getAttributes(), &targetModule);
+    auto *newGv = compilerutils::cloneFunctionHeader(*callee, targetFuncTy, callee->getAttributes(), &targetModule);
     newGv->setName(newName);
     return *newGv;
   }
@@ -534,7 +534,7 @@ void CrossModuleInliner::checkTargetModule(llvm::Module &targetModule) {
     assert(impl->targetMod == &targetModule);
 }
 
-void CompilerUtils::replaceAllPointerUses(Value *oldPointerValue, Value *newPointerValue,
+void compilerutils::replaceAllPointerUses(Value *oldPointerValue, Value *newPointerValue,
                                           SmallVectorImpl<Instruction *> &toBeRemoved) {
   // Note: The implementation explicitly supports typed pointers, which
   //       complicates some of the code below.
@@ -684,20 +684,82 @@ void CompilerUtils::replaceAllPointerUses(Value *oldPointerValue, Value *newPoin
 #endif
 }
 
-Value *CompilerUtils::simplifyingCreateConstGEP1_32(IRBuilder<> &builder, Type *ty, Value *ptr, uint32_t idx) {
+Value *compilerutils::simplifyingCreateConstGEP1_32(IRBuilder<> &builder, Type *ty, Value *ptr, uint32_t idx) {
   // A GEP with a single zero index is redundant with opaque pointers
   if (idx == 0)
     return ptr;
   return builder.CreateConstGEP1_32(ty, ptr, idx);
 }
 
-Value *CompilerUtils::simplifyingCreateConstInBoundsGEP1_32(IRBuilder<> &builder, Type *ty, Value *ptr, uint32_t idx) {
+Value *compilerutils::simplifyingCreateConstInBoundsGEP1_32(IRBuilder<> &builder, Type *ty, Value *ptr, uint32_t idx) {
   if (idx == 0)
     return ptr;
   return builder.CreateConstInBoundsGEP1_32(ty, ptr, idx);
 }
 
-void CompilerUtils::RegisterPasses(llvm::PassBuilder &PB) {
+std::string compilerutils::bb::getLabel(const Function *func) {
+  if (func->hasName())
+    return func->getName().str();
+
+  ModuleSlotTracker mst(func->getParent());
+  mst.incorporateFunction(*func);
+
+  return std::to_string(mst.getLocalSlot(func));
+}
+
+std::string compilerutils::bb::getLabel(const BasicBlock *bb) {
+  if (bb->hasName())
+    return bb->getName().str();
+
+  const Function *func = bb->getParent();
+
+  ModuleSlotTracker mst(func->getParent());
+  mst.incorporateFunction(*func);
+
+  return std::to_string(mst.getLocalSlot(bb));
+}
+
+std::string compilerutils::bb::getLabel(const Value *v) {
+  if (v->hasName())
+    return v->getName().str();
+
+  if (!isa<Instruction>(v))
+    return "";
+
+  const BasicBlock *bb = dyn_cast<Instruction>(v)->getParent();
+  const Function *func = bb->getParent();
+
+  ModuleSlotTracker mst(func->getParent());
+  mst.incorporateFunction(*func);
+
+  return std::to_string(mst.getLocalSlot(v));
+}
+
+std::string compilerutils::bb::getNamesForBasicBlocks(const ArrayRef<BasicBlock *> blocks, StringRef emptyRetValue,
+                                                      StringRef prefix) {
+  std::string s;
+  if (blocks.empty())
+    return emptyRetValue.str();
+
+  for (auto *bb : blocks)
+    s += prefix.str() + getLabel(bb);
+
+  return s;
+}
+
+std::string compilerutils::bb::getNamesForBasicBlocks(const SmallSet<BasicBlock *, 2> &blocks, StringRef emptyRetValue,
+                                                      StringRef prefix) {
+  std::string s;
+  if (blocks.empty())
+    return emptyRetValue.str();
+
+  for (auto *bb : blocks)
+    s += prefix.str() + getLabel(bb);
+
+  return s;
+}
+
+void compilerutils::RegisterPasses(llvm::PassBuilder &PB) {
 #define HANDLE_PASS(NAME, CREATE_PASS)                                                                                 \
   if (innerPipeline.empty() && name == NAME) {                                                                         \
     passMgr.addPass(CREATE_PASS);                                                                                      \

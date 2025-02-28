@@ -532,7 +532,7 @@ void ContHelper::addDxilContinuationPasses(ModulePassManager &MPM, Module *Gpurt
   // Fixup DXIL vs LLVM incompatibilities. This needs to run first.
   // If we add more LLVM processing separate from continuation passes,
   // we potentially should do it earlier as part of the module loading.
-  MPM.addPass(CompilerUtils::DxilToLlvmPass());
+  MPM.addPass(compilerutils::DxilToLlvmPass());
 
   // Translate dx.op intrinsic calls to lgc.rt dialect intrinsic calls
   MPM.addPass(DXILContLgcRtOpConverterPass());
@@ -551,7 +551,7 @@ void ContHelper::addDxilContinuationPasses(ModulePassManager &MPM, Module *Gpurt
 }
 
 void ContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
-  MPM.addPass(CompilerUtils::DxilToLlvmPass());
+  MPM.addPass(compilerutils::DxilToLlvmPass());
 
   MPM.addPass(llvm::DXILContPrepareGpurtLibraryPass());
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
@@ -734,7 +734,7 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDa
 
 Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData,
                                   lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
-                                  CompilerUtils::CrossModuleInliner &Inliner, bool KeepBuilderPos) {
+                                  compilerutils::CrossModuleInliner &Inliner, bool KeepBuilderPos) {
   if (!KeepBuilderPos)
     B.SetInsertPoint(Call);
 
@@ -901,7 +901,7 @@ static bool replaceEnqueueIntrinsic(Function &F) {
     if (NewCall->getFunction()->getName() == ContDriverFunc::ExitRayGenName)
       ContHelper::OutgoingRegisterCount::setValue(NewCall, 0);
 
-    CompilerUtils::createUnreachable(B);
+    compilerutils::createUnreachable(B);
     Changed = true;
   });
 
@@ -929,7 +929,7 @@ static bool replaceAwaitIntrinsic(Function &F, bool PreserveWaitMasks = true) {
     NewArgs.erase(NewArgs.begin() + 1);
 
     B.SetInsertPoint(&CInst);
-    auto *NewCall = CompilerUtils::createNamedCall(B, "_AmdAwait", CInst.getType(), NewArgs, {});
+    auto *NewCall = compilerutils::createNamedCall(B, "_AmdAwait", CInst.getType(), NewArgs, {});
     CInst.replaceAllUsesWith(NewCall);
     if (PreserveWaitMasks)
       ContHelper::setWaitMask(*NewCall);
@@ -1122,7 +1122,7 @@ Function *llvm::tryGpurtPointerArgPromotion(Function *Func) {
   }
 
   // promotePointerArguments returns the input if no argument was promoted.
-  auto *NewFunc = CompilerUtils::promotePointerArguments(Func, PromotionMask);
+  auto *NewFunc = compilerutils::promotePointerArguments(Func, PromotionMask);
 
   // This function is provided by the compiler to GPURT. It will be substituted by LowerRaytracingPipeline.
   // NOTE: GPURT now preserves all function names started with "_Amd", but some of them are not intrinsics, e.g.,
@@ -1288,9 +1288,7 @@ void addLgcContinuationTransform(ModulePassManager &MPM) {
 
   // Scalarizer pass could break down system data structure (and possibly other data) which would help to reduce size of
   // continuations state.
-  ScalarizerPassOptions scalarizerOptions;
-  scalarizerOptions.ScalarizeMinBits = 32;
-  MPM.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass(scalarizerOptions)));
+  MPM.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass()));
 
   MPM.addPass(CoroEarlyPass());
   CGSCCPassManager CGPM;

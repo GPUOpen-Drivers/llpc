@@ -59,8 +59,8 @@ namespace lgc {
 
 // List of names of handler functions
 static const char NggEsMain[] = "lgc.ngg.ES.main";
-static const char NggEsCullDataFetcher[] = "lgc.ngg.ES.cull.data.fetcher";
-static const char NggEsVertexExporter[] = "lgc.ngg.ES.vertex.exporter";
+static const char NggEsFirstPart[] = "lgc.ngg.ES.first.part";
+static const char NggEsSecondPart[] = "lgc.ngg.ES.second.part";
 
 static const char NggGsMain[] = "lgc.ngg.GS.main";
 static const char NggCopyShader[] = "lgc.ngg.COPY.main";
@@ -75,7 +75,7 @@ static const char NggCullerSmallPrimFilter[] = "lgc.ngg.culler.small.prim.filter
 static const char NggCullerCullDistance[] = "lgc.ngg.culler.cull.distance";
 static const char NggCullerRegFetcher[] = "lgc.ngg.culler.reg.fetcher";
 
-static const char NggXfbFetcher[] = "lgc.ngg.xfb.fetcher";
+static const char NggExportCollector[] = "lgc.ngg.export.collector";
 
 // Represents GDS GRBM register for SW-emulated stream-out
 enum {
@@ -408,8 +408,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // XFB outputs
     if (pipelineState->enableSwXfb()) {
       if (ldsLayout) {
-        ldsRegionSize = hwConfig.esVertsPerSubgroup *
-                        hwConfig.esGsRingItemSize; // Transform feedback outputs are stored as a ES-GS ring item
+        ldsRegionSize =
+            hwConfig.esVertsPerSubgroup * hwConfig.esGsRingItemSize; // XFB outputs are stored as a ES-GS ring item
 
         printLdsRegionInfo("XFB Outputs", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::XfbOutput] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -759,14 +759,14 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 }
 
 // =====================================================================================================================
-// Calculate and return the dword size of total transform feedback outputs to write for the ES stage.
+// Calculate and return the dword size of total XFB outputs to write for the ES stage.
 //
 // NOTE: For non 64-bit output, the value is its element count (8-bit/16-bit scalars are padded to 32-bit); for 64-bit
 // output, the value is doubled since each 64-bit scalar is split to two dwords to write. This info is used by ES (VS
 // or TES in non-GS pipeline) to write the outputs to NGG LDS space on GFX11+ to do SW emulated stream-out.
 //
 // @param esMain : ES main function
-// @returns : Dword size of total transform feedback outputs to write
+// @returns : Dword size of total XFB outputs to write
 unsigned NggPrimShader::calcEsXfbOutputsSize(Function *esMain) {
   unsigned xfbOutputsSize = 0;
 
@@ -987,18 +987,19 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   //   if (waveId == 0)
   //     Send GS_ALLOC_REQ message
   //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Collect exports
+  //
+  //   if (Enable SW XFB)
+  //     Process SW XFB
+  //   else if (Enable primitive statistics counting)
+  //     Collect primitive statistics
+  //
   //   if (threadIdInSubgroup < primCountInSubgroup)
   //     Export primitive
   //
-  //   if (Enable SW XFB)
-  //     Process SW XFB (Run ES)
-  //   else {
-  //     if (Enable primitive statistics counting)
-  //       Collect primitive statistics
-  //
-  //     if (threadIdInSubgroup < vertCountInSubgroup)
-  //       Run ES (export vertex)
-  //   }
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Export vertex
   // }
   //
 
@@ -1007,6 +1008,9 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
 
   auto sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
   auto endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
+
+  auto collectExportBlock = createBlock(primShader, ".collectExport");
+  auto endCollectExportBlock = createBlock(primShader, ".endCollectExport");
 
   auto exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
   auto endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
@@ -1079,6 +1083,33 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(endSendGsAllocReqBlock);
 
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, collectExportBlock, endCollectExportBlock);
+  }
+
+  // Construct ".collectExport" block
+  SmallVector<VertexExport, 4> positionExports;
+  SmallVector<VertexExport, 32> attributeExports;
+  SmallVector<XfbExport, 32> xfbExports;
+  {
+    m_builder.SetInsertPoint(collectExportBlock);
+
+    collectExports(args, m_esHandlers.main, false, &positionExports, &attributeExports, &xfbExports);
+
+    m_builder.CreateBr(endCollectExportBlock);
+  }
+
+  // Construct ".endCollectExport" block
+  {
+    m_builder.SetInsertPoint(endCollectExportBlock);
+
+    createPhiForExports(&positionExports, &attributeExports, &xfbExports);
+
+    if (m_pipelineState->enableSwXfb())
+      processSwXfb(args, xfbExports);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
+
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
     m_builder.CreateCondBr(validPrimitive, exportPrimitiveBlock, endExportPrimitiveBlock);
   }
@@ -1095,12 +1126,6 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(endExportPrimitiveBlock);
 
-    // Process SW XFB or primitive statistics counting
-    if (m_pipelineState->enableSwXfb())
-      processSwXfb(args);
-    else if (m_pipelineState->enablePrimStats())
-      collectPrimitiveStats();
-
     auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
     m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
   }
@@ -1109,20 +1134,17 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(exportVertexBlock);
 
-    // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
-    // transform feedback exporting. There won't be separated ES running (ES is not split any more). This is
-    // because we could encounter special cases in which there are memory atomics producing output values both for
-    // transform feedback exporting and for vertex exporting like following codes. The atomics shouldn't be separated
-    // and be run multiple times.
-    //
-    //   void ES() {
-    //     ...
-    //     value = atomicXXX()
-    //     xfbExport = value
-    //     vertexExport = value
-    //  }
-    if (!m_pipelineState->enableSwXfb())
-      runEs(args);
+    // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to
+    // place vertex exports after all attribute exports (ATM operations).
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
+      exportAttributes(attributeExports);
+      if (!attributeExports.empty())
+        m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
+      exportPositions(positionExports);
+    } else {
+      exportPositions(positionExports);
+      exportAttributes(attributeExports);
+    }
 
     m_builder.CreateBr(endExportVertexBlock);
   }
@@ -1218,13 +1240,16 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //     Barrier
   //   }
   //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Collect XFB exports
+  //
   //   if (Enable SW XFB)
   //     Process SW XFB
   //   else if (Enable primitive statistics counting)
   //     Collect primitive statistics
   //
-  //   if (threadIdInWave < vertCountInWave)
-  //     Run part ES to fetch vertex cull data
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Collect cull data
   //
   //   if (Not runtime passthrough) {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
@@ -1232,8 +1257,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //     if (threadIdInSubgroup < maxWaves + 1)
   //       Initialize per-wave and per-subgroup count of output vertices
   //
-  //     if (threadIdInWave < vertCountInWave)
-  //       Write vertex cull data
+  //     if (threadIdInSubgroup < vertCountInSubgroup)
+  //       Write cull data
   //     Barrier
   //
   //     if (threadIdInSubgroup < primCountInSubgroup) {
@@ -1266,14 +1291,17 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //     return (early exit)
   //   }
   //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Collect vertex exports
+  //
   //   if (threadIdInSubgroup < primCountInSubgroup)
   //     Export primitive
   //
   //   if (threadIdInSubgroup < vertCountInSubgroup) {
   //     if (Needn't compact vertex && empty wave)
   //       Dummy vertex export
-  //     else
-  //       Run part ES to do deferred vertex export
+  //     else if (drawFlag)
+  //       Export vertex
   //   }
   // }
   //
@@ -1295,9 +1323,11 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   // Define basic blocks
   auto entryBlock = createBlock(primShader, ".entry");
 
-  auto checkFetchVertexCullDataBlock = createBlock(primShader, ".checkFetchVertexCullData");
-  auto fetchVertexCullDataBlock = createBlock(primShader, ".fetchVertexCullData");
-  auto endFetchVertexCullDataBlock = createBlock(primShader, ".endFetchVertexCullData");
+  auto collectXfbExportBlock = createBlock(primShader, ".collectXfbExport");
+  auto endCollectXfbExportBlock = createBlock(primShader, ".endCollectXfbExport");
+
+  auto collectCullDataBlock = createBlock(primShader, ".collectCullData");
+  auto endCollectCullDataBlock = createBlock(primShader, ".endCollectCullData");
 
   auto checkInitVertexDrawFlagBlock = createBlock(primShader, ".checkInitVertexDrawFlag");
   auto initVertexDrawFlagBlock = createBlock(primShader, ".initVertexDrawFlag");
@@ -1306,8 +1336,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   auto initVertexCountsBlock = createBlock(primShader, ".initVertexCounts");
   auto endInitVertexCountsBlock = createBlock(primShader, ".endInitVertexCounts");
 
-  auto writeVertexCullDataBlock = createBlock(primShader, ".writeVertexCullData");
-  auto endWriteVertexCullDataBlock = createBlock(primShader, ".endWriteVertexCullData");
+  auto writeCullDataBlock = createBlock(primShader, ".writeCullData");
+  auto endWriteCullDataBlock = createBlock(primShader, ".endWriteCullData");
 
   auto cullPrimitiveBlock = createBlock(primShader, ".cullPrimitive");
   auto writeVertexDrawFlagBlock = createBlock(primShader, ".writeVertexDrawFlag");
@@ -1327,7 +1357,10 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   auto endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
 
   auto earlyExitBlock = createBlock(primShader, ".earlyExit");
-  auto checkExportPrimitiveBlock = createBlock(primShader, ".checkExportPrimitive");
+  auto checkCollectVertexExportBlock = createBlock(primShader, ".checkCollectVertexExport");
+
+  auto collectVertexExportBlock = createBlock(primShader, ".collectVertexExport");
+  auto endCollectVertexExportBlock = createBlock(primShader, ".endCollectVertexExport");
 
   auto exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
   auto endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
@@ -1371,46 +1404,109 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // Distribute primitive ID if needed
     distributePrimitiveId(primitiveId);
 
-    // Process SW XFB or primitive statistics counting
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, collectXfbExportBlock, endCollectXfbExportBlock);
+  }
+
+  // Construct ".collectXfbExport" block
+  SmallVector<XfbExport, 32> xfbExports;
+  {
+    m_builder.SetInsertPoint(collectXfbExportBlock);
+
     if (m_pipelineState->enableSwXfb())
-      processSwXfb(args);
-    else if (m_pipelineState->enablePrimStats())
+      collectExports(args, m_esHandlers.main, true, nullptr, nullptr, &xfbExports);
+
+    m_builder.CreateBr(endCollectXfbExportBlock);
+  }
+
+  // Construct ".endCollectXfbExport" block
+  {
+    m_builder.SetInsertPoint(endCollectXfbExportBlock);
+
+    if (m_pipelineState->enableSwXfb()) {
+      createPhiForExports(nullptr, nullptr, &xfbExports);
+      processSwXfb(args, xfbExports);
+    } else if (m_pipelineState->enablePrimStats()) {
       collectPrimitiveStats();
+    }
 
-    m_builder.CreateBr(checkFetchVertexCullDataBlock);
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, collectCullDataBlock, endCollectCullDataBlock);
   }
 
-  // Construct ".checkFetchVertexCullData" block
+  // Construct ".collectCullData" block
+  SmallVector<VertexExport, 4> positionExports;
   {
-    m_builder.SetInsertPoint(checkFetchVertexCullDataBlock);
+    m_builder.SetInsertPoint(collectCullDataBlock);
 
-    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-    m_builder.CreateCondBr(validVertex, fetchVertexCullDataBlock, endFetchVertexCullDataBlock);
-  }
-
-  // Construct ".fetchVertexCullData" block
-  Value *cullData = nullptr;
-  Value *position = nullptr;
-  {
-    m_builder.SetInsertPoint(fetchVertexCullDataBlock);
-
-    // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
+    // Split ES to two parts: cull data exports and other remaining exports
     splitEs();
 
-    // Run part ES to fetch cull data
-    auto cullData = runPartEs(args);
-    position = m_nggControl->enableCullDistanceCulling ? m_builder.CreateExtractValue(cullData, 0) : cullData;
+    // Collect cull data exports
+    collectExports(args, m_esHandlers.part.first, false, &positionExports, nullptr, nullptr);
 
-    m_builder.CreateBr(endFetchVertexCullDataBlock);
+    m_builder.CreateBr(endCollectCullDataBlock);
   }
 
-  // Construct ".endFetchVertexCullData" block
+  // Construct ".endCollectCullData" block
+  Value *position0 = nullptr;
+  SmallVector<Value *> cullDistance;
   {
-    m_builder.SetInsertPoint(endFetchVertexCullDataBlock);
+    m_builder.SetInsertPoint(endCollectCullDataBlock);
 
-    position = createPhi(
-        {{position, fetchVertexCullDataBlock}, {PoisonValue::get(position->getType()), checkFetchVertexCullDataBlock}},
-        "position"); // Update vertex position data
+    createPhiForExports(&positionExports, nullptr, nullptr);
+
+    unsigned clipCullExportSlot = 1;
+    unsigned clipDistanceCount = 0;
+    unsigned cullDistanceCount = 0;
+    if (m_nggControl->enableCullDistanceCulling) {
+      const auto &resUsage =
+          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
+
+      if (m_hasTes) {
+        const auto &builtInUsage = resUsage->builtInUsage.tes;
+
+        const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        clipCullExportSlot = miscExport ? 2 : 1;
+        clipDistanceCount = builtInUsage.clipDistance;
+        cullDistanceCount = builtInUsage.cullDistance;
+      } else {
+        const auto &builtInUsage = resUsage->builtInUsage.vs;
+
+        const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                                builtInUsage.primitiveShadingRate;
+        clipCullExportSlot = miscExport ? 2 : 1;
+        clipDistanceCount = builtInUsage.clipDistance;
+        cullDistanceCount = builtInUsage.cullDistance;
+      }
+
+      assert(cullDistanceCount > 0); // Cull distance must exist if the culling is enabled
+    }
+
+    SmallVector<Value *, 8> clipCullDistance;
+    for (auto &positionExport : positionExports) {
+      if (positionExport.exportSlot == 0) {
+        position0 = positionExport.exportValue;
+        position0->setName("position0");
+      } else {
+        if (m_nggControl->enableCullDistanceCulling) {
+          if (positionExport.exportSlot == clipCullExportSlot) {
+            for (unsigned i = 0; i < 4; i++)
+              clipCullDistance[i] = m_builder.CreateExtractElement(positionExport.exportValue, i);
+          } else if (positionExport.exportSlot == clipCullExportSlot + 1 && clipDistanceCount + cullDistanceCount > 4) {
+            for (unsigned i = 0; i < 4; i++)
+              clipCullDistance[4 + i] = m_builder.CreateExtractElement(positionExport.exportValue, i);
+          }
+        }
+      }
+    }
+
+    if (m_nggControl->enableCullDistanceCulling) {
+      for (unsigned i = 0; i < cullDistanceCount; ++i) {
+        cullDistance.push_back(clipCullDistance[clipDistanceCount + i]);
+        cullDistance[i]->setName("cullDistance" + std::to_string(i));
+      }
+    }
 
     // NOTE: If the Z channel of vertex position data is constant, we can go into runtime passthrough mode. Otherwise,
     // we will further check if this is a small subgroup and enable runtime passthrough mode accordingly.
@@ -1460,27 +1556,22 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     m_builder.SetInsertPoint(endInitVertexCountsBlock);
 
     auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-    m_builder.CreateCondBr(validVertex, writeVertexCullDataBlock, endWriteVertexCullDataBlock);
+    m_builder.CreateCondBr(validVertex, writeCullDataBlock, endWriteCullDataBlock);
   }
 
-  // Construct ".writeVertexCullData" block
+  // Construct ".writeCullData" block
   {
-    m_builder.SetInsertPoint(writeVertexCullDataBlock);
+    m_builder.SetInsertPoint(writeCullDataBlock);
 
     // Write vertex position data
-    writePerThreadDataToLds(position, m_nggInputs.threadIdInSubgroup, PrimShaderLdsRegion::VertexPosition, 0, true);
+    writePerThreadDataToLds(position0, m_nggInputs.threadIdInSubgroup, PrimShaderLdsRegion::VertexPosition, 0, true);
 
     // Write cull distance sign mask
     if (m_nggControl->enableCullDistanceCulling) {
-      auto cullDistance = m_builder.CreateExtractValue(cullData, 1);
-
       // Calculate the sign mask for cull distance
       Value *signMask = m_builder.getInt32(0);
-      for (unsigned i = 0; i < cullDistance->getType()->getArrayNumElements(); ++i) {
-        auto cullDistanceVal = m_builder.CreateExtractValue(cullDistance, i);
-        cullDistanceVal = m_builder.CreateBitCast(cullDistanceVal, m_builder.getInt32Ty());
-
-        Value *signBit = createUBfe(cullDistanceVal, 31, 1);
+      for (unsigned i = 0; i < cullDistance.size(); ++i) {
+        Value *signBit = createUBfe(m_builder.CreateBitCast(cullDistance[i], m_builder.getInt32Ty()), 31, 1);
         signBit = m_builder.CreateShl(signBit, i);
 
         signMask = m_builder.CreateOr(signMask, signBit);
@@ -1489,12 +1580,12 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       writeVertexCullInfoToLds(signMask, vertexItemOffset, m_vertCullInfoOffsets.cullDistanceSignMask);
     }
 
-    m_builder.CreateBr(endWriteVertexCullDataBlock);
+    m_builder.CreateBr(endWriteCullDataBlock);
   }
 
-  // Construct ".endWriteVertexCullData" block
+  // Construct ".endWriteCullData" block
   {
-    m_builder.SetInsertPoint(endWriteVertexCullDataBlock);
+    m_builder.SetInsertPoint(endWriteCullDataBlock);
 
     createFenceAndBarrier();
 
@@ -1532,7 +1623,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
 
     primitiveCulled = createPhi({{m_builder.getTrue(), cullPrimitiveBlock},
                                  {m_builder.getFalse(), writeVertexDrawFlagBlock},
-                                 {m_builder.getTrue(), endWriteVertexCullDataBlock}});
+                                 {m_builder.getTrue(), endWriteCullDataBlock}});
 
     createFenceAndBarrier();
 
@@ -1718,40 +1809,39 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // and no runtime passthrough path (normal culling path).
     if (m_nggControl->compactVertex) {
       m_compactVertex =
-          createPhi({{hasCulledVertices, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
+          createPhi({{hasCulledVertices, endCompactVertexBlock}, {m_builder.getFalse(), endCollectCullDataBlock}},
                     "compactVertex");
     } else {
       assert(!m_compactVertex); // Must be null
     }
 
     // Update primitive culled flag
-    primitiveCulled =
-        createPhi({{primitiveCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
-                  "primitiveCulled");
+    primitiveCulled = createPhi(
+        {{primitiveCulled, endCompactVertexBlock}, {m_builder.getFalse(), endCollectCullDataBlock}}, "primitiveCulled");
 
     // Update fully-culled flag
-    fullyCulled = createPhi({{fullyCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
+    fullyCulled = createPhi({{fullyCulled, endCompactVertexBlock}, {m_builder.getFalse(), endCollectCullDataBlock}},
                             "fullyCulled");
 
     // Update primitive count in subgroup
     m_nggInputs.primCountInSubgroup = createPhi(
-        {{primCountInSubgroup, endCompactVertexBlock}, {m_nggInputs.primCountInSubgroup, endFetchVertexCullDataBlock}},
+        {{primCountInSubgroup, endCompactVertexBlock}, {m_nggInputs.primCountInSubgroup, endCollectCullDataBlock}},
         "primCountInSubgroup");
 
     // Update vertex count in subgroup
     m_nggInputs.vertCountInSubgroup = createPhi(
-        {{vertCountInSubgroup, endCompactVertexBlock}, {m_nggInputs.vertCountInSubgroup, endFetchVertexCullDataBlock}},
+        {{vertCountInSubgroup, endCompactVertexBlock}, {m_nggInputs.vertCountInSubgroup, endCollectCullDataBlock}},
         "vertCountInSubgroup");
 
     if (!m_nggControl->compactVertex) {
       // Update draw flag
-      drawFlag = createPhi({{drawFlag, endCompactVertexBlock}, {m_builder.getTrue(), endFetchVertexCullDataBlock}},
-                           "drawFlag");
+      drawFlag =
+          createPhi({{drawFlag, endCompactVertexBlock}, {m_builder.getTrue(), endCollectCullDataBlock}}, "drawFlag");
 
       // Update vertex count in wave
-      vertCountInWave = createPhi(
-          {{vertCountInWave, endCompactVertexBlock}, {m_nggInputs.vertCountInWave, endFetchVertexCullDataBlock}},
-          "vertCountInWave");
+      vertCountInWave =
+          createPhi({{vertCountInWave, endCompactVertexBlock}, {m_nggInputs.vertCountInWave, endCollectCullDataBlock}},
+                    "vertCountInWave");
     }
 
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
@@ -1773,9 +1863,9 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     createFenceAndBarrier();
 
     if (waNggCullingNoEmptySubgroups)
-      m_builder.CreateCondBr(fullyCulled, earlyExitBlock, checkExportPrimitiveBlock);
+      m_builder.CreateCondBr(fullyCulled, earlyExitBlock, checkCollectVertexExportBlock);
     else
-      m_builder.CreateBr(checkExportPrimitiveBlock);
+      m_builder.CreateBr(checkCollectVertexExportBlock);
   }
 
   if (waNggCullingNoEmptySubgroups) {
@@ -1796,9 +1886,55 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     }
   }
 
-  // Construct ".checkExportPrimitive" block
+  // Construct ".checkCollectVertexExport" block
   {
-    m_builder.SetInsertPoint(checkExportPrimitiveBlock);
+    m_builder.SetInsertPoint(checkCollectVertexExportBlock);
+
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    if (!m_nggControl->compactVertex)
+      validVertex = m_builder.CreateAnd(validVertex, drawFlag); // Culled vertex vertices will not be drawn
+    m_builder.CreateCondBr(validVertex, collectVertexExportBlock, endCollectVertexExportBlock);
+  }
+
+  // Construct ".collectVertexExport" block
+  positionExports.clear(); // Will be reused, clear it
+  SmallVector<VertexExport, 32> attributeExports;
+  {
+    m_builder.SetInsertPoint(collectVertexExportBlock);
+
+    collectExports(args, m_esHandlers.part.second, false, &positionExports, &attributeExports, nullptr);
+
+    // NOTE: After ES splitting, position0 is not contained in the ES second part. We have to insert it back to the
+    // collection of position exports.
+    if (m_compactVertex) {
+      auto uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                                             PrimShaderLdsRegion::VertexIndexMap);
+      auto newPosition0 =
+          readPerThreadDataFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), uncompactedVertexIndex,
+                                   PrimShaderLdsRegion::VertexPosition, 0, true);
+      position0 = m_builder.CreateSelect(m_compactVertex, newPosition0, position0);
+    }
+
+    m_builder.CreateBr(endCollectVertexExportBlock);
+  }
+
+  // Construct ".endCollectVertexExport" block
+  {
+    m_builder.SetInsertPoint(endCollectVertexExportBlock);
+
+    createPhiForExports(&positionExports, &attributeExports, nullptr);
+
+    if (m_compactVertex) {
+      auto exportBlock = cast<Instruction>(position0)->getParent();
+      auto position0Phi =
+          m_builder.CreatePHI(position0->getType(), pred_size(endCollectVertexExportBlock), "position0");
+      for (BasicBlock *predBlock : predecessors(endCollectVertexExportBlock)) {
+        position0Phi->addIncoming(predBlock == exportBlock ? position0 : PoisonValue::get(position0->getType()),
+                                  predBlock);
+      }
+      position0 = position0Phi;
+    }
+    positionExports.push_back({0, 0xF, position0});
 
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
     m_builder.CreateCondBr(validPrimitive, exportPrimitiveBlock, endExportPrimitiveBlock);
@@ -1869,9 +2005,9 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(checkExportVertexBlock);
 
-    auto validVertex = m_nggControl->compactVertex
-                           ? m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup)
-                           : drawFlag;
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    if (!m_nggControl->compactVertex)
+      validVertex = m_builder.CreateAnd(validVertex, drawFlag); // Culled vertex vertices will not be drawn
     m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
   }
 
@@ -1879,8 +2015,17 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(exportVertexBlock);
 
-    // Run part ES to do deferred vertex export
-    runPartEs(args, position);
+    // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to
+    // place vertex exports after all attribute exports (ATM operations).
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
+      exportAttributes(attributeExports);
+      if (!attributeExports.empty())
+        m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
+      exportPositions(positionExports);
+    } else {
+      exportPositions(positionExports);
+      exportAttributes(attributeExports);
+    }
 
     m_builder.CreateBr(endExportVertexBlock);
   }
@@ -1955,6 +2100,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   //   if (threadIdInWave < primCountInWave)
   //     Run GS
   //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Collect XFB exports
+  //
   //   if (Enable SW XFB)
   //     Process SW XFB
   //   else if (Enable primitive statistics counting)
@@ -1986,14 +2134,17 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   //     Send GS_ALLOC_REQ message
   //   Barrier
   //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Collect vertex exports
+  //
   //   if (threadIdInSubgroup < primCountInSubgroup)
   //     Export primitive
   //
   //   if (threadIdInSubgroup < vertCountInSubgroup) {
   //     if (Needn't compact vertex && empty wave)
   //       Dummy vertex export
-  //     else
-  //       Run copy shader (export vertex)
+  //     else if (drawFlag)
+  //       Export vertex
   //   }
   // }
   //
@@ -2009,6 +2160,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 
   auto beginGsBlock = createBlock(primShader, ".beginGs");
   auto endGsBlock = createBlock(primShader, ".endGs");
+
+  auto collectXfbExportBlock = createBlock(primShader, ".collectXfbExport");
+  auto endCollectXfbExportBlock = createBlock(primShader, ".endCollectXfbExport");
 
   BasicBlock *initVertexCountsBlock = nullptr;
   BasicBlock *endInitVertexCountsBlock = nullptr;
@@ -2028,6 +2182,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 
   BasicBlock *sendGsAllocReqBlock = nullptr;
   BasicBlock *endSendGsAllocReqBlock = nullptr;
+
+  BasicBlock *collectVertexExportBlock = nullptr;
+  BasicBlock *endCollectVertexExportBlock = nullptr;
 
   BasicBlock *exportPrimitiveBlock = nullptr;
   BasicBlock *endExportPrimitiveBlock = nullptr;
@@ -2063,6 +2220,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 
     sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
     endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
+
+    collectVertexExportBlock = createBlock(primShader, ".collectVertexExport");
+    endCollectVertexExportBlock = createBlock(primShader, ".endCollectVertexExport");
 
     exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
     endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
@@ -2150,11 +2310,31 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(endGsBlock);
 
-    // Process SW XFB or primitive statistics counting
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, collectXfbExportBlock, endCollectXfbExportBlock);
+  }
+
+  // Construct ".collectXfbExport" block
+  SmallVector<XfbExport, 32> xfbExports;
+  {
+    m_builder.SetInsertPoint(collectXfbExportBlock);
+
     if (m_pipelineState->enableSwXfb())
-      processSwXfbWithGs(args);
-    else if (m_pipelineState->enablePrimStats())
+      collectExports(args, m_gsHandlers.copyShader, true, nullptr, nullptr, &xfbExports);
+
+    m_builder.CreateBr(endCollectXfbExportBlock);
+  }
+
+  // Construct ".endCollectXfbExport" block
+  {
+    m_builder.SetInsertPoint(endCollectXfbExportBlock);
+
+    if (m_pipelineState->enableSwXfb()) {
+      createPhiForExports(nullptr, nullptr, &xfbExports);
+      processSwXfbWithGs(args, xfbExports);
+    } else if (m_pipelineState->enablePrimStats()) {
       collectPrimitiveStats();
+    }
 
     if (noRasterization) {
       auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
@@ -2460,6 +2640,30 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(endSendGsAllocReqBlock);
 
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    if (!m_nggControl->compactVertex)
+      validVertex = m_builder.CreateAnd(validVertex, drawFlag); // Culled vertex vertices will not be drawn
+    m_builder.CreateCondBr(validVertex, collectVertexExportBlock, endCollectVertexExportBlock);
+  }
+
+  // Construct ".collectVertexExport" block
+  SmallVector<VertexExport, 4> positionExports;
+  SmallVector<VertexExport, 32> attributeExports;
+  {
+    m_builder.SetInsertPoint(collectVertexExportBlock);
+
+    mutateCopyShader();
+    collectExports(args, m_gsHandlers.copyShader, false, &positionExports, &attributeExports, nullptr);
+
+    m_builder.CreateBr(endCollectVertexExportBlock);
+  }
+
+  // Construct ".endCollectVertexExport" block
+  {
+    m_builder.SetInsertPoint(endCollectVertexExportBlock);
+
+    createPhiForExports(&positionExports, &attributeExports, nullptr);
+
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
     m_builder.CreateCondBr(validPrimitive, exportPrimitiveBlock, endExportPrimitiveBlock);
   }
@@ -2529,9 +2733,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(checkExportVertexBlock);
 
-    auto validVertex = m_nggControl->compactVertex
-                           ? m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup)
-                           : drawFlag;
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    if (!m_nggControl->compactVertex)
+      validVertex = m_builder.CreateAnd(validVertex, drawFlag); // Culled vertex vertices will not be drawn
     m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
   }
 
@@ -2539,7 +2743,17 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(exportVertexBlock);
 
-    runCopyShader(args);
+    // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to
+    // place vertex exports after all attribute exports (ATM operations).
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
+      exportAttributes(attributeExports);
+      if (!attributeExports.empty())
+        m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
+      exportPositions(positionExports);
+    } else {
+      exportPositions(positionExports);
+      exportAttributes(attributeExports);
+    }
 
     m_builder.CreateBr(endExportVertexBlock);
   }
@@ -2719,7 +2933,7 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       bool bufferActive = xfbStrides[i] > 0;
       if (!bufferActive)
-        continue; // Transform feedback buffer inactive
+        continue; // XFB buffer inactive
 
       // Get stream-out buffer descriptors and record them
       m_streamOutBufDescs[i] = readValueFromCb(FixedVectorType::get(m_builder.getInt32Ty(), 4), streamOutTablePtr,
@@ -3220,24 +3434,15 @@ void NggPrimShader::earlyExitWithDummyExport() {
 //
 // @param args : Arguments of primitive shader entry-point
 void NggPrimShader::runEs(ArrayRef<Argument *> args) {
-  if (!m_hasTes && !m_hasVs) {
-    // No TES or VS, don't have to run
-    return;
-  }
+  if (!m_esHandlers.main)
+    return; // No ES, don't run
 
-  if (!m_hasGs) {
-    // For GS, vertex export is done in copy shader
-    IRBuilder<>::InsertPointGuard guard(m_builder);
-    mutateToExportVertex(m_esHandlers.main);
-  }
+  assert(m_hasGs); // GS must be present, ES is run as part of ES-GS merged shader
 
-  Value *esGsOffset = nullptr;
-  if (m_hasGs) {
-    auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
-    unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
-    esGsOffset =
-        m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(waveSize * hwConfig.esGsRingItemSize));
-  }
+  auto &hwConfig = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig;
+  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
+  auto esGsOffset =
+      m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(waveSize * hwConfig.esGsRingItemSize));
 
   Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
   offChipLdsBase->setName("offChipLdsBase");
@@ -3273,11 +3478,6 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 
   SmallVector<Value *, 32> esArgs;
 
-  if (!m_pipelineState->exportAttributeByExportInstruction()) {
-    if (!m_hasGs) // For GS, ATM is in copy shader
-      appendAttributeThroughMemoryArguments(esArgs);
-  }
-
   // Set up user data SGPRs
   const unsigned userDataCount =
       m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
@@ -3286,9 +3486,7 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
   if (m_hasTes) {
     // Set up system value SGPRs
     esArgs.push_back(offChipLdsBase);
-
-    if (m_hasGs)
-      esArgs.push_back(esGsOffset);
+    esArgs.push_back(esGsOffset);
 
     // Set up system value VGPRs
     esArgs.push_back(tessCoordX);
@@ -3297,8 +3495,7 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
     esArgs.push_back(patchId);
   } else {
     // Set up system value SGPRs
-    if (m_hasGs)
-      esArgs.push_back(esGsOffset);
+    esArgs.push_back(esGsOffset);
 
     // Set up system value VGPRs
     esArgs.push_back(vertexId);
@@ -3314,203 +3511,40 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 }
 
 // =====================================================================================================================
-// Runs part ES. Before doing this, ES must have been already split to two parts: one is to fetch cull data for
-// NGG culling; the other is to do deferred vertex export.
-//
-// @param args : Arguments of primitive shader entry-point
-// @param position : Vertex position data (if provided, the part ES is to do deferred vertex export)
-Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
-  assert(m_hasGs == false);                       // GS must not be present
-  assert(m_nggControl->passthroughMode == false); // NGG culling is enabled
-
-  const bool deferredVertexExport = position != nullptr;
-
-  Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
-  offChipLdsBase->setName("offChipLdsBase");
-
-  Value *userData = args[NumSpecialSgprInputs];
-
-  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
-
-  Value *tessCoordX = nullptr;
-  Value *tessCoordY = nullptr;
-  Value *relPatchId = nullptr;
-  Value *patchId = nullptr;
-
-  Value *vertexId = nullptr;
-  Value *relVertexId = PoisonValue::get(m_builder.getInt32Ty()); // Unused
-  // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
-  Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
-  Value *instanceId = nullptr;
-
-  if (m_gfxIp.major <= 11) {
-    if (m_hasTes) {
-      tessCoordX = vgprArgs[5];
-      tessCoordY = vgprArgs[6];
-      relPatchId = vgprArgs[7];
-      patchId = vgprArgs[8];
-    } else {
-      vertexId = vgprArgs[5];
-      instanceId = vgprArgs[8];
-    }
-  } else {
-    llvm_unreachable("Not implemented!");
-  }
-
-  if (deferredVertexExport && m_compactVertex) {
-    auto exportVertexBlock = m_builder.GetInsertBlock();
-
-    auto uncompactVertexBlock = createBlock(exportVertexBlock->getParent(), ".uncompactVertex");
-    uncompactVertexBlock->moveAfter(exportVertexBlock);
-
-    auto endUncompactVertexBlock = createBlock(exportVertexBlock->getParent(), ".endUncompactVertex");
-    endUncompactVertexBlock->moveAfter(uncompactVertexBlock);
-
-    m_builder.CreateCondBr(m_compactVertex, uncompactVertexBlock, endUncompactVertexBlock);
-
-    // Construct ".uncompactVertex" block
-    Value *newPosition = nullptr;
-    Value *newTessCoordX = nullptr;
-    Value *newTessCoordY = nullptr;
-    Value *newRelPatchId = nullptr;
-    Value *newPatchId = nullptr;
-    Value *newVertexId = nullptr;
-    Value *newVsPrimitiveId = nullptr;
-    Value *newInstanceId = nullptr;
-    {
-      m_builder.SetInsertPoint(uncompactVertexBlock);
-
-      const unsigned esGsRingItemSize =
-          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
-
-      auto uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                                             PrimShaderLdsRegion::VertexIndexMap);
-      auto vertexItemOffset = m_builder.CreateMul(uncompactedVertexIndex, m_builder.getInt32(esGsRingItemSize));
-
-      newPosition = readPerThreadDataFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), uncompactedVertexIndex,
-                                             PrimShaderLdsRegion::VertexPosition, 0, true);
-
-      // NOTE: For deferred vertex export, some system values could be from vertex compaction info rather than from
-      // VGPRs (caused by NGG culling and vertex compaction)
-      const auto resUsage =
-          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
-      if (m_hasTes) {
-        if (resUsage->builtInUsage.tes.tessCoord) {
-          newTessCoordX =
-              readVertexCullInfoFromLds(m_builder.getFloatTy(), vertexItemOffset, m_vertCullInfoOffsets.tessCoordX);
-          newTessCoordY =
-              readVertexCullInfoFromLds(m_builder.getFloatTy(), vertexItemOffset, m_vertCullInfoOffsets.tessCoordY);
-        }
-
-        newRelPatchId =
-            readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.relPatchId);
-
-        if (resUsage->builtInUsage.tes.primitiveId) {
-          newPatchId =
-              readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.patchId);
-        }
-      } else {
-        if (resUsage->builtInUsage.vs.vertexIndex) {
-          newVertexId =
-              readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.vertexId);
-        }
-
-        // NOTE: Relative vertex index provided by HW is not used when VS is merged to GS.
-
-        if (resUsage->builtInUsage.vs.primitiveId) {
-          newVsPrimitiveId =
-              readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.primitiveId);
-        }
-
-        if (resUsage->builtInUsage.vs.instanceIndex) {
-          newInstanceId =
-              readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.instanceId);
-        }
-      }
-      m_builder.CreateBr(endUncompactVertexBlock);
-    }
-
-    // Construct ".endUncompactVertex" block
-    {
-      m_builder.SetInsertPoint(endUncompactVertexBlock);
-
-      position = createPhi({{newPosition, uncompactVertexBlock}, {position, exportVertexBlock}});
-
-      if (m_hasTes) {
-        if (newTessCoordX)
-          tessCoordX = createPhi({{newTessCoordX, uncompactVertexBlock}, {tessCoordX, exportVertexBlock}});
-
-        if (newTessCoordY)
-          tessCoordY = createPhi({{newTessCoordY, uncompactVertexBlock}, {tessCoordY, exportVertexBlock}});
-
-        assert(newRelPatchId);
-        relPatchId = createPhi({{newRelPatchId, uncompactVertexBlock}, {relPatchId, exportVertexBlock}});
-
-        if (newPatchId)
-          patchId = createPhi({{newPatchId, uncompactVertexBlock}, {patchId, exportVertexBlock}});
-      } else {
-        if (newVertexId)
-          vertexId = createPhi({{newVertexId, uncompactVertexBlock}, {vertexId, exportVertexBlock}});
-
-        if (newVsPrimitiveId)
-          vsPrimitiveId = createPhi({{newVsPrimitiveId, uncompactVertexBlock}, {vsPrimitiveId, exportVertexBlock}});
-
-        if (newInstanceId)
-          instanceId = createPhi({{newInstanceId, uncompactVertexBlock}, {instanceId, exportVertexBlock}});
-      }
-    }
-  }
-
-  auto partEs = deferredVertexExport ? m_esHandlers.vertexExporter : m_esHandlers.cullDataFetcher;
-
-  SmallVector<Value *, 32> partEsArgs;
-
-  if (!m_pipelineState->exportAttributeByExportInstruction() && deferredVertexExport)
-    appendAttributeThroughMemoryArguments(partEsArgs);
-
-  if (deferredVertexExport)
-    partEsArgs.push_back(position); // Setup vertex position data as the additional argument
-
-  // Set up user data SGPRs
-  const unsigned userDataCount =
-      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
-  appendUserData(partEsArgs, partEs, userData, userDataCount);
-
-  if (m_hasTes) {
-    // Set up system value SGPRs
-    partEsArgs.push_back(offChipLdsBase);
-
-    // Set up system value VGPRs
-    partEsArgs.push_back(tessCoordX);
-    partEsArgs.push_back(tessCoordY);
-    partEsArgs.push_back(relPatchId);
-    partEsArgs.push_back(patchId);
-  } else {
-    // Set up system value VGPRs
-    partEsArgs.push_back(vertexId);
-    partEsArgs.push_back(relVertexId);
-    partEsArgs.push_back(vsPrimitiveId);
-    partEsArgs.push_back(instanceId);
-  }
-
-  assert(partEsArgs.size() == partEs->arg_size()); // Must have visit all arguments of the part ES
-
-  CallInst *partEsCall = callFunctionHelper(partEs, partEsArgs, m_builder.GetInsertBlock());
-  partEsCall->setCallingConv(CallingConv::AMDGPU_ES);
-  return partEsCall;
-}
-
-// =====================================================================================================================
-// Split ES to two parts. One is to fetch cull data for NGG culling, such as position and cull distance (if cull
-// distance culling is enabled). The other is to do deferred vertex export like original ES.
+// Split ES to two parts. The first part only contains cull data exports, such as position and cull distance (if cull
+// distance culling is enabled). The second part contains other remaining exports that are not in the first part.
 //
 // NOTE: After this splitting, original ES is removed and couldn't be used any more.
 void NggPrimShader::splitEs() {
   assert(m_hasGs == false); // GS must not be present
 
+  SmallVector<CallInst *, 8> callsToRemove;
+
   //
-  // Preparation for fetching cull distances
+  // Create ES first part (only contains cull data exports)
   //
+
+  // Clone ES
+  auto esFirstPartTy = FunctionType::get(m_builder.getVoidTy(), m_esHandlers.main->getFunctionType()->params(), false);
+  auto esFirstPart =
+      Function::Create(esFirstPartTy, GlobalVariable::InternalLinkage, "", m_esHandlers.main->getParent());
+
+  ValueToValueMapTy valueMap;
+
+  Argument *newArg = esFirstPart->arg_begin();
+  for (Argument &arg : m_esHandlers.main->args())
+    valueMap[&arg] = newArg++;
+
+  SmallVector<ReturnInst *, 8> retInsts;
+  CloneFunctionInto(esFirstPart, m_esHandlers.main, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+
+  esFirstPart->setDLLStorageClass(GlobalValue::DefaultStorageClass);
+  esFirstPart->setCallingConv(CallingConv::C);
+  esFirstPart->addFnAttr(Attribute::AlwaysInline);
+
+  esFirstPart->setName(NggEsFirstPart);
+
+  // Mutate ES first part by only keeping cull data exports
   unsigned clipCullExportSlot = 1;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
@@ -3522,15 +3556,15 @@ void NggPrimShader::splitEs() {
     if (m_hasTes) {
       const auto &builtInUsage = resUsage->builtInUsage.tes;
 
-      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
       clipCullExportSlot = miscExport ? 2 : 1;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
     } else {
       const auto &builtInUsage = resUsage->builtInUsage.vs;
 
-      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-      miscExport |= builtInUsage.primitiveShadingRate;
+      const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                              builtInUsage.primitiveShadingRate;
       clipCullExportSlot = miscExport ? 2 : 1;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
@@ -3539,174 +3573,83 @@ void NggPrimShader::splitEs() {
     assert(cullDistanceCount > 0); // Cull distance must exist if the culling is enabled
   }
 
-  //
-  // Create the part ES to fetch cull data for NGG culling
-  //
-  const auto positionTy = FixedVectorType::get(m_builder.getFloatTy(), 4);
-  const auto cullDistanceTy = ArrayType::get(m_builder.getFloatTy(), cullDistanceCount);
-
-  Type *cullDataTy = positionTy;
-  if (m_nggControl->enableCullDistanceCulling)
-    cullDataTy = StructType::get(m_builder.getContext(), {positionTy, cullDistanceTy});
-
-  // Clone ES
-  auto esCullDataFetcherTy = FunctionType::get(cullDataTy, m_esHandlers.main->getFunctionType()->params(), false);
-  auto esCullDataFetcher =
-      Function::Create(esCullDataFetcherTy, m_esHandlers.main->getLinkage(), "", m_esHandlers.main->getParent());
-
-  ValueToValueMapTy valueMap;
-
-  Argument *newArg = esCullDataFetcher->arg_begin();
-  for (Argument &arg : m_esHandlers.main->args())
-    valueMap[&arg] = newArg++;
-
-  SmallVector<ReturnInst *, 8> retInsts;
-  CloneFunctionInto(esCullDataFetcher, m_esHandlers.main, valueMap, CloneFunctionChangeType::LocalChangesOnly,
-                    retInsts);
-  esCullDataFetcher->setName(NggEsCullDataFetcher);
-
-  // Find the return block, remove all exports, and mutate return type
-  BasicBlock *retBlock = nullptr;
-  for (BasicBlock &block : *esCullDataFetcher) {
-    auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
-    if (retInst) {
-      retInst->dropAllReferences();
-      retInst->eraseFromParent();
-
-      retBlock = &block;
-      break;
-    }
-  }
-  assert(retBlock);
-
-  IRBuilder<>::InsertPointGuard guard(m_builder);
-  m_builder.SetInsertPoint(retBlock);
-
-  SmallVector<CallInst *, 8> callsToRemove;
-
-  // Fetch position and cull distances
-  Value *position = PoisonValue::get(positionTy);
-  SmallVector<Value *, MaxClipCullDistanceCount> clipCullDistance(MaxClipCullDistanceCount);
-
   {
     struct Payload {
       NggPrimShader &self;
       const unsigned clipCullExportSlot;
       const unsigned clipDistanceCount;
       const unsigned cullDistanceCount;
-      Value *&position;
-      SmallVectorImpl<Value *> &clipCullDistance;
       SmallVectorImpl<CallInst *> &callsToRemove;
     };
-    Payload payload = {*this,    clipCullExportSlot, clipDistanceCount, cullDistanceCount,
-                       position, clipCullDistance,   callsToRemove};
+    Payload payload = {*this, clipCullExportSlot, clipDistanceCount, cullDistanceCount, callsToRemove};
 
     static const auto visitor =
         llvm_dialects::VisitorBuilder<Payload>()
             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
             .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
-              auto &builder = payload.self.m_builder;
-
+              bool keepExport = false;
               auto exportSlot = exportPositionOp.getExportSlot();
               if (exportSlot == 0) {
-                // Get position value
-                payload.self.m_constPositionZ = isa<Constant>(exportPositionOp.getExportValue2());
-                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue0(),
-                                                               static_cast<uint64_t>(0));
-                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue1(), 1);
-                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue2(), 2);
-                payload.position = builder.CreateInsertElement(payload.position, exportPositionOp.getExportValue3(), 3);
-              } else if (exportSlot == payload.clipCullExportSlot) {
-                // Get clip/cull distance value
+                keepExport = true; // Position0
+              } else {
                 if (payload.self.m_nggControl->enableCullDistanceCulling) {
-                  payload.clipCullDistance[0] = exportPositionOp.getExportValue0();
-                  payload.clipCullDistance[1] = exportPositionOp.getExportValue1();
-                  payload.clipCullDistance[2] = exportPositionOp.getExportValue2();
-                  payload.clipCullDistance[3] = exportPositionOp.getExportValue3();
-                }
-              } else if (exportSlot == payload.clipCullExportSlot + 1 &&
-                         payload.clipDistanceCount + payload.cullDistanceCount > 4) {
-                // Get clip/cull distance value
-                if (payload.self.m_nggControl->enableCullDistanceCulling) {
-                  payload.clipCullDistance[4] = exportPositionOp.getExportValue0();
-                  payload.clipCullDistance[5] = exportPositionOp.getExportValue1();
-                  payload.clipCullDistance[6] = exportPositionOp.getExportValue2();
-                  payload.clipCullDistance[7] = exportPositionOp.getExportValue3();
+                  if (exportSlot == payload.clipCullExportSlot ||
+                      (exportSlot == payload.clipCullExportSlot + 1 &&
+                       payload.clipDistanceCount + payload.cullDistanceCount > 4)) {
+                    keepExport = true; // CullDistance
+                  }
                 }
               }
 
-              payload.callsToRemove.push_back(&exportPositionOp);
+              if (!keepExport)
+                payload.callsToRemove.push_back(&exportPositionOp);
             })
             .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
               payload.callsToRemove.push_back(&exportAttributeOp);
             })
+            .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+              payload.callsToRemove.push_back(&writeXfbOutputOp);
+            })
             .build();
-    visitor.visit(payload, *esCullDataFetcher);
+    visitor.visit(payload, *esFirstPart);
   }
 
-  Value *cullData = position;
-  if (m_nggControl->enableCullDistanceCulling) {
-    Value *cullDistance = PoisonValue::get(cullDistanceTy);
-
-    for (unsigned i = 0; i < cullDistanceCount; ++i)
-      cullDistance = m_builder.CreateInsertValue(cullDistance, clipCullDistance[clipDistanceCount + i], i);
-
-    cullData = m_builder.CreateInsertValue(PoisonValue::get(cullDataTy), position, 0);
-    cullData = m_builder.CreateInsertValue(cullData, cullDistance, 1);
-  }
-
-  m_builder.CreateRet(cullData);
-
   //
-  // Create the part ES to do deferred vertex export after NGG culling
+  // Create ES second part (contains other remaining exports)
   //
+  auto esSecondPart = m_esHandlers.main;
 
-  // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional
-  // argument. This could avoid re-fetching it since we already get the data before NGG culling.
-  auto esVertexExporter =
-      addFunctionArgs(m_esHandlers.main, nullptr, {positionTy}, {"position"}, 0, AddFunctionArgsMaybeUndef);
-  esVertexExporter->setName(NggEsVertexExporter);
+  esSecondPart->setDLLStorageClass(GlobalValue::DefaultStorageClass);
+  esSecondPart->setLinkage(GlobalValue::InternalLinkage);
+  esSecondPart->setCallingConv(CallingConv::C);
+  esSecondPart->addFnAttr(Attribute::AlwaysInline);
 
-  position = esVertexExporter->getArg(0); // The first argument is vertex position data
-  assert(position->getType() == positionTy);
+  esSecondPart->setName(NggEsSecondPart);
 
+  // Mutate ES second part by keep other remaining exports
   {
     struct Payload {
-      NggPrimShader &self;
-      Value *position;
+      SmallVectorImpl<CallInst *> &callsToRemove;
     };
-    Payload payload = {*this, position};
+    Payload payload = {callsToRemove};
 
     static const auto visitor =
         llvm_dialects::VisitorBuilder<Payload>()
             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
             .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
-              auto &builder = payload.self.m_builder;
-              builder.SetInsertPoint(&exportPositionOp);
-
-              if (exportPositionOp.getExportSlot() == 0) {
-                // Replace vertex position data
-                exportPositionOp.setExportValue0(
-                    builder.CreateExtractElement(payload.position, static_cast<uint64_t>(0)));
-                exportPositionOp.setExportValue1(builder.CreateExtractElement(payload.position, 1));
-                exportPositionOp.setExportValue2(builder.CreateExtractElement(payload.position, 2));
-                exportPositionOp.setExportValue3(builder.CreateExtractElement(payload.position, 3));
-              }
+              if (exportPositionOp.getExportSlot() == 0)
+                payload.callsToRemove.push_back(&exportPositionOp); // Position0
+            })
+            .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+              payload.callsToRemove.push_back(&writeXfbOutputOp);
             })
             .build();
-    visitor.visit(payload, *esVertexExporter);
+    visitor.visit(payload, *esSecondPart);
   }
 
-  mutateToExportVertex(esVertexExporter);
-
-  // Remove original ES since it is no longer needed
-  assert(m_esHandlers.main->use_empty());
-  m_esHandlers.main->eraseFromParent();
+  // Remove original ES main function
   m_esHandlers.main = nullptr;
-
-  // Record new part ES
-  m_esHandlers.cullDataFetcher = esCullDataFetcher;
-  m_esHandlers.vertexExporter = esVertexExporter;
+  m_esHandlers.part = std::make_pair(esFirstPart, esSecondPart);
 
   for (auto call : callsToRemove) {
     call->dropAllReferences();
@@ -3719,6 +3662,7 @@ void NggPrimShader::splitEs() {
 //
 // @param args : Arguments of primitive shader entry-point
 void NggPrimShader::runGs(ArrayRef<Argument *> args) {
+  assert(m_gsHandlers.main);
   assert(m_hasGs); // GS must be present
 
   mutateGs();
@@ -3901,87 +3845,25 @@ void NggPrimShader::mutateGs() {
 }
 
 // =====================================================================================================================
-// Runs copy shader.
-//
-// @param args : Arguments of primitive shader entry-point
-void NggPrimShader::runCopyShader(ArrayRef<Argument *> args) {
+// Mutates copy shader to handle the reading GS outputs from GS-VS ring and remove already-handled XFB exports.
+void NggPrimShader::mutateCopyShader() {
   assert(m_hasGs); // GS must be present
 
-  //
-  // The processing is something like this:
-  //
-  //   vertexIndices = Relative vertex indices
-  //   if (compactVertex)
-  //     vertexIndices = Read uncompacted relative vertex indices from LDS
-  //   Calculate vertex offset and run copy shader
-  //
-  Value *vertexIndex = m_nggInputs.threadIdInSubgroup;
-  if (m_compactVertex) {
-    auto exportVertexBlock = m_builder.GetInsertBlock();
-
-    auto uncompactVertexIndexBlock = createBlock(exportVertexBlock->getParent(), ".uncompactVertexIndex");
-    uncompactVertexIndexBlock->moveAfter(exportVertexBlock);
-
-    auto endUncompactVertexIndexBlock = createBlock(exportVertexBlock->getParent(), ".endUncompactVertexIndex");
-    endUncompactVertexIndexBlock->moveAfter(uncompactVertexIndexBlock);
-
-    m_builder.CreateCondBr(m_compactVertex, uncompactVertexIndexBlock, endUncompactVertexIndexBlock);
-
-    // Construct ".uncompactVertexIndex" block
-    Value *uncompactedVertexIndex = nullptr;
-    {
-      m_builder.SetInsertPoint(uncompactVertexIndexBlock);
-
-      uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                                        PrimShaderLdsRegion::VertexIndexMap);
-
-      m_builder.CreateBr(endUncompactVertexIndexBlock);
-    }
-
-    // Construct ".endUncompactVertexIndex" block
-    {
-      m_builder.SetInsertPoint(endUncompactVertexIndexBlock);
-
-      vertexIndex = createPhi({{uncompactedVertexIndex, uncompactVertexIndexBlock}, {vertexIndex, exportVertexBlock}});
-    }
-  }
-
-  mutateCopyShader();
-
-  // Run copy shader
-  SmallVector<Value *, 32> copyShaderArgs;
-
-  if (m_gfxIp.major >= 11) {
-    if (!m_pipelineState->exportAttributeByExportInstruction())
-      appendAttributeThroughMemoryArguments(copyShaderArgs);
-  }
-
-  // Relative vertex index in subgroup (to access GS-VS ring, without vertex compaction)
-  copyShaderArgs.push_back(vertexIndex);
-
-  CallInst *copyShaderCall = m_builder.CreateCall(m_gsHandlers.copyShader, copyShaderArgs);
-  copyShaderCall->setCallingConv(CallingConv::AMDGPU_VS);
-}
-
-// =====================================================================================================================
-// Mutates copy shader to handle the reading GS outputs from GS-VS ring.
-void NggPrimShader::mutateCopyShader() {
   IRBuilder<>::InsertPointGuard guard(m_builder);
 
-  mutateToExportVertex(m_gsHandlers.copyShader);
+  assert(m_gsHandlers.copyShader->arg_size() == 1); // Only one argument
+  auto vertexIndex = getFunctionArgument(m_gsHandlers.copyShader, 0);
 
-  // Relative vertex index is always the last argument
-  auto vertexIndex = getFunctionArgument(m_gsHandlers.copyShader, m_gsHandlers.copyShader->arg_size() - 1);
   const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
   assert(rasterStream != InvalidValue);
 
-  SmallVector<NggReadGsOutputOp *, 32> callsToRemove;
+  SmallVector<CallInst *, 32> callsToRemove;
 
   struct Payload {
     NggPrimShader &self;
     Value *vertexIndex;
     const unsigned rasterStream;
-    SmallVectorImpl<NggReadGsOutputOp *> &callsToRemove;
+    SmallVectorImpl<CallInst *> &callsToRemove;
   };
   Payload payload = {*this, vertexIndex, rasterStream, callsToRemove};
 
@@ -4005,10 +3887,14 @@ void NggPrimShader::mutateCopyShader() {
 
             payload.callsToRemove.push_back(&readGsOutputOp);
           })
+          .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+            payload.callsToRemove.push_back(&writeXfbOutputOp);
+          })
           .build();
   visitor.visit(payload, *m_gsHandlers.copyShader);
 
   for (auto call : callsToRemove) {
+    assert(call->user_empty());
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -6197,141 +6083,302 @@ Value *NggPrimShader::ballot(Value *value) {
 }
 
 // =====================================================================================================================
-// Append additional arguments to the argument list for attribute-through-memory (ATM) of the specified shader stage.
-// Currently, three arguments are required to do attribute-through-memory:
-//   (1) Attribute ring buffer descriptor;
-//   (2) Attribute ring base offset;
-//   (3) Relative vertex index in NGG subgroup.
+// Make an export collector from the specified function by returning the exports of position/attribute/XFB. The input
+// collections are to decide which kinds of exports will be collected.
 //
-// @param [in/out] args : The arguments that will be appended to
-void NggPrimShader::appendAttributeThroughMemoryArguments(SmallVectorImpl<llvm::Value *> &args) {
-  assert(m_gfxIp.major >= 11);                                    // For GFX11+
-  assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
-
-  if (!m_attribRingBufDesc && !m_attribRingBaseOffset)
-    return; // No ATM, no attributes to export
-
-  args.push_back(m_attribRingBufDesc);
-  args.push_back(m_attribRingBaseOffset);
-  args.push_back(m_nggInputs.threadIdInSubgroup);
-}
-
-// =====================================================================================================================
-// Mutate the target function to export vertex (positions and attributes) by lowering position/attribute exporting. If
-// attribute through memory (ATM) is required, we mutate its argument list by adding three additional arguments
-// (attribute ring buffer descriptor, attribute ring base offset, and relative vertex index in subgroup).
-//
-// @param [in/out] target : Target function to process vertex export
-void NggPrimShader::mutateToExportVertex(Function *&target) {
-  Value *attribRingBufDesc = nullptr;
-  Value *attribRingBaseOffset = nullptr;
-  Value *vertexIndex = nullptr;
+// @param [in/out] fromFunc : Function from which to make an export collector
+// @param makeClone : Whether to make a clone of the specified function
+// @param [out] positionExports : Collection of position exports
+// @param [out] attributeExports : Collection of attribute exports
+// @param [out] xfbExports : Collection of XFB exports
+// @returns : Export collector after mutation
+Function *NggPrimShader::makeExportCollector(Function *&fromFunc, bool makeClone,
+                                             SmallVectorImpl<VertexExport> *positionExports,
+                                             SmallVectorImpl<VertexExport> *attributeExports,
+                                             SmallVectorImpl<XfbExport> *xfbExports) {
+  const bool collectPositionExports = positionExports != nullptr;
+  const bool collectAttributeExports = attributeExports != nullptr;
+  const bool collectXfbExports = m_pipelineState->enableSwXfb() && xfbExports != nullptr;
+  assert(collectPositionExports || collectAttributeExports || collectXfbExports);
 
   //
-  // Mutate the argument list of the target function for ATM.
+  // Count vertex position/attribute/XFB exports.
   //
-  if (!m_pipelineState->exportAttributeByExportInstruction()) {
-    assert(m_gfxIp.major >= 11); // Must be GFX11+
+  unsigned numPositionExports = 0;
+  unsigned numAttributeExports = 0;
+  unsigned numXfbExports = 0;
 
-    // Could be no ATM
-    if (m_attribRingBufDesc && m_attribRingBaseOffset) {
-      // Mutate the argument list by adding two additional arguments
-      auto newTarget = addFunctionArgs(
-          target, nullptr,
-          {
-              FixedVectorType::get(m_builder.getInt32Ty(), 4), // Attribute ring buffer descriptor (4 SGPRs)
-              m_builder.getInt32Ty(),                          // Attribute ring base offset (SGPR)
-              m_builder.getInt32Ty()                           // Relative vertex index in subgroup (VGPR)
-          },
-          {"attribRingBufDesc", "attribRingBaseOffset", "vertexIndex"}, 0x3);
+  {
+    struct Payload {
+      const bool collectPositionExports;
+      const bool collectAttributeExports;
+      const bool collectXfbExports;
+      unsigned &numPositionExports;
+      unsigned &numAttributeExports;
+      unsigned &numXfbExports;
+    };
+    Payload payload = {collectPositionExports, collectAttributeExports, collectXfbExports,
+                       numPositionExports,     numAttributeExports,     numXfbExports};
 
-      // Original function is no longer needed
-      assert(target->use_empty());
-      target->eraseFromParent();
-
-      target = newTarget;
-
-      attribRingBufDesc = target->getArg(0);
-      attribRingBaseOffset = target->getArg(1);
-      vertexIndex = target->getArg(2);
-    }
+    static const auto visitor =
+        llvm_dialects::VisitorBuilder<Payload>()
+            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+            .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
+              if (payload.collectPositionExports)
+                ++payload.numPositionExports;
+            })
+            .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
+              if (payload.collectAttributeExports)
+                ++payload.numAttributeExports;
+            })
+            .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+              if (payload.collectXfbExports)
+                ++payload.numXfbExports;
+            })
+            .build();
+    visitor.visit(payload, *fromFunc);
   }
 
+  if (numPositionExports == 0 && numAttributeExports == 0 && numXfbExports == 0)
+    return nullptr; // No exports to collect
+
+  auto exportTy = FixedVectorType::get(m_builder.getFloatTy(), 4);
+
+  ArrayType *positionExportsTy = nullptr;
+  if (numPositionExports > 0) {
+    positionExportsTy = ArrayType::get(exportTy, numPositionExports);
+    positionExports->resize(numPositionExports);
+  }
+
+  ArrayType *attributeExportsTy = nullptr;
+  if (numAttributeExports > 0) {
+    attributeExportsTy = ArrayType::get(exportTy, numAttributeExports);
+    attributeExports->resize(numAttributeExports);
+  }
+
+  ArrayType *xfbExportsTy = nullptr;
+  if (numXfbExports > 0) {
+    xfbExportsTy = ArrayType::get(exportTy, numXfbExports);
+    xfbExports->resize(numXfbExports);
+  }
+
+  SmallVector<Type *, 3> exportsTy;
+  if (positionExportsTy)
+    exportsTy.push_back(positionExportsTy);
+  if (attributeExportsTy)
+    exportsTy.push_back(attributeExportsTy);
+  if (xfbExportsTy)
+    exportsTy.push_back(xfbExportsTy);
+  auto returnTy = StructType::get(m_builder.getContext(), exportsTy);
+
+  Function *exportCollector = nullptr;
+  if (makeClone) {
+    auto exportCollectorTy = FunctionType::get(returnTy, fromFunc->getFunctionType()->params(), false);
+    exportCollector = Function::Create(exportCollectorTy, GlobalVariable::InternalLinkage, "", fromFunc->getParent());
+
+    ValueToValueMapTy valueMap;
+
+    Argument *newArg = exportCollector->arg_begin();
+    for (Argument &arg : fromFunc->args())
+      valueMap[&arg] = newArg++;
+
+    SmallVector<ReturnInst *, 8> retInsts;
+    CloneFunctionInto(exportCollector, fromFunc, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+  } else {
+    exportCollector = addFunctionArgs(fromFunc, returnTy, {}, {});
+
+    // Original function is no longer needed
+    assert(fromFunc->use_empty());
+    fromFunc->eraseFromParent();
+    fromFunc = nullptr;
+  }
+
+  exportCollector->setDLLStorageClass(GlobalValue::DefaultStorageClass);
+  exportCollector->setLinkage(GlobalValue::InternalLinkage);
+  exportCollector->setCallingConv(CallingConv::C);
+  exportCollector->addFnAttr(Attribute::AlwaysInline);
+
+  std::string postfix = "";
+  if (numPositionExports > 0 && numAttributeExports > 0 && numXfbExports > 0)
+    postfix = ""; // Collect all
+  else if (numPositionExports > 0 && numAttributeExports > 0)
+    postfix = ".vertex"; // Collect vertex (position and attribute)
+  else if (numPositionExports > 0)
+    postfix = ".position"; // Collect position
+  else if (numAttributeExports > 0)
+    postfix = ".attribute"; // Collect attribute
+  else if (numXfbExports > 0)
+    postfix = ".xfb"; // Collect XFB
+  else
+    llvm_unreachable("Unexpected collecting kind");
+
+  exportCollector->setName(NggExportCollector + postfix);
+
   //
-  // Collect vertex position/attribute exports.
+  // Collect vertex position/attribute/XFB exports.
   //
   SmallVector<NggExportPositionOp *, 4> exportPositionOps;
   SmallVector<NggExportAttributeOp *, 4> exportAttributeOps;
+  SmallVector<WriteXfbOutputOp *, 4> writeXfbOutputOps;
 
-  // Collect vertex poistion/attribute exports
-  struct Payload {
-    SmallVectorImpl<NggExportPositionOp *> &exportPositionOps;
-    SmallVectorImpl<NggExportAttributeOp *> &exportAttributeOps;
-  };
-  Payload payload = {exportPositionOps, exportAttributeOps};
+  {
+    struct Payload {
+      SmallVectorImpl<NggExportPositionOp *> &exportPositionOps;
+      SmallVectorImpl<NggExportAttributeOp *> &exportAttributeOps;
+      SmallVectorImpl<WriteXfbOutputOp *> &writeXfbOutputOps;
+    };
+    Payload payload = {exportPositionOps, exportAttributeOps, writeXfbOutputOps};
 
-  static const auto visitor =
-      llvm_dialects::VisitorBuilder<Payload>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-          .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
-            payload.exportPositionOps.push_back(&exportPositionOp);
-          })
-          .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
-            payload.exportAttributeOps.push_back(&exportAttributeOp);
-          })
-          .build();
-  visitor.visit(payload, *target);
+    static const auto visitor =
+        llvm_dialects::VisitorBuilder<Payload>()
+            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+            .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
+              payload.exportPositionOps.push_back(&exportPositionOp);
+            })
+            .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
+              payload.exportAttributeOps.push_back(&exportAttributeOp);
+            })
+            .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
+              payload.writeXfbOutputOps.push_back(&writeXfbOutputOp);
+            })
+            .build();
+    visitor.visit(payload, *exportCollector);
+  }
 
-  // If there are no position/attribute exports, skip further processing
-  if (exportPositionOps.empty() && exportAttributeOps.empty())
-    return;
+  //
+  // Construct the return value of export reader
+  //
+  IRBuilder<>::InsertPointGuard guard(m_builder);
 
-  assert(!exportPositionOps.empty()); // Position0 export is always present
-  ReturnInst *retInst = dyn_cast<ReturnInst>(exportPositionOps[0]->getParent()->getTerminator());
+  ReturnInst *retInst = nullptr;
+  if (!exportPositionOps.empty())
+    retInst = dyn_cast<ReturnInst>(exportPositionOps[0]->getParent()->getTerminator());
+  else if (!exportAttributeOps.empty())
+    retInst = dyn_cast<ReturnInst>(exportAttributeOps[0]->getParent()->getTerminator());
+  else if (!writeXfbOutputOps.empty())
+    retInst = dyn_cast<ReturnInst>(writeXfbOutputOps[0]->getParent()->getTerminator());
   assert(retInst);
+  m_builder.SetInsertPoint(retInst);
 
-  //
-  // Reorder vertex position/attribute exports.
-  //
-  for (auto exportPositionOp : exportPositionOps)
-    exportPositionOp->moveBefore(retInst);
+  Value *returnValue = PoisonValue::get(returnTy);
+  unsigned index = 0;
+  if (numPositionExports > 0) {
+    Value *positionExportValues = PoisonValue::get(positionExportsTy);
+    unsigned i = 0;
 
-  // NOTE: If the workaround of attributes-through-memory preceding vertex position data is required, we have to
-  // place vertex exports after all attribute exports (ATM operations).
-  Instruction *movePoint = retInst;
-  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx11.waAtmPrecedesPos) {
-    if (!exportAttributeOps.empty()) {
-      m_builder.SetInsertPoint(exportPositionOps[0]);
-      movePoint =
-          m_builder.CreateFence(AtomicOrdering::Release, m_builder.getContext().getOrInsertSyncScopeID("agent"));
+    for (auto exportPositionOp : exportPositionOps) {
+      std::array<Value *, 4> exportValues = {exportPositionOp->getExportValue0(), exportPositionOp->getExportValue1(),
+                                             exportPositionOp->getExportValue2(), exportPositionOp->getExportValue3()};
+      unsigned channelMask = 0;
+      Value *positionExportValue = PoisonValue::get(exportTy);
+      for (unsigned j = 0; j < 4; ++j) {
+        if (!isa<UndefValue>(exportValues[j]) && !isa<PoisonValue>(exportValues[j]))
+          channelMask |= (1u << j); // Update channel mask if the value is valid (not unspecified)
+        positionExportValue = m_builder.CreateInsertElement(positionExportValue, exportValues[j], j);
+      }
+
+      (*positionExports)[i] = {};
+      (*positionExports)[i].exportSlot = exportPositionOp->getExportSlot();
+      (*positionExports)[i].channelMask = channelMask;
+
+      positionExportValues = m_builder.CreateInsertValue(positionExportValues, positionExportValue, i);
+      ++i;
     }
+
+    returnValue = m_builder.CreateInsertValue(returnValue, positionExportValues, index++);
   }
 
-  for (auto exportAttributeOp : exportAttributeOps)
-    exportAttributeOp->moveBefore(movePoint);
+  if (numAttributeExports > 0) {
+    Value *attributeExportValues = PoisonValue::get(attributeExportsTy);
+    unsigned i = 0;
 
-  //
-  // Lower vertex position/attribute exports.
-  //
-  for (auto exportPositionOp : exportPositionOps) {
-    m_builder.SetInsertPoint(exportPositionOp);
-    const bool lastExport = exportPositionOp == exportPositionOps[exportPositionOps.size() - 1];
-    exportPosition(exportPositionOp->getExportSlot(),
-                   {exportPositionOp->getExportValue0(), exportPositionOp->getExportValue1(),
-                    exportPositionOp->getExportValue2(), exportPositionOp->getExportValue3()},
-                   lastExport);
+    for (auto exportAttributeOp : exportAttributeOps) {
+      std::array<Value *, 4> exportValues = {exportAttributeOp->getExportValue0(), exportAttributeOp->getExportValue1(),
+                                             exportAttributeOp->getExportValue2(),
+                                             exportAttributeOp->getExportValue3()};
+      unsigned channelMask = 0;
+      Value *attributeExportValue = PoisonValue::get(exportTy);
+      for (unsigned j = 0; j < 4; ++j) {
+        if (!isa<UndefValue>(exportValues[j]) && !isa<PoisonValue>(exportValues[j]))
+          channelMask |= (1u << j); // Update channel mask if the value is valid (not unspecified)
+        attributeExportValue = m_builder.CreateInsertElement(attributeExportValue, exportValues[j], j);
+      }
+      (*attributeExports)[i] = {};
+      (*attributeExports)[i].exportSlot = exportAttributeOp->getExportSlot();
+      (*attributeExports)[i].channelMask = channelMask;
+
+      attributeExportValues = m_builder.CreateInsertValue(attributeExportValues, attributeExportValue, i);
+      ++i;
+    }
+
+    returnValue = m_builder.CreateInsertValue(returnValue, attributeExportValues, index++);
   }
 
-  for (auto exportAttributeOp : exportAttributeOps) {
-    m_builder.SetInsertPoint(exportAttributeOp);
-    exportAttribute(exportAttributeOp->getExportSlot(),
-                    {exportAttributeOp->getExportValue0(), exportAttributeOp->getExportValue1(),
-                     exportAttributeOp->getExportValue2(), exportAttributeOp->getExportValue3()},
-                    attribRingBufDesc, attribRingBaseOffset, vertexIndex);
+  if (numXfbExports > 0) {
+    Value *xfbExportValues = PoisonValue::get(xfbExportsTy);
+    unsigned i = 0;
+    unsigned offsetInVertex = 0;
+
+    for (auto writeXfbOutputOp : writeXfbOutputOps) {
+      auto outputValue = writeXfbOutputOp->getOutputValue();
+      auto outputTy = outputValue->getType();
+      assert(outputTy->getScalarSizeInBits() == 32);
+      unsigned numElements = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+      assert(numElements <= 4);
+
+      (*xfbExports)[i] = {};
+      (*xfbExports)[i].xfbBuffer = writeXfbOutputOp->getXfbBuffer();
+      (*xfbExports)[i].xfbOffset = writeXfbOutputOp->getXfbOffset();
+      (*xfbExports)[i].numElements = numElements;
+
+      if (m_hasGs) {
+        // NOTE: For GS, the output value must be loaded by NggReadGsOutputOp. This is generated by copy shader.
+        NggReadGsOutputOp *readGsOutputOp = dyn_cast<NggReadGsOutputOp>(outputValue);
+        assert(readGsOutputOp->getStreamId() == writeXfbOutputOp->getStreamId()); // Stream IDs must match
+
+        (*xfbExports)[i].locInfo.streamId = writeXfbOutputOp->getStreamId();
+        (*xfbExports)[i].locInfo.location = readGsOutputOp->getLocation();
+        (*xfbExports)[i].locInfo.component = readGsOutputOp->getComponent();
+
+        ++i;
+        continue;
+      }
+
+      if (outputTy->isIntOrIntVectorTy()) {
+        if (numElements == 1) {
+          outputValue = m_builder.CreateBitCast(outputValue, m_builder.getFloatTy());
+        } else {
+          outputValue = m_builder.CreateBitCast(outputValue, FixedVectorType::get(m_builder.getFloatTy(), numElements));
+        }
+      }
+
+      // Always pad the write value to <4 x float>
+      Value *xfbExportValue = outputValue;
+      if (numElements == 1) {
+        xfbExportValue =
+            m_builder.CreateInsertElement(PoisonValue::get(exportTy), outputValue, static_cast<uint64_t>(0));
+      } else if (numElements < 4) {
+        xfbExportValue = m_builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),
+                                                       ArrayRef<int>({0U, 1U, 2U, 3U}));
+      }
+
+      (*xfbExports)[i].offsetInVertex = offsetInVertex;
+      offsetInVertex += numElements; // Increment the offset
+
+      xfbExportValues = m_builder.CreateInsertValue(xfbExportValues, xfbExportValue, i);
+      ++i;
+    }
+
+    returnValue = m_builder.CreateInsertValue(returnValue, xfbExportValues, index++);
   }
+  m_builder.CreateRet(returnValue);
+
+  // Remove original return instruction
+  retInst->eraseFromParent();
+  retInst = nullptr;
 
   //
-  // Remove export dialect ops.
+  // Clean-up
   //
   for (auto exportPositionOp : exportPositionOps) {
     exportPositionOp->dropAllReferences();
@@ -6342,87 +6389,434 @@ void NggPrimShader::mutateToExportVertex(Function *&target) {
     exportAttributeOp->dropAllReferences();
     exportAttributeOp->eraseFromParent();
   }
-}
 
-// =====================================================================================================================
-// Export vertex position.
-//
-// @param exportSlot : Export slot
-// @param exportValues : Vertex position values to export
-// @param lastExport : Whether this is the last export
-void NggPrimShader::exportPosition(unsigned exportSlot, ArrayRef<Value *> exportValues, bool lastExport) {
-  assert(exportValues.size() == 4);
-
-  unsigned channelMask = 0;
-  for (unsigned i = 0; i < 4; ++i) {
-    assert(exportValues[i]);
-    if (!isa<UndefValue>(exportValues[i]) && !isa<PoisonValue>(exportValues[i]))
-      channelMask |= (1u << i); // Update channel mask if the value is valid (not unspecified)
+  for (auto writeXfbOutputOp : writeXfbOutputOps) {
+    writeXfbOutputOp->dropAllReferences();
+    writeXfbOutputOp->eraseFromParent();
   }
 
-  m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
-                            {m_builder.getInt32(EXP_TARGET_POS_0 + exportSlot), // tgt
-                             m_builder.getInt32(channelMask),                   // en
-                             exportValues[0],                                   // src0
-                             exportValues[1],                                   // src1
-                             exportValues[2],                                   // src2
-                             exportValues[3],                                   // src3
-                             m_builder.getInt1(lastExport),                     // done
-                             m_builder.getFalse()});                            // vm
+  return exportCollector;
 }
 
 // =====================================================================================================================
-// Export vertex attribute.
-//
-// @param exportSlot : Export slot
-// @param exportValues : Vertex attribute values to export
-// @param attribRingBufDesc : Attribute ring buffer descriptor
-// @param attribRingBaseOffset : Subgroup's attribute ring base offset (in bytes)
-// @param vertexIndex :  Vertex index in subgroup
-void NggPrimShader::exportAttribute(unsigned exportSlot, ArrayRef<Value *> exportValues, Value *attribRingBufDesc,
-                                    Value *attribRingBaseOffset, Value *vertexIndex) {
-  assert(exportValues.size() == 4);
-
-  if (m_pipelineState->exportAttributeByExportInstruction()) {
-    unsigned channelMask = 0;
-    for (unsigned i = 0; i < 4; ++i) {
-      assert(exportValues[i]);
-      if (!isa<UndefValue>(exportValues[i]) && !isa<PoisonValue>(exportValues[i]))
-        channelMask |= (1u << i); // Update channel mask if the value is valid (not unspecified)
-    }
-
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
-                              {m_builder.getInt32(EXP_TARGET_PARAM_0 + exportSlot), // tgt
-                               m_builder.getInt32(channelMask),                     // en
-                               exportValues[0],                                     // src0
-                               exportValues[1],                                     // src1
-                               exportValues[2],                                     // src2
-                               exportValues[3],                                     // src3
-                               m_builder.getFalse(),                                // done
-                               m_builder.getFalse()});                              // vm
-  } else {
-    auto locationOffset = m_builder.getInt32(exportSlot * SizeOfVec4);
-
-    Value *exportValue = PoisonValue::get(FixedVectorType::get(m_builder.getFloatTy(), 4)); // Must be <4 x float>
-    for (unsigned i = 0; i < 4; ++i)
-      exportValue = m_builder.CreateInsertElement(exportValue, exportValues[i], i);
-
-    CoherentFlag coherent = {};
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-      coherent.bits.glc = true;
-    }
-
-    m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
-                              {exportValue, attribRingBufDesc, vertexIndex, locationOffset, attribRingBaseOffset,
-                               m_builder.getInt32(coherent.u32All)});
-  }
-}
-
-// =====================================================================================================================
-// Processes SW emulated transform feedback when API GS is not present.
+// Collect exports from the specified function by making an export collector (either clone it or mutate it), calling it,
+// and analyzing its return value.
 //
 // @param args : Arguments of primitive shader entry-point
-void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
+// @param [in/out] fromFunc : Function from which to collect exports
+// @param makeClone : Whether to make a clone of the specified function
+// @param [out] positionExports : Collection of position exports
+// @param [out] attributeExports : Collection of attribute exports
+// @param [out] xfbExports : Collection of XFB exports
+void NggPrimShader::collectExports(ArrayRef<Argument *> args, Function *&fromFunc, bool makeClone,
+                                   SmallVectorImpl<VertexExport> *positionExports,
+                                   SmallVectorImpl<VertexExport> *attributeExports,
+                                   SmallVectorImpl<XfbExport> *xfbExports) {
+  const bool collectPositionExports = positionExports != nullptr;
+  const bool collectAttributeExports = attributeExports != nullptr;
+  const bool collectXfbExports = m_pipelineState->enableSwXfb() && xfbExports != nullptr;
+  assert(collectPositionExports || collectAttributeExports || collectXfbExports);
+
+  //
+  // Mutate the specified function to an export collector
+  //
+  auto exportCollector = makeExportCollector(fromFunc, makeClone, positionExports, attributeExports, xfbExports);
+  if (!exportCollector)
+    return; // No export to collect
+
+  //
+  // Run the export collector to collect exports
+  //
+  SmallVector<Value *, 32> exportCollectorArgs;
+
+  if (m_hasGs) {
+    // The export collector is derived from copy shader
+    Value *vertexIndex = m_nggInputs.threadIdInSubgroup;
+    if (m_compactVertex) {
+      auto collectExportBlock = m_builder.GetInsertBlock();
+
+      auto uncompactVertexIndexBlock = createBlock(collectExportBlock->getParent(), ".uncompactVertexIndex");
+      uncompactVertexIndexBlock->moveAfter(collectExportBlock);
+
+      auto endUncompactVertexIndexBlock = createBlock(collectExportBlock->getParent(), ".endUncompactVertexIndex");
+      endUncompactVertexIndexBlock->moveAfter(uncompactVertexIndexBlock);
+
+      m_builder.CreateCondBr(m_compactVertex, uncompactVertexIndexBlock, endUncompactVertexIndexBlock);
+
+      // Construct ".uncompactVertexIndex" block
+      Value *uncompactedVertexIndex = nullptr;
+      {
+        m_builder.SetInsertPoint(uncompactVertexIndexBlock);
+
+        uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                                          PrimShaderLdsRegion::VertexIndexMap);
+
+        m_builder.CreateBr(endUncompactVertexIndexBlock);
+      }
+
+      // Construct ".endUncompactVertexIndex" block
+      {
+        m_builder.SetInsertPoint(endUncompactVertexIndexBlock);
+
+        vertexIndex = createPhi({{uncompactedVertexIndex, uncompactVertexIndexBlock},
+                                 {vertexIndex, uncompactVertexIndexBlock->getSinglePredecessor()}});
+      }
+    }
+
+    exportCollectorArgs.push_back(vertexIndex); // Only one argument
+  } else {
+    // The export collector is derived from ES
+    Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
+    offChipLdsBase->setName("offChipLdsBase");
+
+    Value *userData = args[NumSpecialSgprInputs];
+
+    ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
+
+    Value *tessCoordX = nullptr;
+    Value *tessCoordY = nullptr;
+    Value *relPatchId = nullptr;
+    Value *patchId = nullptr;
+
+    Value *vertexId = nullptr;
+    Value *relVertexId = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+    // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
+    Value *vsPrimitiveId =
+        m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
+    Value *instanceId = nullptr;
+
+    if (m_gfxIp.major <= 11) {
+      if (m_hasTes) {
+        tessCoordX = vgprArgs[5];
+        tessCoordY = vgprArgs[6];
+        relPatchId = vgprArgs[7];
+        patchId = vgprArgs[8];
+      } else {
+        vertexId = vgprArgs[5];
+        instanceId = vgprArgs[8];
+      }
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
+
+    if (m_compactVertex) {
+      auto collectExportBlock = m_builder.GetInsertBlock();
+
+      auto uncompactVertexBlock = createBlock(collectExportBlock->getParent(), ".uncompactVertex");
+      uncompactVertexBlock->moveAfter(collectExportBlock);
+
+      auto endUncompactVertexBlock = createBlock(collectExportBlock->getParent(), ".endUncompactVertex");
+      endUncompactVertexBlock->moveAfter(uncompactVertexBlock);
+
+      m_builder.CreateCondBr(m_compactVertex, uncompactVertexBlock, endUncompactVertexBlock);
+
+      // Construct ".uncompactVertex" block
+      Value *newTessCoordX = nullptr;
+      Value *newTessCoordY = nullptr;
+      Value *newRelPatchId = nullptr;
+      Value *newPatchId = nullptr;
+      Value *newVertexId = nullptr;
+      Value *newVsPrimitiveId = nullptr;
+      Value *newInstanceId = nullptr;
+      {
+        m_builder.SetInsertPoint(uncompactVertexBlock);
+
+        const unsigned esGsRingItemSize =
+            m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize;
+
+        auto uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                                               PrimShaderLdsRegion::VertexIndexMap);
+        auto vertexItemOffset = m_builder.CreateMul(uncompactedVertexIndex, m_builder.getInt32(esGsRingItemSize));
+
+        // NOTE: If vertex compaction, some system values could be from vertex compaction info rather than from VGPRs
+        // (caused by NGG culling and vertex compaction)
+        const auto resUsage =
+            m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
+        if (m_hasTes) {
+          if (resUsage->builtInUsage.tes.tessCoord) {
+            newTessCoordX =
+                readVertexCullInfoFromLds(m_builder.getFloatTy(), vertexItemOffset, m_vertCullInfoOffsets.tessCoordX);
+            newTessCoordY =
+                readVertexCullInfoFromLds(m_builder.getFloatTy(), vertexItemOffset, m_vertCullInfoOffsets.tessCoordY);
+          }
+
+          newRelPatchId =
+              readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.relPatchId);
+
+          if (resUsage->builtInUsage.tes.primitiveId) {
+            newPatchId =
+                readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.patchId);
+          }
+        } else {
+          if (resUsage->builtInUsage.vs.vertexIndex) {
+            newVertexId =
+                readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.vertexId);
+          }
+
+          // NOTE: Relative vertex index provided by HW is not used when VS is merged to GS.
+
+          if (resUsage->builtInUsage.vs.primitiveId) {
+            newVsPrimitiveId =
+                readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.primitiveId);
+          }
+
+          if (resUsage->builtInUsage.vs.instanceIndex) {
+            newInstanceId =
+                readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.instanceId);
+          }
+        }
+        m_builder.CreateBr(endUncompactVertexBlock);
+      }
+
+      // Construct ".endUncompactVertex" block
+      {
+        m_builder.SetInsertPoint(endUncompactVertexBlock);
+
+        if (m_hasTes) {
+          if (newTessCoordX)
+            tessCoordX = createPhi(
+                {{newTessCoordX, uncompactVertexBlock}, {tessCoordX, uncompactVertexBlock->getSinglePredecessor()}});
+
+          if (newTessCoordY)
+            tessCoordY = createPhi(
+                {{newTessCoordY, uncompactVertexBlock}, {tessCoordY, uncompactVertexBlock->getSinglePredecessor()}});
+
+          assert(newRelPatchId);
+          relPatchId = createPhi(
+              {{newRelPatchId, uncompactVertexBlock}, {relPatchId, uncompactVertexBlock->getSinglePredecessor()}});
+
+          if (newPatchId)
+            patchId = createPhi(
+                {{newPatchId, uncompactVertexBlock}, {patchId, uncompactVertexBlock->getSinglePredecessor()}});
+        } else {
+          if (newVertexId)
+            vertexId = createPhi(
+                {{newVertexId, uncompactVertexBlock}, {vertexId, uncompactVertexBlock->getSinglePredecessor()}});
+
+          if (newVsPrimitiveId)
+            vsPrimitiveId = createPhi({{newVsPrimitiveId, uncompactVertexBlock},
+                                       {vsPrimitiveId, uncompactVertexBlock->getSinglePredecessor()}});
+
+          if (newInstanceId)
+            instanceId = createPhi(
+                {{newInstanceId, uncompactVertexBlock}, {instanceId, uncompactVertexBlock->getSinglePredecessor()}});
+        }
+      }
+    }
+
+    // Set up user data SGPRs
+    const unsigned userDataCount =
+        m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
+    appendUserData(exportCollectorArgs, exportCollector, userData, userDataCount);
+
+    if (m_hasTes) {
+      // Set up system value SGPRs
+      exportCollectorArgs.push_back(offChipLdsBase);
+
+      // Set up system value VGPRs
+      exportCollectorArgs.push_back(tessCoordX);
+      exportCollectorArgs.push_back(tessCoordY);
+      exportCollectorArgs.push_back(relPatchId);
+      exportCollectorArgs.push_back(patchId);
+    } else {
+      // Set up system value VGPRs
+      exportCollectorArgs.push_back(vertexId);
+      exportCollectorArgs.push_back(relVertexId);
+      exportCollectorArgs.push_back(vsPrimitiveId);
+      exportCollectorArgs.push_back(instanceId);
+    }
+  }
+
+  assert(exportCollectorArgs.size() == exportCollector->arg_size()); // Must have visit all arguments of export reader
+  auto returnValue = callFunctionHelper(exportCollector, exportCollectorArgs, m_builder.GetInsertBlock());
+
+  //
+  // Analyze the return value to extract export values
+  //
+  unsigned index = 0;
+
+  const unsigned numPositionExports = collectPositionExports ? positionExports->size() : 0;
+  const unsigned numAttributeExports = collectAttributeExports ? attributeExports->size() : 0;
+  const unsigned numXfbExports = collectXfbExports ? xfbExports->size() : 0;
+
+  if (numPositionExports > 0) {
+    auto positionExportValues = m_builder.CreateExtractValue(returnValue, index++);
+    assert(positionExportValues->getType()->isArrayTy());
+    assert(numPositionExports == positionExportValues->getType()->getArrayNumElements()); // Sizes must match
+
+    for (unsigned i = 0; i < numPositionExports; ++i)
+      (*positionExports)[i].exportValue = m_builder.CreateExtractValue(positionExportValues, i);
+  }
+
+  if (numAttributeExports > 0) {
+    auto attributeExportValues = m_builder.CreateExtractValue(returnValue, index++);
+    assert(attributeExportValues->getType()->isArrayTy());
+    assert(numAttributeExports == attributeExportValues->getType()->getArrayNumElements()); // Sizes must match
+
+    for (unsigned i = 0; i < numAttributeExports; ++i)
+      (*attributeExports)[i].exportValue = m_builder.CreateExtractValue(attributeExportValues, i);
+  }
+
+  if (numXfbExports > 0) {
+    auto xfbExportValues = m_builder.CreateExtractValue(returnValue, index++);
+    assert(xfbExportValues->getType()->isArrayTy());
+    assert(numXfbExports == xfbExportValues->getType()->getArrayNumElements()); // Sizes must match
+
+    for (unsigned i = 0; i < numXfbExports; ++i) {
+      auto xfbExportValue = m_builder.CreateExtractValue(xfbExportValues, i);
+      if ((*xfbExports)[i].numElements == 1) {
+        (*xfbExports)[i].exportValue = m_builder.CreateExtractElement(xfbExportValue, static_cast<uint64_t>(0));
+      } else {
+        SmallVector<int, 8> shuffleMask;
+        for (unsigned j = 0; j < (*xfbExports)[i].numElements; ++j)
+          shuffleMask.push_back(j);
+        (*xfbExports)[i].exportValue = m_builder.CreateShuffleVector(xfbExportValue, xfbExportValue, shuffleMask);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Create PHI node for the export values of the export collections.
+//
+// @param [out] positionExports : Collection of position exports
+// @param [out] attributeExports : Collection of attribute exports
+// @param [out] xfbExports : Collection of XFB exports
+void NggPrimShader::createPhiForExports(SmallVectorImpl<VertexExport> *positionExports,
+                                        SmallVectorImpl<VertexExport> *attributeExports,
+                                        SmallVectorImpl<XfbExport> *xfbExports) {
+  auto currentBlock = m_builder.GetInsertBlock();
+
+  if (positionExports) {
+    for (auto &positionExport : *positionExports) {
+      auto &exportValue = positionExport.exportValue;
+      auto exportBlock = cast<Instruction>(exportValue)->getParent();
+      std::string valueName = "position" + std::to_string(positionExport.exportSlot);
+
+      auto exportValuePhi = m_builder.CreatePHI(exportValue->getType(), pred_size(currentBlock), valueName);
+      for (BasicBlock *predBlock : predecessors(currentBlock)) {
+        exportValuePhi->addIncoming(predBlock == exportBlock ? exportValue : PoisonValue::get(exportValue->getType()),
+                                    predBlock);
+      }
+      exportValue = exportValuePhi;
+    }
+  }
+
+  if (attributeExports) {
+    for (auto &attributeExport : *attributeExports) {
+      auto &exportValue = attributeExport.exportValue;
+      auto exportBlock = cast<Instruction>(exportValue)->getParent();
+      std::string valueName = "attribute" + std::to_string(attributeExport.exportSlot);
+
+      auto exportValuePhi = m_builder.CreatePHI(exportValue->getType(), pred_size(currentBlock), valueName);
+      for (BasicBlock *predBlock : predecessors(currentBlock)) {
+        exportValuePhi->addIncoming(predBlock == exportBlock ? exportValue : PoisonValue::get(exportValue->getType()),
+                                    predBlock);
+      }
+      exportValue = exportValuePhi;
+    }
+  }
+
+  if (xfbExports && m_pipelineState->enableSwXfb()) {
+    for (auto &xfbExport : *xfbExports) {
+      auto &exportValue = xfbExport.exportValue;
+      auto exportBlock = cast<Instruction>(exportValue)->getParent();
+      std::string valueName =
+          "xfb.buffer" + std::to_string(xfbExport.xfbBuffer) + ".offset" + std::to_string(xfbExport.xfbOffset);
+      switch (xfbExport.numElements) {
+      case 1:
+        valueName += ".x";
+        break;
+      case 2:
+        valueName += ".xy";
+        break;
+      case 3:
+        valueName += ".xyz";
+        break;
+      case 4:
+        valueName += ".xyzw";
+        break;
+      default:
+        llvm_unreachable("Unexpected number of elements");
+        break;
+      }
+      auto exportValuePhi = m_builder.CreatePHI(exportValue->getType(), pred_size(currentBlock), valueName);
+      for (BasicBlock *predBlock : predecessors(currentBlock)) {
+        exportValuePhi->addIncoming(predBlock == exportBlock ? exportValue : PoisonValue::get(exportValue->getType()),
+                                    predBlock);
+      }
+      exportValue = exportValuePhi;
+    }
+  }
+}
+
+// =====================================================================================================================
+// Export positions.
+//
+// @param positionExports : Input collection of position exports
+void NggPrimShader::exportPositions(const SmallVectorImpl<VertexExport> &positionExports) {
+  CallInst *lastExport = nullptr;
+  for (auto &positionExport : positionExports) {
+    std::array<Value *, 4> exportValues;
+    for (unsigned i = 0; i < 4; ++i)
+      exportValues[i] = m_builder.CreateExtractElement(positionExport.exportValue, i);
+
+    lastExport = m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
+                                           {m_builder.getInt32(EXP_TARGET_POS_0 + positionExport.exportSlot), // tgt
+                                            m_builder.getInt32(positionExport.channelMask),                   // en
+                                            exportValues[0],                                                  // src0
+                                            exportValues[1],                                                  // src1
+                                            exportValues[2],                                                  // src2
+                                            exportValues[3],                                                  // src3
+                                            m_builder.getFalse(),                                             // done
+                                            m_builder.getFalse()});                                           // vm
+  }
+
+  if (lastExport)
+    lastExport->setArgOperand(6, m_builder.getTrue()); // Set Done flag
+}
+
+// =====================================================================================================================
+// Export attributes.
+//
+// @param attributeExports : Input collection of attribute exports
+void NggPrimShader::exportAttributes(const SmallVectorImpl<VertexExport> &attributeExports) {
+  for (auto &attributeExport : attributeExports) {
+    if (m_pipelineState->exportAttributeByExportInstruction()) {
+      std::array<Value *, 4> exportValues;
+      for (unsigned i = 0; i < 4; ++i)
+        exportValues[i] = m_builder.CreateExtractElement(attributeExport.exportValue, i);
+
+      m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
+                                {m_builder.getInt32(EXP_TARGET_PARAM_0 + attributeExport.exportSlot), // tgt
+                                 m_builder.getInt32(attributeExport.channelMask),                     // en
+                                 exportValues[0],                                                     // src0
+                                 exportValues[1],                                                     // src1
+                                 exportValues[2],                                                     // src2
+                                 exportValues[3],                                                     // src3
+                                 m_builder.getFalse(),                                                // done
+                                 m_builder.getFalse()});                                              // vm
+    } else {
+      auto attributeOffset = m_builder.getInt32(attributeExport.exportSlot * SizeOfVec4);
+
+      CoherentFlag coherent = {};
+      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+        coherent.bits.glc = true;
+      }
+
+      m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
+                                {attributeExport.exportValue, m_attribRingBufDesc, m_nggInputs.threadIdInSubgroup,
+                                 attributeOffset, m_attribRingBaseOffset, m_builder.getInt32(coherent.u32All)});
+    }
+  }
+}
+
+// =====================================================================================================================
+// Processes SW emulated XFB when API GS is not present.
+//
+// @param args : Arguments of primitive shader entry-point
+// @param xfbExports : Input collection of XFB exports
+void NggPrimShader::processSwXfb(ArrayRef<Argument *> args, const SmallVectorImpl<XfbExport> &xfbExports) {
   assert(m_pipelineState->enableSwXfb());
   assert(!m_hasGs); // API GS is not present
 
@@ -6436,10 +6830,8 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   // The processing is something like this:
   //
   // NGG_XFB() {
-  //   if (threadIdInSubgroup < vertCountInSubgroup) {
-  //     Mutate/clone ES to fetch XFB outputs
-  //     Write XFB outputs to LDS region
-  //   }
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Write XFB to LDS
   //
   //   Prepare XFB to update its relevant counters
   //   Barrier
@@ -6448,75 +6840,56 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   //   Read primsToWrite and dwordsWritten from XFB statistics info
   //
   //   if (threadIdInSubgroup < primsToWrite)
-  //     Export XFB outputs to buffer for each vertice of this primitive
+  //     Export XFB to buffer for each vertice of this primitive
   // }
   //
   BasicBlock *xfbEntryBlock = m_builder.GetInsertBlock();
 
-  BasicBlock *fetchXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".fetchXfbOutput");
-  fetchXfbOutputBlock->moveAfter(xfbEntryBlock);
-  BasicBlock *endFetchXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endFetchXfbOutput");
-  endFetchXfbOutputBlock->moveAfter(fetchXfbOutputBlock);
+  BasicBlock *writeXfbBlock = createBlock(xfbEntryBlock->getParent(), ".writeXfb");
+  writeXfbBlock->moveAfter(xfbEntryBlock);
+  BasicBlock *endWriteXfbBlock = createBlock(xfbEntryBlock->getParent(), ".endWriteXfb");
+  endWriteXfbBlock->moveAfter(writeXfbBlock);
 
   unsigned possibleVertsPerPrim = 3;
   if (isa<ConstantInt>(m_verticesPerPrimitive))
     possibleVertsPerPrim = cast<ConstantInt>(m_verticesPerPrimitive)->getZExtValue();
 
-  BasicBlock *exportXfbOutputBlock[3] = {};
-  auto insertPos = endFetchXfbOutputBlock;
+  BasicBlock *exportXfbBlock[3] = {};
+  auto insertPos = endWriteXfbBlock;
   for (unsigned i = 0; i < possibleVertsPerPrim; ++i) {
-    exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInVertex" + std::to_string(i));
-    exportXfbOutputBlock[i]->moveAfter(insertPos);
-    insertPos = exportXfbOutputBlock[i];
+    exportXfbBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbInVertex" + std::to_string(i));
+    exportXfbBlock[i]->moveAfter(insertPos);
+    insertPos = exportXfbBlock[i];
   }
 
-  BasicBlock *endExportXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endExportXfbOutput");
-  endExportXfbOutputBlock->moveAfter(insertPos);
+  BasicBlock *endExportXfbBlock = createBlock(xfbEntryBlock->getParent(), ".endExportXfb");
+  endExportXfbBlock->moveAfter(insertPos);
 
-  // Insert branching in current block to process transform feedback export
+  // Insert branching in current block to process XFB
   {
     auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-    m_builder.CreateCondBr(validVertex, fetchXfbOutputBlock, endFetchXfbOutputBlock);
+    m_builder.CreateCondBr(validVertex, writeXfbBlock, endWriteXfbBlock);
   }
 
-  // Construct ".fetchXfbOutput" block
-  SmallVector<XfbOutputExport, 32> xfbOutputExports;
+  // Construct ".writeXfb" block
   {
-    m_builder.SetInsertPoint(fetchXfbOutputBlock);
+    m_builder.SetInsertPoint(writeXfbBlock);
 
-    auto xfbOutputs = fetchXfbOutput(m_esHandlers.main, args, xfbOutputExports);
+    for (unsigned i = 0; i < xfbExports.size(); ++i)
+      writeXfbOutputToLds(xfbExports[i].exportValue, m_nggInputs.threadIdInSubgroup,
+                          xfbExports[i].offsetInVertex); // Write XFB to LDS
 
-    for (unsigned i = 0; i < xfbOutputExports.size(); ++i) {
-      const auto &xfbOutputExport = xfbOutputExports[i];
-      assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
-      auto outputValue = m_builder.CreateExtractValue(xfbOutputs, i);
-
-      // Extract valid elements from returned transform feedback output
-      assert(outputValue->getType() == FixedVectorType::get(m_builder.getInt32Ty(), 4)); // Must be <4 x i32>
-      if (xfbOutputExport.numElements == 1) {
-        outputValue = m_builder.CreateExtractElement(outputValue, static_cast<uint64_t>(0));
-      } else {
-        SmallVector<int, 8> shuffleMask;
-        for (unsigned j = 0; j < xfbOutputExport.numElements; ++j)
-          shuffleMask.push_back(j);
-        outputValue = m_builder.CreateShuffleVector(outputValue, outputValue, shuffleMask);
-      }
-
-      // Write transform feedback outputs to LDS region
-      writeXfbOutputToLds(outputValue, m_nggInputs.threadIdInSubgroup, xfbOutputExport.offsetInVertex);
-    }
-
-    m_builder.CreateBr(endFetchXfbOutputBlock);
+    m_builder.CreateBr(endWriteXfbBlock);
   }
 
-  // Construct ".endFetchXfbOutput" block
-  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
+  // Construct ".endWriteXfb" block
+  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write XFB outputs
   {
-    m_builder.SetInsertPoint(endFetchXfbOutputBlock);
+    m_builder.SetInsertPoint(endWriteXfbBlock);
 
     prepareSwXfb({m_nggInputs.primCountInSubgroup});
 
-    // We are going to read transform feedback statistics info and outputs from LDS and export them to transform
+    // We are going to read XFB statistics info and outputs from LDS and export them to transform
     // feedback buffers. Make all values have been written before this.
     createFenceAndBarrier();
 
@@ -6534,7 +6907,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
                                                      {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers)});
 
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, numPrimsToWrite);
-    m_builder.CreateCondBr(validPrimitive, exportXfbOutputBlock[0], endExportXfbOutputBlock);
+    m_builder.CreateCondBr(validPrimitive, exportXfbBlock[0], endExportXfbBlock);
   }
 
   Value *vertexIndices[3] = {};
@@ -6543,18 +6916,18 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   vertexIndices[2] = m_nggInputs.vertexIndex2;
 
   for (unsigned i = 0; i < possibleVertsPerPrim; ++i) {
-    // Construct ".exportXfbOutputInVertex[N]" block
-    m_builder.SetInsertPoint(exportXfbOutputBlock[i]);
+    // Construct ".exportXfbInVertex[N]" block
+    m_builder.SetInsertPoint(exportXfbBlock[i]);
 
-    for (unsigned j = 0; j < xfbOutputExports.size(); ++j) {
-      const auto &xfbOutputExport = xfbOutputExports[j];
-      auto outputValue = readXfbOutputFromLds(
-          xfbOutputExport.numElements > 1 ? FixedVectorType::get(m_builder.getFloatTy(), xfbOutputExport.numElements)
-                                          : m_builder.getFloatTy(),
-          vertexIndices[i], xfbOutputExport.offsetInVertex);
+    for (unsigned j = 0; j < xfbExports.size(); ++j) {
+      const auto &xfbExport = xfbExports[j];
+      auto exportValue = readXfbOutputFromLds(xfbExport.numElements > 1
+                                                  ? FixedVectorType::get(m_builder.getFloatTy(), xfbExport.numElements)
+                                                  : m_builder.getFloatTy(),
+                                              vertexIndices[i], xfbExport.offsetInVertex);
 
       unsigned format = 0;
-      switch (xfbOutputExport.numElements) {
+      switch (xfbExport.numElements) {
       case 1:
         format = BUF_FORMAT_32_FLOAT;
         break;
@@ -6581,38 +6954,38 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
       // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
       Value *vertexOffset = m_builder.CreateAdd(
           m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_verticesPerPrimitive), m_builder.getInt32(i));
-      vertexOffset = m_builder.CreateMul(vertexOffset, m_builder.getInt32(xfbStrides[xfbOutputExport.xfbBuffer]));
+      vertexOffset = m_builder.CreateMul(vertexOffset, m_builder.getInt32(xfbStrides[xfbExport.xfbBuffer]));
       // xfbOutputOffset = vertexOffset + xfbOffset
-      Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbOutputExport.xfbOffset));
+      Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbExport.xfbOffset));
 
       m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                {outputValue,                                    // vdata
-                                 m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                 xfbOutputOffset,                                // offset
-                                 streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
-                                 m_builder.getInt32(format),                     // format
-                                 m_builder.getInt32(coherent.u32All)});          // auxiliary data
+                                {exportValue,                              // vdata
+                                 m_streamOutBufDescs[xfbExport.xfbBuffer], // rsrc
+                                 xfbOutputOffset,                          // offset
+                                 streamOutOffsets[xfbExport.xfbBuffer],    // soffset
+                                 m_builder.getInt32(format),               // format
+                                 m_builder.getInt32(coherent.u32All)});    // auxiliary data
     }
 
     if (i == possibleVertsPerPrim - 1) {
       // Last vertex
-      m_builder.CreateBr(endExportXfbOutputBlock);
+      m_builder.CreateBr(endExportXfbBlock);
     } else {
       // Not last vertex, check if we need to export outputs of next vertex
       auto exportNextVertex = m_builder.CreateICmpUGT(m_verticesPerPrimitive, m_builder.getInt32(i + 1));
-      m_builder.CreateCondBr(exportNextVertex, exportXfbOutputBlock[i + 1], endExportXfbOutputBlock);
+      m_builder.CreateCondBr(exportNextVertex, exportXfbBlock[i + 1], endExportXfbBlock);
     }
   }
 
-  // Construct ".endExportXfbOutput" block
-  { m_builder.SetInsertPoint(endExportXfbOutputBlock); }
+  // Construct ".endExportXfb" block
+  { m_builder.SetInsertPoint(endExportXfbBlock); }
 }
 
 // =====================================================================================================================
-// Process SW emulated transform feedback when API GS is present.
+// Process SW emulated XFB when API GS is present.
 //
 // @param args : Arguments of primitive shader entry-point
-void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
+void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args, const SmallVectorImpl<XfbExport> &xfbExports) {
   assert(m_pipelineState->enableSwXfb());
   assert(m_hasGs); // GS is present
 
@@ -6657,8 +7030,6 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   //       Compact primitive index (compacted -> uncompacted)
   //   }
   //
-  //   Mutate copy shader to fetch XFB outputs
-  //
   //   Prepare XFB and update its relevant counters
   //   Barrier
   //
@@ -6667,7 +7038,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   //
   //   for each vertex stream {
   //     if (threadIdInSubgroup < primsToWrite)
-  //       Export XFB outputs to buffer for each vertice of this primitive
+  //       Export XFB to buffer for each vertice of this primitive
   //   }
   // }
   //
@@ -6705,22 +7076,21 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
   }
 
-  BasicBlock *exportXfbOutputBlock[MaxGsStreams] = {};
-  BasicBlock *endExportXfbOutputBlock[MaxGsStreams] = {};
+  BasicBlock *exportXfbBlock[MaxGsStreams] = {};
+  BasicBlock *endExportXfbBlock[MaxGsStreams] = {};
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
     if (m_pipelineState->isVertexStreamActive(i)) {
-      exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInStream" + std::to_string(i));
-      exportXfbOutputBlock[i]->moveAfter(insertPos);
-      insertPos = exportXfbOutputBlock[i];
+      exportXfbBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbInStream" + std::to_string(i));
+      exportXfbBlock[i]->moveAfter(insertPos);
+      insertPos = exportXfbBlock[i];
 
-      endExportXfbOutputBlock[i] =
-          createBlock(xfbEntryBlock->getParent(), ".endExportXfbOutputInStream" + std::to_string(i));
-      endExportXfbOutputBlock[i]->moveAfter(insertPos);
-      insertPos = endExportXfbOutputBlock[i];
+      endExportXfbBlock[i] = createBlock(xfbEntryBlock->getParent(), ".endExportXfbInStream" + std::to_string(i));
+      endExportXfbBlock[i]->moveAfter(insertPos);
+      insertPos = endExportXfbBlock[i];
     }
   }
 
-  // Insert branching in current block to process transform feedback export
+  // Insert branching in current block to process XFB
   {
     auto validWave =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(m_maxWavesPerSubgroup + 1));
@@ -6845,8 +7215,6 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
                            endCompactPrimitiveIndexBlock[firstActiveStream]);
   }
 
-  SmallVector<XfbOutputExport, 32> xfbOutputExports;
-
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
     if (!m_pipelineState->isVertexStreamActive(i))
       continue;
@@ -6878,11 +7246,8 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     {
       m_builder.SetInsertPoint(endCompactPrimitiveIndexBlock[i]);
 
-      if (i == lastActiveStream) {
-        // Start to fetch transform feedback outputs after we finish compacting primitive index of the last vertex
-        // stream.
-        fetchXfbOutput(m_gsHandlers.copyShader, args, xfbOutputExports);
-      } else {
+      if (i != lastActiveStream) {
+        // Start to prepare XFB after we finish compacting primitive index of the last vertex stream.
         unsigned nextActiveStream = i + 1;
         while (!m_pipelineState->isVertexStreamActive(nextActiveStream)) {
           ++nextActiveStream;
@@ -6895,12 +7260,12 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
   }
 
-  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write transform feedback outputs
+  Value *streamOutOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out offset to write XFB outputs
   Value *numPrimsToWrite[MaxGsStreams] = {};
   {
     prepareSwXfb(primCountInSubgroup);
 
-    // We are going to read transform feedback statistics info from LDS. Make sure the info has been written before
+    // We are going to read XFB statistics info from LDS. Make sure the info has been written before
     // this.
     createFenceAndBarrier();
 
@@ -6924,17 +7289,16 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
 
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, numPrimsToWrite[firstActiveStream]);
-    m_builder.CreateCondBr(validPrimitive, exportXfbOutputBlock[firstActiveStream],
-                           endExportXfbOutputBlock[firstActiveStream]);
+    m_builder.CreateCondBr(validPrimitive, exportXfbBlock[firstActiveStream], endExportXfbBlock[firstActiveStream]);
   }
 
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
     if (!m_pipelineState->isVertexStreamActive(i))
       continue;
 
-    // Construct ".exportXfbOutputInStream[N]" block
+    // Construct ".exportXfbInStream[N]" block
     {
-      m_builder.SetInsertPoint(exportXfbOutputBlock[i]);
+      m_builder.SetInsertPoint(exportXfbBlock[i]);
 
       Value *vertexIndices[3] = {};
 
@@ -6977,20 +7341,18 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
       }
 
       for (unsigned j = 0; j < outVertsPerPrim; ++j) {
-        for (unsigned k = 0; k < xfbOutputExports.size(); ++k) {
-          const auto &xfbOutputExport = xfbOutputExports[k];
-          if (xfbOutputExport.locInfo.streamId != i)
+        for (unsigned k = 0; k < xfbExports.size(); ++k) {
+          const auto &xfbExport = xfbExports[k];
+          if (xfbExport.locInfo.streamId != i)
             continue; // Output not belong to this stream
 
-          auto outputValue =
-              readGsOutput(xfbOutputExport.numElements > 1
-                               ? FixedVectorType::get(m_builder.getFloatTy(), xfbOutputExport.numElements)
-                               : m_builder.getFloatTy(),
-                           xfbOutputExport.locInfo.location, xfbOutputExport.locInfo.component, i,
-                           calcVertexItemOffset(i, vertexIndices[j]));
+          auto exportValue = readGsOutput(
+              xfbExport.numElements > 1 ? FixedVectorType::get(m_builder.getFloatTy(), xfbExport.numElements)
+                                        : m_builder.getFloatTy(),
+              xfbExport.locInfo.location, xfbExport.locInfo.component, i, calcVertexItemOffset(i, vertexIndices[j]));
 
           unsigned format = 0;
-          switch (xfbOutputExport.numElements) {
+          switch (xfbExport.numElements) {
           case 1:
             format = BUF_FORMAT_32_FLOAT;
             break;
@@ -7018,26 +7380,26 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
           Value *vertexOffset = m_builder.CreateAdd(
               m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(outVertsPerPrim)),
               m_builder.getInt32(j));
-          vertexOffset = m_builder.CreateMul(vertexOffset, m_builder.getInt32(xfbStrides[xfbOutputExport.xfbBuffer]));
+          vertexOffset = m_builder.CreateMul(vertexOffset, m_builder.getInt32(xfbStrides[xfbExport.xfbBuffer]));
           // xfbOutputOffset = vertexOffset + xfbOffset
-          Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbOutputExport.xfbOffset));
+          Value *xfbOutputOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(xfbExport.xfbOffset));
 
           m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                                    {outputValue,                                    // vdata
-                                     m_streamOutBufDescs[xfbOutputExport.xfbBuffer], // rsrc
-                                     xfbOutputOffset,                                // offset
-                                     streamOutOffsets[xfbOutputExport.xfbBuffer],    // soffset
-                                     m_builder.getInt32(format),                     // format
-                                     m_builder.getInt32(coherent.u32All)});          // auxiliary data
+                                    {exportValue,                              // vdata
+                                     m_streamOutBufDescs[xfbExport.xfbBuffer], // rsrc
+                                     xfbOutputOffset,                          // offset
+                                     streamOutOffsets[xfbExport.xfbBuffer],    // soffset
+                                     m_builder.getInt32(format),               // format
+                                     m_builder.getInt32(coherent.u32All)});    // auxiliary data
         }
       }
 
-      m_builder.CreateBr(endExportXfbOutputBlock[i]);
+      m_builder.CreateBr(endExportXfbBlock[i]);
     }
 
-    // Construct ".endExportXfbOutputInStream[N]" block
+    // Construct ".endExportXfbInStream[N]" block
     {
-      m_builder.SetInsertPoint(endExportXfbOutputBlock[i]);
+      m_builder.SetInsertPoint(endExportXfbBlock[i]);
 
       if (i != lastActiveStream) {
         unsigned nextActiveStream = i + 1;
@@ -7048,16 +7410,14 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         assert(nextActiveStream <= lastActiveStream);
         auto validPrimitive =
             m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, numPrimsToWrite[nextActiveStream]);
-        m_builder.CreateCondBr(validPrimitive, exportXfbOutputBlock[nextActiveStream],
-                               endExportXfbOutputBlock[nextActiveStream]);
+        m_builder.CreateCondBr(validPrimitive, exportXfbBlock[nextActiveStream], endExportXfbBlock[nextActiveStream]);
       }
     }
   }
 }
 
 // =====================================================================================================================
-// Prepare SW emulated transform feedback. Update various counter relevant to transform feedback, such as dwordsWritten,
-// primsNeed, and primsWritten.
+// Prepare SW emulated XFB. Update various counter relevant to XFB, such as dwordsWritten, primsNeed, and primsWritten.
 //
 // @param primCountInSubgroup : Number of primitives in subgroup for each vertex stream
 void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
@@ -7074,7 +7434,7 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       for (unsigned j = 0; j < MaxGsStreams; ++j) {
         if ((streamXfbBuffers[j] & (1 << i)) != 0) {
-          // NOTE: According to GLSL spec, all outputs assigned to a given transform feedback buffer are required to
+          // NOTE: According to GLSL spec, all outputs assigned to a given XFB buffer are required to
           // come from a single vertex stream.
           xfbBufferToStream[i] = j;
           break;
@@ -7121,7 +7481,7 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
 
       for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
         if (!bufferActive[i])
-          continue; // Transform feedback buffer is inactive
+          continue; // XFB buffer is inactive
 
         if (firstActiveBuffer == InvalidValue)
           firstActiveBuffer = i;
@@ -7135,6 +7495,10 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
       }
 
       Value *dwordsWritten[MaxTransformFeedbackBuffers] = {};
+
+      // NOTE: HW requires us to insert s_waitcnt lgkmcnt(0) following each GDS ordered count instruction.
+      // This is to avoid outstanding GDS instructions, which cause problems in GDS synchronization.
+      SyncScope::ID workgroupScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
 
       // Calculate numPrimsToWrite
       for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
@@ -7157,12 +7521,14 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
                   m_builder.getFalse(),          // wave release
                   m_builder.getFalse(),          // wave done
               });
+          m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
         } else {
           // ds_add_gs_reg
           dwordsWritten[i] =
               m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
                                         {m_builder.getInt32(0),                                         // value to add
                                          m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+          m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
         }
 
         // NUM_RECORDS = SQ_BUF_RSRC_WORD2
@@ -7200,37 +7566,45 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
                   m_builder.getTrue(),           // wave release
                   m_builder.getTrue(),           // wave done
               });
+          m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
         } else {
           // ds_add_gs_reg
           dwordsWritten[i] =
               m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, dwordsToWrite->getType(),
                                         {dwordsToWrite,                                                 // value to add
                                          m_builder.getInt32((GDS_STRMOUT_DWORDS_WRITTEN_0 + i) << 2)}); // count index
+          m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
         }
       }
 
-      // Store transform feedback statistics info to LDS and GDS
+      // Update GDS primitive statistics counters
       const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbStats);
+      for (unsigned i = 0; i < MaxGsStreams; ++i) {
+        if (!m_pipelineState->isVertexStreamActive(i))
+          continue;
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
+                                  {primCountInSubgroup[i],                                          // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
+        m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite[i]->getType(),
+                                  {numPrimsToWrite[i],                                               // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
+        m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
+      }
+
+      // Store XFB statistics info to LDS
       for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
         if (!bufferActive[i])
           continue;
-
         writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i));
       }
 
       for (unsigned i = 0; i < MaxGsStreams; ++i) {
         if (!m_pipelineState->isVertexStreamActive(i))
           continue;
-
         writeValueToLds(numPrimsToWrite[i], m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers + i));
-
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
-                                  {primCountInSubgroup[i],                                          // value to add
-                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
-
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, numPrimsToWrite[i]->getType(),
-                                  {numPrimsToWrite[i],                                               // value to add
-                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
       }
 
       m_builder.CreateBr(endPrepareXfbBlock);
@@ -7246,290 +7620,6 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
   }
 
   llvm_unreachable("Not implemented!");
-}
-
-// =====================================================================================================================
-// Fetches transform feedback outputs by creating a fetcher cloned from the target function or just mutating
-// the target function and running it after that. Meanwhile, we collect the transform feedback export info.
-//
-// @param target : Target function to process SW emulated transform feedback
-// @param args : Arguments of primitive shader entry-point
-// @param [out] xfbOutputExports : Export info of transform feedback outputs
-Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args,
-                                     SmallVectorImpl<XfbOutputExport> &xfbOutputExports) {
-  assert(m_pipelineState->enableSwXfb());
-
-  auto resUsage = m_pipelineState->getShaderResourceUsage(
-      m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex));
-  const unsigned xfbOutputCount = resUsage->inOutUsage.xfbExpCount;
-
-  // Skip following handling if transform feedback output is empty
-  if (xfbOutputCount == 0)
-    return nullptr;
-
-  //
-  // Clone the target function or just mutate the target function to fetch transform feedback outputs
-  //
-  auto savedInsertPos = m_builder.saveIP();
-
-  // We don't clone the target function if we are in passthrough mode without GS
-  const bool makeClone = m_hasGs || !m_nggControl->passthroughMode;
-
-  // Clone or mutate the target function
-  xfbOutputExports.resize(xfbOutputCount);
-
-  // NOTE: For non-GS transform feedback, the return type is represented as an array of transform feedback outputs; for
-  // GS transform feedback, the return type is void. This is because output values must be loaded by GS read output
-  // call. Thus, we don't have to return output values. Instead, we recode the location in transform feedback export
-  // info and fetch them later.
-  Type *xfbOutputsTy = ArrayType::get(FixedVectorType::get(m_builder.getInt32Ty(), 4), xfbOutputCount);
-  Type *xfbReturnTy = m_hasGs ? m_builder.getVoidTy() : xfbOutputsTy;
-
-  Function *xfbFetcher = target;
-  if (makeClone) {
-    auto xfbFetcherTy = FunctionType::get(xfbReturnTy, target->getFunctionType()->params(), false);
-    xfbFetcher = Function::Create(xfbFetcherTy, target->getLinkage(), "", target->getParent());
-
-    ValueToValueMapTy valueMap;
-
-    Argument *newArg = xfbFetcher->arg_begin();
-    for (Argument &arg : target->args())
-      valueMap[&arg] = newArg++;
-
-    SmallVector<ReturnInst *, 8> retInsts;
-    CloneFunctionInto(xfbFetcher, target, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
-    xfbFetcher->setName(NggXfbFetcher);
-  } else {
-    mutateToExportVertex(target);
-
-    xfbFetcher = addFunctionArgs(target, xfbReturnTy, {}, {}, 0);
-
-    // Original target function is no longer needed
-    assert(target->use_empty());
-    target->eraseFromParent();
-    target = nullptr;
-  }
-
-  // Find the return block
-  BasicBlock *retBlock = nullptr;
-  for (BasicBlock &block : *xfbFetcher) {
-    auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
-    if (retInst) {
-      retInst->dropAllReferences();
-      retInst->eraseFromParent();
-
-      retBlock = &block;
-      break;
-    }
-  }
-  assert(retBlock);
-  m_builder.SetInsertPoint(retBlock);
-
-  // Visit XFB writes and vertex position/attribute exports by lowering or removing them, and mutating the return type
-  SmallVector<CallInst *, 8> callsToRemove;
-
-  Value *xfbOutputs = PoisonValue::get(xfbOutputsTy);
-  unsigned outputIndex = 0;
-  unsigned offsetInVertex = 0;
-
-  struct Payload {
-    NggPrimShader &self;
-    Value *&xfbOutputs;
-    unsigned &outputIndex;
-    unsigned &offsetInVertex;
-    SmallVectorImpl<XfbOutputExport> &xfbOutputExports;
-    SmallVectorImpl<CallInst *> &callsToRemove;
-  };
-  Payload payload = {*this, xfbOutputs, outputIndex, offsetInVertex, xfbOutputExports, callsToRemove};
-
-  static const auto visitor =
-      llvm_dialects::VisitorBuilder<Payload>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-          .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
-            auto &builder = payload.self.m_builder;
-
-            auto xfbBuffer = writeXfbOutputOp.getXfbBuffer();
-            auto xfbOffset = writeXfbOutputOp.getXfbOffset();
-            auto outputValue = writeXfbOutputOp.getOutputValue();
-            assert(outputValue->getType()->getScalarSizeInBits() == 32);
-
-            const unsigned numElements = outputValue->getType()->isVectorTy()
-                                             ? cast<FixedVectorType>(outputValue->getType())->getNumElements()
-                                             : 1;
-            assert(numElements <= 4);
-
-            // Those values are just for GS
-            auto streamId = InvalidValue;
-            unsigned location = InvalidValue;
-            unsigned component = InvalidValue;
-
-            if (payload.self.m_hasGs) {
-              // NOTE: For GS, the output value must be loaded by NggReadGsOutputOp. This is generated by copy
-              // shader.
-              NggReadGsOutputOp *readGsOutputOp = dyn_cast<NggReadGsOutputOp>(outputValue);
-              streamId = writeXfbOutputOp.getStreamId();
-              assert(streamId == readGsOutputOp->getStreamId()); // Stream ID must match
-              location = readGsOutputOp->getLocation();
-              component = readGsOutputOp->getComponent();
-            } else {
-              // If the output value is floating point, cast it to integer type
-              if (outputValue->getType()->isFPOrFPVectorTy()) {
-                if (numElements == 1) {
-                  outputValue = builder.CreateBitCast(outputValue, builder.getInt32Ty());
-                } else {
-                  outputValue =
-                      builder.CreateBitCast(outputValue, FixedVectorType::get(builder.getInt32Ty(), numElements));
-                }
-              }
-
-              // Always pad the output value to <4 x i32>
-              if (numElements == 1) {
-                outputValue =
-                    builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 4)),
-                                                outputValue, static_cast<uint64_t>(0));
-              } else if (numElements < 4) {
-                outputValue = builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),
-                                                          ArrayRef<int>({0U, 1U, 2U, 3U}));
-              }
-            }
-
-            // For VS/TES, return the output value
-            if (!payload.self.m_hasGs)
-              payload.xfbOutputs = builder.CreateInsertValue(payload.xfbOutputs, outputValue, payload.outputIndex);
-
-            // Collect export info
-            payload.xfbOutputExports[payload.outputIndex].xfbBuffer = xfbBuffer;
-            payload.xfbOutputExports[payload.outputIndex].xfbOffset = xfbOffset;
-            payload.xfbOutputExports[payload.outputIndex].numElements = numElements;
-
-            if (payload.self.m_hasGs) {
-              // Update fields for GS to use
-              payload.xfbOutputExports[payload.outputIndex].locInfo.streamId = streamId;
-              payload.xfbOutputExports[payload.outputIndex].locInfo.location = location;
-              payload.xfbOutputExports[payload.outputIndex].locInfo.component = component;
-            } else {
-              // Update the field for ES to use
-              payload.xfbOutputExports[payload.outputIndex].offsetInVertex = payload.offsetInVertex;
-              payload.offsetInVertex += numElements; // Increment the offset
-            }
-
-            ++payload.outputIndex;
-
-            payload.callsToRemove.push_back(&writeXfbOutputOp);
-          })
-          .add<NggExportPositionOp>([](Payload &payload, NggExportPositionOp &exportPositionOp) {
-            payload.callsToRemove.push_back(&exportPositionOp);
-          })
-          .add<NggExportAttributeOp>([](Payload &payload, NggExportAttributeOp &exportAttributeOp) {
-            payload.callsToRemove.push_back(&exportAttributeOp);
-          })
-          .build();
-  visitor.visit(payload, *xfbFetcher);
-
-  assert(outputIndex == xfbOutputCount); // Visit all transform feedback export calls
-
-  m_builder.CreateRet(xfbOutputs);
-
-  // Remove XFB writes in original target function
-  if (makeClone) {
-    assert(target);
-
-    struct Payload {
-      SmallVectorImpl<CallInst *> &callsToRemove;
-    };
-    Payload payload = {callsToRemove};
-
-    static const auto visitor = llvm_dialects::VisitorBuilder<Payload>()
-                                    .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                                    .add<WriteXfbOutputOp>([](Payload &payload, WriteXfbOutputOp &writeXfbOutputOp) {
-                                      payload.callsToRemove.push_back(&writeXfbOutputOp);
-                                    })
-                                    .build();
-    visitor.visit(payload, *target);
-  }
-
-  for (auto call : callsToRemove) {
-    call->dropAllReferences();
-    call->eraseFromParent();
-  }
-
-  m_builder.restoreIP(savedInsertPos);
-
-  //
-  // Run transform feedback fetch function
-  //
-  if (m_hasGs) {
-    // Copy shader has fixed argument layout
-    return m_builder.CreateCall(xfbFetcher, {m_nggInputs.threadIdInSubgroup});
-  }
-
-  Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
-  offChipLdsBase->setName("offChipLdsBase");
-
-  Value *userData = args[NumSpecialSgprInputs];
-
-  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
-
-  Value *tessCoordX = nullptr;
-  Value *tessCoordY = nullptr;
-  Value *relPatchId = nullptr;
-  Value *patchId = nullptr;
-
-  Value *vertexId = nullptr;
-  Value *relVertexId = PoisonValue::get(m_builder.getInt32Ty());
-  // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
-  Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
-  Value *instanceId = nullptr;
-
-  if (m_gfxIp.major <= 11) {
-    if (m_hasTes) {
-      tessCoordX = vgprArgs[5];
-      tessCoordY = vgprArgs[6];
-      relPatchId = vgprArgs[7];
-      patchId = vgprArgs[8];
-    } else {
-      vertexId = vgprArgs[5];
-      instanceId = vgprArgs[8];
-    }
-  } else {
-    llvm_unreachable("Not implemented!");
-  }
-
-  SmallVector<Value *, 32> xfbFetcherArgs;
-
-  // If we don't clone the target function, we are going to run it and handle vertex attribute through memory here.
-  if (!makeClone) {
-    if (!m_pipelineState->exportAttributeByExportInstruction()) {
-      if (!m_hasGs) // For GS, ATM is done in copy shader
-        appendAttributeThroughMemoryArguments(xfbFetcherArgs);
-    }
-  }
-
-  // Set up user data SGPRs
-  const unsigned userDataCount =
-      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
-  appendUserData(xfbFetcherArgs, xfbFetcher, userData, userDataCount);
-
-  if (m_hasTes) {
-    // Set up system value SGPRs
-    xfbFetcherArgs.push_back(offChipLdsBase);
-
-    // Set up system value VGPRs
-    xfbFetcherArgs.push_back(tessCoordX);
-    xfbFetcherArgs.push_back(tessCoordY);
-    xfbFetcherArgs.push_back(relPatchId);
-    xfbFetcherArgs.push_back(patchId);
-  } else {
-    // Set up system value VGPRs
-    xfbFetcherArgs.push_back(vertexId);
-    xfbFetcherArgs.push_back(relVertexId);
-    xfbFetcherArgs.push_back(vsPrimitiveId);
-    xfbFetcherArgs.push_back(instanceId);
-  }
-
-  assert(xfbFetcherArgs.size() == xfbFetcher->arg_size()); // Must have visit all arguments
-
-  return m_builder.CreateCall(xfbFetcher, xfbFetcherArgs);
 }
 
 // =====================================================================================================================
@@ -7770,11 +7860,11 @@ void NggPrimShader::collectPrimitiveStats() {
 }
 
 // =====================================================================================================================
-// Reads transform feedback output from LDS
+// Reads XFB output from LDS
 //
 // @param readDataTy : Data read from LDS
 // @param vertexIndex: Relative vertex index in NGG subgroup
-// @param offsetInVertex : Output offset within all transform feedback outputs of a vertex (in dwords)
+// @param offsetInVertex : Output offset within all XFB outputs of a vertex (in dwords)
 Value *NggPrimShader::readXfbOutputFromLds(Type *readDataTy, Value *vertexIndex, unsigned offsetInVertex) {
   assert(m_pipelineState->enableSwXfb()); // SW-emulated stream-out must be enabled
   assert(!m_hasGs);
@@ -7789,7 +7879,7 @@ Value *NggPrimShader::readXfbOutputFromLds(Type *readDataTy, Value *vertexIndex,
     return readValueFromLds(readDataTy, ldsOffset);
   }
 
-  // NOTE: For NGG culling mode, transform feedback outputs are part of vertex cull info.
+  // NOTE: For NGG culling mode, XFB outputs are part of vertex cull info.
   const auto regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCullInfo);
   Value *ldsOffset = m_builder.CreateAdd(
       vertexItemOffset, m_builder.getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + offsetInVertex));
@@ -7797,11 +7887,11 @@ Value *NggPrimShader::readXfbOutputFromLds(Type *readDataTy, Value *vertexIndex,
 }
 
 // =====================================================================================================================
-// Writes transform feedback output from LDS
+// Writes XFB output from LDS
 //
 // @param writeData : Data written to LDS
 // @param vertexIndex: Relative vertex index in NGG subgroup
-// @param offsetInVertex : Output offset within all transform feedback outputs of a vertex (in dwords)
+// @param offsetInVertex : Output offset within all XFB outputs of a vertex (in dwords)
 void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexIndex, unsigned offsetInVertex) {
   assert(m_pipelineState->enableSwXfb()); // SW-emulated stream-out must be enabled
   assert(!m_hasGs);
@@ -7817,7 +7907,7 @@ void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexIndex, un
     return;
   }
 
-  // NOTE: For NGG culling mode, transform feedback outputs are part of vertex cull info.
+  // NOTE: For NGG culling mode, XFB outputs are part of vertex cull info.
   const auto regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCullInfo);
   Value *ldsOffset = m_builder.CreateAdd(
       vertexItemOffset, m_builder.getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + offsetInVertex));

@@ -551,13 +551,12 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtDrawPrimPayloadEn] = hasPrimitivePayload;
 
     // Pipeline metadata: mesh_linear_dispatch_from_task
-    bool meshLinearDispatchFromTask = false;
     if (m_hasTask) {
-      meshLinearDispatchFromTask =
+      const bool meshLinearDispatchFromTask =
           m_pipelineState->getShaderResourceUsage(ShaderStage::Task)->builtInUsage.task.meshLinearDispatch;
+      getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MeshLinearDispatchFromTask] =
+          meshLinearDispatchFromTask;
     }
-    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MeshLinearDispatchFromTask] =
-        meshLinearDispatchFromTask;
 
     if (m_gfxIp.major >= 11) {
       // SPI_SHADER_GS_MESHLET_DIM
@@ -1171,6 +1170,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   bool useViewportIndex = false;
   bool useViewportIndexImplicitly = false;
   bool useShadingRate = false;
+  bool useEdgeFlag = false;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
 
@@ -1238,6 +1238,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       useLayer = builtInUsage.layer;
       useViewportIndex = builtInUsage.viewportIndex;
       useShadingRate = builtInUsage.primitiveShadingRate;
+      useEdgeFlag = builtInUsage.edgeFlag;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
 
@@ -1299,7 +1300,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   bool miscExport = usePointSize;
   if (!meshPipeline) {
     // NOTE: Those built-ins are exported through primitive payload for mesh pipeline rather than vertex position data.
-    miscExport |= useLayer || useViewportIndex || useShadingRate;
+    miscExport |= useLayer || useViewportIndex || useShadingRate || useEdgeFlag;
   }
 
   if (miscExport) {
@@ -1316,6 +1317,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       // data.
       paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::UseVtxRenderTargetIndx] = useLayer;
       paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::UseVtxViewportIndx] = useViewportIndex;
+      paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::UseVtxEdgeFlag] = useEdgeFlag;
 
       if (useShadingRate) {
         assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+

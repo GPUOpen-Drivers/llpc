@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -30,7 +30,7 @@ if(LLPC_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
     add_library(vkgc_gpurtshim STATIC GpurtShim.cpp)
 
     include(../../cmake/CompilerFlags.cmake)
-    set_compiler_options(vkgc_gpurtshim ${LLPC_ENABLE_WERROR})
+    set_compiler_options(vkgc_gpurtshim)
 
     # Link against vkgc_headers to pull in the necessary include directories and all the VKI_* defines
     target_link_libraries(vkgc_gpurtshim PUBLIC vkgc_headers)

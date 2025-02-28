@@ -1358,6 +1358,9 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
   pipelineOut->pipelineBin.codeSize = candidateElf.size();
   pipelineOut->pipelineBin.pCode = code;
 
+  BinaryData binElf = {candidateElf.size(), candidateElf.data()};
+  PipelineDumper::DumpPm4Crc(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), m_gfxIp, &binElf);
+
   if (metaDataSize > 0) {
     pipelineOut->fsOutputMetaData = code + candidateElf.size();
     pipelineOut->fsOutputMetaDataSize = metaDataSize;
@@ -1495,6 +1498,8 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
   memcpy(code, elf.pCode, elf.codeSize);
   pipelineOut->pipelineBin.codeSize = elf.codeSize;
   pipelineOut->pipelineBin.pCode = code;
+
+  PipelineDumper::DumpPm4Crc(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), m_gfxIp, &elf);
 
   return Result::Success;
 }
@@ -2576,6 +2581,9 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("Adding graphics pipeline to the cache.\n");
     cacheAccessor->setElfInCache(elfBin);
   }
+
+  PipelineDumper::DumpPm4Crc(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), m_gfxIp, &elfBin);
+
   return result;
 }
 
@@ -2727,6 +2735,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   if (cacheAccessor && !cacheAccessor->isInCache()) {
     cacheAccessor->setElfInCache(elfBin);
   }
+
+  PipelineDumper::DumpPm4Crc(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), m_gfxIp, &elfBin);
 
   return Result::Success;
 }

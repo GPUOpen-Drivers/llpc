@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if an OOB check will get optimized away. It does so by checking if there
 // are no phi nodes left at the end.
 

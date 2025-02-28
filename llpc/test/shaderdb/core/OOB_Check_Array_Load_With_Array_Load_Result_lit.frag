@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if load access on an array where the index is another member of the array which is fetched by using a runtime index
 // will be transformed to multiple out of bounds checks against the bounds of the array, moving the loads into  conditionally executed BBs.
 // The OOB check will possibly zero out the load results.

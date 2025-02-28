@@ -1,4 +1,11 @@
 #version 450
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 layout(set = 0, binding = 0) uniform sampler1DShadow        samp1DShadow;
 layout(set = 1, binding = 0) uniform samplerCubeArrayShadow sampCubeArrayShadow[4];

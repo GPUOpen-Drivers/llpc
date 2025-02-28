@@ -1,4 +1,11 @@
 #version 450
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 layout(set = 0, binding = 0, rgba32f) uniform image1D           img1D;
 layout(set = 0, binding = 1, rgba32f) uniform image2DRect       img2DRect;

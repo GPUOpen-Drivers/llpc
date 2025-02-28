@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if load access on dependent array elements (e. g. using the result of a load as input for another load)  using a runtime index
 // will be transformed to multiple out of bounds checks against the bounds of the array, moving the loads into  conditionally executed BBs.
 // The OOB check will possibly zero out the load results.

@@ -39,7 +39,7 @@
 #include <cassert>
 
 using namespace llvm;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 #define DEBUG_TYPE "specialize-driver-shaders"
 #ifndef NDEBUG
@@ -926,14 +926,14 @@ public:
     // Initialize a new value origin tracker for the current function.
     // Move AwaitOriginAssumptions into the VOT to prevent a copy, and reset the optional
     // to prevent unintended accesses.
-    CompilerUtils::ValueOriginTracker::Options Opts{};
+    compilerutils::ValueOriginTracker::Options Opts{};
     Opts.BytesPerSlice = ArgSlotSizeInBytes;
     Opts.MaxBytesPerValue = MaxNumAnalyzedArgSlots * ArgSlotSizeInBytes;
     // Handle freeze poison conservatively. Optimizing based on it requires to replace affected freeze poison
     // by something else (e.g. zeroinitializer), which means we'd need to change app shaders and not just
     // Traversal. As of now, in tests it didn't make a difference.
-    Opts.FreezeMode = CompilerUtils::ValueOriginTracker::Options::FreezeHandlingMode::Dynamic;
-    CompilerUtils::ValueOriginTracker VOT{DL, Opts, std::move(*ToBePreservedInputArgsInfo.AwaitOriginAssumptions)};
+    Opts.FreezeMode = compilerutils::ValueOriginTracker::Options::FreezeHandlingMode::Dynamic;
+    compilerutils::ValueOriginTracker VOT{DL, Opts, std::move(*ToBePreservedInputArgsInfo.AwaitOriginAssumptions)};
     ToBePreservedInputArgsInfo.AwaitOriginAssumptions.reset();
 
     // Do a bulk value origin analysis on all relevant outgoing args. This is more efficient than individual
@@ -991,7 +991,7 @@ public:
     unsigned NumReplacedDwords;
   };
 
-  using ValueSpecializer = CompilerUtils::ValueSpecializer;
+  using ValueSpecializer = compilerutils::ValueSpecializer;
 
   SpecializeArgResult specializeArgument(const ArgSlotsInfo &SpecializationInfo, ValueSpecializer &VS, Argument *Arg,
                                          const ArgumentLayoutInfo &ArgumentLayoutInfo, unsigned GlobalArgSlotBegin) {

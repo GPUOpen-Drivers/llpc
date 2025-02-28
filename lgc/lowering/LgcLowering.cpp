@@ -66,7 +66,7 @@
 #include "lgc/lowering/StructurizeBuffers.h"
 #include "lgc/lowering/VertexFetch.h"
 
-#if LLPC_BUILD_STRIX1
+#if LLPC_BUILD_STRIX1 || LLPC_BUILD_STRIX_HALO
 #include "lgc/lowering/WorkaroundDsSubdwordWrite.h"
 #endif
 #include "lgc/Debug.h"
@@ -211,7 +211,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerInvariantLoads()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(AddLoopMetadata())));
 
-#if LLPC_BUILD_STRIX1
+#if LLPC_BUILD_STRIX1 || LLPC_BUILD_STRIX_HALO
   passMgr.addPass(WorkaroundDsSubdwordWrite());
 #endif
 

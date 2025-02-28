@@ -35,6 +35,7 @@
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/BufferResource.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
@@ -46,7 +47,7 @@
 
 #define DEBUG_TYPE "lgc-lower-buffer-operations"
 
-using namespace CompilerUtils;
+using namespace compilerutils;
 using namespace llvm;
 using namespace lgc;
 
@@ -727,21 +728,27 @@ void BufferOpLowering::visitConvertToStridedBufferPointer(ConvertToStridedBuffer
   m_builder.SetInsertPoint(&convertToStrided);
 
   auto *oldDescriptor = values[0];
-
-  auto *currentDword1 = m_builder.CreateExtractElement(oldDescriptor, 1);
+  Value *newDescriptor = nullptr;
   auto *stride = m_builder.getInt32(convertToStrided.getStride());
-  auto *newDword1 = m_builder.CreateAnd(currentDword1, ~0x3FFF0000);
-  newDword1 = m_builder.CreateOr(newDword1, m_builder.CreateShl(stride, 16));
-  auto *newDescriptor = m_builder.CreateInsertElement(oldDescriptor, newDword1, 1);
 
-  auto *currentNumRecords = m_builder.CreateExtractElement(newDescriptor, 2);
-  auto *newNumRecords = m_builder.CreateUDiv(currentNumRecords, stride);
-  newDescriptor = m_builder.CreateInsertElement(newDescriptor, newNumRecords, 2);
-
-  auto *currentDword3 = m_builder.CreateExtractElement(newDescriptor, 3);
-  currentDword3 = m_builder.CreateAnd(currentDword3, 0xCFFFFFFF);
-  currentDword3 = m_builder.CreateOr(currentDword3, 0x10000000);
-  newDescriptor = m_builder.CreateInsertElement(newDescriptor, currentDword3, 3);
+  if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 12) {
+    // Set stride[61:48]
+    auto *currentDword1 = m_builder.CreateExtractElement(oldDescriptor, 1);
+    auto *newDword1 = m_builder.CreateAnd(currentDword1, ~0x3FFF0000);
+    newDword1 = m_builder.CreateOr(newDword1, m_builder.CreateShl(stride, 16));
+    newDescriptor = m_builder.CreateInsertElement(oldDescriptor, newDword1, 1);
+    // Set NumRecords[95:64]
+    auto *currentNumRecords = m_builder.CreateExtractElement(newDescriptor, 2);
+    auto *newNumRecords = m_builder.CreateUDiv(currentNumRecords, stride);
+    newDescriptor = m_builder.CreateInsertElement(newDescriptor, newNumRecords, 2);
+    // Set OOB[125:124] as 0b01, (total_offset + payload) > numRecord
+    auto *currentDword3 = m_builder.CreateExtractElement(newDescriptor, 3);
+    currentDword3 = m_builder.CreateAnd(currentDword3, 0xCFFFFFFF);
+    currentDword3 = m_builder.CreateOr(currentDword3, 0x10000000);
+    newDescriptor = m_builder.CreateInsertElement(newDescriptor, currentDword3, 3);
+  } else {
+    llvm_unreachable("Unsupported gfxip");
+  }
 
   m_typeLowering.replaceInstruction(&convertToStrided,
                                     {newDescriptor, values[1], m_builder.getInt32(0), m_builder.getFalse(),
@@ -812,9 +819,7 @@ void BufferOpLowering::visitBufferLoadDescToPtr(BufferLoadDescToPtrOp &loadDescT
     m_typeLowering.replaceInstruction(&loadDescToPtr, {descriptor, ConstantPointerNull::get(m_offsetType),
                                                        m_builder.getFalse(), PoisonValue::get(m_builder.getInt32Ty())});
   } else {
-    Value *index = m_builder.CreatePtrToInt(loadDescToPtr.getDescPtr(), m_builder.getInt64Ty());
-    index = m_builder.CreateBitCast(index, FixedVectorType::get(m_builder.getInt32Ty(), 2));
-    index = m_builder.CreateExtractElement(index, m_builder.getInt64(0));
+    Value *index = m_builder.CreatePtrToInt(loadDescToPtr.getDescPtr(), m_builder.getInt32Ty());
     m_typeLowering.replaceInstruction(&loadDescToPtr,
                                       {descriptor, ConstantPointerNull::get(m_offsetType), m_builder.getTrue(), index});
   }
@@ -847,7 +852,7 @@ void BufferOpLowering::visitStridedBufferLoadDescToPtr(StridedBufferLoadDescToPt
                                       {descriptor, ConstantPointerNull::get(m_offsetType), m_builder.getInt32(0),
                                        m_builder.getFalse(), PoisonValue::get(m_builder.getInt32Ty())});
   } else {
-    Value *index = m_builder.CreateBitCast(loadDescToPtr.getDescPtr(), m_builder.getInt32Ty());
+    Value *index = m_builder.CreatePtrToInt(loadDescToPtr.getDescPtr(), m_builder.getInt32Ty());
     m_typeLowering.replaceInstruction(&loadDescToPtr, {descriptor, ConstantPointerNull::get(m_offsetType),
                                                        m_builder.getInt32(0), m_builder.getTrue(), index});
   }
@@ -896,11 +901,9 @@ void BufferOpLowering::visitBufferLength(BufferLengthOp &length) {
   auto values = m_typeLowering.getValue(length.getPointer());
 
   Value *const bufferDesc = values[0];
-  Value *numRecords = nullptr;
-  {
-    // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
-    numRecords = m_builder.CreateZExt(m_builder.CreateExtractElement(bufferDesc, 2), m_builder.getInt64Ty());
-  }
+  Value *numRecords = getBufferNumRecords(m_pipelineState.getTargetInfo().getGfxIpVersion(), m_builder, bufferDesc);
+  if (numRecords->getType()->getIntegerBitWidth() == 32)
+    numRecords = m_builder.CreateZExt(numRecords, m_builder.getInt64Ty());
   Value *offset = length.getOffset();
 
   // If null descriptors are allowed, we must guarantee a 0 result for a null buffer descriptor.
@@ -1534,14 +1537,10 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
   const bool isStridedPointer =
       pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER;
   auto pointerValues = m_typeLowering.getValue(pointerOperand);
-  unsigned id = isStridedPointer ? 3 : 2;
+
   Value *bufferDesc = pointerValues[0];
   bool isIndexedDesc = false;
-  if (isa<ConstantInt>(pointerValues[id])) {
-    isIndexedDesc = cast<ConstantInt>(pointerValues[id])->isOne();
-    if (isIndexedDesc)
-      bufferDesc = pointerValues[id + 1];
-  }
+  unsigned isIndexedIdx = isStridedPointer ? 3 : 2;
 
   const DataLayout &dataLayout = m_builder.GetInsertBlock()->getModule()->getDataLayout();
 
@@ -1701,22 +1700,13 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         accessSizeAllowed = accessSize >= 4;
       }
 
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
-      // Old version of the code
-      const bool isDivergentPtr = m_uniformityInfo.isDivergent(*pointerOperand);
-#else
-      // New version of the code (also handles unknown version, which we treat as latest)
       const bool isDivergentPtr = m_uniformityInfo.isDivergent(pointerOperand);
-#endif
-      const bool haveNonStridedDescriptor = !isStridedPointer || m_stridedDescriptors.contains(bufferDesc);
-      const bool is32BitStridedBufferLoad = isStridedPointer && intAccessType->getScalarSizeInBits() == 32;
+
       if (isInvariant && !isDivergentDesc && accessSizeAllowed &&
-          (haveNonStridedDescriptor || is32BitStridedBufferLoad) &&
           (!indexValue || isa<ConstantInt>(indexValue) || !isDivergentPtr)) {
         // create s.buffer.load
         Value *desc = bufferDesc;
-        if (isIndexedDesc)
-          desc = m_builder.CreateLoad(FixedVectorType::get(m_builder.getInt32Ty(), 4), bufferDesc);
+        assert(desc->getType()->isVectorTy());
         if (isStridedPointer) {
           // Especially when the index is a constant, and the stride is known at compile-time,
           // we should create s_buffer_load instructions with constant offsets: index * stride + offset
@@ -1724,10 +1714,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
           if (m_stridedDescriptors.contains(desc)) {
             std::tie(desc, stride) = m_stridedDescriptors[desc];
           } else {
-            Value *desc1 = m_builder.CreateExtractElement(desc, 1);
-            // stride is 61:48 bits in descriptor, which will always be constantInt when create BufferDesc
-            stride =
-                m_builder.CreateAnd(m_builder.CreateLShr(desc1, m_builder.getInt32(16)), m_builder.getInt32(0x3fff));
+            stride = getBufferStride(m_pipelineState.getTargetInfo().getGfxIpVersion(), m_builder, desc);
           }
           Value *indexOffsetVal = m_builder.CreateMul(indexValue, stride);
           offsetVal = m_builder.CreateAdd(offsetVal, indexOffsetVal);
@@ -1738,6 +1725,8 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
         part = call;
       } else {
+        if (isIndexedDesc)
+          bufferDesc = pointerValues[isIndexedIdx + 1];
         if (indexValue) {
           Intrinsic::ID intrinsic = Intrinsic::amdgcn_struct_buffer_load;
 #if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 506212
@@ -1758,6 +1747,8 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       }
     } else {
       // Store
+      if (isIndexedDesc)
+        bufferDesc = pointerValues[isIndexedIdx + 1];
       unsigned compCount = accessSize / smallestByteSize;
       part = PoisonValue::get(FixedVectorType::get(smallestType, compCount));
 
@@ -1899,27 +1890,29 @@ Instruction *BufferOpLowering::makeLoop(Value *const loopStart, Value *const loo
 Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Value *const offset,
                                                    Value *const strideIndex, Type *const type, Instruction &inst,
                                                    const function_ref<Value *(Value *)> callback) {
-  // The 2nd element (NUM_RECORDS) in the buffer descriptor is byte bound.
-  Value *bound = m_builder.CreateExtractElement(bufferDesc, 2);
+  Value *bound = getBufferNumRecords(m_pipelineState.getTargetInfo().getGfxIpVersion(), m_builder, bufferDesc);
   Value *newOffset = offset;
 
   // index is for strided load which we need to handle the stride of the SRD.
   if (strideIndex || m_pipelineState.getOptions().checkRawBufferAccessDescStride) {
-    Value *desc1 = m_builder.CreateExtractElement(bufferDesc, 1);
-    Value *stride =
-        m_builder.CreateAnd(m_builder.CreateLShr(desc1, m_builder.getInt32(16)), m_builder.getInt32(0x3fff));
-    Value *byteBound = m_builder.CreateMul(bound, stride);
+    Value *stride = getBufferStride(m_pipelineState.getTargetInfo().getGfxIpVersion(), m_builder, bufferDesc);
+    Value *byteBound = bound;
+    if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 12)
+      byteBound = m_builder.CreateMul(bound, stride);
 
     if (strideIndex) {
       bound = byteBound;
       newOffset = m_builder.CreateAdd(m_builder.CreateMul(strideIndex, stride), newOffset);
-    } else {
+    } else if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 12) {
       // It is not a strided load, but it is possible that the application/client binds a strided descriptor so if
       // the stride is not zero, use bound in bytes to avoid wrong OOB check.
       stride = m_builder.CreateICmpNE(stride, m_builder.getInt32(0));
       bound = m_builder.CreateSelect(stride, byteBound, bound);
     }
   }
+
+  if (bound->getType()->getIntegerBitWidth() == 64)
+    newOffset = m_builder.CreateZExt(newOffset, m_builder.getInt64Ty());
 
   Value *inBound = m_builder.CreateICmpULT(newOffset, bound);
 
@@ -1933,7 +1926,7 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
     Value *isNonNullDesc = m_builder.getTrue();
     if (m_pipelineState.getOptions().allowNullDescriptor) {
       // Check dword2 against 0 for null descriptor
-      isNonNullDesc = m_builder.CreateICmpNE(bound, m_builder.getInt32(0));
+      isNonNullDesc = m_builder.CreateICmpNE(bound, ConstantInt::get(bound->getType(), 0));
     }
     Value *isInBound = m_pipelineState.getOptions().enableExtendedRobustBufferAccess ? inBound : m_builder.getTrue();
     isValidAccess = m_builder.CreateAnd(isNonNullDesc, isInBound);
@@ -1946,7 +1939,7 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
   // NOTE: The offset of out-of-bound overridden as 0 may cause unexpected result when the extended robustness access
   // is disabled.
   if (!m_pipelineState.getOptions().enableExtendedRobustBufferAccess)
-    newOffset = m_builder.CreateSelect(inBound, newOffset, m_builder.getInt32(0));
+    newOffset = m_builder.CreateSelect(inBound, newOffset, ConstantInt::get(newOffset->getType(), 0));
 
   // Add on the index to the address.
   Value *pointer = m_builder.CreateGEP(m_builder.getInt8Ty(), baseAddr, newOffset);

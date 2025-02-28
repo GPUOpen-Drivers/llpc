@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // If implicit invariant marking is allowed for instructions contributing to gl_Position exports, the
 // fast math flag is disabled for these instructions. This occurs if invariance is expected even if no
 // invariance flag is being used in SPIR-V. Enabling the FMF can sometimes break rendering with FMA

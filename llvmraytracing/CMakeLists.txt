@@ -38,7 +38,7 @@ endfunction()
 
 option(LLVMRAYTRACING_BUILD_TESTS "Build raytracing tests")
 
-add_llvm_library(LLVMRaytracing
+set(LLVMRaytracingLibFiles
   lib/CleanupContinuations.cpp
   lib/ContStateBuilder.cpp
   lib/Continuations.cpp
@@ -63,7 +63,10 @@ add_llvm_library(LLVMRaytracing
   lib/PayloadAccessQualifiers.cpp
   lib/RematSupport.cpp
   lib/RemoveTypesMetadata.cpp
-  lib/SpecializeDriverShaders.cpp
+  lib/SpecializeDriverShaders.cpp)
+
+add_llvm_library(LLVMRaytracing
+  ${LLVMRaytracingLibFiles}
 
   DEPENDS
   intrinsics_gen
@@ -91,12 +94,8 @@ target_link_libraries(LLVMRaytracing PUBLIC llvm_dialects ${extra_llvm_libs} llp
 set_compiler_options(LLVMRaytracing)
 
 # TableGen for dialects
-if (EXISTS ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
-  set(RAYTRACING_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
-else()
-  set(RAYTRACING_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
-endif()
-set(RAYTRACING_TABLEGEN_TARGET llvm-dialects-tblgen)
+include(../cmake/DialectsTablegen.cmake)
+set_dialects_tablegen_exe(RAYTRACING)
 
 macro(raytracing_tablegen DIALECTNAME FILE OUTPUT_FILENAME)
   set(LLVM_TARGET_DEFINITIONS "${FILE}")
@@ -141,3 +140,4 @@ if(LLVMRAYTRACING_BUILD_TESTS)
   add_custom_target(check-continuations DEPENDS check-llvmraytracing)
   add_custom_target(check-continuations-units DEPENDS check-llvmraytracing-units)
 endif()
+

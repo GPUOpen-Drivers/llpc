@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -33,6 +33,7 @@
 #define COMPILERUTILS_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/Attributes.h"
@@ -44,7 +45,7 @@ class PassBuilder;
 
 } // namespace llvm
 
-namespace CompilerUtils {
+namespace compilerutils {
 
 // Register compiler utils passes.
 void RegisterPasses(llvm::PassBuilder &PB);
@@ -165,7 +166,26 @@ llvm::Value *simplifyingCreateConstGEP1_32(llvm::IRBuilder<> &builder, llvm::Typ
 // Create an inbounds GEP if idx is non-null, otherwise return the pointer.
 llvm::Value *simplifyingCreateConstInBoundsGEP1_32(llvm::IRBuilder<> &builder, llvm::Type *ty, llvm::Value *ptr,
                                                    uint32_t idx);
-} // namespace CompilerUtils
+
+namespace bb {
+std::string getLabel(const llvm::Function *func);
+std::string getLabel(const llvm::BasicBlock *bb);
+std::string getLabel(const llvm::Value *v);
+
+// Returns a concatenated list as string, where each BB label is prefixed by @prefix. In case an empty list is given,
+// return @emptyRetValue.
+std::string getNamesForBasicBlocks(const llvm::ArrayRef<llvm::BasicBlock *> blocks,
+                                   llvm::StringRef emptyRetValue = "<empty>", llvm::StringRef prefix = " %");
+
+// Returns a concatenated list as string, where each BB label is prefixed by @prefix. In case an empty list is given,
+// return @emptyRetValue.
+std::string getNamesForBasicBlocks(const llvm::SmallSet<llvm::BasicBlock *, 2> &blocks,
+                                   llvm::StringRef emptyRetValue = "<empty>", llvm::StringRef prefix = " %");
+} // namespace bb
+} // namespace compilerutils
+
+// Temporary alias.
+namespace CompilerUtils = compilerutils;
 
 namespace llvm {
 

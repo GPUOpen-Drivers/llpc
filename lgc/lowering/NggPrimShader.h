@@ -147,19 +147,27 @@ struct VertexCullInfoOffsets {
   unsigned relPatchId;
 };
 
-// Represents export info of a transform feedback output
-struct XfbOutputExport {
-  unsigned xfbBuffer;   // Transform feedback buffer
-  unsigned xfbOffset;   // Transform feedback offset
-  unsigned numElements; // Number of output elements, valid range is [1,4]
+// Represents export info of a vertex
+struct VertexExport {
+  unsigned exportSlot;      // Export slot
+  unsigned channelMask;     // Channel mask
+  llvm::Value *exportValue; // Export values
+};
+
+// Represents export info of a XFB output
+struct XfbExport {
+  unsigned xfbBuffer;   // XFB buffer
+  unsigned xfbOffset;   // XFB offset
+  unsigned numElements; // Number of export elements, valid range is [1,4]
   // For ES only
-  unsigned offsetInVertex; // Offset of an output within all transform feedback outputs of a vertex
+  unsigned offsetInVertex; // Offset of a XFB output within all XFB outputs of a vertex
   // For GS only
   struct {
-    unsigned streamId;  // Output stream ID
-    unsigned location;  // Output location
-    unsigned component; // Output component within a location
-  } locInfo;            // Output location info in GS-VS ring
+    unsigned streamId;      // Output stream ID
+    unsigned location;      // Output location
+    unsigned component;     // Output component within a location
+  } locInfo;                // Output location info in GS-VS ring
+  llvm::Value *exportValue; // Export value of a XFB output
 };
 
 // Enumerates the LDS regions used by primitive shader
@@ -238,13 +246,9 @@ private:
   void earlyExitWithDummyExport();
 
   void runEs(llvm::ArrayRef<llvm::Argument *> args);
-  llvm::Value *runPartEs(llvm::ArrayRef<llvm::Argument *> args, llvm::Value *position = nullptr);
   void splitEs();
-
   void runGs(llvm::ArrayRef<llvm::Argument *> args);
   void mutateGs();
-
-  void runCopyShader(llvm::ArrayRef<llvm::Argument *> args);
   void mutateCopyShader();
 
   void appendUserData(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Function *target, llvm::Value *userData,
@@ -298,17 +302,23 @@ private:
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexIndex);
   llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexIndex);
 
-  void appendAttributeThroughMemoryArguments(llvm::SmallVectorImpl<llvm::Value *> &args);
-  void mutateToExportVertex(llvm::Function *&target);
-  void exportPosition(unsigned exportSlot, llvm::ArrayRef<llvm::Value *> exportValues, bool lastExport);
-  void exportAttribute(unsigned exportSlot, llvm::ArrayRef<llvm::Value *> exportValues, llvm::Value *attribRingBufDesc,
-                       llvm::Value *attribRingBaseOffset, llvm::Value *vertexIndex);
+  llvm::Function *makeExportCollector(llvm::Function *&fromFunc, bool makeClone,
+                                      llvm::SmallVectorImpl<VertexExport> *positionExports,
+                                      llvm::SmallVectorImpl<VertexExport> *attributeExports,
+                                      llvm::SmallVectorImpl<XfbExport> *xfbExports);
+  void collectExports(llvm::ArrayRef<llvm::Argument *> args, llvm::Function *&fromFunc, bool makeClone,
+                      llvm::SmallVectorImpl<VertexExport> *positionExports,
+                      llvm::SmallVectorImpl<VertexExport> *attributeExports,
+                      llvm::SmallVectorImpl<XfbExport> *xfbExports);
+  void createPhiForExports(llvm::SmallVectorImpl<VertexExport> *positionExports,
+                           llvm::SmallVectorImpl<VertexExport> *attributeExports,
+                           llvm::SmallVectorImpl<XfbExport> *xfbExports);
+  void exportPositions(const llvm::SmallVectorImpl<VertexExport> &positionExports);
+  void exportAttributes(const llvm::SmallVectorImpl<VertexExport> &attributeExports);
 
-  void processSwXfb(llvm::ArrayRef<llvm::Argument *> args);
-  void processSwXfbWithGs(llvm::ArrayRef<llvm::Argument *> args);
+  void processSwXfb(llvm::ArrayRef<llvm::Argument *> args, const llvm::SmallVectorImpl<XfbExport> &xfbExports);
+  void processSwXfbWithGs(llvm::ArrayRef<llvm::Argument *> args, const llvm::SmallVectorImpl<XfbExport> &xfbExports);
   void prepareSwXfb(llvm::ArrayRef<llvm::Value *> primCountInSubgroup);
-  llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
-                              llvm::SmallVectorImpl<XfbOutputExport> &xfbOutputExports);
 
   llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexIndex, unsigned offsetInVertex);
   void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexIndex, unsigned offsetInVertex);
@@ -373,9 +383,10 @@ private:
 
   // ES handlers
   struct {
-    llvm::Function *main;            // ES main function
-    llvm::Function *cullDataFetcher; // Part ES to fetch cull data (position and cull distance)
-    llvm::Function *vertexExporter;  // Part ES to do deferred vertex exporting
+    llvm::Function *main; // ES main function
+    // Part ES functions, the first part contains cull data exports (position and cull distance) and the second part
+    // contains other remaining exports.
+    std::pair<llvm::Function *, llvm::Function *> part;
   } m_esHandlers = {};
 
   // GS handlers

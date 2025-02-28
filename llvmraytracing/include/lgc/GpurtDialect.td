@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -379,4 +379,12 @@ def GpurtGetRayQueryDispatchIdOp : GpurtOp<"get.ray.query.dispatch.id", [Memory<
     the rayQuery dispatch ID is the subgroup local invocation ID in the X component, and 0 in the Y and Z
     components.
   }];
+}
+
+def GpurtMakePcOp : GpurtOp<"make.pc", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$va);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+  let summary = "create a 64-bit extended virtual address out of a 32-bit input virtual address";
 }

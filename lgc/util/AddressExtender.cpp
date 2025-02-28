@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -43,7 +43,7 @@ using namespace llvm;
 Instruction *AddressExtender::getFirstInsertionPt() {
   if (m_pc)
     return m_pc->getNextNode();
-  return &*m_func->front().getFirstNonPHIOrDbgOrAlloca();
+  return &*m_insertInto->getFirstNonPHIOrDbgOrAlloca();
 }
 
 // =====================================================================================================================
@@ -93,10 +93,10 @@ Instruction *AddressExtender::extendWithPc(Value *addr32, Type *ptrTy, IRBuilder
 // code at the start of the function.
 Instruction *AddressExtender::getPc() {
   if (!m_pc) {
-    // This uses its own builder, as it wants to insert at the start of the function, whatever the caller
+    // This uses its own builder, as it wants to insert at the (original) start of the function, whatever the caller
     // is doing.
     IRBuilder<> builder(m_func->getContext());
-    builder.SetInsertPointPastAllocas(m_func);
+    builder.SetInsertPoint(m_insertInto->getFirstNonPHIOrDbgOrAlloca());
     Value *pc = builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {}, {});
     pc = cast<Instruction>(builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2)));
     m_pc = cast<Instruction>(pc);

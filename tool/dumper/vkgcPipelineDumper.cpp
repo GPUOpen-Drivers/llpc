@@ -67,6 +67,7 @@ std::ostream &operator<<(std::ostream &out, VkProvokingVertexModeEXT provokingVe
 std::ostream &operator<<(std::ostream &out, ResourceLayoutScheme layout);
 std::ostream &operator<<(std::ostream &out, ThreadGroupSwizzleMode threadGroupSwizzleMode);
 std::ostream &operator<<(std::ostream &out, InvariantLoads invariants);
+std::ostream &operator<<(std::ostream &out, LlvmScheduleStrategy strategy);
 
 template std::ostream &operator<<(std::ostream &out, ElfReader<Elf64> &reader);
 template raw_ostream &operator<<(raw_ostream &out, ElfReader<Elf64> &reader);
@@ -716,6 +717,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.viewIndexFromDeviceIndex = " << shaderInfo->options.viewIndexFromDeviceIndex << "\n";
   dumpFile << "options.forceUnderflowPrevention = " << shaderInfo->options.forceUnderflowPrevention << "\n";
   dumpFile << "options.forceMemoryBarrierScope = " << shaderInfo->options.forceMemoryBarrierScope << "\n";
+  dumpFile << "options.scheduleStrategy = " << shaderInfo->options.scheduleStrategy << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -855,6 +857,55 @@ void PipelineDumper::DumpFragmentOutputs(PipelineDumpFile *dumpFile, const uint8
 }
 
 // =====================================================================================================================
+// Dump pm4crc hash. It hashes up to and including the first s_endpgm with an immediate 0 operand or 16KB
+//
+// @param dumpFile : Directory of pipeline dump
+// @param gfxIp : Graphics IP version info
+// @param pipelineBin : Pipeline binary (ELF)
+void PipelineDumper::DumpPm4Crc(PipelineDumpFile *dumpFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin) {
+  if (!dumpFile)
+    return;
+  ElfReader<Elf64> reader(gfxIp);
+  size_t readSize = 0;
+  if (reader.ReadFromBuffer(pipelineBin->pCode, &readSize) == Result::Success) {
+    unsigned sectionCount = reader.getSectionCount();
+    bool sortSection = reader.getMap().size() == sectionCount;
+    for (unsigned idx = 0; idx < sectionCount; ++idx) {
+      typename ElfReader<Elf64>::SectionBuffer *section = nullptr;
+      Result result = Result::Success;
+      unsigned secIdx = idx;
+      if (sortSection) {
+        result = reader.getSectionDataBySortingIndex(idx, &secIdx, &section);
+      } else {
+        result = reader.getSectionDataBySectionIndex(idx, &section);
+      }
+      assert(result == Result::Success);
+      if (strcmp(section->name, TextName) == 0) {
+        // .text section
+        std::vector<ElfSymbol> symbols;
+        reader.GetSymbolsBySectionIndex(secIdx, symbols);
+        dumpFile->dumpFile << "\n";
+        for (auto sym : symbols) {
+          // S_ENDPGM hardware opcode value
+          static const uint32_t endPgm = (gfxIp.major == 11 || gfxIp.major == 12) ? 0xBFB00000 : 0xBF810000;
+          // Hash up to 16KB
+          const unsigned codeSizeInbyte = std::min(sym.size, UINT64_C(16384));
+
+          const uint32_t *symCode = reinterpret_cast<const uint32_t *>(voidPtrInc(section->data, sym.value));
+          unsigned endPos = 0;
+          const unsigned codeSizeInDw = codeSizeInbyte / sizeof(uint32_t);
+          while (endPos < codeSizeInDw && symCode[endPos++] != endPgm) {
+            // nothing
+          }
+          auto crc = calculateCrc64(symCode, endPos * sizeof(uint32_t));
+          dumpFile->dumpFile << ";" << sym.pSymName << "_pm4Crc = " << std::hex << crc << "\n";
+        }
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
 // Dumps LLPC version info to file
 //
 // @param [out] dumpFile : Dump file
@@ -960,9 +1011,11 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << glStatePrefix << "emulateWideLineStipple = " << options->getGlState().emulateWideLineStipple << "\n";
   dumpFile << glStatePrefix << "enablePointSmooth = " << options->getGlState().enablePointSmooth << "\n";
   dumpFile << glStatePrefix << "enableRemapLocation = " << options->getGlState().enableRemapLocation << "\n";
+  dumpFile << glStatePrefix << "enableDepthCompareParam = " << options->getGlState().enableDepthCompareParam << "\n";
   dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
   dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
   dumpFile << "options.optimizePointSizeWrite = " << options->optimizePointSizeWrite << "\n";
+  dumpFile << "options.padBufferSizeToNextDword = " << options->padBufferSizeToNextDword << "\n";
 
   // Output compile time constant info
   if (options->compileConstInfo) {
@@ -2020,8 +2073,10 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().emulateWideLineStipple);
   hasher->Update(options->getGlState().enablePointSmooth);
   hasher->Update(options->getGlState().enableRemapLocation);
+  hasher->Update(options->getGlState().enableDepthCompareParam);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
   hasher->Update(options->optimizePointSizeWrite);
+  hasher->Update(options->padBufferSizeToNextDword);
   hasher->Update(options->compileConstInfo != nullptr);
   if (options->compileConstInfo != nullptr) {
     hasher->Update(options->compileConstInfo->numCompileTimeConstants);
@@ -2126,6 +2181,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.viewIndexFromDeviceIndex);
       hasher->Update(options.forceUnderflowPrevention);
       hasher->Update(options.forceMemoryBarrierScope);
+      hasher->Update(options.scheduleStrategy);
     }
   }
 }
@@ -2692,6 +2748,26 @@ std::ostream &operator<<(std::ostream &out, WaveBreakSize waveBreakSize) {
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _8x8)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _16x16)
     CASE_CLASSENUM_TO_STRING(WaveBreakSize, _32x32)
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+
+  return out << string;
+}
+
+// =====================================================================================================================
+// Translates enum "LlvmScheduleStrategy" to string and output to ostream.
+//
+// @param [out] out : Output stream
+// @param strategy: LLVM instruction schedule strategy
+std::ostream &operator<<(std::ostream &out, LlvmScheduleStrategy strategy) {
+  const char *string = nullptr;
+  switch (strategy) {
+    CASE_CLASSENUM_TO_STRING(LlvmScheduleStrategy, None)
+    CASE_CLASSENUM_TO_STRING(LlvmScheduleStrategy, MaxIlp)
+    CASE_CLASSENUM_TO_STRING(LlvmScheduleStrategy, MaxMemoryClause)
     break;
   default:
     llvm_unreachable("Should never be called!");

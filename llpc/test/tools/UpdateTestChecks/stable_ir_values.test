@@ -1,0 +1,5 @@
+# RUN: cp -f %S/Inputs/stable_ir_values.pipe %t.pipe && %update_llpc_test_checks --generalize-calls %t.pipe
+# RUN: diff -u %t.pipe %S/Inputs/stable_ir_values.pipe.expected
+# Check that we get the same result after running twice
+# RUN: %update_llpc_test_checks %t.pipe
+# RUN: diff -u %t.pipe %S/Inputs/stable_ir_values.pipe.expected

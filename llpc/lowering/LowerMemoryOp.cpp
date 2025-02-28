@@ -134,7 +134,7 @@ void LowerMemoryOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
                                  : ConstantInt::get(Type::getInt32Ty(*m_context), i);
       getElemPtr->setOperand(operandIndex, constIndex);
       getElemPtrs.push_back(getElemPtr);
-      getElemPtr->insertBefore(&getElemPtrInst);
+      getElemPtr->insertBefore(getElemPtrInst.getIterator());
     }
 
     // Copy users, ExpandStoreInst/ExpandLoadInst change getElemPtrInst's user

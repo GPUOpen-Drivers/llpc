@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -47,11 +47,13 @@ std::string getModuleHashStr(const llvm::Module &m);
 // FilenamePrefix.FuncName.Hash.dot where FuncName is determined by demangling
 // the DXIL function name, and Hash is given by getModuleHashStr.
 // Set cfgOnly = false to include instructions within the BBs.
-void writeCFGToDotFile(const llvm::Function &f, llvm::StringRef filenamePrefix = "cfg", bool cfgOnly = true);
+void writeCFGToDotFile(const llvm::Function &f);
+void writeCFGToDotFile(const llvm::Function &f, llvm::StringRef filenamePrefix, bool cfgOnly = true);
 
 // Writes an LL file with the module. The filename is:
 // FilenamePrefix.Hash.ll where Hash is given by getModuleHashStr.
-void writeModuleToLLFile(const llvm::Module &m, llvm::StringRef filenamePrefix = "module");
+void writeModuleToLLFile(const llvm::Module &m);
+void writeModuleToLLFile(const llvm::Module &m, llvm::StringRef filenamePrefix);
 
 } // namespace irserializationutils
 

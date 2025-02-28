@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -67,6 +67,8 @@ public:
   static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
   static void DumpFragmentOutputs(PipelineDumpFile *dumpFile, const uint8_t *data, uint32_t size);
+
+  static void DumpPm4Crc(PipelineDumpFile *dumpFile, GfxIpVersion gfxIp, const BinaryData *pipelineBin);
 
   static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
                                                          UnlinkedShaderStage unlinkedShaderType = UnlinkedStageCount);

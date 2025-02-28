@@ -1,4 +1,11 @@
 #version 450 core
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 layout(input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput    subIn1;
 layout(input_attachment_index = 1, set = 0, binding = 1) uniform subpassInputMS  subIn2;

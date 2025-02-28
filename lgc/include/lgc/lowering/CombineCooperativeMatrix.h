@@ -33,9 +33,7 @@
 #include "llvm/IR/PassManager.h"
 
 namespace lgc {
-class CooperativeMatrixConvertOp;
-class CooperativeMatrixTransposeOp;
-class CooperativeMatrixMulAddOp;
+
 // =====================================================================================================================
 // Pass to combine cooperative matrix operations.
 class CombineCooperativeMatrix : public Patch, public llvm::PassInfoMixin<CombineCooperativeMatrix> {

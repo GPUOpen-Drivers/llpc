@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // Shadow table is disabled, F-mask doesn't need to load descriptor, append the provided sample number to coordinates.
 
 // BEGIN_SHADERTEST

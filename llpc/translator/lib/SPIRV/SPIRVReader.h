@@ -5,7 +5,7 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -46,6 +46,7 @@
 #include "vkgcDefs.h"
 #include "compilerutils/LoweringPointerTupleMap.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcXdlTypes.h"
 
 namespace llvm {
 class Module;
@@ -97,6 +98,7 @@ struct ImageTypeIndices {
   unsigned samplerPointer = ~0;
   unsigned samplerStride = ~0;
   unsigned convertingSamplerIdx = ~0;
+  unsigned compareParamPointer = ~0;
 };
 
 class SPIRVToLLVM {
@@ -181,6 +183,7 @@ public:
     Value *fmaskPointer = nullptr;
     Value *samplerPointer = nullptr;
     Value *convertingSamplerIdx = nullptr;
+    Value *compareParamPointer = nullptr;
   };
 
   // Load image and/or sampler descriptors, and get information from the image
@@ -269,7 +272,7 @@ private:
   };
 
   typedef DenseMap<SPIRVTypeContext::TupleType, Type *> SPIRVToLLVMFullTypeMap;
-  typedef CompilerUtils::LoweringPointerTupleMap<SPIRVValue *, Value *, true> SPIRVToLLVMValueMap;
+  typedef compilerutils::LoweringPointerTupleMap<SPIRVValue *, Value *, true> SPIRVToLLVMValueMap;
   typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
   typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
@@ -337,17 +340,10 @@ private:
     SmallVector<llvm::Instruction *, 1> llvmInstructions;
   };
 
-  lgc::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
-  lgc::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
-                                                             lgc::CooperativeMatrixElementType elemTy, unsigned rows,
-                                                             unsigned columns);
-
-  enum CooperativeMatrixMemoryAccess {
-    CooperativeMatrixMemoryAccessNone = 0x00,
-    CooperativeMatrixMemoryAccessVolatile = 0x01,
-    CooperativeMatrixMemoryAccessCoherent = 0x02,
-    CooperativeMatrixMemoryAccessTemporal = 0x04,
-  };
+  lgc::xdl::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
+  lgc::xdl::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
+                                                                  lgc::xdl::CooperativeMatrixElementType elemTy,
+                                                                  unsigned rows, unsigned columns);
 
   Value *transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlock *bb);
   Value *transCooperativeMatrixKHRFromConstruct(SPIRVType *spvCoopMatRowTy, const std::vector<Value *> &constituents);
@@ -358,6 +354,8 @@ private:
   // input for another load, we are using a vector here, which contains a pointer to the instruction along with it being
   // either a load or store.
   MapVector<Function *, MapVector<SPIRVValue *, ScratchBoundsCheckData>> m_spirvMemopToLlvmMemopMapping;
+  bool checkVolatile(SPIRVValue *pointer, SPIRVMemoryAccess *access, bool isLoad);
+  bool checkCoherent(SPIRVValue *pointer, SPIRVMemoryAccess *access, bool isLoad);
 
   lgc::Builder *getBuilder() const { return m_builder; }
 

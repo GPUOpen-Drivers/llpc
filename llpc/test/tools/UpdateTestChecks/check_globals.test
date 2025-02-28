@@ -1,0 +1,6 @@
+# RUN: cp -f %S/Inputs/base_test.pipe %t.pipe && %update_llpc_test_checks %t.pipe --check-globals --version 1 --generalize-calls
+# RUN: diff -u %t.pipe %S/Inputs/check_globals.pipe.expected
+# RUN: cp -f %S/Inputs/base_test.pipe %t.pipe && %update_llpc_test_checks %t.pipe --check-globals all --generalize-calls
+# RUN: diff -u %t.pipe %S/Inputs/check_globals_all.pipe.expected
+# RUN: cp -f %S/Inputs/base_test.pipe %t.pipe && %update_llpc_test_checks %t.pipe --check-globals smart --generalize-calls
+# RUN: diff -u %t.pipe %S/Inputs/check_globals_smart.pipe.expected

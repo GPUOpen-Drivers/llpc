@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -35,7 +35,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Type.h"
 
-using namespace CompilerUtils;
+using namespace compilerutils;
 using namespace llvm;
 using namespace lgc::cps;
 
@@ -396,7 +396,7 @@ Value *CpsStackLowering::getRealMemoryAddress(Value *Offset) {
 //                          `nullptr` if there is no base address and the csp
 //                          can be converted with ptrtoint.
 Function *CpsStackLowering::addOrInitCsp(Function *F, Function *GetGlobalMemBase, bool RequiresIncomingCsp) {
-  CompilerUtils::CrossModuleInliner CrossInliner;
+  compilerutils::CrossModuleInliner CrossInliner;
   auto &GpurtContext = lgc::GpurtContext::get(Mod->getContext());
   auto &GpurtLibrary = GpurtContext.theModule ? *GpurtContext.theModule : *Mod;
   Value *Initializer = nullptr;
@@ -411,7 +411,7 @@ Function *CpsStackLowering::addOrInitCsp(Function *F, Function *GetGlobalMemBase
 
     NewArgTys.insert(NewArgTys.begin(), Builder.getInt32Ty());
 
-    Function *NewFunc = CompilerUtils::mutateFunctionArguments(*F, F->getReturnType(), NewArgTys, F->getAttributes());
+    Function *NewFunc = compilerutils::mutateFunctionArguments(*F, F->getReturnType(), NewArgTys, F->getAttributes());
 
     Argument *CspArg = NewFunc->getArg(0);
     CspArg->setName("cspInit");

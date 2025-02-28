@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if using a loop of unknown length to access an array
 // will be transformed to an out of bounds checks against all bounds of the array, moving the load into a conditionally executed BB.
 // The OOB check will possibly zero out the load results.

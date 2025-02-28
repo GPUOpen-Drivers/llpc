@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if store access to an array inside a 2D (multidimensional) array using some runtime indices
 // will be transformed to an out of bounds checks against all accessed elements, moving the store into a conditionally executed BB.
 // The OOB check will possibly omit the store.

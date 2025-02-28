@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // This test checks if load access to a vector using a runtime index
 // will be transformed to an out of bounds checks against the vector bounds, moving the load into a conditionally executed BB.
 // The OOB check will possibly zero out the load results.

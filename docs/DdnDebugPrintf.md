@@ -1,6 +1,8 @@
-# Support of NonSemantics.DebugPrintf
+# Support of DebugPrintf
 
 ## Summary
+
+### NonSemantics.DebugPrintf
 
 The `NonSemantics.DebugPrintf` extended instruction enables `printf`-style
 functionality in SPIR-V modules.
@@ -12,6 +14,12 @@ Vulkan layers.
 
 Our internal print debug capability allows us to use `printf` in internal
 SPIR-V applications that are head-scratching hard to debug.
+
+### Shader Abort (OpAbortKHR)
+
+The new instruction `OpAbortKHR` from Vulkan extension `VK_KHR_shader_abort` allows to
+abort the shader and trigger device loss with passing `Message` through the API which
+depends on `debugPrintf` implementation to retrieve data.
 
 ## Interfaces
 
@@ -69,8 +77,18 @@ The `amdpal.format_strings` map contains:
     passed into `DebugPrintf`
   * An element with key `.64bit_arguments` whose value is an array of 64-bit
     integers that serve as a bitmask of arguments that are 64-bit sized
+  * An element with key `.is_abort_message` whose value indicates if the string comes
+    from debug printf or shader abort function.
+  * An element with key `.data_count` whose value is the total number of 32-bit words
+    in an abort message
+  * An element with key `.constant_status` whose value is an array of 64-bit words that
+    are concatenated to form a bit vector indicating which of the 32-bit words in the
+    abort message are constant.
+  * An element with key `.constant` whose value is an array of 32-bit integer constants
+    in the order in which they appear in the abort message. The length of this array is
+    equal to the number of set bits with true in the `.constant_status` bit vector.
 
-An example in JSON-ified form:
+An example in JSON-ified form of debug printf:
 ```json
 {
     "amdpal.version": [ .. ],
@@ -90,6 +108,33 @@ An example in JSON-ified form:
               ".argument_count": 2,
               ".64bit_arguments": [0]
             }
+        ]
+    }
+}
+
+```
+An example in JSON-ified form of shader abort:
+```json
+{
+    "amdpal.version": [ .. ],
+    "amdpal.pipelines": [ .. ],
+    "amdpal.format_strings": {
+        ".version": 1,
+        ".strings": [
+            {
+              ".index": 12345678,
+              ".is_abort_message": 1,
+              ".data_count": 2,
+              ".constant_status": [0x3],
+              ".constants": [0x0000000074736574 0x000000006C25203A]
+            },
+            {
+              ".index": 34567890,
+              ".is_abort_message": 1,
+              ".data_count": 2,
+              ".constant_status": [0x1],
+              ".constants": [0x0000000074736574]
+            },
         ]
     }
 }
@@ -168,6 +213,11 @@ Most of the implementation is in xgl/icd/api/debug_printf.cpp.
 > **Note/Todo:** At time of writing, the implementation is limited to handling
 > only a single pipeline at a time.
 
+#### TDR solution
+
+To maintain data coherence between the CPU and GPU during a TDR event, allocate the
+printf buffer in a shared memory region that is cacheable for the CPU but uncached for the GPU.
+
 ### LLPC
 
 #### lgc: debug printf operation
@@ -188,8 +238,21 @@ Allowed types for the variable argument operands are:
 * `i8, i16, i32, i64, half, float, double`
 * Vectors of the above
 
+#### lgc: shader abort message operation
+
+The `@lgc.abort.msg` operation represents a printf and abort call for debug purposes.
+It is declared as follows:
+```llvm
+; Function Attrs: nodivergencesource nounwind willreturn memory(inaccessiblemem: readwrite)
+declare void @lgc.abort.msg(...)
+```
+Allowed types for the variable argument operands are:
+
+* Vectors of i32 values
+
 #### SPIRVReader
 
+##### lgc.debug.printf
 The SPIRVReader emits the format string as a global variable in the constant
 address space and produces a call to `@lgc.debug.printf`.
 
@@ -202,14 +265,27 @@ Example:
   ...
 ```
 
+##### lgc.abort.msg
+The SPIRVReader emits a argument and produces a call to `@lgc.abort.msg`.
+
+Example:
+```llvm
+  ...
+  // string: "test: %lf %d \n"
+  call void (...) @lgc.abort.msg(i32 1953719668, i32 1814372410, i32 1680154726, i32 10, i32 undef, i32 0, i32 1, i32 undef)
+  ...
+```
+
 **Note:** Builder record/replay is not used.
 
 #### lgc::LowerDebugPrintf
 
 The module pass `LowerDebugPrintf` runs just before `MutateEntryPoint`.
-It collects all calls to `@lgc.debug.printf` in the entire module and:
+It collects all calls to `@lgc.debug.printf` or `@lgc.abort.msg` in the entire module and:
 
-* Collects the format strings and adds the `amdpal.format_strings` entry to the
+* `@lgc.debug.printf` will collect the format strings and adds the `amdpal.format_strings` entry to the
+  PAL metadata document.
+* `@lgc.abort.msg` will collect constants information and adds the `amdpal.format_strings` entry to the
   PAL metadata document.
 * Lowers the calls to the required lower-level instructions.
 

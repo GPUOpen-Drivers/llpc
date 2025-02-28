@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -43,7 +43,7 @@ using namespace lgc;
 using namespace lgc::rt;
 using namespace llvm;
 using namespace llvm_dialects;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 // Table of GPURT function names. Must match the order of enum GpurtFunc.
 static const char *const GpurtFuncNames[] = {

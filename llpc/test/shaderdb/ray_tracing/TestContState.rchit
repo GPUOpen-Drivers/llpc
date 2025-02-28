@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 // Test that continuations state has a reasonable size.
 // NOTE: Hit attribute is extracted from system data, we want to make sure we only put necessary part into continuations

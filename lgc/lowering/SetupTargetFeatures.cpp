@@ -102,12 +102,21 @@ void SetUpTargetFeatures::setupTargetFeatures(Module *module) {
     }
 
     if (isShaderEntryPoint(&*func)) {
-      bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage.value()).useSiScheduler;
-      if (useSiScheduler) {
+      const ShaderOptions &options = m_pipelineState->getShaderOptions(shaderStage.value());
+      if (options.useSiScheduler) {
         // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
         // game. So we disable the latter here. That only affects XNACK targets.
         targetFeatures += ",+si-scheduler";
         builder.addAttribute("amdgpu-max-memory-clause", "1");
+      }
+
+      LlvmScheduleStrategy schedStrategy = options.scheduleStrategy;
+      if (schedStrategy == LlvmScheduleStrategy::MaxMemoryClause) {
+        builder.addAttribute("amdgpu-sched-strategy", "max-memory-clause");
+        // Use a more aggressive value than the default value. This helps clustering more instructions.
+        builder.addAttribute("amdgpu-max-memory-cluster-dwords", "32");
+      } else if (schedStrategy == LlvmScheduleStrategy::MaxIlp) {
+        builder.addAttribute("amdgpu-sched-strategy", "max-ilp");
       }
     }
 

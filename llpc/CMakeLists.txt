@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -28,14 +28,9 @@ project(LLPC C CXX)
 ### Create LLPC Library ################################################################################################
 add_library(llpcinternal STATIC "")
 
-if(ICD_BUILD_LLPC)
-    add_dependencies(llpcinternal LLVMlgc)
-endif()
-
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_TESTS      "LLPC build all tests"        OFF)
 option(LLPC_BUILD_LLVM_TOOLS "Build LLVM tools"            OFF)
-option(LLPC_ENABLE_WERROR    "Build LLPC with more errors" OFF)
 option(LLPC_DISABLE_SPVGEN   "Build LLPC tools without SPVGEN" OFF)
 
 if(ICD_BUILD_LLPC)
@@ -54,21 +49,17 @@ if(ICD_BUILD_LLPC)
         endforeach()
     endif()
     target_link_libraries(llpcinternal PUBLIC ${extra_llvm_libs})
-    target_link_libraries(llpcinternal PRIVATE gfxruntime)
+    target_link_libraries(llpcinternal PRIVATE LLVMlgc gfxruntime sharedme_xdl)
 endif()
 
 ### Compiler Options ###################################################################################################
 include(../cmake/CompilerFlags.cmake)
-set_compiler_options(llpcinternal ${LLPC_ENABLE_WERROR})
+set_compiler_options(llpcinternal)
 
 ### TableGen for LLPC dialect ########################################################################################
 if (ICD_BUILD_LLPC)
-    if (EXISTS ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
-      set(LLPC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
-    else()
-      set(LLPC_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
-    endif()
-    set(LLPC_TABLEGEN_TARGET llvm-dialects-tblgen)
+    include(../cmake/DialectsTablegen.cmake)
+    set_dialects_tablegen_exe(LLPC)
     set(LLVM_TARGET_DEFINITIONS include/LlpcDialect.td)
 
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include")
@@ -125,8 +116,8 @@ target_include_directories(llpcinternal
         util
         ../util
         ${PROJECT_BINARY_DIR}/include
-        ${XGL_PAL_PATH}/inc/core
-        ${XGL_PAL_PATH}/inc/util
+        ${PAL_SOURCE_DIR}/inc/core
+        ${PAL_SOURCE_DIR}/inc/util
         ${LLVM_INCLUDE_DIRS}
 )
 
@@ -317,7 +308,7 @@ target_include_directories(llpc
     include
 )
 
-set_compiler_options(llpc ${LLPC_ENABLE_WERROR})
+set_compiler_options(llpc)
 
 # This one source file is here just to stop getting cmake and ar errors about having no source files.
 target_sources(llpc PRIVATE
@@ -393,9 +384,9 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/util
-    ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
-    ${XGL_PAL_PATH}/inc/core
-    ${XGL_PAL_PATH}/inc/util
+    ${PAL_SOURCE_DIR}/src/core/hw/gfxip/gfx9/chip
+    ${PAL_SOURCE_DIR}/inc/core
+    ${PAL_SOURCE_DIR}/inc/util
     ${LLVM_INCLUDE_DIRS}
 )
 
@@ -420,13 +411,13 @@ if (NOT LLVM_LINK_LLVM_DYLIB)
     target_link_libraries(llpc_standalone_compiler PUBLIC ${llvm_libs})
 endif()
 
-set_compiler_options(llpc_standalone_compiler ${LLPC_ENABLE_WERROR})
+set_compiler_options(llpc_standalone_compiler)
 
 # Add an executable for the amdllpc standalone compiler.
 add_executable(amdllpc tool/amdllpc.cpp)
 add_dependencies(amdllpc llpc_standalone_compiler)
 target_link_libraries(amdllpc PRIVATE llpc_standalone_compiler)
-set_compiler_options(amdllpc ${LLPC_ENABLE_WERROR})
+set_compiler_options(amdllpc)
 add_compile_definitions(amdllpc PRIVATE SH_EXPORTING)
 
 endif()

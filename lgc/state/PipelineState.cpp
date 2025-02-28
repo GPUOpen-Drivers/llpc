@@ -1977,13 +1977,6 @@ void PipelineState::initializeInOutPackState() {
     m_outputPackState[ShaderStage::TessEval] = true;
     m_outputPackState[ShaderStage::Geometry] = true;
 
-    // NOTE: For mesh shader, we don't do in-out packing currently in that mesh shader could emit per-vertex outputs
-    // and per-primitive outputs, which introduces additional complexity and this complexity increases with the
-    // involvement of dynamic indexing.
-    if (hasShaderStage(ShaderStage::Mesh)) {
-      m_outputPackState[ShaderStage::Mesh] = false;
-      m_inputPackState[ShaderStage::Fragment] = false;
-    }
   } else {
     // For unlinked shaders, we can do in-out packing if the pipeline has two adjacent shaders.
     // We are assuming that if any of the vertex processing, then the vertex processing stages are complete.  For
@@ -2000,6 +1993,13 @@ void PipelineState::initializeInOutPackState() {
       m_inputPackState[stage] = true;
       m_outputPackState[*preStage] = true;
     }
+  }
+  // NOTE: For mesh shader, we don't do in-out packing currently in that mesh shader could emit per-vertex outputs
+  // and per-primitive outputs, which introduces additional complexity and this complexity increases with the
+  // involvement of dynamic indexing.
+  if (hasShaderStage(ShaderStage::Mesh)) {
+    m_outputPackState[ShaderStage::Mesh] = false;
+    m_inputPackState[ShaderStage::Fragment] = false;
   }
 }
 

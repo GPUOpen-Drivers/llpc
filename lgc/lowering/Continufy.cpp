@@ -32,6 +32,7 @@
 
 #include "lgc/lowering/Continufy.h"
 #include "compilerutils/CompilerUtils.h"
+#include "llpc/GpurtEnums.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcCpsDialect.h"
@@ -59,7 +60,7 @@ static Function *insertCpsArguments(Function &fn) {
   auto *fnTy = fn.getFunctionType();
   argTys.append(fnTy->params().begin(), fnTy->params().end());
 
-  auto *newFn = CompilerUtils::mutateFunctionArguments(fn, Type::getVoidTy(context), argTys, fn.getAttributes());
+  auto *newFn = compilerutils::mutateFunctionArguments(fn, Type::getVoidTy(context), argTys, fn.getAttributes());
 
   fn.replaceAllUsesWith(newFn);
   for (unsigned idx = 0; idx < fn.arg_size(); idx++) {
@@ -81,7 +82,7 @@ static Function *insertCpsArguments(Function &fn) {
 static unsigned getReturnedLevels(int stage) {
   // Traversal will return to RGS or CHS/MISS.
   if (stage == -1)
-    return 1u << (unsigned)CpsLevel::RayGen | 1u << (unsigned)CpsLevel::ClosestHit_Miss_Callable;
+    return 1u << (unsigned)CpsSchedulingLevel::RayGen | 1u << (unsigned)CpsSchedulingLevel::ClosestHit_Miss_Callable;
 
   RtStage rtStage = static_cast<RtStage>(stage);
   switch (rtStage) {
@@ -90,39 +91,39 @@ static unsigned getReturnedLevels(int stage) {
   case RtStage::ClosestHit:
   case RtStage::Miss:
     // Traversal
-    return (1u << (unsigned)CpsLevel::Traversal);
+    return (1u << (unsigned)CpsSchedulingLevel::Traversal);
   case RtStage::Callable:
     // CHS/Miss/Callable | RGS
-    return (1u << (unsigned)CpsLevel::ClosestHit_Miss_Callable | 1u << (unsigned)CpsLevel::RayGen);
+    return (1u << (unsigned)CpsSchedulingLevel::ClosestHit_Miss_Callable | 1u << (unsigned)CpsSchedulingLevel::RayGen);
   case RtStage::AnyHit:
     // IS | Traversal
-    return (1u << (unsigned)CpsLevel::Intersection | 1u << (unsigned)CpsLevel::Traversal);
+    return (1u << (unsigned)CpsSchedulingLevel::Intersection | 1u << (unsigned)CpsSchedulingLevel::Traversal);
   case RtStage::Intersection:
     // Traversal
-    return 1u << (unsigned)CpsLevel::Traversal;
+    return 1u << (unsigned)CpsSchedulingLevel::Traversal;
   default:
     llvm_unreachable("Unknown raytracing shader type.");
   }
 }
 
-/// Return CPS level of the ray-tracing stage.
-static CpsLevel getCpsLevelFromRtStage(int stage) {
+/// Return CPS scheduling level of the ray-tracing stage.
+static CpsSchedulingLevel getCpsLevelFromRtStage(int stage) {
   // Traversal
   if (stage == -1)
-    return CpsLevel::Traversal;
+    return CpsSchedulingLevel::Traversal;
 
   RtStage rtStage = static_cast<RtStage>(stage);
   switch (rtStage) {
   case RtStage::RayGeneration:
-    return CpsLevel::RayGen;
+    return CpsSchedulingLevel::RayGen;
   case RtStage::ClosestHit:
   case RtStage::Miss:
   case RtStage::Callable:
-    return CpsLevel::ClosestHit_Miss_Callable;
+    return CpsSchedulingLevel::ClosestHit_Miss_Callable;
   case RtStage::AnyHit:
-    return CpsLevel::AnyHit_CombinedIntersection_AnyHit;
+    return CpsSchedulingLevel::AnyHit_CombinedIntersection_AnyHit;
   case RtStage::Intersection:
-    return CpsLevel::Intersection;
+    return CpsSchedulingLevel::Intersection;
   default:
     llvm_unreachable("Unknown raytracing shader type.");
   }
@@ -149,7 +150,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
     if (continufyStage) {
       fnPtr = insertCpsArguments(fn);
       currentRtStage = mdconst::extract<ConstantInt>(continufyStage->getOperand(0))->getSExtValue();
-      CpsLevel level = getCpsLevelFromRtStage(currentRtStage.value());
+      CpsSchedulingLevel level = getCpsLevelFromRtStage(currentRtStage.value());
       setCpsFunctionLevel(*fnPtr, level);
     }
 
@@ -168,7 +169,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
 
         builder.SetInsertPoint(&call);
         auto *continuationRef = builder.CreatePtrToInt(called, IntegerType::get(context, 32));
-        CpsLevel calleeLevel =
+        CpsSchedulingLevel calleeLevel =
             getCpsLevelFromRtStage(mdconst::extract<ConstantInt>(calleeStage->getOperand(0))->getSExtValue());
         continuationRef = builder.CreateOr(continuationRef, builder.getInt32((uint32_t)calleeLevel));
 

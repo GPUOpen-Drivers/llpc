@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -30,14 +30,24 @@
  */
 #pragma once
 
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace lgc {
 
-// Disassemble an object (typically ELF) into ostream. Does report_fatal_error on error.
+// Disassemble an object (typically ELF) into ostream.
 //
 // @param data : The object file contents
 // @param ostream : The stream to disassemble into
-void disassembleObject(llvm::MemoryBufferRef data, llvm::raw_ostream &ostream);
+// @returns : Error::success() if no errors occurred, otherwise returns the Error object
+llvm::Error disassembleObject(llvm::MemoryBufferRef data, llvm::raw_ostream &ostream);
+
+// Disassemble a single symbol within an object (typically ELF) into ostream.
+//
+// @param data : The object file contents
+// @param ostream : The stream to disassemble into
+// @param symbolName : symbol to disassemble
+// @returns : Error::success() if no errors occurred, otherwise returns the Error object
+llvm::Error disassembleSingleSymbol(llvm::MemoryBufferRef data, llvm::raw_ostream &ostream, llvm::StringRef symbolName);
 
 } // namespace lgc

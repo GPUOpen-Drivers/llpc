@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -103,7 +103,7 @@ void LowerAwaitPassImpl::processContinuations() {
 
     // Create new empty function
     auto *NewFuncTy = FunctionType::get(NewRetTy, AllArgTypes, false);
-    Function *NewFunc = CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ArrayRef<AttributeSet>{});
+    Function *NewFunc = compilerutils::cloneFunctionHeader(*F, NewFuncTy, ArrayRef<AttributeSet>{});
     NewFunc->takeName(F);
 
     // Transfer code from old function to new function

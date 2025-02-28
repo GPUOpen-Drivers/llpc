@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -81,10 +81,18 @@ static void writeToHashedOutputFile(const Module &m, StringRef filenamePrefix, S
   dbgs() << "Wrote file '" << fullName << "'\n";
 }
 
+void irserializationutils::writeCFGToDotFile(const Function &f) {
+  writeCFGToDotFile(f, "cfg");
+}
+
+void irserializationutils::writeModuleToLLFile(const Module &m) {
+  writeModuleToLLFile(m, "module");
+}
+
 void irserializationutils::writeCFGToDotFile(const Function &f, StringRef filenamePrefix, bool cfgOnly) {
   // LLVM_DEBUG is not used in this function because the call will already be
   // guarded by a DEBUG macro, such as: DEBUG_WITH_TYPE(...);
-  auto funcName = CompilerUtils::dxil::tryDemangleFunctionName(f.getName());
+  auto funcName = compilerutils::dxil::tryDemangleFunctionName(f.getName());
   auto filenamePrefixFuncName = filenamePrefix.str() + "." + funcName.str();
 
   writeToHashedOutputFile(*f.getParent(), filenamePrefixFuncName, "dot", [&](raw_fd_ostream &file) {

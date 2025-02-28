@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -422,7 +422,13 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
       if (!var->hasDecorate(DecorationLocation, 0, &location))
         continue;
 
+      unsigned outCount = 1;
       SPIRVType *varElemTy = var->getType()->getPointerElementType();
+      if (varElemTy->getOpCode() == OpTypeArray) {
+        outCount = varElemTy->getArrayLength();
+        varElemTy = varElemTy->getArrayElementType();
+      }
+
       unsigned elemCount = 1;
       if (varElemTy->getOpCode() == OpTypeVector) {
         elemCount = varElemTy->getVectorComponentCount();
@@ -540,6 +546,12 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
       auto colorTarget = &pipelineInfo->cbState.target[location];
       colorTarget->format = format;
       colorTarget->channelWriteMask = (1U << elemCount) - 1;
+
+      for (unsigned idx = 1; idx < outCount; idx++) {
+        auto colorTarget = &pipelineInfo->cbState.target[location + idx];
+        colorTarget->format = format;
+        colorTarget->channelWriteMask = (1U << elemCount) - 1;
+      }
     }
   }
 

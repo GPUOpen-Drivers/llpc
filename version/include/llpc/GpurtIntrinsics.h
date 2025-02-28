@@ -30,37 +30,13 @@
  */
 #pragma once
 
+#include "llpc/GfxRuntimeCommon.hlsli"
 #include "llpc/GpurtEnums.h"
 
 // clang-format off
 
-#ifndef DUMMY_VOID_FUNC
-#ifdef AMD_VULKAN
-#define DUMMY_VOID_FUNC {}
-#else // AMD_VULKAN
-#define DUMMY_VOID_FUNC ;
-#endif
-#endif
-
-#ifndef DUMMY_GENERIC_FUNC
-#ifdef AMD_VULKAN
-#define DUMMY_GENERIC_FUNC(value) { return value; }
-#else // AMD_VULKAN
-#define DUMMY_GENERIC_FUNC(value) ;
-#endif
-#endif
-
-#ifdef __cplusplus
-#define GPURT_INOUT
-#define GPURT_DECL extern
-#else // __cplusplus
-#define GPURT_INOUT inout
-#ifdef AMD_VULKAN
-#define GPURT_DECL [noinline]
-#else // AMD_VULKAN
-#define GPURT_DECL
-#endif
-#endif
+#define GPURT_INOUT GFX_RUNTIME_COMMON_INOUT
+#define GPURT_DECL GFX_RUNTIME_COMMON_DECL
 
 //=====================================================================================================================
 // Continuation intrinsics

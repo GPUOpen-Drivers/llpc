@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // NOTE : Do not autogenerate
 
 // Check that we calculate payload size correctly using scalar alignment (requested by spec)

@@ -56,6 +56,7 @@
 #include "lgc/lowering/MutateEntryPoint.h"
 #include "ShaderMerger.h"
 #include "compilerutils/CompilerUtils.h"
+#include "llpc/GpurtEnums.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcCpsDialect.h"
@@ -87,12 +88,22 @@ using namespace llvm;
 using namespace lgc;
 using namespace cps;
 
+static cl::opt<bool> UseInitWholeWave("lgc-use-init-whole-wave",
+                                      cl::desc("Use the llvm.amdgcn.init.whole.wave intrinsic"), cl::init(false));
+
+// =====================================================================================================================
+bool MutateEntryPoint::useInitWholeWave() const {
+  return UseInitWholeWave && m_initWholeWaveId != llvm::Intrinsic::not_intrinsic;
+}
+
 // =====================================================================================================================
 MutateEntryPoint::MutateEntryPoint() : m_hasTs(false), m_hasGs(false) {
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 513481
   m_setInactiveChainArgId = Function::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg");
+  m_initWholeWaveId = Function::lookupIntrinsicID("llvm.amdgcn.init.whole.wave");
 #else
   m_setInactiveChainArgId = Intrinsic::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg");
+  m_initWholeWaveId = Intrinsic::lookupIntrinsicID("llvm.amdgcn.init.whole.wave");
 #endif
 }
 
@@ -494,15 +505,13 @@ void MutateEntryPoint::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCps
 // continuation transform, under which we still need to pass ShaderInput arguments(WorkgroupId/LocalInvocationId) during
 // cps chain call.
 bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
-  SmallVector<cps::JumpOp *> cpsJumps;
-  SmallVector<CallInst *> tobeErased;
-
   struct Payload {
-    SmallVectorImpl<cps::JumpOp *> &jumps;
-    SmallVectorImpl<CallInst *> &tobeErased;
-    MutateEntryPoint *self;
+    SmallVector<cps::JumpOp *> jumps;
+    SmallVector<CallInst *> tobeErased;
+    MutateEntryPoint *self = nullptr;
   };
-  Payload payload = {cpsJumps, tobeErased, this};
+  Payload payload;
+  payload.self = this;
 
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -514,11 +523,11 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
                             .build();
   visitor.visit(payload, *func);
 
-  for (auto *call : tobeErased)
+  for (auto *call : payload.tobeErased)
     call->eraseFromParent();
 
   bool isCpsFunc = cps::isCpsFunction(*func);
-  if (!isCpsFunc && cpsJumps.empty())
+  if (!isCpsFunc && payload.jumps.empty())
     return false;
 
   // Get the number of user-data arguments.
@@ -550,8 +559,44 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   SmallVector<CpsExitInfo> exitInfos;
   IRBuilder<> builder(func->getContext());
 
+  // If init.whole.wave is available, generate a new entry block to initialize the whole wave:
+  // entry.block:
+  //    %orig.exec = llvm.amdgcn.init.whole.wave()
+  //    br %orig.exec, %func, %tail.block
+  // func:
+  //    ...
+  //    br %tail.block
+  //  tail.block:
+  //    ...
+  bool useIWW = useInitWholeWave();
+  if (isCpsFunc && useIWW) {
+    auto *entryBlock = &func->getEntryBlock();
+    BasicBlock *shaderBlock = entryBlock->splitBasicBlock(entryBlock->getFirstNonPHIOrDbgOrAlloca());
+    builder.SetInsertPoint(entryBlock, entryBlock->getFirstNonPHIOrDbgOrAlloca());
+
+    // For the extra VGPR args, we'll have to preserve the values in the inactive
+    // lanes. This is achieved by adding the original values to Phi nodes in the
+    // tail block - but first we will have to split them into i32. Do this in
+    // the entry block, before inserting the init.whole.wave intrinsic.
+    SmallVector<Value *> remainingArgs;
+    for (Argument &arg : drop_begin(func->args(), numShaderArg))
+      remainingArgs.push_back(&arg);
+
+    SmallVector<Value *> vgprArgs;
+    splitIntoI32(func->getParent()->getDataLayout(), builder, remainingArgs, vgprArgs);
+
+    exitInfos.push_back(CpsExitInfo(entryBlock, std::move(vgprArgs)));
+
+    // Now we can finally insert the init.whole.wave intrinsic.
+    auto *originalExec = builder.CreateIntrinsic(builder.getInt1Ty(), m_initWholeWaveId, {});
+    builder.CreateCondBr(originalExec, shaderBlock, tailBlock);
+
+    // Remove the unconditional branch inserted by splitBB().
+    entryBlock->getTerminator()->eraseFromParent();
+  }
+
   // Lower cps jumps.
-  for (auto *jump : cpsJumps)
+  for (auto *jump : payload.jumps)
     lowerCpsJump(func, jump, tailBlock, exitInfos);
 
   // Lower returns.
@@ -620,26 +665,30 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     // it and call it. LLVM will misrecognize it as llvm.amdgcn.set.inactive, and lit-test would just fail. So here we
     // just call llvm.amdgcn.set.inactive to pass compilation and lit-test if no *set.inactive.chain.arg support.
     // TODO: Cleanup this when the related LLVM versions have the intrinsic definition.
-    if (m_setInactiveChainArgId != Intrinsic::not_intrinsic)
-      vcr = builder.CreateIntrinsic(vcrTy, m_setInactiveChainArgId, {vcr, vcrShaderArg});
-    else
-      vcr = builder.CreateIntrinsic(vcrTy, Intrinsic::amdgcn_set_inactive, {vcr, vcrShaderArg});
+    if (!useIWW) {
+      if (m_setInactiveChainArgId != Intrinsic::not_intrinsic)
+        vcr = builder.CreateIntrinsic(vcrTy, m_setInactiveChainArgId, {vcr, vcrShaderArg});
+      else
+        vcr = builder.CreateIntrinsic(vcrTy, Intrinsic::amdgcn_set_inactive, {vcr, vcrShaderArg});
+    }
 
     auto level = builder.CreateAnd(vcr, builder.getInt32(0x7));
     auto funcLevel = static_cast<unsigned>(cps::getCpsLevelFromFunction(*func));
-    static const std::vector<cps::CpsLevel> priorities[] = {
+    static const std::vector<CpsSchedulingLevel> priorities[] = {
         // RayGen: Continue with RayGen or hit shaders
-        {CpsLevel::Traversal, CpsLevel::ClosestHit_Miss_Callable, CpsLevel::RayGen},
+        {CpsSchedulingLevel::Traversal, CpsSchedulingLevel::ClosestHit_Miss_Callable, CpsSchedulingLevel::RayGen},
         // ClosestHit_Miss_Callable: Continue with hit shaders, then resume RayGen
-        {CpsLevel::Traversal, CpsLevel::RayGen, CpsLevel::ClosestHit_Miss_Callable},
+        {CpsSchedulingLevel::Traversal, CpsSchedulingLevel::RayGen, CpsSchedulingLevel::ClosestHit_Miss_Callable},
         // Traversal: Call Intersection or AnyHit, then call hit shaders or continue with RayGen
         // Traversal can continue with traversal when it wants to wait, so try that last
-        {CpsLevel::Traversal, CpsLevel::RayGen, CpsLevel::ClosestHit_Miss_Callable,
-         CpsLevel::AnyHit_CombinedIntersection_AnyHit, CpsLevel::Intersection},
+        {CpsSchedulingLevel::Traversal, CpsSchedulingLevel::RayGen, CpsSchedulingLevel::ClosestHit_Miss_Callable,
+         CpsSchedulingLevel::AnyHit_CombinedIntersection_AnyHit, CpsSchedulingLevel::Intersection},
         // AnyHit_CombinedIntersection_AnyHit: Continue with AnyHit, then resume Traversal
-        {CpsLevel::Traversal, CpsLevel::Intersection, CpsLevel::AnyHit_CombinedIntersection_AnyHit},
+        {CpsSchedulingLevel::Traversal, CpsSchedulingLevel::Intersection,
+         CpsSchedulingLevel::AnyHit_CombinedIntersection_AnyHit},
         // Intersection: Continue with Intersection, then resume Traversal
-        {CpsLevel::Traversal, CpsLevel::AnyHit_CombinedIntersection_AnyHit, CpsLevel::Intersection}};
+        {CpsSchedulingLevel::Traversal, CpsSchedulingLevel::AnyHit_CombinedIntersection_AnyHit,
+         CpsSchedulingLevel::Intersection}};
     // Get non-zero level execution Mask
     pendingBallot = takeLevel(level, builder, waveMaskTy, priorities[funcLevel - 1]);
   } else {
@@ -656,7 +705,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   auto *targetMask = builder.CreateICmpEQ(vcr, targetVcr);
   auto *execMask = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, targetMask);
 
-  if (isCpsFunc) {
+  if (isCpsFunc && !useIWW) {
     targetVcr = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, targetVcr);
     execMask = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, execMask);
   }
@@ -678,7 +727,10 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     builder.SetInsertPoint(chainBlock);
   // Mask off metadata bits and setup jump target.
   Value *addr32 = builder.CreateAnd(targetVcr, builder.getInt32(~0x3fu));
-  AddressExtender addressExtender(func);
+  // Insert jumpTarget computations in the tailBlock, since that is closer to where they will be used.
+  // These operations are expected to only use SGPRs, so it should be safe to run with or without all lanes
+  // enabled (i.e. regardless of useIWW's value).
+  AddressExtender addressExtender(func, tailBlock);
   Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
 
   const DataLayout &layout = func->getParent()->getDataLayout();
@@ -728,11 +780,38 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
 Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fixedShaderArgTys,
                                              ArrayRef<std::string> argNames) {
   IRBuilder<> builder(func->getContext());
+  AttributeList oldAttrs = func->getAttributes();
+
   SmallVector<Type *> newArgTys;
   newArgTys.append(fixedShaderArgTys.begin(), fixedShaderArgTys.end());
   newArgTys.push_back(builder.getInt32Ty());
   auto remainingArgs = func->getFunctionType()->params();
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
+
+  // If init.whole.wave is available, we need to pad the argument list up to the maximum number of VGPRs used for this
+  // pipeline, so that we can preserve the inactive lanes for these VGPRs.
+  int numInactiveVgprs = 0;
+  bool useIWW = useInitWholeWave();
+  if (useIWW) {
+    SmallVector<Type *> remainingVgprArgs;
+    for (unsigned idx = 0; idx < remainingArgs.size(); ++idx)
+      if (!oldAttrs.getParamAttrs(idx).hasAttribute(Attribute::InReg))
+        remainingVgprArgs.push_back(remainingArgs[idx]);
+
+    const DataLayout &layout = func->getParent()->getDataLayout();
+    std::optional<unsigned> argBound = lgc::cps::getMaxArgumentVgprs(*func->getParent());
+    if (!argBound.has_value())
+      report_fatal_error("Missing lgc.cps.maxArgumentVgprs metadata");
+
+    numInactiveVgprs = *argBound - lgc::cps::getArgumentDwordCount(layout, remainingVgprArgs);
+
+    if (numInactiveVgprs < 0)
+      report_fatal_error("Invalid number of inactive VGPRs, check lgc.cps.maxArgumentVgprs");
+
+    for (int i = 0; i < numInactiveVgprs; ++i)
+      newArgTys.push_back(builder.getInt32Ty());
+  }
+
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
   auto newFunc = createFunctionHelper(newFuncTy, func->getLinkage(), func->getParent());
   newFunc->copyAttributesFrom(func);
@@ -749,7 +828,6 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
   assert(haveLocalInvocationId == (argNames.back() == "LocalInvocationId") ||
          (argNames[argNames.size() - 2] == "LocalInvocationId"));
 
-  AttributeList oldAttrs = func->getAttributes();
   SmallVector<AttributeSet, 8> argAttrs;
   unsigned numUserdataArg = haveLocalInvocationId ? fixedShaderArgTys.size() - 1 : fixedShaderArgTys.size();
   for (unsigned idx = 0; idx != numUserdataArg; ++idx)
@@ -787,6 +865,12 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
     newArg->setName(oldArg->getName());
     oldArg->replaceAllUsesWith(newArg);
   }
+
+  if (useIWW) {
+    for (unsigned idx = newFunc->arg_size() - numInactiveVgprs; idx < newFunc->arg_size(); idx++)
+      newFunc->getArg(idx)->setName("inactive.vgpr");
+  }
+
   setShaderStage(newFunc, getShaderStage(func));
   newFunc->setAlignment(Align(64));
   newFunc->setCallingConv(CallingConv::AMDGPU_CS_Chain);
@@ -801,7 +885,7 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
 // @param waveMaskTy : Wave Mask type
 // @param priorities : Priorities list
 Value *MutateEntryPoint::takeLevel(Value *level, IRBuilder<> &builder, Type *waveMaskTy,
-                                   ArrayRef<CpsLevel> priorities) {
+                                   ArrayRef<CpsSchedulingLevel> priorities) {
   auto levelMask = builder.CreateICmpNE(level, builder.getInt32(0));
   Value *levelBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, levelMask);
   Value *cond = nullptr;

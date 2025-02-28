@@ -83,7 +83,7 @@ LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragmentColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 LLPC_MODULE_PASS("lgc-lower-desc", LowerDesc)
 
-#if LLPC_BUILD_STRIX1
+#if LLPC_BUILD_STRIX1  || LLPC_BUILD_STRIX_HALO
 LLPC_MODULE_PASS("lgc-workaround-ds-subdword-write", WorkaroundDsSubdwordWrite)
 #endif
 

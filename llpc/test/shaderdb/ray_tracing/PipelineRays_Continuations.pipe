@@ -1,13 +1,24 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ; Check that the ray tracing continuations mode is working.
 ; Generating the instruction 'image_bvh64_intersect_ray' indicates the trace ray library is linked correctly.
+; Among other things, make sure the !lgc.cps.maxArgumentVgprs metadata is the same for all modules in the pipeline.
 
 ; TODO: Change this to ISA / assembly output checks once the LLVM backend has settled
 
 ; RUN: amdllpc -gfxip 11.0 -emit-llvm -o - %s | FileCheck -check-prefixes=CHECK %s
 ; RUN: amdllpc -gfxip 11.0 -filetype=asm -add-rt-helpers 1 -o - %s | FileCheck -check-prefixes=ASM %s
 
+; Main doesn't contain any CPS functions, so we don't emit the maxArgumentVgprs metadata.
 ; CHECK-LABEL: @_amdgpu_cs_main(
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
+; CHECK-NOT: !lgc.cps.maxArgumentVgprs
 
 ; ASM: {{^}}_amdgpu_cs_main:
 
@@ -21,10 +32,16 @@
 ; CHECK:     unreachable
 ; CHECK:     ret void
 
+; CHECK: !lgc.cps.maxArgumentVgprs = !{[[ARG_BOUND_RGEN:![0-9]+]]}
+; CHECK: [[ARG_BOUND_RGEN]] = !{i32 [[ARG_BOUND_VALUE:[0-9]+]]}
+
 ; ASM: {{^}}_rgen_1.resume.0:
 
 ; CHECK-LABEL: @_chit_2(
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
+
+; CHECK: !lgc.cps.maxArgumentVgprs = !{[[ARG_BOUND_CHIT:![0-9]+]]}
+; CHECK: [[ARG_BOUND_CHIT]] = !{i32 [[ARG_BOUND_VALUE]]}
 
 ; ASM: {{^}}_chit_2:
 
@@ -33,6 +50,9 @@
 ; CHECK-NOT: ret void
 ; CHECK:     call void {{.*}} @llvm.amdgcn.cs.chain.
 ; CHECK-NOT: ret void
+
+; CHECK: !lgc.cps.maxArgumentVgprs = !{[[ARG_BOUND_CS:![0-9]+]]}
+; CHECK: [[ARG_BOUND_CS]] = !{i32 [[ARG_BOUND_VALUE]]}
 
 ; ASM: {{^}}_cs_:
 ; ASM:       image_bvh64_intersect_ray

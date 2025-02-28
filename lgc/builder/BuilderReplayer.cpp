@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -777,15 +777,18 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::SubgroupClusteredReduction: {
     Builder::GroupArithOp groupArithOp = static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
-    return m_builder->CreateSubgroupClusteredReduction(groupArithOp, args[1], args[2]);
+    unsigned clusterSize = cast<ConstantInt>(args[2])->getZExtValue();
+    return m_builder->CreateSubgroupClusteredReduction(groupArithOp, args[1], clusterSize);
   }
   case BuilderOpcode::SubgroupClusteredInclusive: {
     Builder::GroupArithOp groupArithOp = static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
-    return m_builder->CreateSubgroupClusteredInclusive(groupArithOp, args[1], args[2]);
+    unsigned clusterSize = cast<ConstantInt>(args[2])->getZExtValue();
+    return m_builder->CreateSubgroupClusteredInclusive(groupArithOp, args[1], clusterSize);
   }
   case BuilderOpcode::SubgroupClusteredExclusive: {
     Builder::GroupArithOp groupArithOp = static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
-    return m_builder->CreateSubgroupClusteredExclusive(groupArithOp, args[1], args[2]);
+    unsigned clusterSize = cast<ConstantInt>(args[2])->getZExtValue();
+    return m_builder->CreateSubgroupClusteredExclusive(groupArithOp, args[1], clusterSize);
   }
   case BuilderOpcode::SubgroupClusteredMultiExclusive: {
     Builder::GroupArithOp groupArithOp = static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());

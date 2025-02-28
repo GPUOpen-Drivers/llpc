@@ -27,15 +27,15 @@
  * @file  CombineCooperativeMatrix.cpp
  * @brief Pass and helpers for combining cooperative matrix operations.
  *
- * This pass is the place for combining / optimizing high-level cooperative matrix ops (@lgc.cooperative.matrix.*).
+ * This pass is the place for combining / optimizing high-level cooperative matrix ops (@lgc.xdl.cooperative.matrix.*).
  *
  * In particular, this pass reduces the number of transpose and convert operations.
  ***********************************************************************************************************************
  */
 #include "lgc/lowering/CombineCooperativeMatrix.h"
-#include "lgc/Builder.h"
+#include "xdl/util/ElementType.h"
 #include "lgc/LgcDialect.h"
-#include "lgc/state/Defs.h"
+#include "lgc/LgcXdlDialect.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm-dialects/Dialect/Visitor.h"
@@ -46,12 +46,9 @@
 
 using namespace llvm;
 using namespace lgc;
+using namespace lgc::xdl;
 
 namespace lgc {
-
-class CooperativeMatrixConvertOp;
-class CooperativeMatrixTransposeOp;
-class CooperativeMatrixMulAddOp;
 
 struct Shape {
   CooperativeMatrixElementType elementType;
@@ -455,7 +452,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
         b.SetInsertPointPastAllocas(&m_function);
       }
 
-      Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, component.shape->layout);
+      Type *resultMatrixTy = getCooperativeMatrixTy(b, component.shape->elementType, component.shape->layout);
       auto *transposed = b.create<CooperativeMatrixTransposeOp>(resultMatrixTy, PoisonValue::get(input->getType()),
                                                                 component.shape->elementType, component.shape->layout);
       foldTo(input, transposed);
@@ -484,7 +481,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           b.SetInsertPoint(def->getNextNode());
         }
 
-        Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, component.shape->layout);
+        Type *resultMatrixTy = getCooperativeMatrixTy(b, component.shape->elementType, component.shape->layout);
         transposed = b.create<CooperativeMatrixTransposeOp>(resultMatrixTy, use->get(), component.shape->elementType,
                                                             component.shape->layout);
       }
@@ -573,7 +570,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
         b.SetInsertPointPastAllocas(&m_function);
       }
 
-      Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, *otherLayout);
+      Type *resultMatrixTy = getCooperativeMatrixTy(b, component.shape->elementType, *otherLayout);
       CooperativeMatrixConvertOp *convert = b.create<CooperativeMatrixConvertOp>(
           resultMatrixTy, (CastInst::CastOps)0, PoisonValue::get(input->getType()), component.shape->elementType,
           component.shape->elementType, component.shape->layout, *otherLayout);
@@ -609,7 +606,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           b.SetInsertPoint(def->getNextNode());
         }
 
-        Type *resultMatrixTy = b.getCooperativeMatrixTy(component.shape->elementType, component.shape->layout);
+        Type *resultMatrixTy = getCooperativeMatrixTy(b, component.shape->elementType, component.shape->layout);
         relayouted = b.create<CooperativeMatrixConvertOp>(resultMatrixTy, (CastInst::CastOps)0, use->get(),
                                                           component.shape->elementType, component.shape->elementType,
                                                           *otherLayout, component.shape->layout);

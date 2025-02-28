@@ -135,7 +135,7 @@ Value *getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDataTy, 
 /// Replace call to intrinsic (lgc.rt.*) with a call to the driver
 /// implementation (_cont_*).
 Value *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData, lgc::rt::RayTracingShaderStage Kind,
-                            CallInst *Call, Module *GpurtLibrary, CompilerUtils::CrossModuleInliner &Inliner,
+                            CallInst *Call, Module *GpurtLibrary, compilerutils::CrossModuleInliner &Inliner,
                             bool KeepBuilderPos = false);
 
 /// Promote pointer arguments of a GPURT function @Func to by-value if appropriate (e. g. depending on pointeetys

@@ -45,25 +45,24 @@ set(LLVM_INCLUDE_UTILS ON CACHE BOOL "LLVM include utils")
 set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "LLVM enable terminfo")
 set(LLVM_RAM_PER_TABLEGEN_JOB 4000 CACHE STRING "LLVM RAM per tablegen job")
 set(LLVM_RAM_PER_LINK_JOB 5000 CACHE STRING "LLVM RAM per link job")
-if("${CMAKE_BUILD_TYPE}" STREQUAL Debug)
+if("${CMAKE_BUILD_TYPE}" STREQUAL Debug OR CMAKE_CONFIGURATION_TYPES)
     # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
     set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL "Build optimized llvm-tblgen")
-#if _WIN32
-    if(LLVM_OPTIMIZED_TABLEGEN AND WIN32 AND (CMAKE_GENERATOR MATCHES "Ninja"))
-        # LLVM implements the Release build of llvm-tblgen as a cross-compile target, which fails to find
-        # our DK-based toolchain (created with amd_generate_msvc_toolchain). However, we can inject the toolchain
-        # argument into LLVM's add_custom_target that sets up this cross-compile build.
-        # See: llvm-project/llvm/cmake/modules/CrossCompile.cmake
-        set(CROSS_TOOLCHAIN_FLAGS_NATIVE "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" CACHE STRING
-            "Toolchain flags for native build" FORCE)
+    if(LLVM_OPTIMIZED_TABLEGEN AND WIN32)
+        if(CMAKE_GENERATOR MATCHES "Ninja")
+            set(CROSS_TOOLCHAIN_FLAGS_NATIVE "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}" CACHE STRING
+                "Toolchain flags for native build" FORCE)
 
-        # Fail early to avoid the dreaded -ologo error.
-        if(CMAKE_VERSION VERSION_LESS "3.27")
-            message(FATAL_ERROR "Using LLVM_OPTIMIZED_TABLEGEN in a Debug build requires CMake 3.27 or higher."
-                                " The current CMake version is ${CMAKE_VERSION}.")
+            # Fail early to avoid the dreaded -ologo error.
+            if(CMAKE_VERSION VERSION_LESS "3.27")
+                message(FATAL_ERROR "Using LLVM_OPTIMIZED_TABLEGEN in a Debug build requires CMake 3.27 or higher."
+                                    " The current CMake version is ${CMAKE_VERSION}.")
+            endif()
+        else()
+            list(APPEND LLVM_CROSS_TOOLCHAIN_FLAGS_NATIVE "-D Python3_ROOT_DIR=${Python3_ROOT_DIR}")
+            set(CROSS_TOOLCHAIN_FLAGS_NATIVE ${LLVM_CROSS_TOOLCHAIN_FLAGS_NATIVE} CACHE STRING "" FORCE)
         endif()
     endif()
-#endif
 endif()
 
 # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
@@ -90,15 +89,19 @@ list(APPEND CMAKE_MODULE_PATH
     "${LLPC_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/lib/cmake/llvm" # Workaround for VS generator with older LLVM.
 )
 
-# Export LLVM build path for client driver.
-# TODO: Change uses to LLPC_LLVM_BUILD_PATH.
-set(XGL_LLVM_BUILD_PATH ${LLPC_LLVM_BUILD_PATH} PARENT_SCOPE)
+if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    # Export LLVM build path for client driver.
+    # TODO: Change uses to LLPC_LLVM_BUILD_PATH.
+    set(XGL_LLVM_BUILD_PATH ${LLPC_LLVM_BUILD_PATH} PARENT_SCOPE)
+endif()
 
 # Extract LLVM revision number for code outside the LLPC repository to use.
 file(READ "${LLPC_LLVM_SRC_PATH}/include/llvm/Config/llvm-config.h.cmake" LLVM_CONFIG_HEADER)
 string(REGEX MATCH "#define LLVM_MAIN_REVISION ([0-9]+)" "\\1" _ "${LLVM_CONFIG_HEADER}")
 set(LLVM_MAIN_REVISION "${CMAKE_MATCH_1}")
-set(LLVM_MAIN_REVISION ${LLVM_MAIN_REVISION} PARENT_SCOPE)
+if (NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(LLVM_MAIN_REVISION ${LLVM_MAIN_REVISION} PARENT_SCOPE)
+endif()
 
 # Some of the games using old versions of the tcmalloc lib are crashing
 # when allocating aligned memory. C++17 enables aligned new by default,

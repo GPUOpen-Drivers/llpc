@@ -1,3 +1,5 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 // BEGIN_SHADERTEST
 // This test is to verify input mapping of TES when component indexing is encountered. In such
 // case, we are supposed to reserve all components of locations corresponding to a TES input

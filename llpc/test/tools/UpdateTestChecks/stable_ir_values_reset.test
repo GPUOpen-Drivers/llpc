@@ -1,0 +1,2 @@
+# RUN: cp -f %S/Inputs/stable_ir_values.pipe %t.pipe && %update_llpc_test_checks %t.pipe --reset-variable-names --generalize-calls
+# RUN: diff -u %t.pipe %S/Inputs/stable_ir_values.pipe.expected.reset

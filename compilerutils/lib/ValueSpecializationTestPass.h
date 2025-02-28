@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -28,7 +28,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 
-namespace CompilerUtils {
+namespace compilerutils {
 
 // Helper pass to enable lit tests of ValueSpecializer.
 // Calls to a function named "specialize" trigger value specialization.
@@ -39,4 +39,4 @@ public:
   static llvm::StringRef name() { return "Test ValueSpecialization"; }
 };
 
-} // namespace CompilerUtils
+} // namespace compilerutils

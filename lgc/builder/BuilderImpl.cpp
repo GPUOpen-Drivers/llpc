@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -74,35 +74,6 @@ Type *BuilderBase::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecT
 // @param vector2 : The float vector 2
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
-  if (vector1->getType()->getScalarType()->isBFloatTy()) {
-    assert(getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11);
-    // Note: v_dot2_bf16_bf16 only respects RTE mode according to HW spec. We must check the specified rounding mode
-    //       before using it. Also, v_dot2_bf16_bf16 doesn't respect signed zeros so we must check NSZ as well.
-    const auto fp16RoundMode =
-        getPipelineState()->getShaderModes()->getCommonShaderMode(m_shaderStage.value()).fp16RoundMode;
-    const auto vectorTy = dyn_cast<FixedVectorType>(vector1->getType());
-    if (vectorTy && (fp16RoundMode == FpRoundMode::DontCare || fp16RoundMode == FpRoundMode::Even) &&
-        getFastMathFlags().noSignedZeros()) {
-      int compCount = vectorTy->getNumElements();
-      Value *result = nullptr;
-
-      if (compCount % 2 == 0) {
-        result = ConstantFP::get(getBFloatTy(), 0.0);
-      } else {
-        // If the component count is odd, prefer feeding the last product (odd one out) as initial value.
-        Value *lhs = CreateExtractElement(vector1, compCount - 1);
-        Value *rhs = CreateExtractElement(vector2, compCount - 1);
-        result = CreateFMul(lhs, rhs);
-      }
-
-      for (int i = 0; i + 1 < compCount; i += 2) {
-        Value *lhs = CreateShuffleVector(vector1, {i, i + 1});
-        Value *rhs = CreateShuffleVector(vector2, {i, i + 1});
-        result = CreateIntrinsic(getBFloatTy(), Intrinsic::amdgcn_fdot2_bf16_bf16, {lhs, rhs, result});
-      }
-      return result;
-    }
-  }
 
   Value *product = CreateFMul(vector1, vector2);
   if (!isa<VectorType>(product->getType()))
@@ -788,7 +759,7 @@ void implementScalarization(Value *nonUniformInstOperand, Value *nonUniformIndex
 
   for (Instruction *origInst : instrsToClone) {
     auto *newInst = origInst->clone();
-    newInst->insertBefore(prevInst);
+    newInst->insertBefore(prevInst->getIterator());
     origClonedValuesMap[origInst] = newInst;
     prevInst = newInst;
     // Update the operand of the nonUniformInst (for which the waterfall is created) with the new load that we
@@ -805,7 +776,7 @@ void implementScalarization(Value *nonUniformInstOperand, Value *nonUniformIndex
   // Clone the first non-uniform index.
   auto *origInst = cast<Instruction>(nonUniformIndex);
   auto *newInst = origInst->clone();
-  newInst->insertBefore(prevInst);
+  newInst->insertBefore(prevInst->getIterator());
   origClonedValuesMap[origInst] = newInst;
 
   // Update the operands of the cloned instructions.

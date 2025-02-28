@@ -48,10 +48,10 @@ namespace Llpc {
 
 // =====================================================================================================================
 LowerGlCompatibility::LowerGlCompatibility()
-    : m_retInst(nullptr), m_entryPointEnd(nullptr), m_originalEntryBlock(nullptr), m_clipVertex(nullptr),
-      m_clipDistance(nullptr), m_clipPlane(nullptr), m_frontColor(nullptr), m_backColor(nullptr),
-      m_frontSecondaryColor(nullptr), m_backSecondaryColor(nullptr), m_color(nullptr), m_secondaryColor(nullptr),
-      m_frontFacing(nullptr), m_patchTexCoord(nullptr), m_fragColor(nullptr), m_fragDepth(), m_fragStencilRef() {
+    : m_retInst(nullptr), m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr), m_frontColor(nullptr),
+      m_backColor(nullptr), m_frontSecondaryColor(nullptr), m_backSecondaryColor(nullptr), m_color(nullptr),
+      m_secondaryColor(nullptr), m_frontFacing(nullptr), m_patchTexCoord(nullptr), m_fragColor(nullptr), m_fragDepth(),
+      m_fragStencilRef() {
 }
 
 // =====================================================================================================================
@@ -319,18 +319,6 @@ void LowerGlCompatibility::buildPatchPositionInfo() {
     collectEmitInst();
   else
     unifyFunctionReturn(m_entryPoint);
-
-  // Create early kill block for bitmap, bitmap require a early return in masked thread.
-  if (needEmulateBitmap()) {
-    m_originalEntryBlock = &(m_entryPoint->getEntryBlock());
-    m_originalEntryBlock->splitBasicBlockBefore(m_originalEntryBlock->getFirstInsertionPt(), ".gl.compatibility.entry");
-    m_entryPointEnd = m_originalEntryBlock->splitBasicBlockBefore(m_originalEntryBlock->getFirstInsertionPt(),
-                                                                  ".gl.compatibility.kill");
-    m_builder->SetInsertPoint(m_entryPointEnd->begin());
-    m_builder->CreateKill();
-    ReturnInst::Create(*m_context, m_entryPointEnd);
-    m_entryPointEnd->back().eraseFromParent();
-  }
 }
 
 // =====================================================================================================================
@@ -502,7 +490,7 @@ void LowerGlCompatibility::createClipPlane() {
   auto vec4Type = FixedVectorType::get(floatType, 4);
   auto clipPlaneType = ArrayType::get(vec4Type, 8);
   auto clipPlane =
-      new GlobalVariable(*m_module, clipPlaneType, false, GlobalValue::ExternalLinkage, nullptr, "gl_ClipPlaneInternal",
+      new GlobalVariable(*m_module, clipPlaneType, true, GlobalValue::ExternalLinkage, nullptr, "gl_ClipPlaneInternal",
                          nullptr, GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Uniform);
   auto locationFound =
       getUniformConstantEntryByLocation(m_context, m_shaderStage, Vkgc::GlCompatibilityUniformLocation::ClipPlane);
@@ -748,32 +736,34 @@ void LowerGlCompatibility::emulateTwoSideLighting() {
 void LowerGlCompatibility::emulateBitmap() {
   auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   m_builder->SetInsertPoint(m_entryPoint->getEntryBlock().begin());
-  auto floatType = m_builder->getFloatTy();
-  auto int32Type = m_builder->getInt32Ty();
-  auto vec2Type = FixedVectorType::get(floatType, 2);
-  auto ivec2Type = FixedVectorType::get(int32Type, 2);
+  Value *constInt0x7 = ConstantInt::get(m_builder->getInt32Ty(), 0x7);
+  Value *constInt0x3 = ConstantInt::get(m_builder->getInt32Ty(), 0x3);
   if (!m_patchTexCoord) {
     createPatchTexCoord();
   }
-  Value *constInt0x7 = ConstantInt::get(ivec2Type, 0x7);
-  Value *constInt0x3 = ConstantInt::get(ivec2Type, 0x3);
-  Value *patchTexcoord = m_builder->CreateLoad(vec2Type, m_patchTexCoord);
-  Value *texcoord = m_builder->CreateFPToUI(patchTexcoord, ivec2Type);
-  Value *mask = m_builder->CreateAnd(texcoord, constInt0x7);
-  if (buildInfo->glState.enableBitmapLsb) {
-    mask = m_builder->CreateSub(mask, constInt0x7);
+  Value *patchTexcoord = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 2), m_patchTexCoord);
+  Value *texcoordBits = m_builder->CreateFPToUI(patchTexcoord, FixedVectorType::get(m_builder->getInt32Ty(), 2));
+  Value *texcoordX = m_builder->CreateExtractElement(texcoordBits, uint64_t(0));
+  Value *bitMaskResult = m_builder->CreateAnd(texcoordX, constInt0x7);
+  if (!buildInfo->glState.enableBitmapLsb) {
+    bitMaskResult = m_builder->CreateSub(constInt0x7, bitMaskResult);
   }
-  mask = m_builder->CreateShl(ConstantInt::get(ivec2Type, 1), mask);
-  Value *texCoordSrc = m_builder->CreateLShr(constInt0x3, texcoord);
+
+  bitMaskResult = m_builder->CreateShl(ConstantInt::get(m_builder->getInt32Ty(), 1), bitMaskResult);
+  texcoordX = m_builder->CreateLShr(texcoordX, constInt0x3);
+  texcoordBits = m_builder->CreateInsertElement(texcoordBits, texcoordX, uint64_t(0));
+
   auto imageDescPtr = m_builder->CreateGetDescPtr(
       lgc::ResourceNodeType::DescriptorResource, lgc::ResourceNodeType::DescriptorResource,
       PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource),
       Vkgc::InternalBinding::PixelOpInternalBinding);
-  Value *texel = m_builder->CreateImageLoad(ivec2Type, Dim2D, 0, imageDescPtr, texCoordSrc, nullptr);
-  Value *val = m_builder->CreateAnd(mask, texel);
-  val = m_builder->CreateExtractElement(val, ConstantInt::get(int32Type, 0));
-  auto cmp = m_builder->CreateICmpEQ(val, ConstantInt::get(int32Type, 0));
-  m_builder->CreateCondBr(cmp, m_entryPointEnd, m_originalEntryBlock);
+  Value *cmpResult = m_builder->CreateImageLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), Dim2D, 0,
+                                                imageDescPtr, texcoordBits, nullptr);
+  cmpResult = m_builder->CreateExtractElement(cmpResult, uint64_t(0));
+  cmpResult = m_builder->CreateAnd(bitMaskResult, cmpResult);
+  cmpResult = m_builder->CreateICmpEQ(cmpResult, ConstantInt::get(m_builder->getInt32Ty(), 0));
+  m_builder->SetInsertPoint(SplitBlockAndInsertIfThen(cmpResult, m_builder->GetInsertPoint(), false));
+  m_builder->CreateKill();
 }
 
 // =====================================================================================================================
@@ -783,8 +773,9 @@ void LowerGlCompatibility::emulateBitmap() {
 // @param [in] valTy         : current input value's type, should be global's valueType in top-level.
 // @param [in] metaVal       : metadata value of current output variable.
 // @param [in] alphaScaleVal : calculated alpha scaling results, default value is one.
-void LowerGlCompatibility::patchAlphaScaling(Value *val, Type *valTy, Constant *metaVal, Value *alphaScaleVal) {
+Value *LowerGlCompatibility::patchAlphaScaling(Value *val, Type *valTy, Constant *metaVal, Value *alphaScaleVal) {
   ShaderInOutMetadata outputMeta = {};
+  Value *returnVal = nullptr;
 
   if (valTy->isArrayTy()) {
     outputMeta.U64All[0] = cast<ConstantInt>(metaVal->getOperand(2))->getZExtValue();
@@ -792,18 +783,22 @@ void LowerGlCompatibility::patchAlphaScaling(Value *val, Type *valTy, Constant *
 
     if (!outputMeta.IsBuiltIn) {
       auto elemMeta = cast<Constant>(metaVal->getOperand(1));
-      const uint64_t elemCount = val->getType()->getArrayNumElements();
+      const uint64_t elemCount = valTy->getArrayNumElements();
       for (unsigned idx = 0; idx < elemCount; ++idx) {
         Value *elem = m_builder->CreateExtractValue(val, {idx}, "");
-        patchAlphaScaling(elem, elem->getType(), elemMeta, alphaScaleVal);
+        returnVal = patchAlphaScaling(elem, elem->getType(), elemMeta, alphaScaleVal);
+        if (returnVal != nullptr)
+          returnVal = m_builder->CreateInsertValue(val, returnVal, {idx}, "");
       }
     }
   } else if (valTy->isStructTy()) {
-    const uint64_t memberCount = val->getType()->getStructNumElements();
+    const uint64_t memberCount = valTy->getStructNumElements();
     for (unsigned memberIdx = 0; memberIdx < memberCount; ++memberIdx) {
       auto memberMeta = cast<Constant>(metaVal->getOperand(memberIdx));
       Value *member = m_builder->CreateExtractValue(val, {memberIdx});
-      patchAlphaScaling(member, member->getType(), memberMeta, alphaScaleVal);
+      returnVal = patchAlphaScaling(member, member->getType(), memberMeta, alphaScaleVal);
+      if (returnVal != nullptr)
+        returnVal = m_builder->CreateInsertValue(val, returnVal, {memberIdx}, "");
     }
   } else {
     Constant *inOutMetaConst = cast<Constant>(metaVal);
@@ -812,14 +807,14 @@ void LowerGlCompatibility::patchAlphaScaling(Value *val, Type *valTy, Constant *
 
     // When enabling line smooth, alpha channel will be patched with a scaling factor.
     if (!outputMeta.IsBuiltIn && outputMeta.NumComponents == 4 && alphaScaleVal) {
-      Value *outputValue = m_builder->CreateLoad(valTy, val);
-      Value *scaledAlpha = m_builder->CreateExtractElement(outputValue, 3);
+      Value *scaledAlpha = m_builder->CreateExtractElement(val, 3);
       Value *alphaScaleFactor = m_builder->CreateLoad(m_builder->getFloatTy(), alphaScaleVal);
       scaledAlpha = m_builder->CreateFMul(alphaScaleFactor, scaledAlpha);
-      outputValue = m_builder->CreateInsertElement(outputValue, scaledAlpha, m_builder->getInt32(3));
-      m_builder->CreateStore(outputValue, val);
+      returnVal = m_builder->CreateInsertElement(val, scaledAlpha, m_builder->getInt32(3));
     }
   }
+
+  return returnVal;
 }
 
 // =====================================================================================================================
@@ -874,9 +869,7 @@ void LowerGlCompatibility::emulateSmoothStipple() {
     Value *xInByteOffset = m_builder->CreateAnd(calcFragCoordX, m_builder->getInt32(0x7u));
     // xInByteOffset = 7 - xInByteOffset
     // Due to concern with default turned on option LsbFirst, x bits are in reverse order within each 8 bits pattern.
-    if (pipelineBuildInfo->glState.enableBitmapLsb) {
-      xInByteOffset = m_builder->CreateSub(m_builder->getInt32(0x7u), xInByteOffset);
-    }
+    xInByteOffset = m_builder->CreateSub(m_builder->getInt32(0x7u), xInByteOffset);
     // xOffset = xInByteOffset + xOffset
     xOffset = m_builder->CreateAdd(xOffset, xInByteOffset);
 
@@ -934,7 +927,10 @@ void LowerGlCompatibility::emulateSmoothStipple() {
       auto addrSpace = global.getType()->getAddressSpace();
       if (addrSpace == SPIRAS_Output) {
         auto outputMetaVal = mdconst::extract<Constant>(global.getMetadata(gSPIRVMD::InOut)->getOperand(0));
-        patchAlphaScaling(&global, global.getValueType(), outputMetaVal, alphaScaleVal);
+        Value *patchedVal = m_builder->CreateLoad(global.getValueType(), &global);
+        patchedVal = patchAlphaScaling(patchedVal, global.getValueType(), outputMetaVal, alphaScaleVal);
+        if (patchedVal != nullptr)
+          m_builder->CreateStore(patchedVal, &global);
       }
     }
   }
@@ -985,7 +981,10 @@ void LowerGlCompatibility::emulateSmoothStipple() {
       auto addrSpace = global.getType()->getAddressSpace();
       if (addrSpace == SPIRAS_Output) {
         auto outputMetaVal = mdconst::extract<Constant>(global.getMetadata(gSPIRVMD::InOut)->getOperand(0));
-        patchAlphaScaling(&global, global.getValueType(), outputMetaVal, alphaScaleVal);
+        Value *patchedVal = m_builder->CreateLoad(global.getValueType(), &global);
+        patchedVal = patchAlphaScaling(patchedVal, global.getValueType(), outputMetaVal, alphaScaleVal);
+        if (patchedVal != nullptr)
+          m_builder->CreateStore(patchedVal, &global);
       }
     }
   }
@@ -1146,7 +1145,7 @@ void LowerGlCompatibility::lowerAlphaTest() {
   Value *outputAlpha = m_builder->CreateExtractElement(outputValue, 3);
 
   // get alphaRef
-  auto alphaRef = new GlobalVariable(*m_module, floatTy, false, GlobalValue::ExternalLinkage, nullptr, "alphaTestRef",
+  auto alphaRef = new GlobalVariable(*m_module, floatTy, true, GlobalValue::ExternalLinkage, nullptr, "alphaTestRef",
                                      nullptr, GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Uniform);
   auto locationFound =
       getUniformConstantEntryByLocation(m_context, m_shaderStage, Vkgc::GlCompatibilityUniformLocation::AlphaTestRef);

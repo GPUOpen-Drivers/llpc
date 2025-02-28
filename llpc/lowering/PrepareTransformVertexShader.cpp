@@ -37,7 +37,7 @@
 
 using namespace lgc;
 using namespace llvm;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 namespace Llpc {
 #define DEBUG_TYPE "prepare-transform-shader"
@@ -130,7 +130,7 @@ void PrepareTransformVertexShader::genFunTransformVertex(Function &function) {
   Value *vsOutput = PoisonValue::get(structTy);
 
   // 2. Handle early returns
-  m_unifiedReturn = CompilerUtils::unifyReturns(function, *m_builder);
+  m_unifiedReturn = compilerutils::unifyReturns(function, *m_builder);
   m_builder->SetInsertPoint(m_unifiedReturn);
 
   // 3. Store gl_Position, gl_ClipDistance, gl_FrontColor and gl_TextureCoord[0] in the struct

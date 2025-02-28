@@ -48,7 +48,7 @@ function(llpc_set_property target scope varName default propertyName)
         endif()
         # For an LLPC_ variable, cache it as an option so that GPURT can see it.
         if ("${varName}" MATCHES "^LLPC_")
-            option(${varName} "Support ${varName}?" ${${varName}})
+            set(${varName} "${${varName}}" CACHE BOOL "Support ${varName}?" FORCE)
         endif()
         set(${varName} ${${varName}} PARENT_SCOPE)
     endif()

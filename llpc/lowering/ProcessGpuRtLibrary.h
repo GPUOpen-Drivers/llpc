@@ -133,6 +133,7 @@ private:
   void createInitStaticId(llvm::Function *func);
   void createGetKnownSetRayFlags(llvm::Function *func);
   void createGetKnownUnsetRayFlags(llvm::Function *func);
+  void createMakePc(llvm::Function *func);
   void createContStackAlloc(llvm::Function *func);
   void createContStackFree(llvm::Function *func);
   void createContStackGetPtr(llvm::Function *func);

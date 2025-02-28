@@ -80,7 +80,7 @@ class BufferOpLowering {
   };
 
 public:
-  BufferOpLowering(CompilerUtils::TypeLowering &typeLowering, PipelineState &pipelineState,
+  BufferOpLowering(compilerutils::TypeLowering &typeLowering, PipelineState &pipelineState,
                    llvm::UniformityInfo &uniformityInfo);
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLowering> &builder);
@@ -132,7 +132,7 @@ private:
                                          const llvm::function_ref<llvm::Value *(llvm::Value *)> callback);
   llvm::Value *createLoadDesc(llvm::Value *buffAddress, bool forceRawView, bool isCompact);
 
-  CompilerUtils::TypeLowering &m_typeLowering;
+  compilerutils::TypeLowering &m_typeLowering;
   BuilderImpl m_builder;
 
   PipelineState &m_pipelineState;

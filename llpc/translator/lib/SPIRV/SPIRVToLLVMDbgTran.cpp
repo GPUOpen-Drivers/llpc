@@ -46,6 +46,7 @@
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
+#include <llvm/Support/Casting.h>
 
 using namespace std;
 using namespace SPIRVDebug::Operand;
@@ -254,7 +255,11 @@ DIType *SPIRVToLLVMDbgTran::transTypePointer(const SPIRVExtInst *DebugInst) {
     Ty = Builder.createPointerType(PointeeTy, BM->getAddressingModel() * 32, 0, AS);
 
   if (Flags & SPIRVDebug::FlagIsObjectPointer)
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 524303
+    Ty = Builder.createObjectPointerType(Ty, /*Implicit=*/true);
+#else
     Ty = Builder.createObjectPointerType(Ty);
+#endif
   else if (Flags & SPIRVDebug::FlagIsArtificial)
     Ty = Builder.createArtificialType(Ty);
 
@@ -902,22 +907,14 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
     // If new Debug Info Format is turned OFF then 'insertDeclare' will return Instruction (Intrinsic) which we are
     // storing in hashMap. This part will be removed after the transition, since new DbgInfoFormat will be turned ON
     // always and we will return nullptr from that point. This comment applies also to 'insertDbgValueIntrinsic' below.
-    if (DbgInst.is<Instruction *>()) {
-      return DbgInst.get<Instruction *>();
-    } else {
-      return nullptr;
-    }
+    return dyn_cast_or_null<Instruction *>(DbgInst);
   }
   case SPIRVDebug::Value: {
     using namespace SPIRVDebug::Operand::DebugValue;
     auto LocalVar = GetLocalVar(Ops[DebugLocalVarIdx]);
     LLPCDbgInstPtr DbgInst = Builder.insertDbgValueIntrinsic(GetValue(Ops[ValueIdx]), LocalVar.first,
                                                              GetExpression(Ops[ExpressionIdx]), LocalVar.second, BB);
-    if (DbgInst.is<Instruction *>()) {
-      return DbgInst.get<Instruction *>();
-    } else {
-      return nullptr;
-    }
+    return dyn_cast_or_null<Instruction *>(DbgInst);
   }
   default:
     llvm_unreachable("Unknown debug intrinsic!");

@@ -757,15 +757,15 @@ public:
 
   // Create a subgroup clustered reduction.
   llvm::Value *CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, llvm::Value *const value,
-                                                llvm::Value *const clusterSize, const llvm::Twine &instName = "");
+                                                unsigned clusterSize, const llvm::Twine &instName = "");
 
   // Create a subgroup clustered inclusive scan.
   llvm::Value *CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, llvm::Value *const value,
-                                                llvm::Value *const clusterSize, const llvm::Twine &instName = "");
+                                                unsigned clusterSize, const llvm::Twine &instName = "");
 
   // Create a subgroup clustered exclusive scan.
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
-                                                llvm::Value *const clusterSize, const llvm::Twine &instName = "");
+                                                unsigned clusterSize, const llvm::Twine &instName = "");
 
   // Create a subgroup clustered multi exclusive scan.
   llvm::Value *CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArithOp, llvm::Value *const value,

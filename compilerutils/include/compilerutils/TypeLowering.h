@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -61,7 +61,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
-namespace CompilerUtils {
+namespace compilerutils {
 
 class TypeLowering;
 
@@ -129,7 +129,8 @@ using ConstantTypeLoweringFn = llvm::SmallVector<llvm::Constant *>(TypeLowering 
 ///   payload.lowering.finishPhis();
 ///
 ///   // Erase all instructions that "have been replaced" (by calling
-///   replaceInstruction for them). payload.lowering.finishCleanup();
+///   replaceInstruction for them).
+///   payload.finishCleanup();
 /// @endcode
 class TypeLowering {
 public:
@@ -151,6 +152,7 @@ public:
   void eraseInstruction(llvm::Instruction *);
 
   llvm::Function *lowerFunctionArguments(llvm::Function &);
+  void lowerGlobalVariable(llvm::GlobalVariable &);
   void finishPhis();
   bool finishCleanup();
 
@@ -171,16 +173,17 @@ private:
   llvm::SmallVector<std::function<ConstantTypeLoweringFn>> m_constantRules;
 
   /// Cache mappings of types (including no-op mappings).
-  CompilerUtils::LoweringPointerTupleMap<llvm::Type *, llvm::Type *, false> m_typeConversions;
+  compilerutils::LoweringPointerTupleMap<llvm::Type *, llvm::Type *, false> m_typeConversions;
 
   llvm::IRBuilder<> m_builder;
 
   /// Map original values to type-converted values.
-  CompilerUtils::LoweringPointerTupleMap<llvm::Value *, llvm::Value *, true> m_valueMap;
+  compilerutils::LoweringPointerTupleMap<llvm::Value *, llvm::Value *, true> m_valueMap;
 
   std::vector<std::pair<llvm::PHINode *, llvm::SmallVector<llvm::PHINode *>>> m_phis;
   std::vector<llvm::Instruction *> m_instructionsToErase;
   llvm::SmallVector<llvm::Function *> m_functionsToErase;
+  llvm::SmallVector<llvm::GlobalVariable *> m_gvToErase;
 };
 
-} // namespace CompilerUtils
+} // namespace compilerutils

@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // Test not forcing NURI
 // BEGIN_SHADERTEST
 // RUN: amdllpc -v %gfxip %s --force-non-uniform-resource-index-stage-mask=0x00000000 | FileCheck -check-prefix=NOTFORCENURITEST %s

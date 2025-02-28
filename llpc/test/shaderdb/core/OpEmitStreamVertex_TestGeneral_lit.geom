@@ -1,4 +1,6 @@
 #version 450
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 
 layout(triangles) in;
 layout(triangle_strip, max_vertices = 32, stream = 1) out;

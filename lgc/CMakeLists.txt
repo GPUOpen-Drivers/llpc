@@ -54,14 +54,11 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 )
 
 llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils Raytracing)
-target_link_libraries(LLVMlgc PUBLIC llvm_dialects ${extra_llvm_libs} llpc_version)
-
-### Cached Project Options #############################################################################################
-option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
+target_link_libraries(LLVMlgc PUBLIC llvm_dialects ${extra_llvm_libs} sharedme_xdl llpc_version)
 
 ### Compiler Options ###################################################################################################
 include(../cmake/CompilerFlags.cmake)
-set_compiler_options(LLVMlgc ${LLPC_ENABLE_WERROR})
+set_compiler_options(LLVMlgc)
 
 ### TableGen for LGC dialect ###########################################################################################
 
@@ -71,12 +68,8 @@ if (${LLVM_MAIN_REVISION} GREATER_EQUAL 514862)
   set(LGC_TABLEGEN_FLAGS -DLLVM_HAVE_NODIVERGENCESOURCE_ATTR)
 endif()
 
-if (EXISTS ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
-  set(LGC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
-else()
-  set(LGC_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
-endif()
-set(LGC_TABLEGEN_TARGET llvm-dialects-tblgen)
+include(../cmake/DialectsTablegen.cmake)
+set_dialects_tablegen_exe(LGC)
 set(LLVM_TARGET_DEFINITIONS interface/lgc/LgcDialect.td)
 
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/interface/lgc)
@@ -195,7 +188,7 @@ target_sources(LLVMlgc PRIVATE
     lowering/VertexFetch.cpp
     lowering/CollectImageOperations.cpp
     lowering/RegisterMetadataBuilder.cpp
-#if LLPC_BUILD_STRIX1
+#if LLPC_BUILD_STRIX1  || LLPC_BUILD_STRIX_HALO
     lowering/WorkaroundDsSubdwordWrite.cpp
 #endif
     lowering/CombineCooperativeMatrix.cpp
@@ -287,6 +280,7 @@ target_sources(LLVMlgc PRIVATE
     util/RegStackUsage.cpp
     util/StartStopTimer.cpp
     util/WorkgroupLayout.cpp
+    util/BufferResource.cpp
 )
 
 # include/lgc/util

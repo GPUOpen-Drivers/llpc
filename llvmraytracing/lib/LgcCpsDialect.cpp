@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -43,6 +43,7 @@ using namespace llvm;
 using namespace lgc::rt;
 
 constexpr const char CpsMetadata[] = "lgc.cps";
+constexpr const char CpsMaxArgumentVgprsMetadata[] = "lgc.cps.maxArgumentVgprs";
 
 // =====================================================================================================================
 // Helper to determine how many dwords we require to store a variable of a given
@@ -114,6 +115,27 @@ std::optional<unsigned> lgc::cps::getRemainingArgumentDwords(const DataLayout &D
 }
 
 // =====================================================================================================================
+// Get the maximum number of VGPR registers that can be used as arguments by any
+// shader in the pipeline. This includes payload registers and their
+// corresponding padding.
+std::optional<unsigned> lgc::cps::getMaxArgumentVgprs(const Module &m) {
+  NamedMDNode *node = m.getNamedMetadata(CpsMaxArgumentVgprsMetadata);
+  if (!node)
+    return std::nullopt;
+
+  return mdconst::extract<ConstantInt>(node->getOperand(0)->getOperand(0))->getZExtValue();
+}
+
+// Set the maximum number of VGPR registers that can be used as arguments by any
+// shader in the pipeline.
+void lgc::cps::setMaxArgumentVgprs(Module &module, unsigned maxArgumentVgprs) {
+  LLVMContext &context = module.getContext();
+  MDNode *node =
+      MDNode::get(context, {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(context), maxArgumentVgprs))});
+  module.getOrInsertNamedMetadata(CpsMaxArgumentVgprsMetadata)->addOperand(node);
+}
+
+// =====================================================================================================================
 // Checks if a function is annotated with !lgc.cps metadata.
 bool lgc::cps::isCpsFunction(const Function &fn) {
   MDNode *node = fn.getMetadata(fn.getContext().getMDKindID(CpsMetadata));
@@ -123,8 +145,8 @@ bool lgc::cps::isCpsFunction(const Function &fn) {
 // =====================================================================================================================
 // Transforms a function into a CPS function by setting the CPS level as
 // metadata.
-void lgc::cps::setCpsFunctionLevel(Function &fn, CpsLevel level) {
-  assert(level < CpsLevel::Count && "Invalid CPS level!");
+void lgc::cps::setCpsFunctionLevel(Function &fn, CpsSchedulingLevel level) {
+  assert(level < CpsSchedulingLevel::Count && "Invalid CPS level!");
 
   LLVMContext &context = fn.getContext();
   MDNode *node = MDNode::get(
@@ -136,7 +158,7 @@ void lgc::cps::setCpsFunctionLevel(Function &fn, CpsLevel level) {
 // Returns the CPS level of a function, if the function is a CPS function and
 // has the level metadata node set. For now, this always expects a function to
 // have both the CPS metadata and the level metadata.
-lgc::cps::CpsLevel lgc::cps::getCpsLevelFromFunction(const Function &fn) {
+CpsSchedulingLevel lgc::cps::getCpsLevelFromFunction(const Function &fn) {
   MDNode *node = fn.getMetadata(fn.getContext().getMDKindID(CpsMetadata));
   if (!node) {
     // Expect that we have set the CPS metadata.
@@ -145,28 +167,28 @@ lgc::cps::CpsLevel lgc::cps::getCpsLevelFromFunction(const Function &fn) {
 
   const ConstantAsMetadata *c = cast<ConstantAsMetadata>(node->getOperand(0));
   unsigned level = cast<ConstantInt>(c->getValue())->getZExtValue();
-  assert(level < static_cast<unsigned>(CpsLevel::Count) && "Invalid CPS level!");
-  return static_cast<CpsLevel>(level);
+  assert(level < static_cast<unsigned>(CpsSchedulingLevel::Count) && "Invalid CPS level!");
+  return static_cast<CpsSchedulingLevel>(level);
 }
 
 // =====================================================================================================================
 // Transform a shader type into the corresponding CPS level.
-lgc::cps::CpsLevel lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage stage) {
+CpsSchedulingLevel lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage stage) {
   if (stage == RayTracingShaderStage::RayGeneration)
-    return CpsLevel::RayGen;
+    return CpsSchedulingLevel::RayGen;
 
   if (stage == RayTracingShaderStage::Traversal)
-    return CpsLevel::Traversal;
+    return CpsSchedulingLevel::Traversal;
 
   if (stage == RayTracingShaderStage::ClosestHit || stage == RayTracingShaderStage::Miss ||
       stage == RayTracingShaderStage::Callable)
-    return CpsLevel::ClosestHit_Miss_Callable;
+    return CpsSchedulingLevel::ClosestHit_Miss_Callable;
 
   if (stage == RayTracingShaderStage::AnyHit)
-    return CpsLevel::AnyHit_CombinedIntersection_AnyHit;
+    return CpsSchedulingLevel::AnyHit_CombinedIntersection_AnyHit;
 
   if (stage == RayTracingShaderStage::Intersection)
-    return CpsLevel::Intersection;
+    return CpsSchedulingLevel::Intersection;
 
   llvm_unreachable("Cannot determine CPS level.");
 }
@@ -177,7 +199,7 @@ lgc::cps::CpsLevel lgc::cps::getCpsLevelForShaderStage(RayTracingShaderStage sta
 uint8_t lgc::cps::getPotentialCpsReturnLevels(RayTracingShaderStage stage) {
   std::bitset<8> CpsLevels;
 
-  auto SetLevel = [&CpsLevels](CpsLevel Level) -> void { CpsLevels.set(static_cast<uint8_t>(Level)); };
+  auto SetLevel = [&CpsLevels](CpsSchedulingLevel Level) -> void { CpsLevels.set(static_cast<uint8_t>(Level)); };
 
   switch (stage) {
   case RayTracingShaderStage::RayGeneration:
@@ -190,18 +212,18 @@ uint8_t lgc::cps::getPotentialCpsReturnLevels(RayTracingShaderStage stage) {
   case RayTracingShaderStage::Miss:
   case RayTracingShaderStage::Traversal:
     // These stages returns to wherever TraceRay is called (RGS, CHS and miss).
-    SetLevel(CpsLevel::RayGen);
-    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+    SetLevel(CpsSchedulingLevel::RayGen);
+    SetLevel(CpsSchedulingLevel::ClosestHit_Miss_Callable);
     break;
   case RayTracingShaderStage::AnyHit:
     // AHS returns to Traversal (triangle intersection) or IS (procedural
     // intersection).
-    SetLevel(CpsLevel::Traversal);
-    SetLevel(CpsLevel::Intersection);
+    SetLevel(CpsSchedulingLevel::Traversal);
+    SetLevel(CpsSchedulingLevel::Intersection);
     break;
   case RayTracingShaderStage::Intersection:
     // IS returns to Traversal only.
-    SetLevel(CpsLevel::Traversal);
+    SetLevel(CpsSchedulingLevel::Traversal);
     break;
   default:
     llvm_unreachable("Cannot determine CPS level.");

@@ -1015,12 +1015,6 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
   // The processing is something like this:
   //
   // OPTIMIZED_TF_STORE_AND_HS_OUTPUTS_STORE() {
-  //   if (threadIdInWave < hsVertexCount) {
-  //     Read TFs from LDS (each thread corresponds to an output vertex)
-  //     if (outerTfs > 0.0)
-  //       Write HS outputs to off-chip LDS buffer
-  //   }
-  //
   //   Read hsPatchCount from LDS
   //
   //   if (threadIdInGroup < hsPatchCount) {
@@ -1047,6 +1041,12 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
   //     } else {
   //       Write TFs to buffer
   //     }
+  //   }
+  //
+  //   if (threadIdInWave < hsVertexCount) {
+  //     Read TFs from LDS (each thread corresponds to an output vertex)
+  //     if (outerTfs > 0.0)
+  //       Write HS outputs to off-chip LDS buffer
   //   }
   // }
   //

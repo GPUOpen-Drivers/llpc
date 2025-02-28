@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -123,6 +123,10 @@ public:
     ADD_CLASS_ENUM_MAP(InvariantLoads, EnableOptimization)
     ADD_CLASS_ENUM_MAP(InvariantLoads, DisableOptimization)
     ADD_CLASS_ENUM_MAP(InvariantLoads, ClearInvariants)
+
+    ADD_CLASS_ENUM_MAP(LlvmScheduleStrategy, None)
+    ADD_CLASS_ENUM_MAP(LlvmScheduleStrategy, MaxIlp)
+    ADD_CLASS_ENUM_MAP(LlvmScheduleStrategy, MaxMemoryClause)
   }
 };
 

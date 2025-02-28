@@ -3,7 +3,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -53,7 +53,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 #define DEBUG_TYPE "dxil-to-llvm"
 
@@ -330,9 +330,47 @@ struct DxilToLlvmPassImpl {
     m_typeLower.eraseInstruction(&gepInst);
   }
 
+  void visitCallInst(llvm::CallInst &callInst) {
+    // Changing return types is currently not supported.
+    // TypeLowering's lowerFunctionArguments asserts this as well.
+    assert(callInst.getType() == getConvertedType(callInst.getType()));
+
+    // The operands of createHandleForLib may come from a load that was replaced.
+    if (!isa_and_nonnull<Function>(callInst.getCalledOperand()) ||
+        !callInst.getCalledOperand()->getName().starts_with("dx.op.createHandleForLib"))
+      return;
+
+    // Find converted args
+    auto opcode = callInst.getArgOperand(0);
+    auto resource = callInst.getArgOperand(1);
+    auto convertedResource = m_typeLower.getValueOptional(resource);
+    if (convertedResource.empty())
+      return;
+
+    assert(convertedResource.size() == 1);
+    Value *callArgs[] = {opcode, convertedResource[0]};
+
+    // Replacement of function uses has already occurred via lowerFunctionArguments.
+    auto *newFn = cast<Function>(callInst.getCalledOperand());
+
+    // Create a new call instruction to the new function
+    CallInst *newCallInst = CallInst::Create(newFn, callArgs, "", callInst.getIterator());
+    newCallInst->setCallingConv(callInst.getCallingConv());
+    newCallInst->setTailCallKind(callInst.getTailCallKind());
+    newCallInst->setAttributes(callInst.getAttributes());
+    // Replace uses of the old call with the new call
+    callInst.replaceAllUsesWith(newCallInst);
+    m_typeLower.eraseInstruction(&callInst);
+  }
+
   void fixFunctionTypes() {
     for (Function &function : m_module)
       m_typeLower.lowerFunctionArguments(function);
+  }
+
+  void fixGlobalVariables() {
+    for (GlobalVariable &gv : m_module.globals())
+      m_typeLower.lowerGlobalVariable(gv);
   }
 
   llvm::PreservedAnalyses run() {
@@ -344,8 +382,10 @@ struct DxilToLlvmPassImpl {
                                     .add(&DxilToLlvmPassImpl::visitExtractElement)
                                     .add(&DxilToLlvmPassImpl::visitShuffleVector)
                                     .add(&DxilToLlvmPassImpl::visitGEP)
+                                    .add(&DxilToLlvmPassImpl::visitCallInst)
                                     .build();
     fixFunctionTypes();
+    fixGlobalVariables();
 
     visitor.visit(*this, m_module);
 
@@ -367,7 +407,7 @@ template <> struct llvm_dialects::VisitorPayloadProjection<DxilToLlvmPassImpl, T
   static TypeLowering &project(DxilToLlvmPassImpl &p) { return p.m_typeLower; }
 };
 
-llvm::PreservedAnalyses CompilerUtils::DxilToLlvmPass::run(llvm::Module &module, llvm::ModuleAnalysisManager &) {
+llvm::PreservedAnalyses compilerutils::DxilToLlvmPass::run(llvm::Module &module, llvm::ModuleAnalysisManager &) {
   DxilToLlvmPassImpl Impl{module};
   return Impl.run();
 }

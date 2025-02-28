@@ -515,6 +515,7 @@ struct PipelineOptions {
     bool emulateWideLineStipple;            ///< For OGL only, enable line AA stipple.
     bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
     bool enableRemapLocation;               ///< For OGL only, enables location remapping.
+    bool enableDepthCompareParam;           ///< For OGL only, enable depth compare param descriptor.
   } glState;
   const auto &getGlState() const { return glState; }
 
@@ -526,6 +527,7 @@ struct PipelineOptions {
                                       ///< eliminated if the write value is 1.0.
   CompileConstInfo *compileConstInfo; ///< Compile time constant data.
   unsigned reserved22;
+  bool padBufferSizeToNextDword; ///< Vulkan only, set if the driver rounds the buffer size up the next dword
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -694,6 +696,13 @@ enum class WaveBreakSize : unsigned {
   _8x8 = 0x1,   ///< Outside a 8x8 pixel region
   _16x16 = 0x2, ///< Outside a 16x16 pixel region
   _32x32 = 0x3, ///< Outside a 32x32 pixel region
+};
+
+/// Enumerate llvm schedule strategy.
+enum class LlvmScheduleStrategy : unsigned {
+  None = 0,
+  MaxMemoryClause = 1, // Maximize memory clause
+  MaxIlp = 2           // Maximize ILP
 };
 
 /// Enumerates various sizing options of subgroup size for NGG primitive shader.
@@ -933,6 +942,9 @@ struct PipelineShaderOptions {
   /// Force scope for memory barrier (0 - do not force, nonzero - value of Scope enumeration from SPIR-V headers with
   /// the exception of CrossDevice that cannot be set at all).
   unsigned forceMemoryBarrierScope;
+
+  /// Choose llvm's instruction scheduling strategy.
+  LlvmScheduleStrategy scheduleStrategy;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

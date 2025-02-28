@@ -1,0 +1,61 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
+// Test to check the optimization of storing mesh outputs to allocas without LDS involvement.
+// In this test, the mesh shader is linearly dispatched with the dimensions Y=1 and Z=1. The mesh
+// outputs could be stored to allocas and read back from those allocas before primitive/vertex export.
+// Such stores can largely reduce the LDS consumption and avoid unnecessary LDS reads/writes, which
+// improves the performance of mesh shader noticeably.
+
+// RUN: amdllpc -gfxip=11 -v %s | FileCheck -check-prefix=SHADERTEST %s
+
+// SHADERTEST-LABEL: {{^// LLPC}} mesh shader LDS region info (in dwords) and general info
+// SHADERTEST: Internal Mesh LDS = 3 dwords
+// SHADERTEST: OutputsToAllocas = true
+
+// SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+// SHADERTEST: call void @llvm.amdgcn.exp.row.i32(i32 20, i32 1, i32 2098176, i32 poison, i32 poison, i32 poison, i1 true
+// SHADERTEST: call void @llvm.amdgcn.exp.row.f32(i32 12, i32 15, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, i1 true
+
+// SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+// SHADERTEST: v_mov_b32_e32 v1, 0x200400
+// SHADERTEST: exp prim v1, off, off, off done row_en
+// SHADERTEST: v_mov_b32_e32 v0, 0
+// SHADERTEST: exp pos0 v0, v0, v0, v0 done row_en
+// SHADERTEST: .lds_size: 0x0000000000000200
+
+#version 450
+
+#extension GL_EXT_mesh_shader : require
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+layout(max_vertices = 128, max_primitives = 128, triangles) out;
+
+struct UniformData
+{
+    ivec4 zero4u;
+    ivec4 vertexCount;
+    ivec4 primCount;
+};
+
+layout(set = 0, binding = 0, std140) uniform UniformDataBlock
+{
+    UniformData g_uniforms;
+} _30;
+
+void main()
+{
+    uint groupID = gl_WorkGroupID.x;
+    uint groupThreadID = gl_LocalInvocationID.x;
+    uint meshletIndex = groupID;
+    uint vertexCount = uint(_30.g_uniforms.vertexCount[meshletIndex % 4u] + 0);
+    uint primCount = uint(_30.g_uniforms.primCount[meshletIndex % 4u] + 0);
+    SetMeshOutputsEXT(vertexCount, primCount);
+
+    if (groupThreadID < vertexCount)
+    {
+        gl_MeshVerticesEXT[groupThreadID].gl_Position = vec4(0.0);
+    }
+    if (groupThreadID < primCount)
+    {
+        gl_PrimitiveTriangleIndicesEXT[groupThreadID] = uvec3(0u, 1u, 2u);
+    }
+}

@@ -325,6 +325,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, viewIndexFromDeviceIndex, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceUnderflowPrevention, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceMemoryBarrierScope, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scheduleStrategy, MemberTypeEnum, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -526,6 +527,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, emulateWideLineStipple, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enablePointSmooth, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableRemapLocation, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableDepthCompareParam, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -594,6 +596,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizePointSizeWrite, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, padBufferSizeToNextDword, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_compileTimeConstants, MemberTypeCompileConstInfo, true);
       return addrTableInitializer;
     }();

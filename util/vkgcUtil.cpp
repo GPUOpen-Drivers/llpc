@@ -257,4 +257,60 @@ const char *getEntryPointNameFromSpirvBinary(const BinaryData *spvBin) {
   return entryName;
 }
 
+// =====================================================================================================================
+// Calculate 64-bit CRC for the given block of data
+//
+// Returns 64-bit CRC compatible with CRC-64/XZ
+//
+// @param data : Pointer to the block of data
+// @param size : Size of the data in bytes
+// @param refin : Whether to reflect input
+// @param refout : Whether to reflect result
+uint64_t calculateCrc64(const void *data, size_t size, bool refin, bool refout) {
+  static constexpr uint64_t Poly = 0x42F0E1EBA9EA3693;
+  static constexpr uint64_t InitV = 0xFFFFFFFFFFFFFFFF;
+  static constexpr uint64_t XorOut = 0xFFFFFFFFFFFFFFFF;
+
+  auto reflectByte = [](uint8_t b) {
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
+  };
+
+  auto reflect64 = [](uint64_t value) {
+    uint64_t result = 0;
+    for (int i = 0; i < 64; ++i) {
+      if (value & (1ULL << i)) {
+        result |= 1ULL << (63 - i);
+      }
+    }
+    return result;
+  };
+
+  uint64_t crc = InitV;
+  const uint8_t *ptr = reinterpret_cast<const uint8_t *>(data);
+  const uint8_t *end = ptr + size;
+  while (ptr < end) {
+    uint8_t byte = *ptr;
+    if (refin) {
+      byte = reflectByte(byte);
+    }
+    crc ^= static_cast<uint64_t>(byte) << 56;
+    for (int i = 0; i < 8; ++i) {
+      if (crc & 0x8000000000000000) {
+        crc = (crc << 1) ^ Poly;
+      } else {
+        crc <<= 1;
+      }
+    }
+    ptr++;
+  }
+
+  if (refout) {
+    crc = reflect64(crc);
+  }
+  return crc ^ XorOut;
+}
+
 } // namespace Vkgc

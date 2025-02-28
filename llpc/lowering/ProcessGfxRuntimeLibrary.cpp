@@ -91,7 +91,7 @@ void ProcessGfxRuntimeLibrary::processLibraryFunction(Function *&func) {
         continue;
       promotionMask.set(argId);
     }
-    func = CompilerUtils::promotePointerArguments(func, promotionMask);
+    func = compilerutils::promotePointerArguments(func, promotionMask);
     return;
   }
 

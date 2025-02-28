@@ -33,6 +33,7 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
+#include "vkgcBase.h"
 #include "vkgcGpurtShim.h"
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
@@ -321,6 +322,8 @@ Options PipelineContext::computePipelineOptions() const {
   options.rtStaticPipelineFlags = m_rtState.staticPipelineFlags;
   options.rtTriCompressMode = m_rtState.triCompressMode;
   options.disablePerCompFetch = getPipelineOptions()->disablePerCompFetch;
+
+  options.padBufferSizeToNextDword = getPipelineOptions()->padBufferSizeToNextDword;
 
   return options;
 }
@@ -639,7 +642,7 @@ void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappi
       auto &immutableNode = *it->second;
 
       if (immutableNode.arraySize != 0) {
-        if (src.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+        if (src.type == ResourceMappingNodeType::DescriptorYCbCrSampler && src.srdRange.strideInDwords == 0) {
           // TODO: Remove the statement when dst.stride is per array size
           // Update dst.stride = node.sizeInDwords / immutableNode.arraySize
           dst.stride /= immutableNode.arraySize;
@@ -803,6 +806,15 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   shaderOptions.viewIndexFromDeviceIndex = shaderInfo.options.viewIndexFromDeviceIndex;
 
   shaderOptions.forceUnderflowPrevention = shaderInfo.options.forceUnderflowPrevention;
+
+  static_assert(static_cast<lgc::LlvmScheduleStrategy>(Vkgc::LlvmScheduleStrategy::MaxIlp) ==
+                    lgc::LlvmScheduleStrategy::MaxIlp,
+                "Mismatch");
+  static_assert(static_cast<lgc::LlvmScheduleStrategy>(Vkgc::LlvmScheduleStrategy::MaxMemoryClause) ==
+                    lgc::LlvmScheduleStrategy::MaxMemoryClause,
+                "Mismatch");
+  shaderOptions.scheduleStrategy = static_cast<lgc::LlvmScheduleStrategy>(shaderInfo.options.scheduleStrategy);
+
   return shaderOptions;
 }
 

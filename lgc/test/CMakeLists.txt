@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -32,6 +32,12 @@ set(LGC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # required by configure_lit_site_cfg
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
+
+# read LLVM_MAIN_REVISION from its header file
+file(READ "${LLVM_MAIN_INCLUDE_DIR}/llvm/Config/llvm-config.h.cmake" LLVM_CONFIG_CONTENTS)
+string(REGEX MATCH "#define LLVM_MAIN_REVISION ([0-9]+)" _UNUSED_VAR "${LLVM_CONFIG_CONTENTS}")
+set(LLVM_MAIN_REVISION ${CMAKE_MATCH_1}) # may be empty
+message("LLVM_MAIN_REVISION: ${LLVM_MAIN_REVISION}")
 
 # When cross-compiling (or compiling a release tablegen), external llvm projects are defined but other projects are not.
 # We expect that tests are not run in a cmake configuration where llpc_version does not exist, so we only use its

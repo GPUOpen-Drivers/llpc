@@ -63,7 +63,7 @@ static Function *transformFunction(Function &F) {
     auto Name = F.getName();
     LLVM_DEBUG(dbgs() << "Transforming function " << Name << "\n");
     // Copy name, otherwise it will be deleted before it is set
-    std::string NewName = CompilerUtils::dxil::tryDemangleFunctionName(Name.str()).str();
+    std::string NewName = compilerutils::dxil::tryDemangleFunctionName(Name.str()).str();
 
     LLVM_DEBUG(dbgs() << "  Set new name " << NewName << "\n");
     F.setName(NewName);
@@ -79,13 +79,13 @@ static Function *transformFunction(Function &F) {
   Function *NewFn = &F;
   if (NewRetTy->isStructTy() && NewRetTy->getStructNumElements() == 1) {
     if (F.getName().contains("ObjectToWorld4x3") || F.getName().contains("WorldToObject4x3")) {
-      NewFn = CompilerUtils::unpackStructReturnType(NewFn);
+      NewFn = compilerutils::unpackStructReturnType(NewFn);
     }
   }
 
   // Lower `StructRet` argument.
   if (NewFn->hasStructRetAttr())
-    NewFn = CompilerUtils::lowerStructRetArgument(NewFn);
+    NewFn = compilerutils::lowerStructRetArgument(NewFn);
 
   NewFn->addFnAttr(Attribute::AlwaysInline);
   // Set external linkage, so the functions don't get removed, even if they are

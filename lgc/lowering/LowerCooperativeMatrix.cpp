@@ -29,9 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "lgc/lowering/LowerCooperativeMatrix.h"
+#include "xdl/util/ElementType.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcXdlDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
@@ -45,6 +47,7 @@
 
 using namespace llvm;
 using namespace lgc;
+using namespace lgc::xdl;
 
 namespace lgc {
 
@@ -211,10 +214,9 @@ LowerCooperativeMatrix::TypeProperties LowerCooperativeMatrix::getTypeProperties
   auto waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage.value());
   if (layout == CooperativeMatrixLayout::FactorMatrixLayout) {
     assert(elemType != CooperativeMatrixElementType::Float32 && elemType != CooperativeMatrixElementType::Int32);
-    props.numFlatElements = BuilderCommon::isTypeNCooperativeMatrix(elemType, 4) ? 8 : 16;
+    props.numFlatElements = isTypeNCooperativeMatrix(elemType, 4) ? 8 : 16;
   } else if (layout == CooperativeMatrixLayout::AccumulatorMatrixLayout) {
-    if (BuilderCommon::isTypeNCooperativeMatrix(elemType, 16) &&
-        (elemType != CooperativeMatrixElementType::Float16Packed)) {
+    if (isTypeNCooperativeMatrix(elemType, 16) && (elemType != CooperativeMatrixElementType::Float16Packed)) {
       props.matrixElementStride = 2;
     }
     if (elemType == CooperativeMatrixElementType::Float16Packed) {
@@ -272,7 +274,7 @@ Value *LowerCooperativeMatrix::convCoopMatrixVecToFlatVec(BuilderCommon &builder
                                                           CooperativeMatrixElementType elemType,
                                                           CooperativeMatrixLayout layout, unsigned kSize) {
   auto props = getTypeProperties(elemType, layout, kSize);
-  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
+  Type *elemTy = transCooperativeMatrixElementType(builder, elemType);
   if (elemTy->getScalarSizeInBits() < 8)
     elemTy = builder.getInt8Ty();
   Type *flatType = FixedVectorType::get(elemTy, props.numMatrixElements);
@@ -412,7 +414,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
   unsigned kSize = load.getKSize();
 
   // Calc element offset in memory
-  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
+  Type *elemTy = transCooperativeMatrixElementType(builder, elemType);
   if (elemType == CooperativeMatrixElementType::Int4)
     elemTy = builder.getInt8Ty();
   const unsigned dataBitwidth = elemTy->getScalarSizeInBits();
@@ -514,7 +516,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixStoreOp(CooperativeMatrixStor
   assert(waveSize == 32 || waveSize == 64);
 
   // Calc element offset in memory
-  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
+  Type *elemTy = transCooperativeMatrixElementType(builder, elemType);
   if (elemType == CooperativeMatrixElementType::Int4)
     elemTy = builder.getInt8Ty();
 
@@ -603,7 +605,7 @@ void LowerCooperativeMatrix::visitCooperativeMatrixFillOp(CooperativeMatrixFillO
   Value *value = fill.getScalar();
   unsigned kSize = fill.getKSize();
   auto props = getTypeProperties(elemType, layout, kSize);
-  Type *flatType = FixedVectorType::get(builder.transCooperativeMatrixElementType(elemType), props.numMatrixElements);
+  Type *flatType = FixedVectorType::get(transCooperativeMatrixElementType(builder, elemType), props.numMatrixElements);
 
   Value *vec = PoisonValue::get(flatType);
   for (unsigned idx = 0; idx < props.numMatrixElements; idx++)
@@ -699,7 +701,7 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
   if (dstElemType == CooperativeMatrixElementType::BFloat16)
     dstType = FixedVectorType::get(builder.getBFloatTy(), vecSize);
   else
-    dstType = FixedVectorType::get(builder.transCooperativeMatrixElementType(dstElemType), vecSize);
+    dstType = FixedVectorType::get(transCooperativeMatrixElementType(builder, dstElemType), vecSize);
 
   if (srcElemType == CooperativeMatrixElementType::BFloat16) {
     assert(source->getType()->isIntOrIntVectorTy());
@@ -827,8 +829,8 @@ void LowerCooperativeMatrix::visitCooperativeMatrixConvertOp(CooperativeMatrixCo
                                                                 convert.getName(), &convert);
     }
   } else {
-    unsigned numSrcBit = builder.transCooperativeMatrixElementType(srcElemType)->getScalarSizeInBits();
-    unsigned numDstBit = builder.transCooperativeMatrixElementType(dstElemType)->getScalarSizeInBits();
+    unsigned numSrcBit = transCooperativeMatrixElementType(builder, srcElemType)->getScalarSizeInBits();
+    unsigned numDstBit = transCooperativeMatrixElementType(builder, dstElemType)->getScalarSizeInBits();
 
     // Step 1: Some cases need change the layout due to different element types before conversion.
     if ((numSrcBit < numDstBit) && (srcLayout != dstLayout)) {
@@ -1656,24 +1658,25 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
     unsigned factorFlatElemNum = 0;
     unsigned matrixLength = 0;
 
-    if (BuilderCommon::isTypeNCooperativeMatrix(matrixAType, 16)) {
+    if (isTypeNCooperativeMatrix(matrixAType, 16)) {
       assert(matrixAType == matrixBType);
       if (m_gfxIp.major <= 11)
         factorFlatElemNum = 16;
       Type *factorType =
-          FixedVectorType::get(builder.transCooperativeMatrixElementType(matrixAType), factorFlatElemNum);
+          FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixAType), factorFlatElemNum);
       matrixA = builder.CreateBitCast(matrixA, factorType);
       matrixB = builder.CreateBitCast(matrixB, factorType);
-    } else if (BuilderCommon::isTypeNCooperativeMatrix(matrixAType, 8)) {
-    } else if (!BuilderCommon::isTypeNCooperativeMatrix(matrixAType, 4)) {
+    } else if (isTypeNCooperativeMatrix(matrixAType, 8)) {
+    } else if (isTypeNCooperativeMatrix(matrixAType, 4)) {
+    } else {
       llvm_unreachable("Factor element type is not supported!");
     }
 
-    if (BuilderCommon::isTypeNCooperativeMatrix(matrixCType, 32)) {
+    if (isTypeNCooperativeMatrix(matrixCType, 32)) {
       if (m_gfxIp.major <= 12)
         matrixC = waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector")
                                  : matrixC;
-    } else if (BuilderCommon::isTypeNCooperativeMatrix(matrixCType, 16)) {
+    } else if (isTypeNCooperativeMatrix(matrixCType, 16)) {
       if (m_gfxIp.major == 12) {
         // When gfxIp.major > 12, waveSize will always be 32 then matrixC size is solid without any necessary swizzle.
         matrixC =
@@ -1750,11 +1753,9 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
     }
     matrixD = builder.CreateIntrinsic(retTy, intrinsic, args, nullptr, instName);
 
-    if (BuilderCommon::isTypeNCooperativeMatrix(matrixCType, 16)) {
+    if (isTypeNCooperativeMatrix(matrixCType, 16)) {
       unsigned coopVeclength = cast<FixedVectorType>(matrixD->getType())->getNumElements();
-      Type *wordTy = builder.transCooperativeMatrixElementType(matrixCType)->isIntOrIntVectorTy()
-                         ? builder.getInt32Ty()
-                         : builder.getFloatTy();
+      Type *wordTy = isUnderlyingIntegerCooperativeMatrix(matrixCType) ? builder.getInt32Ty() : builder.getFloatTy();
       matrixD = builder.CreateBitCast(matrixD, FixedVectorType::get(wordTy, coopVeclength / 2));
       {
         matrixD = waveSize == 64 ? builder.CreateShuffleVector(matrixD, PoisonValue::get(matrixD->getType()),
@@ -1809,7 +1810,8 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
     }
   } else if (matrixCType == CooperativeMatrixElementType::Int16 ||
              matrixCType == CooperativeMatrixElementType::Float16) {
-    dotProductValue = PoisonValue::get(FixedVectorType::get(builder.transCooperativeMatrixElementType(matrixCType), 8));
+    dotProductValue =
+        PoisonValue::get(FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixCType), 8));
     // For gfx10, A*B:8*float32->16*half  C: no reshape for 16bit, still 16*half
     Value *colData =
         convCoopMatrixVecToFlatVec(builder, matrixB, matrixAType, CooperativeMatrixLayout::FactorMatrixLayout);
@@ -2159,11 +2161,10 @@ void LowerCooperativeMatrix::visitCooperativeRowAccLoadOp(CooperativeRowAccLoadO
   auto stride = load.getStride();
   auto elemType = load.getElemType();
   auto memoryAccess = load.getMemoryAccess();
-
-  assert(builder.transCooperativeMatrixElementType(elemType) == load.getType());
+  Type *elemTy = transCooperativeMatrixElementType(builder, elemType);
+  assert(elemTy == load.getType());
 
   // Calc element offset in memory
-  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
   const unsigned dataBitwidth = elemTy->getScalarSizeInBits();
   const unsigned addrSpace = dataPtr->getType()->getPointerAddressSpace();
   assert(addrSpace == ADDR_SPACE_LOCAL || addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER || addrSpace == ADDR_SPACE_GLOBAL);
@@ -2203,11 +2204,10 @@ void LowerCooperativeMatrix::visitCooperativeRowAccStoreOp(CooperativeRowAccStor
   auto elemType = store.getElemType();
   auto memoryAccess = store.getMemoryAccess();
   auto data = store.getData();
-
-  assert(builder.transCooperativeMatrixElementType(elemType) == data->getType());
+  Type *elemTy = transCooperativeMatrixElementType(builder, elemType);
+  assert(elemTy == data->getType());
 
   // Calc element offset in memory
-  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
   const unsigned dataBitwidth = elemTy->getScalarSizeInBits();
   const unsigned addrSpace = dataPtr->getType()->getPointerAddressSpace();
   assert(addrSpace == ADDR_SPACE_LOCAL || addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER || addrSpace == ADDR_SPACE_GLOBAL);
@@ -2244,7 +2244,7 @@ void LowerCooperativeMatrix::visitCooperativeRowAccAccumulateModeOp(CooperativeR
   Value *rowAccVal = accumulateMode.getRowAcc();
   auto elemType = accumulateMode.getElemType();
 
-  assert(builder.transCooperativeMatrixElementType(elemType) == accumulateMode.getType());
+  assert(transCooperativeMatrixElementType(builder, elemType) == accumulateMode.getType());
   assert(accumulateMode.getType() == rowAccVal->getType());
 
   if (m_gfxIp.major >= 12)
@@ -2265,7 +2265,7 @@ void LowerCooperativeMatrix::visitCooperativeRowAccFinalizeModeOp(CooperativeRow
   Value *rowAccVal = finalize.getRowAcc();
   auto elemType = finalize.getElemType();
 
-  assert(builder.transCooperativeMatrixElementType(elemType) == finalize.getType());
+  assert(transCooperativeMatrixElementType(builder, elemType) == finalize.getType());
   assert(finalize.getType() == rowAccVal->getType());
 
   if (m_gfxIp.major >= 12)
@@ -2285,7 +2285,7 @@ void LowerCooperativeMatrix::visitCooperativeRowAccSplatOp(CooperativeRowAccSpla
 
   Value *scalar = splat.getScalar();
 
-  assert(builder.transCooperativeMatrixElementType(splat.getElemType()) == scalar->getType());
+  assert(transCooperativeMatrixElementType(builder, splat.getElemType()) == scalar->getType());
 
   splat.replaceAllUsesWith(scalar);
   m_coopRowAccCalls.push_back(&splat);
@@ -2305,7 +2305,7 @@ void LowerCooperativeMatrix::visitCooperativeRowAccExpandOp(CooperativeRowAccExp
   auto matrixLayout = expand.getMatrixLayout();
   auto colMajor = expand.getColMajor();
 
-  assert(builder.getCooperativeMatrixTy(matrixElemType, matrixLayout) == expand.getType());
+  assert(getCooperativeMatrixTy(builder, matrixElemType, matrixLayout) == expand.getType());
   assert(rowAccElemType == CooperativeMatrixElementType::Float16 ||
          rowAccElemType == CooperativeMatrixElementType::Float32 ||
          rowAccElemType == CooperativeMatrixElementType::Int32);
@@ -2326,7 +2326,7 @@ void LowerCooperativeMatrix::visitCooperativeRowAccExpandOp(CooperativeRowAccExp
   assert(matrixLayout == CooperativeMatrixLayout::AccumulatorMatrixLayout);
   auto props = getTypeProperties(matrixElemType, matrixLayout, 16);
   Type *flatType =
-      FixedVectorType::get(builder.transCooperativeMatrixElementType(matrixElemType), props.numFlatElements);
+      FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixElemType), props.numFlatElements);
   Value *flatVec = PoisonValue::get(flatType);
 
   if (!colMajor) {
@@ -2532,8 +2532,8 @@ void LowerCooperativeMatrix::visitCooperativeRowAccScalarOp(CooperativeRowAccSca
   auto coopMatArithOp = scalar.getBinop();
   bool accumulateMode = scalar.getAccumulateMode();
 
-  assert(builder.transCooperativeMatrixElementType(elemType) == rowAccVal->getType());
-  assert(builder.transCooperativeMatrixElementType(elemType) == scalarVal->getType());
+  assert(transCooperativeMatrixElementType(builder, elemType) == rowAccVal->getType());
+  assert(transCooperativeMatrixElementType(builder, elemType) == scalarVal->getType());
 
   bool needHandleAccumulateMode = accumulateMode && (m_gfxIp.major >= 12);
 

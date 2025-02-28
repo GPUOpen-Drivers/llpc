@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // BEGIN_SHADERTEST
 // This is not the main test, just to make sure that the shader is valid.
 // The real check will be included in the used pipelines.

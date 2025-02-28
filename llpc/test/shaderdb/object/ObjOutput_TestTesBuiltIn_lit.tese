@@ -1,4 +1,6 @@
 #version 450 core
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 
 #extension GL_ARB_shader_viewport_layer_array: enable
 

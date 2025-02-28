@@ -1,7 +1,7 @@
 ﻿/*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -398,21 +398,20 @@ Value *BuilderImpl::createSubgroupShuffle(const SubgroupHelperLaneState &state, 
     // Start the WWM section by setting the inactive lanes.
     Value *const poisonValue = PoisonValue::get(value->getType());
     Value *const poisonIndex = PoisonValue::get(index->getType());
-    Value *wwmValue = BuilderBase::get(*this).CreateSetInactive(value, poisonValue);
-    Value *wwmIndex = nullptr;
-    BuilderBase::MapToSimpleTypeFunc bPermFunc = nullptr;
-    {
-      Value *const scaledIndex = CreateMul(index, getInt32(4));
-      wwmIndex = BuilderBase::get(*this).CreateSetInactive(scaledIndex, poisonIndex);
-      bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-        return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
-      };
-    }
 
+    auto bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
+      return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
+    };
     auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {mappedArgs[0]});
     };
+
+    Value *wwmValue = BuilderBase::get(*this).CreateSetInactive(value, poisonValue);
+    Value *const scaledIndex = CreateMul(index, getInt32(4));
+    Value *wwmIndex = BuilderBase::get(*this).CreateSetInactive(scaledIndex, poisonIndex);
+
     auto swapped = CreateMapToSimpleType(permuteFunc, wwmValue, {});
 
     auto bPermSameHalf = CreateMapToSimpleType(bPermFunc, wwmValue, wwmIndex);
@@ -566,12 +565,12 @@ Value *BuilderImpl::CreateSubgroupShuffleDown(Value *const value, Value *const d
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param inClusterSize : The expected cluster size.
+// @param inClusterSize : The expected cluster size or full wavesize if 0.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
-                                                     Value *const inClusterSize, const Twine &instName) {
-  assert(isa<ConstantInt>(inClusterSize));
-  unsigned clusterSize = cast<ConstantInt>(inClusterSize)->getZExtValue();
+                                                     unsigned inClusterSize, const Twine &instName) {
+  unsigned clusterSize = (inClusterSize == 0) ? getShaderWaveSize() : inClusterSize;
+
   assert(isPowerOf2_32(clusterSize));
   const unsigned waveSize = getShaderWaveSize();
   clusterSize = std::min(clusterSize, waveSize);
@@ -649,12 +648,11 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param inClusterSize : The expected cluster size.
+// @param inClusterSize : The expected cluster size or full wavesize if 0.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
-                                                     Value *const inClusterSize, const Twine &instName) {
-  assert(isa<ConstantInt>(inClusterSize));
-  unsigned clusterSize = cast<ConstantInt>(inClusterSize)->getZExtValue();
+                                                     unsigned inClusterSize, const Twine &instName) {
+  unsigned clusterSize = (inClusterSize == 0) ? getShaderWaveSize() : inClusterSize;
   assert(isPowerOf2_32(clusterSize));
   const unsigned waveSize = getShaderWaveSize();
   clusterSize = std::min(clusterSize, waveSize);
@@ -723,12 +721,11 @@ Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, 
 //
 // @param groupArithOp : The group arithmetic operation.
 // @param value : An LLVM value.
-// @param inClusterSize : The expected cluster size.
+// @param inClusterSize : The expected cluster size or full wavesize if 0.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
-                                                     Value *const inClusterSize, const Twine &instName) {
-  assert(isa<ConstantInt>(inClusterSize));
-  unsigned clusterSize = cast<ConstantInt>(inClusterSize)->getZExtValue();
+                                                     unsigned inClusterSize, const Twine &instName) {
+  unsigned clusterSize = (inClusterSize == 0) ? getShaderWaveSize() : inClusterSize;
   assert(isPowerOf2_32(clusterSize));
   const unsigned waveSize = getShaderWaveSize();
   clusterSize = std::min(clusterSize, waveSize);

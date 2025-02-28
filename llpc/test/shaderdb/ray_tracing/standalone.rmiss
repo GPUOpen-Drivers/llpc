@@ -13,6 +13,8 @@
 */
 // END_SHADERTEST
 
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 #version 460
 #extension GL_EXT_ray_tracing : enable
 

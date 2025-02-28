@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -23,13 +23,23 @@
  #
  #######################################################################################################################
 
-function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
+option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
+
+# Function to set standard compiler options on the specified target.
+# There is an optional second arg to specify whether to apply -Werror; if the arg is not given,
+# then that is controlled by LLPC_ENABLE_WERROR.
+function(set_compiler_options PROJECT_NAME)
     target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
         POSITION_INDEPENDENT_CODE ON)
+
+    set(ENABLE_WERROR "${ARGN}")
+    if("${ENABLE_WERROR}" STREQUAL "")
+        set(ENABLE_WERROR "${LLPC_ENABLE_WERROR}")
+    endif()
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(ENABLE_WERROR)

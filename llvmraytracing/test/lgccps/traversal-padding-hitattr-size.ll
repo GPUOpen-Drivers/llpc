@@ -2,6 +2,30 @@
 ; We run this test file twice with different max hit attribute sizes to test that e.g. padding depends correctly on the max hit attribute size.
 ; RUN: grep -v HITATTR_SIZE_8  %s | opt --verify-each -passes='lower-raytracing-pipeline,lint' -S --lint-abort-on-error | FileCheck -check-prefix=CHECK-ATTRSIZE-16 %s
 ; RUN: grep -v HITATTR_SIZE_16 %s | opt --verify-each -passes='lower-raytracing-pipeline,lint' -S --lint-abort-on-error | FileCheck -check-prefix=CHECK-ATTRSIZE-8 %s
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;  Permission is hereby granted, free of charge, to any person obtaining a copy
+ ;  of this software and associated documentation files (the "Software"), to
+ ;  deal in the Software without restriction, including without limitation the
+ ;  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ ;  sell copies of the Software, and to permit persons to whom the Software is
+ ;  furnished to do so, subject to the following conditions:
+ ;
+ ;  The above copyright notice and this permission notice shall be included in all
+ ;  copies or substantial portions of the Software.
+ ;
+ ;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ ;  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ ;  IN THE SOFTWARE.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 %struct.AnyHitTraversalData = type { i32 }
 %struct.DispatchSystemData = type { i32 }
@@ -16,7 +40,7 @@ declare i32 @_AmdGetCurrentFuncAddr()
 
 define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @_cont_Traversal({ i32 } %0) local_unnamed_addr !lgc.shaderstage !0 !pointeetys !1 !lgc.rt.shaderstage !2 {
 ; CHECK-ATTRSIZE-16-LABEL: define dso_local spir_func void @_cont_Traversal(
-; CHECK-ATTRSIZE-16-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [4 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META5:![0-9]+]] !lgc.rt.shaderstage [[META6:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META7:![0-9]+]] !continuation [[META8:![0-9]+]] {
+; CHECK-ATTRSIZE-16-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [4 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META6:![0-9]+]] !lgc.rt.shaderstage [[META7:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META8:![0-9]+]] !continuation [[META9:![0-9]+]] {
 ; CHECK-ATTRSIZE-16-NEXT:  [[_ENTRY:.*:]]
 ; CHECK-ATTRSIZE-16-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8
 ; CHECK-ATTRSIZE-16-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [8 x i32], align 4
@@ -44,7 +68,7 @@ define dso_local spir_func { { float, i32, i32, i32, i32 }, <2 x float>, i32 } @
 ; CHECK-ATTRSIZE-16-NEXT:    unreachable
 ;
 ; CHECK-ATTRSIZE-8-LABEL: define dso_local spir_func void @_cont_Traversal(
-; CHECK-ATTRSIZE-8-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [2 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META4:![0-9]+]] !lgc.rt.shaderstage [[META5:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META6:![0-9]+]] !continuation [[META7:![0-9]+]] {
+; CHECK-ATTRSIZE-8-SAME: i32 [[SHADERINDEX:%.*]], i32 [[RETURNADDR:%.*]], { i32 } [[SYSTEM_DATA:%.*]], {} [[HIT_ATTRS:%.*]], [2 x i32] [[PADDING:%.*]], [8 x i32] [[PAYLOAD:%.*]]) local_unnamed_addr !lgc.shaderstage [[META5:![0-9]+]] !lgc.rt.shaderstage [[META6:![0-9]+]] !continuation.registercount [[META0:![0-9]+]] !lgc.cps [[META7:![0-9]+]] !continuation [[META8:![0-9]+]] {
 ; CHECK-ATTRSIZE-8-NEXT:  [[_ENTRY:.*:]]
 ; CHECK-ATTRSIZE-8-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca { i32 }, align 8
 ; CHECK-ATTRSIZE-8-NEXT:    [[PAYLOAD_SERIALIZATION_ALLOCA:%.*]] = alloca [8 x i32], align 4
@@ -110,14 +134,14 @@ declare void @lgc.cps.jump(...) local_unnamed_addr
 !6 = !{%struct.DispatchSystemData poison}
 ;.
 ; CHECK-ATTRSIZE-16: [[META0]] = !{i32 8}
-; CHECK-ATTRSIZE-16: [[META5]] = !{i32 7}
-; CHECK-ATTRSIZE-16: [[META6]] = !{i32 6}
-; CHECK-ATTRSIZE-16: [[META7]] = !{i32 3}
-; CHECK-ATTRSIZE-16: [[META8]] = !{ptr @_cont_Traversal}
+; CHECK-ATTRSIZE-16: [[META6]] = !{i32 7}
+; CHECK-ATTRSIZE-16: [[META7]] = !{i32 6}
+; CHECK-ATTRSIZE-16: [[META8]] = !{i32 3}
+; CHECK-ATTRSIZE-16: [[META9]] = !{ptr @_cont_Traversal}
 ;.
 ; CHECK-ATTRSIZE-8: [[META0]] = !{i32 8}
-; CHECK-ATTRSIZE-8: [[META4]] = !{i32 7}
-; CHECK-ATTRSIZE-8: [[META5]] = !{i32 6}
-; CHECK-ATTRSIZE-8: [[META6]] = !{i32 3}
-; CHECK-ATTRSIZE-8: [[META7]] = !{ptr @_cont_Traversal}
+; CHECK-ATTRSIZE-8: [[META5]] = !{i32 7}
+; CHECK-ATTRSIZE-8: [[META6]] = !{i32 6}
+; CHECK-ATTRSIZE-8: [[META7]] = !{i32 3}
+; CHECK-ATTRSIZE-8: [[META8]] = !{ptr @_cont_Traversal}
 ;.

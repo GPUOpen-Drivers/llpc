@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // Check that amdllpc does not apply discard-to-demote attribute to legal discards.
 
 // RUN: amdllpc %gfxip --v %s |\

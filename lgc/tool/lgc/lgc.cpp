@@ -34,6 +34,7 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcIlCpsDialect.h"
+#include "lgc/LgcXdlDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/lowering/LgcLowering.h"
@@ -179,8 +180,8 @@ int main(int argc, char **argv) {
   LgcContext::initialize();
 
   LLVMContext context;
-  auto dialectContext =
-      llvm_dialects::DialectContext::make<LgcDialect, lgc::ilcps::LgcIlCpsDialect, lgc::cps::LgcCpsDialect>(context);
+  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect, lgc::ilcps::LgcIlCpsDialect,
+                                                            lgc::cps::LgcCpsDialect, lgc::xdl::LgcXdlDialect>(context);
 
   // Set our category on options that we want to show in -help, and hide other options.
   auto opts = cl::getRegisteredOptions();

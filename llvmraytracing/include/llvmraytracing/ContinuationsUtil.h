@@ -216,6 +216,8 @@ private:
   // The raytracing ip level that is available on the target architecture.
   // This is exposed to gpurt code via the GetRtip intrinsic.
   static constexpr const char *MDRtipName = "continuation.rtip";
+  // If this metadata is set, the backend is required to handle VPC unpacking.
+  static constexpr const char *MDDeferVPCUnpacking = "continuation.defer.vpc.unpack";
 
   static std::optional<uint32_t> extractZExtI32Constant(MDNode *Node) {
     if (Node) {
@@ -372,6 +374,7 @@ public:
   MODULE_METADATA_HELPER(MaxUsedPayloadRegisterCount, MDMaxUsedPayloadRegisterCountName)
   MODULE_METADATA_HELPER(MaxPayloadRegisterCount, MDMaxPayloadRegisterCountName)
   MODULE_METADATA_HELPER(Rtip, MDRtipName)
+  MODULE_METADATA_HELPER(DeferVpcUnpacking, MDDeferVPCUnpacking)
 
 #undef MODULE_METADATA_HELPER
 

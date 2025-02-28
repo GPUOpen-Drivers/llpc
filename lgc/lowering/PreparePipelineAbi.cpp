@@ -32,6 +32,7 @@
 #include "MeshTaskShader.h"
 #include "RegisterMetadataBuilder.h"
 #include "ShaderMerger.h"
+#include "lgc/Debug.h"
 #include "lgc/state/PalMetadata.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Pass.h"
@@ -283,6 +284,21 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
   //
   // Check if this patch could be discarded
   //
+
+  // NOTE: Here, we dynamically set FP32 denorm mode to allow inout denorms. This is because TFs with denorm values
+  // will be flushed to zeros during this check if FP32 denorm mode is not set to allow denorms via FLOAT_MODE
+  // register field.
+  //
+  // MODE[7:4] = FP_DENORM, [5:4] = Single precision denorm mode, [7:6]= Double precision and FP16 denormal mode
+  // Mode:
+  //   0 = flush input and output denorms
+  //   1 = allow input denorms, flush output denorms
+  //   2 = flush input denorms, allow output denorms
+  //   3 = allow input and output denorms
+  static const unsigned HWRegMode = 1;
+  static const unsigned AllowInOutDenorms = 3;
+  builder.CreateSetReg(HWRegMode, 4, 4, builder.getInt32(AllowInOutDenorms));
+
   Value *minOuterTf = builder.CreateExtractElement(outerTf, static_cast<uint64_t>(0));
   for (unsigned i = 1; i < cast<FixedVectorType>(outerTf->getType())->getNumElements(); ++i)
     minOuterTf = builder.CreateBinaryIntrinsic(Intrinsic::minnum, minOuterTf, builder.CreateExtractElement(outerTf, i));
@@ -294,78 +310,73 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
   // Write HS outputs to off-chip LDS buffer if this patch is valid
   //
   auto &inOutUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage;
+  const auto &nextInOutUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->inOutUsage;
+
   const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->builtInUsage.tcs;
+  const auto &nextBuiltInUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->builtInUsage.tes;
+
   const auto &hwConfig = inOutUsage.tcs.hwConfig;
-
-  // Check if we don't need to write this built-in to off-chip LDS buffer because it is only accessed by HS
-  auto checkBuiltInNotToWrite = [&](unsigned builtIn) {
-    if (pipelineState->getNextShaderStage(ShaderStage::TessControl) == ShaderStage::TessEval) {
-      auto nextInOutStage = pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->inOutUsage;
-      if (builtIn == BuiltInTessLevelOuter || builtIn == BuiltInTessLevelInner) {
-        if (inOutUsage.perPatchBuiltInOutputLocMap.count(builtIn) > 0 &&
-            nextInOutStage.perPatchBuiltInInputLocMap.count(builtIn) == 0)
-          return true;
-      } else {
-        if (inOutUsage.builtInOutputLocMap.count(builtIn) > 0 && nextInOutStage.builtInInputLocMap.count(builtIn) == 0)
-          return true;
-      }
-    }
-    return false;
-  };
-
-  static const unsigned BufferFormatsGfx10[] = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10,
-                                                BUF_FORMAT_32_32_32_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10};
-  static const unsigned BufferFormatsGfx11[] = {BUF_FORMAT_32_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX11,
-                                                BUF_FORMAT_32_32_32_FLOAT_GFX11, BUF_FORMAT_32_32_32_32_FLOAT_GFX11};
+  const bool hasTes = pipelineState->hasShaderStage(ShaderStage::TessEval);
 
   const auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
-  ArrayRef<unsigned> bufferFormats(gfxIp.major == 10 ? BufferFormatsGfx10 : BufferFormatsGfx11);
+  const unsigned bufferFormat =
+      gfxIp.major >= 11 ? BUF_FORMAT_32_32_32_32_FLOAT_GFX11 : BUF_FORMAT_32_32_32_32_FLOAT_GFX10;
   CoherentFlag coherent = {};
   if (gfxIp.major <= 11) {
     coherent.bits.glc = true;
   }
 
-  // Write per-vertex HS outputs to off-chip LDS buffer
-  if (inOutUsage.outputMapLocCount > 0) {
-    SmallDenseSet<unsigned> builtInLocsNotToWrite;
-    SmallDenseMap<unsigned, Type *> builtInLocsToTypes;
+  LLPC_OUTS("===============================================================================\n");
+  LLPC_OUTS("// LLPC HS output write info\n\n");
 
-    for (const auto &[builtIn, loc] : inOutUsage.builtInOutputLocMap) {
-      if (checkBuiltInNotToWrite(builtIn)) {
-        assert(inOutUsage.builtInOutputLocMap.count(builtIn) > 0);
-        builtInLocsNotToWrite.insert(inOutUsage.builtInOutputLocMap[builtIn]);
-      } else {
-        switch (builtIn) {
-        case BuiltInPosition:
-          builtInLocsToTypes[loc] = FixedVectorType::get(builder.getFloatTy(), 4);
-          break;
-        case BuiltInPointSize:
-          builtInLocsToTypes[loc] = builder.getFloatTy();
-          break;
-        case BuiltInClipDistance:
-        case BuiltInCullDistance: {
-          const unsigned clipOrCullDistance =
-              builtIn == BuiltInClipDistance ? builtInUsage.clipDistance : builtInUsage.cullDistance;
-          assert(clipOrCullDistance > 0 && clipOrCullDistance <= 8);
+  // HS output write info (
+  struct HsOutputWriteInfo {
+    unsigned onChipLoc; // Location in on-chip LDS
+    unsigned builtIn;   // Whether for a built-in
+  };
 
-          builtInLocsToTypes[loc] = clipOrCullDistance == 1
-                                        ? builder.getFloatTy()
-                                        : FixedVectorType::get(builder.getFloatTy(), std::min(clipOrCullDistance, 4U));
-          if (clipOrCullDistance > 4) {
-            builtInLocsToTypes[loc + 1] = clipOrCullDistance == 5
-                                              ? builder.getFloatTy()
-                                              : FixedVectorType::get(builder.getFloatTy(), clipOrCullDistance - 4);
-          }
+  // Write per-vertex HS outputs to off-chip LDS buffer (to next stage)
+  unsigned offChipLocCount = hasTes ? nextInOutUsage.inputMapLocCount : inOutUsage.outputMapLocCount;
+  if (offChipLocCount > 0) {
+    LLPC_OUTS("Per-vertex Outputs [OnChip, OffChip]:\n");
 
-          break;
+    SmallDenseMap<unsigned, HsOutputWriteInfo> hsOutputWrites;
+
+    // Check generic outputs
+    const auto &genericOffChipLocMap = hasTes ? nextInOutUsage.inputLocInfoMap : inOutUsage.outputLocInfoMap;
+    auto &genericOnChipLocMap = inOutUsage.outputLocInfoMap;
+
+    for (const auto &[origLocInfo, offChipLocInfo] : genericOffChipLocMap) {
+      const unsigned offChipLoc = offChipLocInfo.getLocation();
+      if (hsOutputWrites.count(offChipLoc) == 0) {
+        assert(genericOnChipLocMap.count(origLocInfo) > 0);
+        hsOutputWrites[offChipLoc].onChipLoc = genericOnChipLocMap[origLocInfo].getLocation();
+        hsOutputWrites[offChipLoc].builtIn = InvalidValue;
+      }
+    }
+
+    // Check built-in outputs
+    const auto &builtInOffChipLocMap = hasTes ? nextInOutUsage.builtInInputLocMap : inOutUsage.builtInOutputLocMap;
+    auto &builtInOnChipLocMap = inOutUsage.builtInOutputLocMap;
+
+    for (const auto &[builtIn, offChipLoc] : builtInOffChipLocMap) {
+      assert(builtInOnChipLocMap.count(builtIn) > 0);
+      hsOutputWrites[offChipLoc].onChipLoc = builtInOnChipLocMap[builtIn];
+      hsOutputWrites[offChipLoc].builtIn = builtIn;
+
+      if (builtIn == BuiltInClipDistance || builtIn == BuiltInCullDistance) {
+        unsigned clipOrCullDistance = 0;
+        if (hasTes) {
+          clipOrCullDistance =
+              builtIn == BuiltInClipDistance ? nextBuiltInUsage.clipDistanceIn : nextBuiltInUsage.cullDistanceIn;
+        } else {
+          clipOrCullDistance = builtIn == BuiltInClipDistance ? builtInUsage.clipDistance : builtInUsage.cullDistance;
         }
-        case BuiltInViewportIndex:
-        case BuiltInLayer:
-          builtInLocsToTypes[loc] = builder.getInt32Ty();
-          break;
-        default:
-          llvm_unreachable("Unexpected built-in");
-          break;
+        assert(clipOrCullDistance > 0 && clipOrCullDistance <= 8);
+
+        if (clipOrCullDistance > 4) {
+          hsOutputWrites[offChipLoc + 1].onChipLoc = builtInOnChipLocMap[builtIn] + 1;
+          hsOutputWrites[offChipLoc + 1].builtIn = builtIn;
         }
       }
     }
@@ -382,58 +393,68 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
         offChipLdsBaseOffset, builder.CreateMul(vertexIdx, builder.getInt32(hwConfig.offChip.outputVertexStride)));
     offChipLdsBaseOffset = builder.CreateAdd(offChipLdsBaseOffset, builder.getInt32(hwConfig.offChip.outputPatchStart));
 
-    for (unsigned loc = 0; loc < inOutUsage.outputMapLocCount; ++loc) {
-      if (builtInLocsNotToWrite.count(loc) > 0)
-        continue;
+    for (unsigned offChipLoc = 0; offChipLoc < offChipLocCount; ++offChipLoc) {
+      if (hsOutputWrites.count(offChipLoc) == 0)
+        continue; // Skip the location if it is not recorded (unlinked pipeline)
 
-      Type *outputTy = FixedVectorType::get(builder.getInt32Ty(), 4); // <4 x i32> for generic outputs
-      if (builtInLocsToTypes.count(loc) > 0)
-        outputTy = builtInLocsToTypes[loc]; // Built-in outputs have known types
+      const unsigned onChipLoc = hsOutputWrites[offChipLoc].onChipLoc;
+      const unsigned builtIn = hsOutputWrites[offChipLoc].builtIn;
 
-      const unsigned numComponents = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+      LLPC_OUTS("location = [" << onChipLoc << ", " << offChipLoc << "]");
+      if (builtIn != InvalidValue) {
+        LLPC_OUTS(" (builtin = " << PipelineState::getBuiltInName(static_cast<BuiltInKind>(builtIn)) << ")");
+      }
+      LLPC_OUTS("\n");
 
       // ldsOffset = baseOffset + attribOffset
-      auto attribOffset = builder.getInt32(4 * loc);
+      auto attribOffset = builder.getInt32(4 * onChipLoc);
       auto onChipLdsOffset = builder.CreateAdd(onChipLdsBaseOffset, attribOffset);
-      auto output = readValueFromLds(outputTy, onChipLdsOffset);
+      auto output = readValueFromLds(FixedVectorType::get(builder.getInt32Ty(), 4), onChipLdsOffset);
 
+      attribOffset = builder.getInt32(4 * offChipLoc);
       auto offChipLdsOffset = builder.CreateAdd(offChipLdsBaseOffset, attribOffset);
       offChipLdsOffset = builder.CreateMul(offChipLdsOffset, builder.getInt32(4)); // Convert to byte offset
 
       builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                              {output,                                             // vdata
-                               offChipLdsDesc,                                     // rsrc
-                               offChipLdsOffset,                                   // voffset
-                               offChipLdsBase,                                     // soffset
-                               builder.getInt32(bufferFormats[numComponents - 1]), // format
-                               builder.getInt32(coherent.u32All)});                // glc
+                              {output,                              // vdata
+                               offChipLdsDesc,                      // rsrc
+                               offChipLdsOffset,                    // voffset
+                               offChipLdsBase,                      // soffset
+                               builder.getInt32(bufferFormat),      // format
+                               builder.getInt32(coherent.u32All)}); // glc
     }
+
+    LLPC_OUTS("\n");
   }
 
-  // Write per-patch HS outputs to off-chip LDS buffer
-  if (inOutUsage.perPatchOutputMapLocCount > 0) {
-    SmallDenseSet<unsigned> builtInLocsNotToWrite;
-    SmallDenseMap<unsigned, Type *> builtInLocsToTypes;
+  // Write per-patch HS outputs to off-chip LDS buffer (to next stage)
+  offChipLocCount = hasTes ? nextInOutUsage.perPatchInputMapLocCount : inOutUsage.perPatchOutputMapLocCount;
+  if (offChipLocCount > 0) {
+    LLPC_OUTS("Per-patch Outputs [OnChip, OffChip]:\n");
 
-    for (const auto &[builtIn, loc] : inOutUsage.perPatchBuiltInOutputLocMap) {
-      if (checkBuiltInNotToWrite(builtIn)) {
-        assert(inOutUsage.perPatchBuiltInOutputLocMap.count(builtIn) > 0);
-        builtInLocsNotToWrite.insert(inOutUsage.perPatchBuiltInOutputLocMap[builtIn]);
-      } else {
-        Type *type = nullptr;
-        switch (builtIn) {
-        case BuiltInTessLevelOuter:
-          type = FixedVectorType::get(builder.getFloatTy(), 4);
-          break;
-        case BuiltInTessLevelInner:
-          type = FixedVectorType::get(builder.getFloatTy(), 2);
-          break;
-        default:
-          llvm_unreachable("Unexpected built-in");
-          break;
-        }
-        builtInLocsToTypes[loc] = type;
+    SmallDenseMap<unsigned, HsOutputWriteInfo> hsOutputWrites;
+
+    // Check generic outputs
+    const auto &genericOffChipLocMap = hasTes ? nextInOutUsage.perPatchInputLocMap : inOutUsage.perPatchOutputLocMap;
+    auto &genericOnChipLocMap = inOutUsage.perPatchOutputLocMap;
+
+    for (const auto &[origLoc, offChipLoc] : genericOffChipLocMap) {
+      if (hsOutputWrites.count(offChipLoc) == 0) {
+        assert(genericOnChipLocMap.count(origLoc) > 0);
+        hsOutputWrites[offChipLoc].onChipLoc = genericOnChipLocMap[origLoc];
+        hsOutputWrites[offChipLoc].builtIn = InvalidValue;
       }
+    }
+
+    // Check built-in outputs
+    const auto &builtInOffChipLocMap =
+        hasTes ? nextInOutUsage.perPatchBuiltInInputLocMap : inOutUsage.perPatchBuiltInOutputLocMap;
+    auto &builtInOnChipLocMap = inOutUsage.perPatchBuiltInOutputLocMap;
+
+    for (const auto &[builtIn, offChipLoc] : builtInOffChipLocMap) {
+      assert(builtInOnChipLocMap.count(builtIn) > 0);
+      hsOutputWrites[offChipLoc].onChipLoc = builtInOnChipLocMap[builtIn];
+      hsOutputWrites[offChipLoc].builtIn = builtIn;
     }
 
     // baseOffset = patchConstStart + relPatchId * patchConstSize
@@ -443,32 +464,38 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
     auto offChipLdsBaseOffset = builder.CreateMul(relPatchId, builder.getInt32(hwConfig.offChip.patchConstSize));
     offChipLdsBaseOffset = builder.CreateAdd(offChipLdsBaseOffset, builder.getInt32(hwConfig.offChip.patchConstStart));
 
-    for (unsigned loc = 0; loc < inOutUsage.perPatchOutputMapLocCount; ++loc) {
-      if (builtInLocsNotToWrite.count(loc) > 0)
-        continue;
+    for (unsigned offChipLoc = 0; offChipLoc < offChipLocCount; ++offChipLoc) {
+      if (hsOutputWrites.count(offChipLoc) == 0)
+        continue; // Skip the location if it is not recorded (unlinked pipeline)
 
-      Type *outputTy = FixedVectorType::get(builder.getInt32Ty(), 4); // <4 x i32> for generic outputs
-      if (builtInLocsToTypes.count(loc) > 0)
-        outputTy = builtInLocsToTypes[loc]; // Built-in outputs have known types
+      const unsigned onChipLoc = hsOutputWrites[offChipLoc].onChipLoc;
+      const unsigned builtIn = hsOutputWrites[offChipLoc].builtIn;
 
-      const unsigned numComponents = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+      LLPC_OUTS("location = [" << onChipLoc << ", " << offChipLoc << "]");
+      if (builtIn != InvalidValue) {
+        LLPC_OUTS(" (builtin = " << PipelineState::getBuiltInName(static_cast<BuiltInKind>(builtIn)) << ")");
+      }
+      LLPC_OUTS("\n");
 
       // ldsOffset = baseOffset + attribOffset
-      auto attribOffset = builder.getInt32(4 * loc);
+      auto attribOffset = builder.getInt32(4 * onChipLoc);
       auto onChipLdsOffset = builder.CreateAdd(onChipLdsBaseOffset, attribOffset);
-      auto output = readValueFromLds(outputTy, onChipLdsOffset);
+      auto output = readValueFromLds(FixedVectorType::get(builder.getInt32Ty(), 4), onChipLdsOffset);
 
+      attribOffset = builder.getInt32(4 * offChipLoc);
       auto offChipLdsOffset = builder.CreateAdd(offChipLdsBaseOffset, attribOffset);
       offChipLdsOffset = builder.CreateMul(offChipLdsOffset, builder.getInt32(4)); // Convert to byte offset
 
       builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store,
-                              {output,                                             // vdata
-                               offChipLdsDesc,                                     // rsrc
-                               offChipLdsOffset,                                   // voffset
-                               offChipLdsBase,                                     // soffset
-                               builder.getInt32(bufferFormats[numComponents - 1]), // format
-                               builder.getInt32(coherent.u32All)});                // glc
+                              {output,                              // vdata
+                               offChipLdsDesc,                      // rsrc
+                               offChipLdsOffset,                    // voffset
+                               offChipLdsBase,                      // soffset
+                               builder.getInt32(bufferFormat),      // format
+                               builder.getInt32(coherent.u32All)}); // glc
     }
+
+    LLPC_OUTS("\n");
   }
 }
 

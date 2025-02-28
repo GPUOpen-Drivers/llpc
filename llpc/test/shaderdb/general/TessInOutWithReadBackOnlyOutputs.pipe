@@ -1,0 +1,250 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Test if we handle outputs of tessellation control shader correctly. Some outputs of tessellation control
+; shader are not mapped to inputs of tessellation evaluation shader. They are read back only by tessellation
+; control shader itself. Such outputs might have conflicts with the location assignments of built-in outputs. Since we
+; always cache all outputs of tessellation control shader to on-chip LDS before writing them to off-chip LDS buffer,
+; this is not a problem now. The outputs can have on-chip LDS location and off-chip LDS buffer location at the same
+; time.
+
+; RUN: amdllpc -v -gfxip 11.0 -o /dev/null %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} location input/output mapping results (TES)
+; SHADERTEST: (TES) Input:  [location, component] = [0, 0]  =>  Mapped = [0, 0]
+; SHADERTEST: (TES) Input:  [location, component] = [0, 1]  =>  Mapped = [0, 1]
+; SHADERTEST: (TES) Input:  [location, component] = [0, 2]  =>  Mapped = [0, 2]
+; SHADERTEST: (TES) Input (per-patch):  location = 3  =>  Mapped = 0
+
+; SHADERTEST-LABEL: {{^// LLPC}} builtin-to-generic mapping results (TES)
+; SHADERTEST: (TES) Input:  builtin = Position  =>  Mapped = 1
+
+; SHADERTEST-LABEL: {{^// LLPC}} location input/output mapping results (TCS)
+; SHADERTEST: (TCS) Output: [location, component] = [0, 0]  =>  Mapped = [0, 0]
+; SHADERTEST: (TCS) Output: [location, component] = [0, 1]  =>  Mapped = [0, 1]
+; SHADERTEST: (TCS) Output: [location, component] = [0, 2]  =>  Mapped = [0, 2]
+; SHADERTEST: (TCS) Output: [location, component] = [1, 0]  =>  Mapped = [1, 0]
+; SHADERTEST: (TCS) Output: [location, component] = [1, 1]  =>  Mapped = [1, 1]
+; SHADERTEST: (TCS) Output: [location, component] = [1, 2]  =>  Mapped = [1, 2]
+; SHADERTEST: (TCS) Output: [location, component] = [1, 3]  =>  Mapped = [1, 3]
+; SHADERTEST: (TCS) Output (per-patch): location = 2  =>  Mapped = 1
+; SHADERTEST: (TCS) Output (per-patch): location = 3  =>  Mapped = 0
+
+; SHADERTEST-LABEL: {{^// LLPC}} builtin-to-generic mapping results (TCS)
+; SHADERTEST: (TCS) Output: builtin = Position  =>  Mapped = 2
+
+; SHADERTEST-LABEL: {{^// LLPC}} HW tessellation configurations
+; SHADERTEST: InputVertices = 4, VertexStride = 5 dwords, Size = 20 dwords
+; SHADERTEST: OutputVertices = 4, VertexStride = [13, 8] dwords, Size = [52, 32] dwords
+; SHADERTEST: PatchConstants = [2, 1], Size = [9, 4] dwords
+
+; SHADERTEST-LABEL: {{^// LLPC}} HS output write info
+; SHADERTEST: Per-vertex Outputs
+; SHADERTEST: location = [0, 0]
+; SHADERTEST: location = [2, 1] (builtin = Position)
+; SHADERTEST: Per-patch Outputs
+; SHADERTEST: location = [0, 0]
+
+; SHADERTEST: AMDLLPC SUCCESS
+
+[Version]
+version = 75
+
+[VsGlsl]
+#version 450
+
+vec4 positions[8] = vec4[](
+    vec4(-1.0, -1.0, 0.0, 1.0),
+    vec4( 1.0, -1.0, 0.0, 1.0),
+    vec4(-1.0,  1.0, 0.0, 1.0),
+    vec4( 1.0,  1.0, 0.0, 1.0),
+    vec4(-0.5, -0.5, 0.0, 1.0),
+    vec4( 0.5, -0.5, 0.0, 1.0),
+    vec4(-0.5,  0.5, 0.0, 1.0),
+    vec4( 0.5,  0.5, 0.0, 1.0)
+);
+out gl_PerVertex {
+    vec4 gl_Position;
+};
+void main (void)
+{
+    gl_Position = positions[gl_VertexIndex];
+}
+
+[VsInfo]
+entryPoint = main
+
+[TcsGlsl]
+#version 450
+#extension GL_EXT_tessellation_shader : require
+#extension GL_EXT_shader_explicit_arithmetic_types : enable
+
+layout (vertices = 4) out;
+
+layout(location = 0) out vec3 outColor[];
+layout(location = 1) out vec4 vertexData[]; // Read back only
+
+layout(location = 2) out patch float patchData;
+layout(location = 3) out patch float patchColor; // Read back only
+
+void main ()
+{
+   vertexData[gl_InvocationID] = gl_in[gl_InvocationID].gl_Position;
+   outColor[gl_InvocationID] = vertexData[gl_InvocationID].xyz;
+   gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+
+   patchData = float(gl_InvocationID);
+   patchColor = patchData;
+
+   gl_TessLevelOuter = float[4](1.0, 1.0, 1.0, 1.0);
+   gl_TessLevelInner = float[2](1.0, 1.0);
+}
+
+[TcsInfo]
+entryPoint = main
+
+[TesGlsl]
+#version 450
+
+layout(quads, equal_spacing) in;
+
+layout(location = 0) in vec3 inColor[];
+layout(location = 3) in patch float patchColor;
+
+layout(location = 0) out vec4 outColor;
+
+void main ()
+{
+    outColor = vec4(inColor[0], 1.0) + vec4(patchColor);
+    gl_Position = gl_in[0].gl_Position;
+}
+
+[TesInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+
+layout(location = 0) in vec4 inColor;
+layout(location = 0) out vec4 outColor;
+
+void main()
+{
+    outColor = inColor;
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 4
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+useVertexBufferDescArray = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 0
+innerCoverage = 0
+perSampleShading = 0
+numSamples = 1
+pixelShaderSamples = 0
+samplePatternIdx = 0
+dynamicSampleInfo = 0
+rasterStream = 0
+enableMapClipDistMask = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+dualSourceBlendDynamic = 0
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 1
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactVertex = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+unlinked = 0
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+enableColorExportShader = 0
+useSoftwareVertexBufferDescriptors = 0
+dynamicTopology = 0
+enableColorClampVs = 0
+enableColorClampFs = 0
+enableFlatShade = 0
+alphaTestFunc = 0
+enableInitialUndefVar = 0
+shaderTraceMask = 0
+originUpperLeft = 0
+forceDisableStreamOut = 0
+vbAddressLowBitsKnown = 0
+advancedBlendInfo.enableAdvancedBlend = 0
+advancedBlendInfo.enableRov = 0
+advancedBlendInfo.binding = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.enableRelocatableShaderElf = 0
+options.disableImageResourceCheck = 0
+options.enableScratchAccessBoundsChecks = 0
+options.enableImplicitInvariantExports = 1
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 0
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+options.enableRayQuery = 0
+options.optimizeTessFactor = 1
+options.enableInterpModePatch = 0
+options.pageMigrationEnabled = 0
+options.optimizationLevel = 2
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.resourceLayoutScheme = Compact
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.internalRtShaders = 0
+options.forceNonUniformResourceIndexStageMask = 0
+options.expertSchedulingMode = 0
+options.glState.replaceSetWithResourceType = 0
+options.glState.disableSampleMask = 0
+options.glState.buildResourcesDataForShaderModule = 0
+options.glState.disableTruncCoordForGather = 1
+options.glState.enableCombinedTexture = 0
+options.glState.vertex64BitsAttribSingleLoc = 0
+options.glState.enableFragColor = 0
+options.glState.disableBaseVertex = 0
+options.glState.enablePolygonStipple = 0
+options.glState.enableLineSmooth = 0
+options.glState.emulateWideLineStipple = 0
+options.glState.enablePointSmooth = 0
+options.glState.enableRemapLocation = 0
+options.cacheScopePolicyControl = 0
+options.temporalHintControl = 0x777777
+options.enablePrimGeneratedQuery = 1
+options.disablePerCompFetch = 0
+options.optimizePointSizeWrite = 1
+options.padBufferSizeToNextDword = 0

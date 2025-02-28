@@ -37,6 +37,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     75.12| Add enableDepthCompareParam to PipelineOptions.                                                       |
+//  |     75.11| Add scheduleStrategy to PipelineShaderOptions                                                         |
 //  |     75.10| Add temporalHintShaderControl to PipelineShaderOptions                                                |
 //  |     75.9 | Add rtIgnoreDeclaredPayloadSize to RayTracingPipelineBuildInfo.                                       |
 //  |     75.8 | Add forceMemoryBarrierScope to PipelineShaderOptions.                                                 |
@@ -201,7 +203,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 75
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 10
+#define LLPC_INTERFACE_MINOR_VERSION 11
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

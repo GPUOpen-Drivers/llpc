@@ -1,4 +1,11 @@
 #version 450 core
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 layout(set = 0, binding = 0) uniform sampler1D samp1D;
 layout(set = 0, binding = 1) uniform sampler2D samp2D;

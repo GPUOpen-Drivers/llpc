@@ -114,6 +114,7 @@ private:
   void lowerIntrinsicCall(Function *F, ContinuationData &Data);
   bool handleIntrinsics(llvm::ModuleAnalysisManager &AnalysisManager);
   void handleContStackIntrinsic(FunctionAnalysisManager &FAM, Function &F);
+  void handleGetShaderKind(Function &F);
   void lowerGetResumePoint(Module &Mod);
   bool lowerCompleteOp(Module &Mod);
 
@@ -255,7 +256,7 @@ void CleanupContinuationsPassImpl::updateCpsStack(Function *F, Function *NewFunc
   Value *ContFrame = getContinuationFramePtr(F, IsStart, CpsInfo, &ToBeRemoved);
 
   if (CpsInfo.ContStateBytes != 0) {
-    CompilerUtils::replaceAllPointerUses(ContFrame, CpsStack, ToBeRemoved);
+    compilerutils::replaceAllPointerUses(ContFrame, CpsStack, ToBeRemoved);
   } else {
     // If there is no continuation state, replace it with a poison
     // value instead of a zero-sized stack allocation.
@@ -478,7 +479,7 @@ void CleanupContinuationsPassImpl::processContinuations() {
         F->eraseMetadata(FuncData.second.MD->getMetadataID());
       auto &Context = F->getContext();
       auto *NewFuncTy = FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);
-      Function *NewFunc = CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
+      Function *NewFunc = compilerutils::cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
       NewFunc->takeName(F);
 
       // Create helper struct for return values and RAUW on them
@@ -656,7 +657,7 @@ void CleanupContinuationsPassImpl::lowerIntrinsicCall(Function *F, ContinuationD
   if (!Stage)
     return;
 
-  CompilerUtils::CrossModuleInliner CrossInliner;
+  compilerutils::CrossModuleInliner CrossInliner;
   Value *SystemDataArg = F->getArg(CpsArgIdx::SystemData);
   Type *SystemDataTy = SystemDataArg->getType();
 
@@ -787,7 +788,7 @@ void CleanupContinuationsPassImpl::handleContStackIntrinsic(FunctionAnalysisMana
       Replacement = Builder.CreateAlignedLoad(DestTy, Ptr, Align(CpsStackLowering::getContinuationStackAlignment()));
 
       if (FuncName.starts_with("LoadLastUse"))
-        CompilerUtils::setIsLastUseLoad(*cast<LoadInst>(Replacement));
+        compilerutils::setIsLastUseLoad(*cast<LoadInst>(Replacement));
 
       IsMemoryAccess = true;
     } else if (FuncName.starts_with("Store")) {
@@ -812,6 +813,26 @@ void CleanupContinuationsPassImpl::handleContStackIntrinsic(FunctionAnalysisMana
       CInst.replaceAllUsesWith(Replacement);
     }
 
+    CInst.eraseFromParent();
+  });
+}
+
+void CleanupContinuationsPassImpl::handleGetShaderKind(Function &F) {
+  assert(F.getReturnType()->isIntegerTy(32) && F.arg_size() == 0);
+
+  llvm::forEachCall(F, [&](llvm::CallInst &CInst) {
+    Function *Caller = CInst.getFunction();
+    auto Stage = lgc::rt::getLgcRtShaderStage(Caller);
+
+    // Ignore GetShaderKind calls where we cannot find the shader kind.
+    // This happens e.g. in gpurt-implemented intrinsics that got inlined,
+    // but not removed.
+    if (!Stage)
+      return;
+
+    DXILShaderKind ShaderKind = ShaderStageHelper::rtShaderStageToDxilShaderKind(*Stage);
+    auto *ShaderKindVal = ConstantInt::get(F.getReturnType(), static_cast<uint64_t>(ShaderKind));
+    CInst.replaceAllUsesWith(ShaderKindVal);
     CInst.eraseFromParent();
   });
 }
@@ -925,7 +946,7 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
     assert(StackAddrspaceMD.has_value() && "Missing continuation.stackAddrspace metadata");
     auto StackAddrspace = StackAddrspaceMD.value();
 
-    if (StackAddrspace == ContStackAddrspace::Global)
+    if (StackAddrspace == ContStackAddrspace::Global || StackAddrspace == ContStackAddrspace::GlobalLLPC)
       GetGlobalMemBase = getContinuationStackGlobalMemBase(*GpurtLibrary);
 
     StackLowering.emplace(Mod.getContext(), static_cast<unsigned>(StackAddrspace));
@@ -947,6 +968,13 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
   }
 
   Changed |= lowerCompleteOp(Mod);
+
+  for (auto &F : Mod.functions()) {
+    if (F.getName().starts_with("_AmdGetShaderKind")) {
+      handleGetShaderKind(F);
+      Changed |= true;
+    }
+  }
 
   return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

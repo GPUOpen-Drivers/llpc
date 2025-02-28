@@ -488,7 +488,8 @@ PreservedAnalyses LowerFragmentColorExport::run(Module &module, ModuleAnalysisMa
   }
 
   FragmentColorExport fragColorExport(m_pipelineState->getLgcContext());
-  bool dummyExport = m_resUsage->builtInUsage.fs.discard || m_pipelineState->getOptions().forceFragColorDummyExport ||
+  bool dummyExport = m_resUsage->builtInUsage.fs.discard ||
+                     m_pipelineState->getOptions().forceNullFsDummyExport && m_resUsage->inOutUsage.fs.isNullFs ||
                      m_pipelineState->getShaderModes()->getFragmentShaderMode().enablePops;
   FragmentColorExport::Key key = FragmentColorExport::computeKey(m_info, m_pipelineState);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),

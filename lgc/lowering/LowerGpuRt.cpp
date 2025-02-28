@@ -34,6 +34,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/AddressExtender.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -73,6 +74,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetBoxSortHeuristicMode)
                             .add(&LowerGpuRt::visitGetRayQueryDispatchId)
                             .add(&LowerGpuRt::visitGetStaticFlags)
+                            .add(&LowerGpuRt::visitMakePc)
                             .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .add(&LowerGpuRt::visitFloatWithRoundMode)
@@ -461,6 +463,43 @@ void LowerGpuRt::visitGetStaticFlags(GpurtGetStaticFlagsOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *staticPipelineFlags = m_builder->getInt32(m_pipelineState->getOptions().rtStaticPipelineFlags);
   inst.replaceAllUsesWith(staticPipelineFlags);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtMakePcOp" instruction
+//
+// @param inst : The dialect instruction to process
+// This generates the following IR for a call to @lgc.gpurt.make.pc(i32 %in32):
+// clang-format off
+// %pc64 = call i64 @llvm.amdgcn.s.getpc()
+// %lshr = lshr i64 %pc64, 32
+// %high32 = trunc i64 %lshr to i32
+// %tmp1 = insertelement <2 x i32> poison, i32 %in32, i64 0
+// %tmp2 = insertelement <2 x i32> %tmp1, i32 %high32, i64 1
+// %tmp3 = bitcast <2 x i32> to i64
+// If the return type of the dialect op is an <2 x i32>, it bitcasts the result again:
+// %bc = bitcast i64 %tmp3 to <2 x i32>
+// clang-format on
+// The original call is then replaced with either %tmp3 or %bc, dependent on the return type of the original dialect op.
+void LowerGpuRt::visitMakePc(GpurtMakePcOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+
+  Value *highPc = m_builder->CreateIntrinsic(m_builder->getInt64Ty(), Intrinsic::amdgcn_s_getpc, {});
+  highPc = m_builder->CreateTrunc(m_builder->CreateLShr(highPc, m_builder->getInt64(32)), m_builder->getInt32Ty());
+
+  BasicBlock *bb = inst.getParent();
+  AddressExtender addressExtender(bb->getParent(), bb);
+
+  Value *addr32 = inst.getVa();
+  Value *replacement = nullptr;
+  replacement = addressExtender.extend(addr32, highPc, nullptr, *m_builder);
+
+  // AddressExtender returns an i64 bitcast. Reconvert that to the vector return type if appropriate.
+  replacement = m_builder->CreateBitCast(replacement, inst.getType());
+  inst.replaceAllUsesWith(replacement);
+
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

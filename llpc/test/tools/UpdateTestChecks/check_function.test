@@ -1,0 +1,2 @@
+# RUN: cp -f %S/Inputs/base_test.pipe %t.pipe && %update_llpc_test_checks %t.pipe --function _amdgpu_ps_main
+# RUN: diff -u %t.pipe %S/Inputs/function.pipe.expected

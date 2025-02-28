@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -24,6 +24,8 @@
  #######################################################################################################################
 
 project(DUMPER C CXX)
+
+set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 ### Create DUMPER Library ################################################################################################
 add_library(dumper_base OBJECT "")
@@ -56,10 +58,10 @@ target_include_directories(dumper_base
     PUBLIC
         .
     PUBLIC
-        ${XGL_PAL_PATH}/inc/core
-        ${XGL_PAL_PATH}/inc/util
+        ${PAL_SOURCE_DIR}/inc/core
+        ${PAL_SOURCE_DIR}/inc/util
         ${LLVM_INCLUDE_DIRS}
-        ${XGL_VKGC_PATH}/util
+        ${LLPC_SOURCE_DIR}/util
 )
 
 target_sources(dumper_base PRIVATE

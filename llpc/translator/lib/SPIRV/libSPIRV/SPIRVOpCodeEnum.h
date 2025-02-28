@@ -1,3 +1,5 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 _SPIRV_OP(Nop, 0)
 _SPIRV_OP(Undef, 1)
 _SPIRV_OP(SourceContinued, 2)

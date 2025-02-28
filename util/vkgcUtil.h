@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -72,6 +72,9 @@ inline void *voidPtrInc(const void *p, size_t numBytes) {
   void *ptr = const_cast<void *>(p);
   return (static_cast<uint8_t *>(ptr) + numBytes);
 }
+
+// Calculate 64-bit CRC for the given block of data
+uint64_t calculateCrc64(const void *data, size_t size, bool refin = true, bool refout = true);
 
 // ===================================================================================
 // Finds the expected structure in Vulkan structure chain with the specified info.

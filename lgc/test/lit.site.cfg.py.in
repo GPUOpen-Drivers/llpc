@@ -1,3 +1,28 @@
+##
+ #######################################################################################################################
+ #
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ #
+ #  Permission is hereby granted, free of charge, to any person obtaining a copy
+ #  of this software and associated documentation files (the "Software"), to
+ #  deal in the Software without restriction, including without limitation the
+ #  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ #  sell copies of the Software, and to permit persons to whom the Software is
+ #  furnished to do so, subject to the following conditions:
+ #
+ #  The above copyright notice and this permission notice shall be included in all
+ #  copies or substantial portions of the Software.
+ #
+ #  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ #  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ #  IN THE SOFTWARE.
+ #
+ #######################################################################################################################
+
 @LIT_SITE_CFG_IN_HEADER@
 
 import sys
@@ -13,6 +38,18 @@ for d in "@LIT_DEFINITIONS@".split(";"):
     name = def_split[0].lower()
     val = def_split[1] if len(def_split) > 1 else "ON"
     config.available_features.add(name)
+
+breaking_revisions = [511860]
+
+llvm_main_revision = "@LLVM_MAIN_REVISION@"
+try:
+    for rev in breaking_revisions:
+        # If there's no llvm_main_revision, we'll just assume we're using the
+        # latest LLVM version.
+        if (not llvm_main_revision) or int(llvm_main_revision) >= rev:
+            config.available_features.add('llvm-main-revision-ge-%d' % rev)
+except ValueError:
+    lit_config.fatal("unable to parse LLVM_MAIN_REVISION")
 
 # Support substitution of the tools_dir with user parameters. This is
 # used when we can't determine the tool dir at configuration time.

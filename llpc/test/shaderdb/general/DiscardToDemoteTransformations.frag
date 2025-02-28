@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // Check that amdllpc enables discard-to-demote transforms automatically and that they
 // can be disabled on demand. This should affect the generated code and cache hash.
 

@@ -671,7 +671,7 @@ protected:
   void validate() const override {
     SPIRVId Op1 = Ops[0];
     SPIRVId Op2 = Ops[1];
-    SPIRVType *Op1Ty, *Op2Ty;
+    [[maybe_unused]] SPIRVType *Op1Ty, *Op2Ty;
     SPIRVInstruction::validate();
     if (getValue(Op1)->isForward() || getValue(Op2)->isForward())
       return;
@@ -696,8 +696,6 @@ protected:
     } else {
       Op2Ty = getValueType(Op2);
     }
-    (void)Op1Ty;
-    (void)Op2Ty;
     if (isBinaryOpCode(OpCode)) {
       assert(
           (getValueType(Op1) == getValueType(Op2) || (Op1Ty->isTypeInt() && Op2Ty->isTypeInt(Op1Ty->getBitWidth()))) &&
@@ -1324,7 +1322,6 @@ public:
            "Result type must be a vector of floating-point type");
     assert(getValueType(Vector)->getVectorComponentType() == getValueType(getId())->getVectorComponentType() &&
            "Scalar must have the same type as the Component Type in Result Type");
-    SPIRVInstruction::validate();
   }
 
 protected:
@@ -1340,8 +1337,8 @@ protected:
     if (getValue(Op)->isForward())
       return;
     if (isGenericNegateOpCode(OpCode)) {
-      SPIRVType *ResTy = nullptr;
-      SPIRVType *OpTy = nullptr;
+      [[maybe_unused]] SPIRVType *ResTy = nullptr;
+      [[maybe_unused]] SPIRVType *OpTy = nullptr;
 
       if (Type->isTypeCooperativeMatrixKHR() &&
           (static_cast<unsigned>(OpCode) == OpSNegate || static_cast<unsigned>(OpCode) == OpFNegate)) {
@@ -1351,8 +1348,7 @@ protected:
         ResTy = Type->isTypeVector() ? Type->getVectorComponentType() : Type;
         OpTy = Type->isTypeVector() ? getValueType(Op)->getVectorComponentType() : getValueType(Op);
       }
-      (void)ResTy;
-      (void)OpTy;
+
       // NOTE: SPIR-V spec only request OpFNegate to match the type between Operand and Result.
       assert((getType() == getValueType(Op) || static_cast<unsigned>(OpCode) != OpFNegate) && "Inconsistent type");
       assert((ResTy->isTypeInt() || ResTy->isTypeFloat()) && "Invalid type for Generic Negate instruction");
@@ -1361,8 +1357,9 @@ protected:
                                    : 1) &&
              "Invalid vector component Width for Generic Negate instruction");
     }
-    if (Type->isTypeCooperativeMatrixKHR() && static_cast<unsigned>(OpCode) >= OpConvertFToU &&
-        static_cast<unsigned>(OpCode) <= OpFConvert) {
+    const bool allowedMatrixConversion =
+        (static_cast<unsigned>(OpCode) >= OpConvertFToU && static_cast<unsigned>(OpCode) <= OpFConvert);
+    if (Type->isTypeCooperativeMatrixKHR() && allowedMatrixConversion) {
       SPIRVType *OpTy = getValueType(Op);
       assert(OpTy->isTypeCooperativeMatrixKHR() &&
              Type->getCooperativeMatrixKHRScope() == OpTy->getCooperativeMatrixKHRScope() &&
@@ -1759,9 +1756,11 @@ protected:
   // need to trace through the base type for struct types
   void validate() const override {
     SPIRVInstruction::validate();
-    assert(getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
-           getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix() ||
-           getValueType(Composite)->isTypeCooperativeMatrixKHR());
+    [[maybe_unused]] const bool typeCheck =
+        getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
+        getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix() ||
+        getValueType(Composite)->isTypeCooperativeMatrixKHR();
+    assert(typeCheck);
   }
   SPIRVId Composite;
   std::vector<SPIRVWord> Indices;
@@ -1798,9 +1797,11 @@ protected:
     SPIRVInstruction::validate();
     assert(OpCode == OC);
     assert(WordCount == Indices.size() + FixedWordCount);
-    assert(getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
-           getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix());
-    assert(Type == getValueType(Composite));
+    [[maybe_unused]] const bool typeCheck =
+        getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
+        getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix() ||
+        getValueType(Composite)->isTypeCooperativeMatrixKHR();
+    assert(typeCheck && Type == getValueType(Composite));
   }
   SPIRVId Object;
   SPIRVId Composite;

@@ -1,0 +1,96 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v -gfxip=11.0 %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 75
+
+[MeshGlsl]
+#version 460
+#extension GL_EXT_mesh_shader : require
+layout(local_size_x = 3, local_size_y = 1, local_size_z = 1) in;
+layout(max_vertices = 3, max_primitives = 3, triangles) out;
+
+out gl_MeshPerVertexEXT
+{
+    invariant vec4 gl_Position;
+} gl_MeshVerticesEXT[];
+
+layout(location = 1) out vec3 ARG[3];
+layout(location = 2) flat out uvec4 ARG_2[3];
+layout(location = 4) perprimitiveEXT out vec2 ARG_1[3];
+
+void main()
+{
+    SetMeshOutputsEXT(3u, 3u);
+    gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position.x = 1.0;
+    gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position.y = 1.0;
+    gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position.z = 0.0;
+    gl_MeshVerticesEXT[gl_LocalInvocationIndex].gl_Position.w = 1.0;
+    ARG[gl_LocalInvocationIndex].x = 1.0;
+    ARG[gl_LocalInvocationIndex].y = 2.0;
+    ARG[gl_LocalInvocationIndex].z = 3.0;
+    ARG_2[gl_LocalInvocationIndex].x = 6u;
+    ARG_2[gl_LocalInvocationIndex].y = 7u;
+    ARG_2[gl_LocalInvocationIndex].z = 8u;
+    ARG_2[gl_LocalInvocationIndex].w = 9u;
+    gl_PrimitiveTriangleIndicesEXT[gl_LocalInvocationIndex] = uvec3(0u, 1u, 2u);
+    gl_MeshPrimitivesEXT[gl_LocalInvocationIndex].gl_PrimitiveID = int(gl_LocalInvocationIndex);
+    ARG_1[gl_LocalInvocationIndex].x = 4.0;
+    ARG_1[gl_LocalInvocationIndex].y = 5.0;
+}
+
+[MeshInfo]
+entryPoint = main
+options.clientHash = 0xB4FC8378D8AD8BCF, 0xF5E42AB8B0336FB7
+
+[FsGlsl]
+#version 460
+
+layout(location = 1) in vec3 ARG;
+layout(location = 0) out vec4 SV_Target;
+layout(location = 1) out vec2 SV_Target_1;
+layout(location = 2) out uvec4 SV_Target_2;
+
+void main()
+{
+    SV_Target.x = ARG.x;
+    SV_Target.y = ARG.y;
+    SV_Target.z = ARG.z;
+    SV_Target.w = 0.0;
+    SV_Target_1.x = 0.0;
+    SV_Target_1.y = 0.0;
+    SV_Target_2.x = uint(gl_PrimitiveID);
+    SV_Target_2.y = 0u;
+    SV_Target_2.z = 0u;
+    SV_Target_2.w = 0u;
+}
+
+[FsInfo]
+entryPoint = main
+options.clientHash = 0x47EB651246D94E97, 0xC726082853873C1D
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+colorBuffer[1].format = VK_FORMAT_R32G32_SFLOAT
+colorBuffer[1].channelWriteMask = 0
+colorBuffer[1].blendEnable = 0
+colorBuffer[1].blendSrcAlphaToColor = 0
+colorBuffer[2].format = VK_FORMAT_R32G32B32A32_UINT
+colorBuffer[2].channelWriteMask = 0
+colorBuffer[2].blendEnable = 0
+colorBuffer[2].blendSrcAlphaToColor = 0
+

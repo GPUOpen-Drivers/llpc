@@ -183,9 +183,9 @@ static bool commonMaterializable(Instruction &Inst) {
   // Insert into constant.
   if (isa<InsertElementInst, InsertValueInst>(Inst)) {
     Instruction *FirstInsert = nullptr;
-    if (FirstInsert = dyn_cast<InsertElementInst>(&Inst))
+    if ((FirstInsert = dyn_cast<InsertElementInst>(&Inst)))
       FirstInsert = TrackSequenceInsert<InsertElementInst>(FirstInsert);
-    else if (FirstInsert = dyn_cast<InsertValueInst>(&Inst))
+    else if ((FirstInsert = dyn_cast<InsertValueInst>(&Inst)))
       FirstInsert = TrackSequenceInsert<InsertValueInst>(FirstInsert);
 
     if (isa<Constant>(FirstInsert->getOperand(0)))

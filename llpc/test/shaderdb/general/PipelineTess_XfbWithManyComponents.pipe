@@ -1,3 +1,11 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ; This test is to check transform feedback from TES while 32 outputs are fully used and they are scalarized to 128
 ; components. Therefore, in this case, we have 128 transform feedback write calls. This test is to check if we can
 ; pack such trasnform feedback outputs correctly in LDS space on GFX11+.
@@ -8,24 +16,24 @@
 ; SHADERTEST-LABEL: LLPC HW GS configurations
 ; SHADERTEST: EsGsRingItemSize = 129 dwords
 
-; SHADERTEST-LABEL: .fetchXfbOutput
+; SHADERTEST-LABEL: .writeXfb
 ; Write v4[31] = 4.0 -> LDS
 ; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr {{i8|i32}}, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
-; SHADERTEST-NEXT: store i32 1082130432, ptr addrspace(3) [[ldsPtr1]], align 4
+; SHADERTEST-NEXT: store float 4.000000e+00, ptr addrspace(3) [[ldsPtr1]], align 4
 
 ; Write v3[31] = 3.0 -> LDS
 ; SHADERTEST: [[ldsPtr2:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 128
-; SHADERTEST-NEXT: store i32 1077936128, ptr addrspace(3) [[ldsPtr2]], align 4
+; SHADERTEST-NEXT: store float 3.000000e+00, ptr addrspace(3) [[ldsPtr2]], align 4
 
 ; Write v2[31] = 2.0 -> LDS
 ; SHADERTEST: [[ldsPtr3:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 256
-; SHADERTEST-NEXT: store i32 1073741824, ptr addrspace(3) [[ldsPtr3]], align 4
+; SHADERTEST-NEXT: store float 2.000000e+00, ptr addrspace(3) [[ldsPtr3]], align 4
 
 ; Write v1[31] = 1.0 -> LDS
 ; SHADERTEST: [[ldsPtr4:%[0-9]*]] = getelementptr i8, ptr addrspace(3) %{{[0-9]*}}, i32 384
-; SHADERTEST-NEXT: store i32 1065353216, ptr addrspace(3) [[ldsPtr4]], align 4
+; SHADERTEST-NEXT: store float 1.000000e+00, ptr addrspace(3) [[ldsPtr4]], align 4
 
-; SHADERTEST-LABEL: .exportXfbOutput
+; SHADERTEST-LABEL: .exportXfbInVertex0
 ; Read v4[31] <- LDS
 ; SHADERTEST: [[ldsPtr1:%[0-9]*]] = getelementptr {{i8|i32}}, ptr addrspace(3) @Lds.GS, i32 %{{[0-9]*}}
 ; SHADERTEST-NEXT: [[v4:%[0-9]*]] = load float, ptr addrspace(3) [[ldsPtr1]], align 4

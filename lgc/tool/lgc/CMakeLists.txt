@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -56,4 +56,4 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
-set_compiler_options(lgc ${LLPC_ENABLE_WERROR})
+set_compiler_options(lgc)

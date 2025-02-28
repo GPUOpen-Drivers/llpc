@@ -57,7 +57,7 @@ function(add_llpc_unittest_impl test_suite test_name)
   target_include_directories(${test_name} PRIVATE
     ${LLVM_INCLUDE_DIRS}  # This is necessary to discover the auto-generated llvm-config.h header.
   )
-  set_compiler_options(${test_name} ${LLPC_ENABLE_WERROR})
+  set_compiler_options(${test_name})
 
   get_target_property(test_suite_folder ${test_suite} FOLDER)
   if(test_suite_folder)

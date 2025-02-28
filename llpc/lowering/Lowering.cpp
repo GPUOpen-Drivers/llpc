@@ -43,7 +43,6 @@
 #include "LowerTerminator.h"
 #include "LowerTranslator.h"
 #include "LoweringUtil.h"
-#include "ProcessGpuRtLibrary.h"
 #include "ScalarReplacementOfBuiltins.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"

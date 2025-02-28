@@ -52,9 +52,12 @@
 #include "llpcRayTracingContext.h"
 #include "compilerutils/TypesMetadata.h"
 #include "llvmraytracing/ContinuationsUtil.h"
+#include "xdl/util/ElementType.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/LgcRtqDialect.h"
+#include "lgc/LgcXdlDialect.h"
+#include "lgc/LgcXdlTypes.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
@@ -101,6 +104,7 @@ using namespace SPIRV;
 using namespace Llpc;
 using namespace lgc::rt;
 using namespace lgc::rtq;
+using namespace lgc::xdl;
 
 namespace Llpc {
 unsigned getTraceRayParamPayloadIdx(void);
@@ -267,6 +271,27 @@ SPIRVWord getStd430AlignedTypeSize(SPIRVType *const spvType) {
   return 0;
 }
 
+static Value *vectorCompositeConstruct(Type *vecTy, const std::vector<Value *> &constituents, lgc::Builder *builder) {
+  Value *v = PoisonValue::get(vecTy);
+  for (unsigned idx = 0, i = 0, e = constituents.size(); i < e; ++i) {
+    if (constituents[i]->getType()->isVectorTy()) {
+      // NOTE: It is allowed to construct a vector from several "smaller"
+      // scalars or vectors, such as vec4 = (vec2, vec2) or vec4 = (float,
+      // vec3).
+      auto compCount = cast<FixedVectorType>(constituents[i]->getType())->getNumElements();
+      for (unsigned j = 0; j < compCount; ++j) {
+        auto *comp = builder->CreateExtractElement(constituents[i], builder->getInt32(j));
+        v = builder->CreateInsertElement(v, comp, builder->getInt32(idx));
+        ++idx;
+      }
+    } else {
+      v = builder->CreateInsertElement(v, constituents[i], builder->getInt32(idx));
+      ++idx;
+    }
+  }
+  return v;
+}
+
 bool SPIRVToLLVM::isStorageClassExplicitlyLaidOut(SPIRVStorageClassKind storageClass) {
   return llvm::is_contained({StorageClassStorageBuffer, StorageClassUniform, StorageClassPushConstant,
                              StorageClassPhysicalStorageBufferEXT},
@@ -377,6 +402,10 @@ ImageTypeIndices SPIRVToLLVM::getImageTypeIndices(unsigned imageComponents) cons
     result.convertingSamplerIdx = idx++;
   }
 
+  if (getPipelineOptions()->getGlState().enableDepthCompareParam) {
+    result.compareParamPointer = idx++;
+  }
+
   return result;
 }
 
@@ -402,6 +431,10 @@ Type *SPIRVToLLVM::getImageTy(unsigned imageComponents) const {
     types.push_back(descPtrTy); // pointer
     types.push_back(i32);       // stride
     types.push_back(i32);       // convertingSamplerIdx
+  }
+
+  if (getPipelineOptions()->getGlState().enableDepthCompareParam) {
+    types.push_back(getBuilder()->getBufferDescTy()); // pointer
   }
 
   return StructType::get(*m_context, types);
@@ -976,7 +1009,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(SPIRVType *co
   unsigned columns = spvType->getCooperativeMatrixKHRColumns();
   auto matrixLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(use), elemType, rows, columns);
   const unsigned kSize = rows > columns ? rows : columns;
-  return getBuilder()->getCooperativeMatrixTy(elemType, matrixLayout, kSize);
+  return lgc::xdl::getCooperativeMatrixTy(*getBuilder(), elemType, matrixLayout, kSize);
 }
 
 // =====================================================================================================================
@@ -1308,10 +1341,10 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
   auto srcType = src->getType();
   CastInst::CastOps co = Instruction::BitCast;
 
-  lgc::CooperativeMatrixElementType srcElemTy = lgc::CooperativeMatrixElementType::Unknown;
-  lgc::CooperativeMatrixElementType dstElemTy = lgc::CooperativeMatrixElementType::Unknown;
-  lgc::CooperativeMatrixLayout srcLayout = lgc::CooperativeMatrixLayout::InvalidLayout;
-  lgc::CooperativeMatrixLayout dstLayout = lgc::CooperativeMatrixLayout::InvalidLayout;
+  auto srcElemTy = lgc::xdl::CooperativeMatrixElementType::Unknown;
+  auto dstElemTy = lgc::xdl::CooperativeMatrixElementType::Unknown;
+  auto srcLayout = lgc::xdl::CooperativeMatrixLayout::InvalidLayout;
+  auto dstLayout = lgc::xdl::CooperativeMatrixLayout::InvalidLayout;
 
   bool isExt = dstType->getScalarSizeInBits() > srcType->getScalarSizeInBits();
   if (bv->getType()->isTypeCooperativeMatrixKHR()) {
@@ -1319,11 +1352,12 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
     srcElemTy = mapToBasicType(srcCompType);
     auto dstCompType = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRComponentType();
     dstElemTy = mapToBasicType(dstCompType);
+    auto srcUse = static_cast<SPIRVTypeCooperativeMatrixKHR *>(srcSpvType)->getCooperativeMatrixKHRUse();
     auto dstUse = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRUse();
     unsigned rows = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRRows();
     unsigned columns = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRColumns();
     dstLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(dstUse), dstElemTy, rows, columns);
-    srcLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(dstUse), srcElemTy, rows, columns);
+    srcLayout = getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(srcUse), srcElemTy, rows, columns);
   }
 
   switch (bc->getOpCode()) {
@@ -1350,9 +1384,9 @@ Value *SPIRVToLLVM::transConvertInst(SPIRVValue *bv, Function *f, BasicBlock *bb
       unsigned rows = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRRows();
       unsigned columns = static_cast<SPIRVTypeCooperativeMatrixKHR *>(dstSpvType)->getCooperativeMatrixKHRColumns();
       const unsigned kSize = rows > columns ? rows : columns;
-      Type *matrixType = getBuilder()->getCooperativeMatrixTy(dstElemTy, dstLayout, kSize);
-      return getBuilder()->create<CooperativeMatrixConvertOp>(matrixType, co, src, srcElemTy, dstElemTy, srcLayout,
-                                                              dstLayout, "convert");
+      Type *matrixType = lgc::xdl::getCooperativeMatrixTy(*getBuilder(), dstElemTy, dstLayout, kSize);
+      return getBuilder()->create<lgc::xdl::CooperativeMatrixConvertOp>(matrixType, co, src, srcElemTy, dstElemTy,
+                                                                        srcLayout, dstLayout, "convert");
     }
 
     if (co == Instruction::FPTrunc) {
@@ -2116,7 +2150,9 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
     return load;
   }
-  if (loadType->isArrayTy() && !spvType->isTypeVector() && !spvType->isTypeImage()) {
+  const bool isVectorTy = spvType->isTypeVector();
+  SPIRVType *(SPIRVType::*getVectorElemType)() const = &SPIRVType::getVectorComponentType;
+  if (loadType->isArrayTy() && !isVectorTy && !spvType->isTypeImage()) {
     // Rewrite this condition to keep consistent with the assert on getArrayElementType/getMatrixColumnType later
     // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
     const bool needsPad = isTypeWithPad(loadType);
@@ -2146,12 +2182,13 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
     return load;
   }
-  if (spvType->isTypeVector() && isCoherent) {
+  if (isVectorTy && isCoherent) {
     // Coherent load operand must be integer, pointer, or floating point type, so need to spilte vector.
-    SPIRVType *spvElementType = spvType->getVectorComponentType();
+    SPIRVType *spvElementType = (spvType->*getVectorElemType)();
+    unsigned elementCount = spvType->getVectorComponentCount();
     Type *elementType = transType(spvElementType);
-    Value *load = PoisonValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
-    for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
+    Value *load = PoisonValue::get(VectorType::get(elementType, elementCount, false));
+    for (unsigned i = 0; i < elementCount; i++) {
       Value *const elementLoadPointer =
           getBuilder()->CreateInBoundsGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
       Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementType, isVolatile,
@@ -2164,7 +2201,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
   Type *alignmentType = loadType;
   // Vectors are represented as arrays in memory, so we need to cast the array to a vector before loading.
-  if (spvType->isTypeVector()) {
+  if (isVectorTy) {
     loadType = transType(spvType, 0, false, LayoutMode::Native);
 
     const bool scalarBlockLayout = getPipelineOptions()->scalarBlockLayout;
@@ -2229,6 +2266,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   }
 
   const bool useSGep = storePointer->getType()->getPointerAddressSpace() == SPIRAS_Output;
+  const bool isVectorTy = spvType->isTypeVector();
+  SPIRVType *(SPIRVType::*getVectorElemType)() const = &SPIRVType::getVectorComponentType;
   Value *const zero = getBuilder()->getInt32(0);
   if (storeType->isStructTy() && !spvType->isTypeSampledImage() && !spvType->isTypeImage() &&
       !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR) {
@@ -2246,7 +2285,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreType, memberStoreValue,
                               isVolatile, isCoherent, isNonTemporal);
     }
-  } else if (storeType->isArrayTy() && !spvType->isTypeVector() && !spvType->isTypeImage()) {
+  } else if (storeType->isArrayTy() && !isVectorTy && !spvType->isTypeImage()) {
     // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
     const bool needsPad = isTypeWithPad(storeType);
 
@@ -2267,11 +2306,11 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       addStoreInstRecursively(spvElementType, elementStorePointer, elementStoreType, elementStoreValue, isVolatile,
                               isCoherent, isNonTemporal);
     }
-  } else if (spvType->isTypeVector() && isCoherent) {
+  } else if (isVectorTy && isCoherent) {
     // Coherent store operand must be integer, pointer, or floating point type, so need to spilte vector.
-    SPIRVType *spvElementType = spvType->getVectorComponentType();
-
-    for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
+    SPIRVType *spvElementType = (spvType->*getVectorElemType)();
+    unsigned elementCount = spvType->getVectorComponentCount();
+    for (unsigned i = 0; i < elementCount; i++) {
       Value *indices[] = {zero, getBuilder()->getInt32(i)};
       Value *const elementStorePointer = getBuilder()->CreateInBoundsGEP(storeType, storePointer, indices);
       Type *const elementStoreType = GetElementPtrInst::getIndexedType(storeType, indices);
@@ -2292,7 +2331,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
     }
 
     // Vectors are represented as arrays in memory, so we need to cast the array to a vector before storing.
-    if (spvType->isTypeVector()) {
+    if (isVectorTy) {
       const bool scalarBlockLayout = getPipelineOptions()->scalarBlockLayout;
       if (!scalarBlockLayout)
         alignmentType = storeType;
@@ -2813,61 +2852,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAtomicCompareExchange>(SP
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *const spvValue) {
   SPIRVCopyMemory *const spvCopyMemory = static_cast<SPIRVCopyMemory *>(spvValue);
 
-  bool isSrcVolatile = spvCopyMemory->SPIRVMemoryAccess::isVolatile(true);
+  bool isSrcVolatile = checkVolatile(spvCopyMemory->getSource(), spvCopyMemory, true);
+  bool isDestVolatile = checkVolatile(spvCopyMemory->getTarget(), spvCopyMemory, false);
 
-  // We don't require volatile on address spaces that become non-pointers.
-  switch (spvCopyMemory->getSource()->getType()->getPointerStorageClass()) {
-  case StorageClassInput:
-  case StorageClassOutput:
-  case StorageClassPrivate:
-  case StorageClassFunction:
-    isSrcVolatile = false;
-    break;
-  default:
-    break;
-  }
-
-  bool isDestVolatile = spvCopyMemory->SPIRVMemoryAccess::isVolatile(false);
-
-  // We don't require volatile on address spaces that become non-pointers.
-  switch (spvCopyMemory->getTarget()->getType()->getPointerStorageClass()) {
-  case StorageClassInput:
-  case StorageClassOutput:
-  case StorageClassPrivate:
-  case StorageClassFunction:
-    isDestVolatile = false;
-    break;
-  default:
-    break;
-  }
-
-  bool isCoherent = false;
-
-  if (spvCopyMemory->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask) {
-    SPIRVWord spvId = spvCopyMemory->getMakeVisibleScope(true);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (spvCopyMemory->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
-
-  if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask) {
-    SPIRVWord spvId = spvCopyMemory->getMakeAvailableScope(false);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (spvCopyMemory->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
+  bool isCoherent = checkCoherent(spvCopyMemory->getSource(), spvCopyMemory, true) ||
+                    checkCoherent(spvCopyMemory->getTarget(), spvCopyMemory, false);
 
   Value *const loadPointer = transValue(spvCopyMemory->getSource(), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
@@ -2947,13 +2936,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     layout = LayoutMode::Scalar;
   }
 
-  bool isVolatile = spvLoad->SPIRVMemoryAccess::isVolatile(true);
-  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
-  if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
-    isVolatile |= spvLoad->getSrc()->isVolatile();
-
   // Translate a volatile load of BuiltInHelperInvocation to a call to IsHelperInvocation.
-  if ((isVolatile || spvLoad->getSrc()->isVolatile()) &&
+  if ((spvLoad->SPIRVMemoryAccess::isVolatile(true) || spvLoad->getSrc()->isVolatile()) &&
       spvLoad->getSrc()->getType()->getPointerStorageClass() == StorageClassInput) {
     if (GlobalVariable *gv = dyn_cast<GlobalVariable>(loadPointer)) {
       SPIRVBuiltinVariableKind kind;
@@ -2964,34 +2948,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     }
   }
 
-  // We don't require volatile on address spaces that become non-pointers.
-  switch (spvLoad->getSrc()->getType()->getPointerStorageClass()) {
-  case StorageClassInput:
-  case StorageClassOutput:
-  case StorageClassPrivate:
-  case StorageClassFunction:
-    isVolatile = false;
-    break;
-  default:
-    break;
-  }
-
-  bool isCoherent = spvLoad->getSrc()->isCoherent();
-
-  // MakePointerVisibleKHR is valid with OpLoad
-  if (spvLoad->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask) {
-    SPIRVWord spvId = spvLoad->getMakeVisibleScope(true);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-
-  if (spvLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
+  bool isVolatile = checkVolatile(spvLoad->getSrc(), spvLoad, true);
+  auto isCoherent = checkCoherent(spvLoad->getSrc(), spvLoad, true);
 
   if (spvLoad->getSrc()->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT)
     isCoherent = true;
@@ -3130,6 +3088,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
   unsigned imageDescSet = descriptorSet;
   unsigned fmaskDescSet = descriptorSet;
   unsigned samplerDescSet = descriptorSet;
+  unsigned compareParamDescSet = descriptorSet;
 
   if (getPipelineOptions()->getGlState().replaceSetWithResourceType) {
     assert(spvTy->getOpCode() != OpTypeSampler);
@@ -3153,6 +3112,9 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
 
     if (!getPipelineOptions()->getGlState().enableCombinedTexture)
       samplerDescSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
+
+    if (getPipelineOptions()->getGlState().enableDepthCompareParam)
+      compareParamDescSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::InlineBuffer);
   }
 
   unsigned convertingSamplerIdx = 0;
@@ -3215,6 +3177,13 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *baseTy
                                              idxs.convertingSamplerIdx);
   }
 
+  if (getPipelineOptions()->getGlState().enableDepthCompareParam) {
+    Value *compareParamPointer = getBuilder()->create<lgc::LoadBufferDescOp>(
+        compareParamDescSet, binding, m_builder->getInt32(0), lgc::Builder::BufferFlagConst);
+    getBuilder()->CreateInvariantStart(compareParamPointer);
+    result = getBuilder()->CreateInsertValue(result, compareParamPointer, idxs.compareParamPointer);
+  }
+
   return result;
 }
 
@@ -3233,41 +3202,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
     return nullptr;
   }
 
-  bool isVolatile = spvStore->SPIRVMemoryAccess::isVolatile(false);
-  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
-  if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
-    isVolatile |= spvStore->getDst()->isVolatile();
+  bool isVolatile = checkVolatile(spvStore->getDst(), spvStore, false);
+  bool isCoherent = checkCoherent(spvStore->getDst(), spvStore, false);
 
-  // We don't require volatile on address spaces that become non-pointers.
   const auto pointerStorageClass = spvStore->getDst()->getType()->getPointerStorageClass();
-  switch (pointerStorageClass) {
-  case StorageClassInput:
-  case StorageClassOutput:
-  case StorageClassPrivate:
-  case StorageClassFunction:
-    isVolatile = false;
-    break;
-  default:
-    break;
-  }
-
-  bool isCoherent = spvStore->getDst()->isCoherent();
-
-  // MakePointerAvailableKHR is valid with OpStore
-  if (spvStore->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask) {
-    SPIRVWord spvId = spvStore->getMakeAvailableScope(false);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-
-    if (isSystemScope)
-      isCoherent = true;
-  }
-
-  if (spvStore->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
-
   if (pointerStorageClass == StorageClassTaskPayloadWorkgroupEXT)
     isCoherent = true;
 
@@ -3602,8 +3540,10 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
         break;
       }
       case OpTypeVector: {
-        gepIndices.push_back(index);
+
         spvAccessElementType = spvAccessElementType->getVectorComponentType();
+        gepIndices.push_back(index);
+
         break;
       }
       case OpTypeCooperativeMatrixKHR: {
@@ -3613,8 +3553,8 @@ SmallVector<Value *> SPIRVToLLVM::transAccessChain(SPIRVValue *const spvValue) {
         unsigned columns = spvAccessElementType->getCooperativeMatrixKHRColumns();
         spvAccessElementType = spvAccessElementType->getCooperativeMatrixKHRComponentType();
         basePointeeType = transType(spvAccessElementType);
-        lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvAccessElementType);
-        lgc::CooperativeMatrixLayout layout =
+        lgc::xdl::CooperativeMatrixElementType elemType = mapToBasicType(spvAccessElementType);
+        lgc::xdl::CooperativeMatrixLayout layout =
             getCooperativeMatrixKHRLayout(static_cast<CooperativeMatrixUse>(use), elemType, rows, columns);
 
         std::string mangledName(LlpcName::SpirvCooperativeMatrixProxy);
@@ -4493,7 +4433,7 @@ Value *SPIRVToLLVM::transGroupArithOp(Builder::GroupArithOp groupArithOp, SPIRVV
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[2], func, block);
   Value *const clusterSize =
-      spvOperands.size() > 3 ? transValue(spvOperands[3], func, block) : getBuilder()->CreateGetWaveSize();
+      spvOperands.size() > 3 ? transValue(spvOperands[3], func, block) : getBuilder()->getInt32(0);
 
   switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
   case GroupOperationReduce:
@@ -5165,14 +5105,11 @@ Value *SPIRVToLLVM::transVariableNonImage(SPIRVValue *const spvValue) {
     break;
   }
   case StorageClassUniformConstant: {
-    if (spvVarType->isTypeAccelerationStructureKHR()) {
+    // We can only mark the variable as readonly if there is no initializer, otherwise the initial value will be
+    // constant-propagated during compilation. In case of default uniform constants, its value may be changed before
+    // shader run. So it is not compile-time constant, but constant during shader execution.
+    if (!initializer)
       readOnly = true;
-    }
-
-    if (spvVarType->isTypeArray() && spvVarType->getArrayElementType()->isTypeAccelerationStructureKHR()) {
-      readOnly = true;
-    }
-
     break;
   }
 
@@ -5324,11 +5261,12 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpMatrixTimesScalar>(SPIRVV
     SPIRVType *elemSpvType = spvOperands[0]->getType()->getCooperativeMatrixKHRComponentType();
     unsigned rows = spvOperands[0]->getType()->getCooperativeMatrixKHRRows();
     unsigned columns = spvOperands[0]->getType()->getCooperativeMatrixKHRColumns();
-    lgc::CooperativeMatrixElementType elemType = mapToBasicType(elemSpvType);
-    lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
+    lgc::xdl::CooperativeMatrixElementType elemType = mapToBasicType(elemSpvType);
+    lgc::xdl::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
         static_cast<CooperativeMatrixUse>(spvOperands[0]->getType()->getCooperativeMatrixKHRUse()), elemType, rows,
         columns);
-    return getBuilder()->create<CooperativeMatrixTimesScalarOp>(matrix->getType(), matrix, scalar, elemType, layout);
+    return getBuilder()->create<lgc::xdl::CooperativeMatrixTimesScalarOp>(matrix->getType(), matrix, scalar, elemType,
+                                                                          layout);
   } else {
     return getBuilder()->CreateMatrixTimesScalar(matrix, scalar);
   }
@@ -5434,18 +5372,18 @@ Value *SPIRVToLLVM::transString(const SPIRVString *spvValue) {
 // |  iu4     |  i32     |   Y   |  Y  |
 // For integer types, arbitrary signedness combinations are supported for the
 // A/B matrices.C/D matrices are always signed.
-lgc::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(SPIRVType *const elemType) {
-  lgc::CooperativeMatrixElementType basicTy = lgc::CooperativeMatrixElementType::Unknown;
+lgc::xdl::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(SPIRVType *const elemType) {
+  auto basicTy = lgc::xdl::CooperativeMatrixElementType::Unknown;
   if (elemType->isTypeInt(8)) {
-    basicTy = lgc::CooperativeMatrixElementType::Int8;
+    basicTy = lgc::xdl::CooperativeMatrixElementType::Int8;
   } else if (elemType->isTypeInt(16)) {
-    basicTy = lgc::CooperativeMatrixElementType::Int16;
+    basicTy = lgc::xdl::CooperativeMatrixElementType::Int16;
   } else if (elemType->isTypeInt(32)) {
-    basicTy = lgc::CooperativeMatrixElementType::Int32;
+    basicTy = lgc::xdl::CooperativeMatrixElementType::Int32;
   } else if (elemType->isTypeFloat(32)) {
-    basicTy = lgc::CooperativeMatrixElementType::Float32;
+    basicTy = lgc::xdl::CooperativeMatrixElementType::Float32;
   } else if (elemType->isTypeFloat(16)) {
-    basicTy = lgc::CooperativeMatrixElementType::Float16;
+    basicTy = lgc::xdl::CooperativeMatrixElementType::Float16;
   } else {
     llvm_unreachable("The element type is not supported!");
   }
@@ -5458,27 +5396,28 @@ lgc::CooperativeMatrixElementType SPIRVToLLVM::mapToBasicType(SPIRVType *const e
 // @param elemType : The type for the CooperativeMatrix element.
 // @param rows: The size of the row for the CooperativeMatrix.
 // @param columns: The size of the column for the CooperativeMatrix.
-lgc::CooperativeMatrixLayout SPIRVToLLVM::getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
-                                                                        lgc::CooperativeMatrixElementType elemType,
-                                                                        unsigned rows, unsigned columns) {
+lgc::xdl::CooperativeMatrixLayout
+SPIRVToLLVM::getCooperativeMatrixKHRLayout(CooperativeMatrixUse use, lgc::xdl::CooperativeMatrixElementType elemType,
+                                           unsigned rows, unsigned columns) {
   [[maybe_unused]] const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAKHR ||
       use == CooperativeMatrixUse::CooperativeMatrixUseMatrixBKHR) {
 
-    return lgc::CooperativeMatrixLayout::FactorMatrixLayout;
+    return lgc::xdl::CooperativeMatrixLayout::FactorMatrixLayout;
   }
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAccumulatorKHR) {
     if (gfxIp.major == 11)
-      return lgc::CooperativeMatrixLayout::AccumulatorMatrixLayout;
-    if (BuilderCommon::isTypeNCooperativeMatrix(elemType, 32))
-      return lgc::CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout;
-    if (elemType == lgc::CooperativeMatrixElementType::Int16 || elemType == lgc::CooperativeMatrixElementType::Float16)
-      return lgc::CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout;
+      return lgc::xdl::CooperativeMatrixLayout::AccumulatorMatrixLayout;
+    if (lgc::xdl::isTypeNCooperativeMatrix(elemType, 32))
+      return lgc::xdl::CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout;
+    if (elemType == lgc::xdl::CooperativeMatrixElementType::Int16 ||
+        elemType == lgc::xdl::CooperativeMatrixElementType::Float16)
+      return lgc::xdl::CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout;
     llvm_unreachable("Invalid element type!");
-    return lgc::CooperativeMatrixLayout::InvalidLayout;
+    return lgc::xdl::CooperativeMatrixLayout::InvalidLayout;
   }
   llvm_unreachable("The element type is not supported!");
-  return lgc::CooperativeMatrixLayout::InvalidLayout;
+  return lgc::xdl::CooperativeMatrixLayout::InvalidLayout;
 }
 
 // =====================================================================================================================
@@ -5493,7 +5432,63 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLengthKH
   unsigned columns = matrixType->getCooperativeMatrixKHRColumns();
   auto layout = getCooperativeMatrixKHRLayout(matrixUse, elemType, rows, columns);
   const unsigned kSize = rows > columns ? rows : columns;
-  return getBuilder()->create<CooperativeMatrixLengthOp>(layout, kSize);
+  return getBuilder()->create<lgc::xdl::CooperativeMatrixLengthOp>(layout, kSize);
+}
+
+// =====================================================================================================================
+// Check if load/store is volatile.
+// @param pointer : Pointer of the memory access.
+// @param access : SPIR-V memory access instruction.
+// @param isLoad : TRUE for load, FALSE for store.
+bool SPIRVToLLVM::checkVolatile(SPIRVValue *pointer, SPIRVMemoryAccess *access, bool isLoad) {
+  assert(pointer && access);
+
+  // We don't require volatile on address spaces that become non-pointers.
+  switch (pointer->getType()->getPointerStorageClass()) {
+  case StorageClassInput:
+  case StorageClassOutput:
+  case StorageClassPrivate:
+  case StorageClassFunction:
+    return false;
+  default:
+    break;
+  }
+
+  if (access->SPIRVMemoryAccess::isVolatile(isLoad))
+    return true;
+
+  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
+  return (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess) && pointer->isVolatile();
+}
+
+// =====================================================================================================================
+// Check if load/store is coherent.
+// @param pointer : Pointer of the memory access.
+// @param access : SPIR-V memory access instruction.
+// @param isLoad : TRUE for load, FALSE for store.
+bool SPIRVToLLVM::checkCoherent(SPIRVValue *pointer, SPIRVMemoryAccess *access, bool isLoad) {
+  assert(pointer && access);
+
+  if (pointer->isCoherent())
+    return true;
+
+  spv::MemoryAccessMask memAccessMask = (spv::MemoryAccessMask)access->getMemoryAccessMask(isLoad);
+  if (memAccessMask & MemoryAccessNonPrivatePointerKHRMask)
+    return true;
+
+  SPIRVWord spvId = SPIRVID_INVALID;
+  if (isLoad && (memAccessMask & MemoryAccessMakePointerVisibleKHRMask))
+    spvId = access->getMakeVisibleScope(isLoad);
+  else if (!isLoad && (memAccessMask & MemoryAccessMakePointerAvailableKHRMask))
+    spvId = access->getMakeAvailableScope(isLoad);
+
+  if (spvId != SPIRVID_INVALID) {
+    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
+    const unsigned scope = spvScope->getZExtIntValue();
+    return (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
+  }
+
+  return false;
 }
 
 // =====================================================================================================================
@@ -5508,6 +5503,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLoadKHR>
   Value *pointer = transValue(coopMatLoad->getSrc(), fn, bb);
   Value *arrayStride = transValue(coopMatLoad->getStride(), fn, bb);
   Value *colMajor = transValue(coopMatLoad->getColMajor(), fn, bb);
+  SPIRVType *elemSpvType = coopMatLoad->getType()->getCooperativeMatrixKHRComponentType();
 
   // The lgc operation expects the stride to be in bytes.
   auto pointeeSize = m_m->getDataLayout().getTypeStoreSize(getPointeeType(coopMatLoad->getSrc())).getFixedValue();
@@ -5515,58 +5511,28 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLoadKHR>
 
   Value *stride = getBuilder()->CreateMul(arrayStride, getBuilder()->getInt32(pointeeSize));
 
-  // Calc memoryAccess
-  unsigned memoryAccess = CooperativeMatrixMemoryAccessNone;
-  // Calc isVolatile
-  bool isVolatile = coopMatLoad->SPIRVMemoryAccess::isVolatile(true);
-  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
-  if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
-    isVolatile |= coopMatLoad->getSrc()->isVolatile();
-  // We don't require volatile on address spaces that become non-pointers.
-  switch (coopMatLoad->getSrc()->getType()->getPointerStorageClass()) {
-  case StorageClassInput:
-  case StorageClassOutput:
-  case StorageClassPrivate:
-  case StorageClassFunction:
-    isVolatile = false;
-    break;
-  default:
-    break;
-  }
-
-  // Calc isCoherent
-  bool isCoherent = coopMatLoad->getSrc()->isCoherent();
-  // MakePointerVisibleKHR is valid with OpCooperativeMatrixLoadKHR
-  if (coopMatLoad->getMemoryAccessMask(true) & MemoryAccessMakePointerVisibleKHRMask) {
-    SPIRVWord spvId = coopMatLoad->getMakeVisibleScope(true);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (coopMatLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
-
-  // Calc isNonTempal
+  // Calc volatile/coherent/isNonTempal
+  const bool isVolatile = checkVolatile(coopMatLoad->getSrc(), coopMatLoad, true);
+  const bool isCoherent = checkCoherent(coopMatLoad->getSrc(), coopMatLoad, true);
   const bool isNonTemporal = coopMatLoad->SPIRVMemoryAccess::isNonTemporal(true);
+
+  auto memoryAccess = static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessMaskNone);
   if (isVolatile) {
-    memoryAccess |= CooperativeMatrixMemoryAccessVolatile;
+    memoryAccess |= static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessVolatileMask);
   }
   if (isCoherent) {
-    memoryAccess |= CooperativeMatrixMemoryAccessCoherent;
+    memoryAccess |= static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessCoherentMask);
   }
   if (isNonTemporal) {
-    memoryAccess |= CooperativeMatrixMemoryAccessTemporal;
+    memoryAccess |= static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
   }
 
   bool isColMajor = cast<ConstantInt>(colMajor)->getZExtValue();
   // Cal elemType
-  SPIRVType *elemSpvType = coopMatLoad->getType()->getCooperativeMatrixKHRComponentType();
   CooperativeMatrixUse use = static_cast<CooperativeMatrixUse>(coopMatLoad->getType()->getCooperativeMatrixKHRUse());
   unsigned rows = static_cast<CooperativeMatrixUse>(coopMatLoad->getType()->getCooperativeMatrixKHRRows());
   unsigned columns = static_cast<CooperativeMatrixUse>(coopMatLoad->getType()->getCooperativeMatrixKHRColumns());
-  lgc::CooperativeMatrixElementType elemType = mapToBasicType(elemSpvType);
+  lgc::xdl::CooperativeMatrixElementType elemType = mapToBasicType(elemSpvType);
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAKHR) {
     // Layout A is the transposition of the layout B, col_major_A = row_majow_B.
     // FactorMatrixLayout is for B, so it needs inverse the layout when use is A.
@@ -5576,15 +5542,15 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixLoadKHR>
   // must be aligned to at least the lesser of 16 bytes or the natural alignment of a row or column
   // (depending on ColumnMajor) of the matrix (where the natural alignment is the number of columns/rows multiplied
   // by the component size).
-  Type *elementllType = getBuilder()->transCooperativeMatrixElementType(elemType);
+  Type *elementllType = lgc::xdl::transCooperativeMatrixElementType(*getBuilder(), elemType);
   unsigned elementSize = static_cast<unsigned>(m_m->getDataLayout().getTypeSizeInBits(elementllType) / 8);
   elementSize = std::max(elementSize, (unsigned)1);
   unsigned alignmentInRowCol = (isColMajor ? rows : columns) * elementSize;
   unsigned loadAlignment = std::min((unsigned)16, alignmentInRowCol);
-  lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(use, elemType, rows, columns);
+  lgc::xdl::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(use, elemType, rows, columns);
   const unsigned kSize = rows > columns ? rows : columns;
-  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
-  auto CoopMatLoadInst = getBuilder()->create<CooperativeMatrixLoadOp>(
+  Type *coopMatrixTy = lgc::xdl::getCooperativeMatrixTy(*getBuilder(), elemType, layout, kSize);
+  auto CoopMatLoadInst = getBuilder()->create<lgc::xdl::CooperativeMatrixLoadOp>(
       coopMatrixTy, pointer, stride, isColMajor, elemType, layout, memoryAccess, loadAlignment, kSize, "load");
   return CoopMatLoadInst;
 }
@@ -5606,51 +5572,21 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixStoreKHR
   // The lgc operation expects the stride to be in bytes.
   auto pointeeSize = m_m->getDataLayout().getTypeStoreSize(getPointeeType(coopMatStore->getDest())).getFixedValue();
   assert(pointeeSize != 0 && "OpCooperativeMatrixStoreKHR pointee must be a scalar or vector");
+  SPIRVType *elemSpvType = coopMatStore->getObject()->getType()->getCooperativeMatrixKHRComponentType();
 
   Value *stride = getBuilder()->CreateMul(arrayStride, getBuilder()->getInt32(pointeeSize));
 
-  // Calc isVolatile
-  bool isVolatile = coopMatStore->SPIRVMemoryAccess::isVolatile(false);
-  const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
-  if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
-    isVolatile |= coopMatStore->getDest()->isVolatile();
-  // We don't require volatile on address spaces that become non-pointers.
-  const auto pointerStorageClass = coopMatStore->getDest()->getType()->getPointerStorageClass();
-  switch (pointerStorageClass) {
-  case StorageClassInput:
-  case StorageClassOutput:
-  case StorageClassPrivate:
-  case StorageClassFunction:
-    isVolatile = false;
-    break;
-  default:
-    break;
-  }
-
-  // Calc isCoherent
-  bool isCoherent = coopMatStore->getDest()->isCoherent();
-  // MakePointerAvailableKHR is valid with OpStore
-  if (coopMatStore->getMemoryAccessMask(false) & MemoryAccessMakePointerAvailableKHRMask) {
-    SPIRVWord spvId = coopMatStore->getMakeAvailableScope(false);
-    SPIRVConstant *const spvScope = static_cast<SPIRVConstant *>(m_bm->getValue(spvId));
-    const unsigned scope = spvScope->getZExtIntValue();
-    const bool isSystemScope = (scope <= ScopeDevice || scope == ScopeQueueFamilyKHR);
-    if (isSystemScope)
-      isCoherent = true;
-  }
-  if (coopMatStore->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
-    isCoherent = true;
-
-  // Calc isNonTempal
+  // Calc volatile/coherent/isNonTempal
+  const bool isVolatile = checkVolatile(coopMatStore->getDest(), coopMatStore, false);
+  const bool isCoherent = checkCoherent(coopMatStore->getDest(), coopMatStore, false);
   const bool isNonTemporal = coopMatStore->SPIRVMemoryAccess::isNonTemporal(false);
 
   // Calc colMajor
   bool isColMajor = cast<ConstantInt>(colMajor)->getZExtValue();
 
   // Cal elemType
-  Type *const elemltType = transType(coopMatStore->getObject()->getType()->getCooperativeMatrixKHRComponentType());
-  lgc::CooperativeMatrixElementType elemType =
-      mapToBasicType(coopMatStore->getObject()->getType()->getCooperativeMatrixKHRComponentType());
+  Type *const elemltType = transType(elemSpvType);
+  lgc::xdl::CooperativeMatrixElementType elemType = mapToBasicType(elemSpvType);
 
   CooperativeMatrixUse use =
       static_cast<CooperativeMatrixUse>(coopMatStore->getObject()->getType()->getCooperativeMatrixKHRUse());
@@ -5662,16 +5598,16 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixStoreKHR
     // FactorMatrixLayout is for B, so it needs inverse the layout when use is A.
     isColMajor = !isColMajor;
   }
-  lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(use, elemType, rows, columns);
-  unsigned memoryAccess = CooperativeMatrixMemoryAccessNone;
+  lgc::xdl::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(use, elemType, rows, columns);
+  auto memoryAccess = static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessMaskNone);
   if (isVolatile) {
-    memoryAccess |= CooperativeMatrixMemoryAccessVolatile;
+    memoryAccess |= static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessVolatileMask);
   }
   if (isCoherent) {
-    memoryAccess |= CooperativeMatrixMemoryAccessCoherent;
+    memoryAccess |= static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessCoherentMask);
   }
   if (isNonTemporal) {
-    memoryAccess |= CooperativeMatrixMemoryAccessTemporal;
+    memoryAccess |= static_cast<unsigned>(lgc::xdl::CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
   }
 
   // For OpCooperativeMatrixLoadKHR and OpCooperativeMatrixStoreKHR instructions, the Pointer and Stride operands
@@ -5683,8 +5619,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixStoreKHR
   unsigned alignmentInRowCol = (isColMajor ? rows : columns) * elementSize;
   unsigned storeAlignment = std::min((unsigned)16, alignmentInRowCol);
   const unsigned kSize = rows > columns ? rows : columns;
-  getBuilder()->create<CooperativeMatrixStoreOp>(pointer, stride, isColMajor, elemType, layout, memoryAccess,
-                                                 storeAlignment, matrix, kSize);
+  getBuilder()->create<lgc::xdl::CooperativeMatrixStoreOp>(pointer, stride, isColMajor, elemType, layout, memoryAccess,
+                                                           storeAlignment, matrix, kSize);
   return nullptr;
 }
 
@@ -5703,8 +5639,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
   SPIRVType *elemTypeA = spvOperands[0]->getType()->getCooperativeMatrixKHRComponentType();
   SPIRVType *elemTypeC = spvOperands[2]->getType()->getCooperativeMatrixKHRComponentType();
 
-  lgc::CooperativeMatrixElementType elemBasicTypeA = mapToBasicType(elemTypeA);
-  lgc::CooperativeMatrixElementType elemBasicTypeC = mapToBasicType(elemTypeC);
+  lgc::xdl::CooperativeMatrixElementType elemBasicTypeA = mapToBasicType(elemTypeA);
+  lgc::xdl::CooperativeMatrixElementType elemBasicTypeC = mapToBasicType(elemTypeC);
 
   bool isSignedA = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixASigned());
   bool isSignedB = static_cast<bool>(static_cast<SPIRVCooperativeMatrixMulAddKHR *>(spvInst)->getMatrixBSigned());
@@ -5714,8 +5650,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
   unsigned kMultiplier = 1;
 
   Type *coopMatrixDType = coopMatrixC->getType();
-  lgc::CooperativeMatrixElementType elemBasicTypeD = elemBasicTypeC;
-  Value *coopMatrixD = getBuilder()->create<CooperativeMatrixMulAddOp>(
+  lgc::xdl::CooperativeMatrixElementType elemBasicTypeD = elemBasicTypeC;
+  Value *coopMatrixD = getBuilder()->create<lgc::xdl::CooperativeMatrixMulAddOp>(
       coopMatrixDType, coopMatrixA, coopMatrixB, coopMatrixC, isSignedA, isSignedB, isSat, 0, elemBasicTypeA,
       elemBasicTypeA, elemBasicTypeC, elemBasicTypeD, kMultiplier, "mulAdd");
   return coopMatrixD;
@@ -6075,12 +6011,14 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     if (auto vecTy = dyn_cast<FixedVectorType>(cond->getType())) {
       unsigned numComponents = vecTy->getNumElements();
       result = PoisonValue::get(lhs->getType());
-      for (unsigned i = 0; i != numComponents; ++i) {
-        Value *compCond = getBuilder()->CreateExtractElement(cond, i);
-        Value *compLhs = getBuilder()->CreateExtractElement(lhs, i);
-        Value *compRhs = getBuilder()->CreateExtractElement(rhs, i);
-        Value *compResult = getBuilder()->CreateSelect(compCond, compLhs, compRhs);
-        result = getBuilder()->CreateInsertElement(result, compResult, i);
+      {
+        for (unsigned i = 0; i != numComponents; ++i) {
+          Value *compCond = getBuilder()->CreateExtractElement(cond, i);
+          Value *compLhs = getBuilder()->CreateExtractElement(lhs, i);
+          Value *compRhs = getBuilder()->CreateExtractElement(rhs, i);
+          Value *compResult = getBuilder()->CreateSelect(compCond, compLhs, compRhs);
+          result = getBuilder()->CreateInsertElement(result, compResult, i);
+        }
       }
     } else {
       result = getBuilder()->CreateSelect(cond, lhs, rhs);
@@ -6204,24 +6142,7 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     switch (bv->getType()->getOpCode()) {
     case OpTypeVector: {
       auto vecTy = transType(cc->getType());
-      Value *v = PoisonValue::get(vecTy);
-      for (unsigned idx = 0, i = 0, e = constituents.size(); i < e; ++i) {
-        if (constituents[i]->getType()->isVectorTy()) {
-          // NOTE: It is allowed to construct a vector from several "smaller"
-          // scalars or vectors, such as vec4 = (vec2, vec2) or vec4 = (float,
-          // vec3).
-          auto compCount = cast<FixedVectorType>(constituents[i]->getType())->getNumElements();
-          for (unsigned j = 0; j < compCount; ++j) {
-            auto comp = ExtractElementInst::Create(constituents[i], ConstantInt::get(*m_context, APInt(32, j)), "", bb);
-            v = InsertElementInst::Create(v, comp, ConstantInt::get(*m_context, APInt(32, idx)), "", bb);
-            ++idx;
-          }
-        } else {
-          v = InsertElementInst::Create(v, constituents[i], ConstantInt::get(*m_context, APInt(32, idx)), "", bb);
-          ++idx;
-        }
-      }
-      return mapValue(bv, v);
+      return mapValue(bv, vectorCompositeConstruct(vecTy, constituents, getBuilder()));
     }
     case OpTypeArray:
     case OpTypeStruct: {
@@ -6304,11 +6225,12 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
 
   case OpCompositeExtract: {
     SPIRVCompositeExtract *ce = static_cast<SPIRVCompositeExtract *>(bv);
-    if (ce->getComposite()->getType()->isTypeVector()) {
+    auto cv = transValue(ce->getComposite(), f, bb);
+    const bool isVectorTy = ce->getComposite()->getType()->isTypeVector();
+    if (isVectorTy) {
       assert(ce->getIndices().size() == 1 && "Invalid index");
-      return mapValue(bv, ExtractElementInst::Create(transValue(ce->getComposite(), f, bb),
-                                                     ConstantInt::get(*m_context, APInt(32, ce->getIndices()[0])),
-                                                     bv->getName(), bb));
+      auto index = ce->getIndices()[0];
+      return mapValue(bv, getBuilder()->CreateExtractElement(cv, index));
     }
     if (ce->getComposite()->getType()->isTypeCooperativeMatrixKHR()) {
       assert(ce->getIndices().size() == 1 && "Invalid index"); // Treating it as vector.
@@ -6319,14 +6241,13 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       unsigned columns = matrixType->getCooperativeMatrixKHRColumns();
       auto layout = getCooperativeMatrixKHRLayout(
           static_cast<CooperativeMatrixUse>(matrixType->getCooperativeMatrixKHRUse()), elemType, rows, columns);
-      Type *extractElementType = getBuilder()->transCooperativeMatrixElementType(elemType);
+      Type *extractElementType = lgc::xdl::transCooperativeMatrixElementType(*getBuilder(), elemType);
       Value *matrix = transValue(ce->getComposite(), f, bb);
       Value *index = getBuilder()->getInt32(ce->getIndices()[0]);
-      return mapValue(
-          bv, getBuilder()->create<CooperativeMatrixExtractOp>(extractElementType, matrix, index, elemType, layout));
+      return mapValue(bv, getBuilder()->create<lgc::xdl::CooperativeMatrixExtractOp>(extractElementType, matrix, index,
+                                                                                     elemType, layout));
     }
 
-    auto cv = transValue(ce->getComposite(), f, bb);
     auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ce->getIndices());
     if (!indexedTy) {
       // NOTE: "OpCompositeExtract" could extract a scalar component from a
@@ -6348,17 +6269,22 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
 
   case OpVectorExtractDynamic: {
     auto ce = static_cast<SPIRVVectorExtractDynamic *>(bv);
-    return mapValue(bv, ExtractElementInst::Create(transValue(ce->getVector(), f, bb),
-                                                   transValue(ce->getIndex(), f, bb), bv->getName(), bb));
+    auto result = transValue(ce->getVector(), f, bb);
+    auto index = transValue(ce->getIndex(), f, bb);
+    return mapValue(bv, ExtractElementInst::Create(result, index, bv->getName(), bb));
   }
 
   case OpCompositeInsert: {
     auto ci = static_cast<SPIRVCompositeInsert *>(bv);
-    if (ci->getComposite()->getType()->isTypeVector()) {
+    auto ciCompositeTy = ci->getComposite()->getType();
+    const bool isVectorTy = ciCompositeTy->isTypeVector();
+    [[maybe_unused]] SPIRVType *(SPIRVType::*getVectorElemType)() const = &SPIRVType::getVectorComponentType;
+    if (isVectorTy) {
       assert(ci->getIndices().size() == 1 && "Invalid index");
-      return mapValue(bv, InsertElementInst::Create(
-                              transValue(ci->getComposite(), f, bb), transValue(ci->getObject(), f, bb),
-                              ConstantInt::get(*m_context, APInt(32, ci->getIndices()[0])), bv->getName(), bb));
+      auto result = transValue(ci->getComposite(), f, bb);
+      auto object = transValue(ci->getObject(), f, bb);
+      auto index = ci->getIndices()[0];
+      return mapValue(bv, getBuilder()->CreateInsertElement(result, object, index));
     }
 
     if (ci->getComposite()->getType()->isTypeCooperativeMatrixKHR()) {
@@ -6374,8 +6300,8 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
       Value *matrix = transValue(ci->getComposite(), f, bb);
       Value *value = transValue(ci->getObject(), f, bb);
       Value *index = getBuilder()->getInt32(ci->getIndices()[0]);
-      return mapValue(bv, getBuilder()->create<CooperativeMatrixInsertOp>(matrix->getType(), matrix, value, index,
-                                                                          elemType, layout));
+      return mapValue(bv, getBuilder()->create<lgc::xdl::CooperativeMatrixInsertOp>(matrix->getType(), matrix, value,
+                                                                                    index, elemType, layout));
     }
 
     auto cv = transValue(ci->getComposite(), f, bb);
@@ -6402,9 +6328,10 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
 
   case OpVectorInsertDynamic: {
     auto ci = static_cast<SPIRVVectorInsertDynamic *>(bv);
-    return mapValue(bv,
-                    InsertElementInst::Create(transValue(ci->getVector(), f, bb), transValue(ci->getComponent(), f, bb),
-                                              transValue(ci->getIndex(), f, bb), bv->getName(), bb));
+    auto result = transValue(ci->getVector(), f, bb);
+    auto component = transValue(ci->getComponent(), f, bb);
+    auto index = transValue(ci->getIndex(), f, bb);
+    return mapValue(bv, getBuilder()->CreateInsertElement(result, component, index, bv->getName()));
   }
 
   case OpVectorShuffle: {
@@ -7640,6 +7567,10 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
     info->convertingSamplerIdx = getBuilder()->CreateExtractValue(image, idxs.convertingSamplerIdx);
   }
 
+  if (getPipelineOptions()->getGlState().enableDepthCompareParam) {
+    info->compareParamPointer = getBuilder()->CreateExtractValue(image, idxs.compareParamPointer);
+  }
+
   // Analyze the data flow for coheren/volatile/(non-)uniformness.
   bool forceNonUniform = isShaderStageInMask(convertToShaderStage(m_execModule),
                                              getPipelineOptions()->forceNonUniformResourceIndexStageMask);
@@ -8202,6 +8133,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
   Value *addr[lgc::Builder::ImageAddressCount] = {};
   addr[lgc::Builder::ImageAddressIdxCoordinate] = transValue(bii->getOpValue(opndIdx++), bb->getParent(), bb);
 
+  bool hasDref = false;
   switch (unsigned(bii->getOpCode())) {
   case OpImageSampleDrefImplicitLod:
   case OpImageSampleDrefExplicitLod:
@@ -8213,6 +8145,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
   case OpImageSparseSampleProjDrefExplicitLod:
     // This instruction has a dref operand.
     addr[lgc::Builder::ImageAddressIdxZCompare] = transValue(bii->getOpValue(opndIdx++), bb->getParent(), bb);
+    hasDref = true;
     break;
   default:
     break;
@@ -8240,6 +8173,24 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
   // First do a normal image sample, extracting the sampler from the {sampler,convertingSamplerIdx} struct.
   Value *result = getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags, imageInfo.imagePointer,
                                                   imageInfo.samplerPointer, addr);
+
+  if (getPipelineOptions()->getGlState().enableDepthCompareParam && hasDref) {
+    Value *compareParamPtr = imageInfo.compareParamPointer;
+    // compareParam descriptor comes from OGLP struct CompareParamDescriptor
+    // DW1: depthComparModeParam { uint32_t compareMode : 1; }
+    auto depthComparModeParamPtr =
+        getBuilder()->CreateInBoundsGEP(getBuilder()->getInt32Ty(), compareParamPtr, getBuilder()->getInt32(0));
+    Value *depthComparModeParam =
+        getBuilder()->CreateAlignedLoad(getBuilder()->getInt32Ty(), depthComparModeParamPtr, Align(4));
+    Value *compareMode = getBuilder()->CreateAnd(depthComparModeParam, getBuilder()->getInt32(0x1));
+    Value *isZero = getBuilder()->CreateICmpEQ(compareMode, getBuilder()->getInt32(0));
+
+    addr[lgc::Builder::ImageAddressIdxZCompare] = nullptr;
+    Value *noZCompareInst = getBuilder()->CreateImageSample(resultTy, imageInfo.dim, imageInfo.flags,
+                                                            imageInfo.imagePointer, imageInfo.samplerPointer, addr);
+
+    result = getBuilder()->CreateSelect(isZero, noZCompareInst, result);
+  }
 
   if (!m_convertingSamplers.empty()) {
     Value *planes = PoisonValue::get(ArrayType::get(getBuilder()->getDescPtrTy(), 3));
@@ -11346,63 +11297,63 @@ void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
 Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlock *bb) {
   auto oc = spvVal->getOpCode();
   Function *func = bb->getParent();
-  CooperativeMatrixArithOp arithOp;
+  lgc::xdl::CooperativeMatrixArithOp arithOp;
   switch (oc) {
   case OpFNegate:
-    arithOp = CooperativeMatrixArithOp::FSub;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FSub;
     break;
   case OpSNegate:
-    arithOp = CooperativeMatrixArithOp::ISub;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::ISub;
     break;
   case OpFAdd:
-    arithOp = CooperativeMatrixArithOp::FAdd;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FAdd;
     break;
   case OpIAdd:
-    arithOp = CooperativeMatrixArithOp::IAdd;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::IAdd;
     break;
   case OpISub:
-    arithOp = CooperativeMatrixArithOp::ISub;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::ISub;
     break;
   case OpFSub:
-    arithOp = CooperativeMatrixArithOp::FSub;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FSub;
     break;
   case OpIMul:
-    arithOp = CooperativeMatrixArithOp::IMul;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::IMul;
     break;
   case OpFMul:
-    arithOp = CooperativeMatrixArithOp::FMul;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FMul;
     break;
   case OpFDiv:
-    arithOp = CooperativeMatrixArithOp::FDiv;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FDiv;
     break;
   case OpSDiv:
-    arithOp = CooperativeMatrixArithOp::SDiv;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::SDiv;
     break;
   case OpUDiv:
-    arithOp = CooperativeMatrixArithOp::UDiv;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::UDiv;
     break;
   case OpFMod:
-    arithOp = CooperativeMatrixArithOp::FMod;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FMod;
     break;
   case OpSMod:
-    arithOp = CooperativeMatrixArithOp::SMod;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::SMod;
     break;
   case OpUMod:
-    arithOp = CooperativeMatrixArithOp::UMod;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::UMod;
     break;
   case OpSRem:
-    arithOp = CooperativeMatrixArithOp::SRem;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::SRem;
     break;
   case OpFRem:
-    arithOp = CooperativeMatrixArithOp::FRem;
+    arithOp = lgc::xdl::CooperativeMatrixArithOp::FRem;
     break;
   default:
     llvm_unreachable("Not support arithmetic for cooperative matrix");
     return nullptr;
   }
 
-  lgc::CooperativeMatrixLayout layout = lgc::CooperativeMatrixLayout::InvalidLayout;
-  lgc::CooperativeMatrixElementType elemType = lgc::CooperativeMatrixElementType::Unknown;
+  auto layout = lgc::xdl::CooperativeMatrixLayout::InvalidLayout;
+  auto elemType = lgc::xdl::CooperativeMatrixElementType::Unknown;
   unsigned kSize = 16;
   if (oc == OpFNegate || oc == OpSNegate) {
     auto unary = static_cast<SPIRVUnary *>(spvVal);
@@ -11417,9 +11368,9 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
           static_cast<CooperativeMatrixUse>(unary->getOperand(0)->getType()->getCooperativeMatrixKHRUse()), elemType,
           rows, columns);
     }
-    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
-    return getBuilder()->create<CooperativeMatrixBinaryOp>(resultTy, arithOp, Constant::getNullValue(srcVal->getType()),
-                                                           srcVal, elemType, layout);
+    Type *resultTy = lgc::xdl::getCooperativeMatrixTy(*getBuilder(), elemType, layout, kSize);
+    return getBuilder()->create<lgc::xdl::CooperativeMatrixBinaryOp>(
+        resultTy, arithOp, Constant::getNullValue(srcVal->getType()), srcVal, elemType, layout);
   } else {
     auto binary = static_cast<SPIRVBinary *>(spvVal);
     Value *lhs = transValue(binary->getOperand(0), func, bb);
@@ -11434,8 +11385,8 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
           static_cast<CooperativeMatrixUse>(binary->getOperand(0)->getType()->getCooperativeMatrixKHRUse()), elemType,
           rows, columns);
     }
-    Type *resultTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
-    return getBuilder()->create<CooperativeMatrixBinaryOp>(resultTy, arithOp, lhs, rhs, elemType, layout);
+    Type *resultTy = lgc::xdl::getCooperativeMatrixTy(*getBuilder(), elemType, layout, kSize);
+    return getBuilder()->create<lgc::xdl::CooperativeMatrixBinaryOp>(resultTy, arithOp, lhs, rhs, elemType, layout);
   }
 }
 
@@ -11443,14 +11394,16 @@ Value *SPIRVToLLVM::transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlo
 // Translate cooperative matrix construction instructions to LLVM IR
 Value *SPIRVToLLVM::transCooperativeMatrixKHRFromConstruct(SPIRVType *spvCoopMatTy,
                                                            const std::vector<Value *> &constituents) {
-  lgc::CooperativeMatrixElementType elemType = mapToBasicType(spvCoopMatTy->getCooperativeMatrixKHRComponentType());
+  lgc::xdl::CooperativeMatrixElementType elemType =
+      mapToBasicType(spvCoopMatTy->getCooperativeMatrixKHRComponentType());
   unsigned rows = spvCoopMatTy->getCooperativeMatrixKHRRows();
   unsigned columns = spvCoopMatTy->getCooperativeMatrixKHRColumns();
   const unsigned kSize = rows > columns ? rows : columns;
-  lgc::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
+  lgc::xdl::CooperativeMatrixLayout layout = getCooperativeMatrixKHRLayout(
       static_cast<CooperativeMatrixUse>(spvCoopMatTy->getCooperativeMatrixKHRUse()), elemType, rows, columns);
-  Type *coopMatrixTy = getBuilder()->getCooperativeMatrixTy(elemType, layout, kSize);
-  return getBuilder()->create<CooperativeMatrixFillOp>(coopMatrixTy, constituents[0], elemType, layout, kSize);
+  Type *coopMatrixTy = lgc::xdl::getCooperativeMatrixTy(*getBuilder(), elemType, layout, kSize);
+  return getBuilder()->create<lgc::xdl::CooperativeMatrixFillOp>(coopMatrixTy, constituents[0], elemType, layout,
+                                                                 kSize);
 }
 
 } // namespace SPIRV

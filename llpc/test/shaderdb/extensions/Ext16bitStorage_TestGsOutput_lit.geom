@@ -1,4 +1,6 @@
 #version 450 core
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 
 #extension GL_AMD_gpu_shader_half_float: enable
 #extension GL_AMD_gpu_shader_int16: enable

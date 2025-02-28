@@ -1,3 +1,5 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 #ifndef SPIRV_DEBUG_H
 #define SPIRV_DEBUG_H
 #include "SPIRVUtil.h"

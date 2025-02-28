@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -62,7 +62,9 @@ struct RtIpVersion {
 
   // RT IP checkers
   bool operator==(const RtIpVersion &rhs) const { return std::tie(major, minor) == std::tie(rhs.major, rhs.minor); }
+  bool operator!=(const RtIpVersion &rhs) const { return !(*this == rhs); }
   bool operator>=(const RtIpVersion &rhs) const { return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor); }
+  bool operator<(const RtIpVersion &rhs) const { return std::tie(major, minor) < std::tie(rhs.major, rhs.minor); }
   bool isRtIp(unsigned rhsMajor, unsigned rhsMinor) const {
     return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
   }

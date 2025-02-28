@@ -41,6 +41,7 @@
 namespace lgc {
 
 class DebugPrintfOp;
+class AbortMsgOp;
 struct ResourceNode;
 
 // =====================================================================================================================
@@ -57,6 +58,8 @@ public:
 
 private:
   void visitDebugPrintf(DebugPrintfOp &op);
+  void writeToDebugPrintfBuffer(uint64_t header, llvm::Value *debugPrintfBuffer,
+                                llvm::SmallVectorImpl<llvm::Value *> &varData, BuilderBase &builder);
   void getDwordValues(llvm::Value *val, llvm::SmallVectorImpl<llvm::Value *> &output,
                       llvm::SmallBitVector &output64Bits, BuilderBase &builder);
   void setupElfsPrintfStrings();

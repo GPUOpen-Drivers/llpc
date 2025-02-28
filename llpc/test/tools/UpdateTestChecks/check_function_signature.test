@@ -1,0 +1,2 @@
+# RUN: cp -f %S/Inputs/base_test.pipe %t.pipe && %update_llpc_test_checks %t.pipe --function-signature --generalize-calls
+# RUN: diff -u %t.pipe %S/Inputs/function_signature.pipe.expected

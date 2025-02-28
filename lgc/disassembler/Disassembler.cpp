@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -111,20 +111,28 @@ class ObjDisassembler {
   StringSaver m_strings{m_stringsAlloc};
 
 public:
-  static void disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
+  static Error disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
     ObjDisassembler objDis(data, ostream);
-    objDis.run();
+    return objDis.run();
+  }
+
+  // Disassemble a single symbol within an object (typically ELF) into ostream.
+  // Returns Error::success() if no errors occurred, otherwise returns the Error object.
+  static Error disassembleSingleSymbol(MemoryBufferRef data, raw_ostream &ostream, StringRef symbolName) {
+    ObjDisassembler objDis(data, ostream);
+    return objDis.run(symbolName);
   }
 
 private:
   ObjDisassembler(MemoryBufferRef data, raw_ostream &ostream) : m_data(data), m_ostream(ostream) {}
 
-  void run();
-  void processSection(ELFSectionRef sectionRef);
-  void gatherSectionSymbols(ELFSectionRef sectionRef, SymbolPool &symbols);
+  Error run(StringRef symbolName = StringRef());
+  Error processSection(ELFSectionRef sectionRef, std::optional<ELFSymbolRef> symbolRef = std::nullopt);
+  Error gatherSectionSymbols(ELFSectionRef sectionRef, bool skipDirectiveEmission, SymbolPool &symbols);
   void gatherRelocs(ELFSectionRef sectionRef, std::vector<object::RelocationRef> &relocs);
-  void tryDisassembleSection(ELFSectionRef sectionRef, unsigned sectType, unsigned sectFlags, bool outputting,
-                             SymbolPool &symbols, ArrayRef<object::RelocationRef> relocs);
+  Error tryDisassembleSection(ELFSectionRef sectionRef, unsigned sectType, unsigned sectFlags, bool outputting,
+                              SymbolPool &symbols, ArrayRef<object::RelocationRef> relocs,
+                              std::optional<ELFSymbolRef> symbolRef = std::nullopt);
   bool disasmInstSeq(SmallVectorImpl<InstOrDirective> &seq, uint64_t offset, bool outputting, StringRef contents,
                      SymbolPool &symbols);
   bool disasmLongJump(SmallVectorImpl<InstOrDirective> &seq, const InstOrDirective &inst, bool outputting,
@@ -134,8 +142,8 @@ private:
   InstOrDirective disasmInst(uint64_t offset, StringRef contents);
   void addBinaryEncodingComment(raw_ostream &stream, unsigned instAlignment, ArrayRef<uint8_t> instBytes);
   void outputInst(InstOrDirective inst, unsigned instAlignment);
-  void outputData(bool outputting, uint64_t offset, StringRef data, ArrayRef<object::RelocationRef> &relocs);
-  void outputRelocs(bool outputting, uint64_t offset, uint64_t size, ArrayRef<object::RelocationRef> &relocs);
+  Error outputData(bool outputting, uint64_t offset, StringRef data, ArrayRef<object::RelocationRef> &relocs);
+  Error outputRelocs(bool outputting, uint64_t offset, uint64_t size, ArrayRef<object::RelocationRef> &relocs);
   size_t decodeNote(StringRef data);
   MCSymbol *getOrCreateSymbol(SymbolPool &symbols, uint64_t offset, Twine name = {}, unsigned type = ELF::STT_NOTYPE);
 
@@ -147,7 +155,7 @@ private:
 // =====================================================================================================================
 // Disassemble an archive of ELFs. We put the disassembled code into a new archive with same member
 // names with ".S" suffix.
-static void disassembleArchive(MemoryBufferRef data, raw_ostream &ostream) {
+static Error disassembleArchive(MemoryBufferRef data, raw_ostream &ostream) {
   Error err = Error::success();
   SmallVector<NewArchiveMember> disassembledMembers;
   SmallVector<SmallString<0>> strBuffers;
@@ -169,7 +177,9 @@ static void disassembleArchive(MemoryBufferRef data, raw_ostream &ostream) {
       nameBuffer += ".S";
       raw_svector_ostream disasmStream(disBuffer);
       disasmStream << "// Member " << *name << ":\n";
-      ObjDisassembler::disassembleObject(*contents, disasmStream);
+      err = ObjDisassembler::disassembleObject(*contents, disasmStream);
+      if (err)
+        break;
       disassembledMembers.emplace_back(MemoryBufferRef(disBuffer, nameBuffer));
     }
   }
@@ -184,16 +194,16 @@ static void disassembleArchive(MemoryBufferRef data, raw_ostream &ostream) {
       ostream << (*newArchive)->getBuffer();
   }
 
-  if (err)
-    report_fatal_error(std::move(err));
+  return err;
 }
 
 // =====================================================================================================================
-// Disassemble an ELF object into ostream. Does report_fatal_error on error.
+// Disassemble an ELF object into ostream.
 //
 // @param data : The object file contents
 // @param ostream : The stream to disassemble into
-void lgc::disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
+// @returns : Error::success() if no errors occurred, otherwise returns the Error object
+Error lgc::disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
   // Initialize targets and assembly printers/parsers.
   InitializeAllTargetInfos();
   InitializeAllTargetMCs();
@@ -201,30 +211,48 @@ void lgc::disassembleObject(MemoryBufferRef data, raw_ostream &ostream) {
 
   if (data.getBuffer().starts_with("!<arch>\n")) {
     // Disassemble archive of ELFs.
-    disassembleArchive(data, ostream);
-    return;
+    return disassembleArchive(data, ostream);
   }
 
   // Attempt to disassemble ELF.
-  ObjDisassembler::disassembleObject(data, ostream);
+  return ObjDisassembler::disassembleObject(data, ostream);
+}
+
+// Disassemble a single symbol within an object (typically ELF) into ostream.
+//
+// @param data : The object file contents
+// @param ostream : The stream to disassemble into
+// @param symbolName : symbol to disassemble
+// @returns : Error::success() if no errors occurred, otherwise returns the Error object
+Error lgc::disassembleSingleSymbol(MemoryBufferRef data, raw_ostream &ostream, StringRef symbolName) {
+  // Initialize targets and assembly printers/parsers.
+  InitializeAllTargetInfos();
+  InitializeAllTargetMCs();
+  InitializeAllDisassemblers();
+
+  // Attempt to disassemble symbol.
+  return ObjDisassembler::disassembleSingleSymbol(data, ostream, symbolName);
 }
 
 // =====================================================================================================================
-// Run the object disassembler to disassemble the object. Does report_fatal_error on error.
-void ObjDisassembler::run() {
+// Run the object disassembler to disassemble the object or symbol.
+//
+// @param symbolName (optional) : symbol to disassemble
+// @returns : Error::success() if no errors occurred, otherwise returns the Error object
+Error ObjDisassembler::run(StringRef symbolName) {
   // Decode the object file.
   Expected<std::unique_ptr<ObjectFile>> expectedObjFile = ObjectFile::createELFObjectFile(m_data);
-  if (!expectedObjFile)
-    report_fatal_error(m_data.getBufferIdentifier() + ": Cannot decode ELF object file");
+  if (Error E = expectedObjFile.takeError())
+    return createStringError(Twine("Cannot decode ELF object file: ") + toString(std::move(E)));
   if (!isa<ELFObjectFileBase>(&*expectedObjFile.get()))
-    report_fatal_error(m_data.getBufferIdentifier() + ": Is not ELF object file");
+    return createStringError("Is not ELF object file");
   m_objFile.reset(cast<ELFObjectFileBase>(expectedObjFile.get().release()));
 
   // Figure out the target triple from the object file, and get features.
   Triple triple = m_objFile->makeTriple();
   Expected<SubtargetFeatures> expectedFeatures = m_objFile->getFeatures();
   if (!expectedFeatures)
-    report_fatal_error(expectedFeatures.takeError());
+    return expectedFeatures.takeError();
   SubtargetFeatures features = *expectedFeatures;
 
   // Get the target specific parser.
@@ -232,45 +260,46 @@ void ObjDisassembler::run() {
   m_tripleName = triple.getTriple();
   m_target = TargetRegistry::lookupTarget(m_tripleName, error);
   if (!m_target)
-    report_fatal_error(m_objFile->getFileName() + ": '" + m_tripleName + "': " + error);
+    return createStringError("'" + m_tripleName + "': " + error);
 
   // Get the CPU name.
   std::optional<StringRef> mcpu = m_objFile->tryGetCPUName();
   if (!mcpu)
-    report_fatal_error(m_objFile->getFileName() + ": Cannot get CPU name");
+    return createStringError("Cannot get CPU name");
 
-  // Output the required llvm-mc command as a comment.
-  m_ostream << "// llvm-mc -triple=" << m_tripleName << " -mcpu=" << mcpu << "\n";
+  // Output the required llvm-mc command as a comment unless we're only disassembling a single symbol.
+  if (symbolName.empty())
+    m_ostream << "// llvm-mc -triple=" << m_tripleName << " -mcpu=" << mcpu << "\n";
 
   // Set up other objects required for disassembly.
   std::unique_ptr<MCRegisterInfo> regInfo(m_target->createMCRegInfo(m_tripleName));
   if (!regInfo)
-    report_fatal_error(m_data.getBufferIdentifier() + ": No register info for target");
+    return createStringError("No register info for target");
   MCTargetOptions targetOptions{};
   targetOptions.AsmVerbose = true;
   std::unique_ptr<MCAsmInfo> asmInfo(m_target->createMCAsmInfo(*regInfo, m_tripleName, targetOptions));
   if (!asmInfo)
-    report_fatal_error(m_data.getBufferIdentifier() + ": No assembly info for target");
+    return createStringError("No assembly info for target");
   m_subtargetInfo.reset(m_target->createMCSubtargetInfo(m_tripleName, *mcpu, features.getString()));
   if (!m_subtargetInfo)
-    report_fatal_error(m_data.getBufferIdentifier() + ": No subtarget info for target");
+    return createStringError("No subtarget info for target");
   std::unique_ptr<MCInstrInfo> instrInfo(m_target->createMCInstrInfo());
   if (!instrInfo)
-    report_fatal_error(m_data.getBufferIdentifier() + ": No instruction info for target");
+    return createStringError("No instruction info for target");
 
   MCContext context(triple, asmInfo.get(), regInfo.get(), m_subtargetInfo.get(), nullptr, &targetOptions);
   std::unique_ptr<MCObjectFileInfo> objFileInfo(m_target->createMCObjectFileInfo(context, /*PIC=*/false));
   if (!objFileInfo)
-    report_fatal_error("No MC object file info");
+    return createStringError("No MC object file info");
   context.setObjectFileInfo(objFileInfo.get());
   m_context = &context;
 
   m_instDisassembler.reset(m_target->createMCDisassembler(*m_subtargetInfo, *m_context));
   if (!m_instDisassembler)
-    report_fatal_error(m_data.getBufferIdentifier() + ": No disassembler for target");
+    return createStringError("No disassembler for target");
   m_instPrinter = m_target->createMCInstPrinter(triple, asmInfo->getAssemblerDialect(), *asmInfo, *instrInfo, *regInfo);
   if (!m_instPrinter)
-    report_fatal_error(m_data.getBufferIdentifier() + ": No instruction printer for target");
+    return createStringError("No instruction printer for target");
 
   auto fostream = std::make_unique<formatted_raw_ostream>(m_ostream);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 505779
@@ -279,32 +308,67 @@ void ObjDisassembler::run() {
 #else
   m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), m_instPrinter, nullptr, nullptr));
 #endif
-  // Process each section.
-  for (ELFSectionRef sectionRef : m_objFile->sections())
-    processSection(sectionRef);
+
+  if (!symbolName.empty()) {
+    for (ELFSymbolRef symbolRef : m_objFile->symbols()) {
+      Expected<StringRef> expectedCurrSymbolName = symbolRef.getName();
+      if (!expectedCurrSymbolName)
+        return expectedCurrSymbolName.takeError();
+
+      if (*expectedCurrSymbolName == symbolName) {
+        Expected<section_iterator> expectedSection = symbolRef.getSection();
+        if (!expectedSection)
+          return expectedSection.takeError();
+
+        return processSection(*expectedSection.get(), symbolRef);
+      }
+    }
+
+    return createStringError(symbolName + ": Symbol not found!");
+  } else {
+    for (ELFSectionRef sectionRef : m_objFile->sections()) {
+      Error err = processSection(sectionRef);
+      if (err)
+        return err;
+    }
+  }
+
+  return Error::success();
 }
 
 // =====================================================================================================================
 // Disassemble one section.
 //
 // @param sectionRef : The section to disassemble
-void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
+// @param symbolRef (optional) : symbol to disassemble
+Error ObjDisassembler::processSection(ELFSectionRef sectionRef, std::optional<ELFSymbolRef> symbolRef) {
   // Omit certain ELF sections.
   unsigned sectType = sectionRef.getType();
   if (sectType == ELF::SHT_NULL || sectType == ELF::SHT_STRTAB || sectType == ELF::SHT_SYMTAB ||
       sectType == ELF::SHT_REL || sectType == ELF::SHT_RELA)
-    return;
+    return Error::success();
 
   // Switch the streamer to the section.
-  m_streamer->addBlankLine();
   unsigned sectFlags = sectionRef.getFlags();
-  MCSection *sect = m_context->getELFSection(cantFail(sectionRef.getName()), sectType, sectFlags);
-  m_streamer->switchSection(sect);
+  Expected<StringRef> expectedSectionName = sectionRef.getName();
+  if (!expectedSectionName)
+    return expectedSectionName.takeError();
+  MCSection *sect = m_context->getELFSection(*expectedSectionName, sectType, sectFlags);
+
+  if (symbolRef) {
+    // Don't output the section when disassembling a single symbol.
+    m_streamer->switchSectionNoPrint(sect);
+  } else {
+    m_streamer->addBlankLine();
+    m_streamer->switchSection(sect);
+  }
 
   // Create all symbols in this section. Also emit directives for symbol type and size,
-  // adding a synthesized label for the end of the symbol.
+  // adding a synthesized label for the end of the symbol unless we're only disassembling a single symbol.
   SymbolPool symbols;
-  gatherSectionSymbols(sectionRef, symbols);
+  Error err = gatherSectionSymbols(sectionRef, symbolRef.has_value(), symbols);
+  if (err)
+    return err;
 
   // Collect and sort the relocs for the section.
   std::vector<object::RelocationRef> relocs;
@@ -333,7 +397,10 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
     // Disassemble the section contents.
     size_t prevNumSymbols = symbols.symbols.size();
     stable_sort(symbols.symbols); // Stable sort as there may be duplicate addresses.
-    tryDisassembleSection(sectionRef, sectType, sectFlags, outputting, symbols, relocs);
+    err = tryDisassembleSection(sectionRef, sectType, sectFlags, outputting, symbols, relocs, symbolRef);
+    if (err)
+      return err;
+
     if (outputting)
       break; // Done final outputting pass.
 
@@ -346,43 +413,67 @@ void ObjDisassembler::processSection(ELFSectionRef sectionRef) {
     // the next pass.
     outputting = (symbols.symbols.size() == prevNumSymbols);
   }
+
+  return Error::success();
 }
 
 // =====================================================================================================================
-// Create all symbols in the given section. Also emit directives for symbol type and size.
+// Create all symbols in the given section.
+// If skipDirectiveEmission is false, also emit directives for symbol type and size.
 // The size is an expression endSym-sym where endSym is a synthesized label at the end of the function.
 //
 // @param sectionRef : The section being disassembled
+// @param skipDirectiveEmission : True to skip synthesizing endSym label and outputting .type and .size directives
 // @param [out] symbols : Symbols to populate
-void ObjDisassembler::gatherSectionSymbols(ELFSectionRef sectionRef, SymbolPool &symbols) {
+Error ObjDisassembler::gatherSectionSymbols(ELFSectionRef sectionRef, bool skipDirectiveEmission, SymbolPool &symbols) {
   for (ELFSymbolRef symbolRef : m_objFile->symbols()) {
-    if (cantFail(symbolRef.getSection()) != sectionRef)
+    Expected<section_iterator> expectedSection = symbolRef.getSection();
+    if (!expectedSection)
+      return expectedSection.takeError();
+
+    if (*expectedSection != sectionRef)
       continue;
 
-    uint64_t offset = cantFail(symbolRef.getValue());
-    StringRef name = cantFail(symbolRef.getName());
+    Expected<uint64_t> expectedOffset = symbolRef.getValue();
+    if (!expectedOffset)
+      return expectedOffset.takeError();
+    uint64_t offset = *expectedOffset;
+
+    Expected<StringRef> expectedSymbolName = symbolRef.getName();
+    if (!expectedSymbolName)
+      return expectedSymbolName.takeError();
+    StringRef name = *expectedSymbolName;
+
+    Expected<StringRef> expectedSectionContents = sectionRef.getContents();
+    if (!expectedSectionContents)
+      return expectedSectionContents.takeError();
+
     unsigned type = symbolRef.getELFType();
     MCSymbol *sym = getOrCreateSymbol(symbols, offset, name, type);
 
-    switch (type) {
-    case ELF::STT_FUNC:
-      m_streamer->emitSymbolAttribute(sym, MCSA_ELF_TypeFunction);
-      break;
-    case ELF::STT_OBJECT:
-      m_streamer->emitSymbolAttribute(sym, MCSA_ELF_TypeObject);
-      break;
-    }
+    if (!skipDirectiveEmission) {
+      switch (type) {
+      case ELF::STT_FUNC:
+        m_streamer->emitSymbolAttribute(sym, MCSA_ELF_TypeFunction);
+        break;
+      case ELF::STT_OBJECT:
+        m_streamer->emitSymbolAttribute(sym, MCSA_ELF_TypeObject);
+        break;
+      }
 
-    if (uint64_t size = symbolRef.getSize()) {
-      uint64_t endOffset = offset + size;
-      if (endOffset <= cantFail(sectionRef.getContents()).size()) {
-        MCSymbol *endSym = getOrCreateSymbol(symbols, endOffset, Twine(name) + "_symend");
-        const MCExpr *sizeExpr = MCBinaryExpr::createSub(MCSymbolRefExpr::create(endSym, *m_context),
-                                                         MCSymbolRefExpr::create(sym, *m_context), *m_context);
-        m_streamer->emitELFSize(sym, sizeExpr);
+      if (uint64_t size = symbolRef.getSize()) {
+        uint64_t endOffset = offset + size;
+        if (endOffset <= expectedSectionContents->size()) {
+          MCSymbol *endSym = getOrCreateSymbol(symbols, endOffset, Twine(name) + "_symend");
+          const MCExpr *sizeExpr = MCBinaryExpr::createSub(MCSymbolRefExpr::create(endSym, *m_context),
+                                                           MCSymbolRefExpr::create(sym, *m_context), *m_context);
+          m_streamer->emitELFSize(sym, sizeExpr);
+        }
       }
     }
   }
+
+  return Error::success();
 }
 
 // =====================================================================================================================
@@ -412,9 +503,11 @@ void ObjDisassembler::gatherRelocs(ELFSectionRef sectionRef, std::vector<object:
 // @param outputting : True to actually stream the disassembly output
 // @param symbols : Sorted array of symbols in the section
 // @param relocs : Sorted array of relocs in the section
-void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned sectType, unsigned sectFlags,
-                                            bool outputting, SymbolPool &symbols,
-                                            ArrayRef<object::RelocationRef> relocs) {
+// @param symbolRef (optional) : symbol to disassemble
+Error ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned sectType, unsigned sectFlags,
+                                             bool outputting, SymbolPool &symbols,
+                                             ArrayRef<object::RelocationRef> relocs,
+                                             std::optional<ELFSymbolRef> symbolRef) {
 
   bool isCode = sectFlags & ELF::SHF_EXECINSTR;
   bool isNote = sectType == ELF::SHT_NOTE;
@@ -423,9 +516,41 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
     instAlignment = m_context->getAsmInfo()->getMinInstAlignment();
 
   // Get the section contents, and disassemble until nothing left.
-  StringRef contents = cantFail(sectionRef.getContents());
+  Expected<StringRef> expectedSectionContents = sectionRef.getContents();
+  if (!expectedSectionContents)
+    return expectedSectionContents.takeError();
+  StringRef contents = *expectedSectionContents;
   size_t offset = 0, lastOffset = 0;
   size_t nextSymbol = 0;
+  size_t endAddr = contents.size();
+
+  if (symbolRef) {
+    bool startingSymbolFound = false;
+    size_t startingSymbol = 0;
+    size_t symbolSize = symbolRef->getSize();
+    Expected<StringRef> expectedSymbolName = symbolRef->getName();
+    if (!expectedSymbolName)
+      return expectedSymbolName.takeError();
+    StringRef symbolName = *expectedSymbolName;
+
+    for (size_t i = 0; i < symbols.symbols.size(); i++) {
+      SymbolInfoTy currSymbol = symbols.symbols[i];
+
+      if (currSymbol.Name == symbolName) {
+        startingSymbol = i;
+        startingSymbolFound = true;
+        break;
+      }
+    }
+
+    if (!startingSymbolFound)
+      return createStringError(symbolName + ": Symbol not found!");
+
+    offset = symbols.symbols[startingSymbol].Addr;
+    lastOffset = offset;
+    endAddr = offset + symbolSize;
+    nextSymbol = startingSymbol;
+  }
 
   // The current sequence of instructions, if any.
   // In the table-jump sequence, currently seen as the longest one, there
@@ -434,7 +559,7 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
   SmallVector<InstOrDirective, 32> instSeq;
 
   for (;;) {
-    size_t endOffset = contents.size();
+    size_t endOffset = endAddr;
     if (nextSymbol != symbols.symbols.size() && symbols.symbols[nextSymbol].Addr < endOffset)
       endOffset = symbols.symbols[nextSymbol].Addr;
 
@@ -442,7 +567,9 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
       // We're about to emit a symbol or finish the section.
       // If there is any remaining non-disassemblable data, output it.
       if (lastOffset != offset) {
-        outputData(outputting, lastOffset, contents.slice(lastOffset, offset), relocs);
+        Error err = outputData(outputting, lastOffset, contents.slice(lastOffset, offset), relocs);
+        if (err)
+          return err;
         lastOffset = offset;
       }
 
@@ -457,7 +584,7 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
         continue;
       }
 
-      if (offset == contents.size())
+      if (offset == endAddr)
         break;
     }
 
@@ -489,11 +616,16 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
 
     // Got a disassemblable instruction.
     // First output any non-disassemblable data up to this point.
-    if (lastOffset != offset)
-      outputData(outputting, lastOffset, contents.slice(lastOffset, offset), relocs);
+    if (lastOffset != offset) {
+      Error err = outputData(outputting, lastOffset, contents.slice(lastOffset, offset), relocs);
+      if (err)
+        return err;
+    }
 
     // Output reloc.
-    outputRelocs(outputting, offset, inst.bytes.size(), relocs);
+    Error err = outputRelocs(outputting, offset, inst.bytes.size(), relocs);
+    if (err)
+      return err;
 
     if (outputting)
       outputInst(inst, instAlignment);
@@ -501,6 +633,8 @@ void ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned s
     offset += inst.bytes.size();
     lastOffset = offset;
   }
+
+  return Error::success();
 }
 
 // =====================================================================================================================
@@ -762,8 +896,8 @@ void ObjDisassembler::outputInst(InstOrDirective inst, unsigned instAlignment) {
 // @param offset : Offset in section
 // @param data : Bytes of data
 // @param [in/out] relocs : ArrayRef of relocs, bumped on output past relocs that have been consumed
-void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef data,
-                                 ArrayRef<object::RelocationRef> &relocs) {
+Error ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef data,
+                                  ArrayRef<object::RelocationRef> &relocs) {
   // Check whether the data is mostly ASCII, possibly with a terminating 0.
   size_t asciiCount = 0;
   for (char ch : data) {
@@ -773,8 +907,11 @@ void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef dat
   bool isAscii = asciiCount * 10 >= data.size() * 9;
 
   while (!data.empty()) {
-    if (!relocs.empty() && relocs[0].getOffset() == offset)
-      outputRelocs(outputting, offset, 1, relocs);
+    if (!relocs.empty() && relocs[0].getOffset() == offset) {
+      Error err = outputRelocs(outputting, offset, 1, relocs);
+      if (err)
+        return err;
+    }
 
     // Only go as far as the next reloc.
     size_t size = data.size();
@@ -816,6 +953,8 @@ void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef dat
     offset += size;
     data = data.drop_front(size);
   }
+
+  return Error::success();
 }
 
 // =====================================================================================================================
@@ -826,8 +965,8 @@ void ObjDisassembler::outputData(bool outputting, uint64_t offset, StringRef dat
 // @param offset : Offset in section
 // @param size : Size of range to output relocs for
 // @param [in/out] relocs : ArrayRef of relocs, bumped on output past relocs that have been consumed
-void ObjDisassembler::outputRelocs(bool outputting, uint64_t offset, uint64_t size,
-                                   ArrayRef<object::RelocationRef> &relocs) {
+Error ObjDisassembler::outputRelocs(bool outputting, uint64_t offset, uint64_t size,
+                                    ArrayRef<object::RelocationRef> &relocs) {
   while (!relocs.empty() && relocs[0].getOffset() < offset + size) {
     if (outputting) {
       // Start with a '$' reference.
@@ -843,12 +982,18 @@ void ObjDisassembler::outputRelocs(bool outputting, uint64_t offset, uint64_t si
       relocs[0].getTypeName(relocName);
       const MCExpr *tgtExpr = nullptr;
       auto symRef = relocs[0].getSymbol();
-      if (symRef != m_objFile->symbol_end())
-        tgtExpr = MCSymbolRefExpr::create(m_context->getOrCreateSymbol(cantFail(symRef->getName())), *m_context);
+      if (symRef != m_objFile->symbol_end()) {
+        Expected<StringRef> expectedSymbolName = symRef->getName();
+        if (!expectedSymbolName)
+          return expectedSymbolName.takeError();
+        tgtExpr = MCSymbolRefExpr::create(m_context->getOrCreateSymbol(*expectedSymbolName), *m_context);
+      }
       m_streamer->emitRelocDirective(*offsetExpr, relocName, tgtExpr, {}, *m_subtargetInfo);
     }
     relocs = relocs.drop_front(1);
   }
+
+  return Error::success();
 }
 
 // =====================================================================================================================

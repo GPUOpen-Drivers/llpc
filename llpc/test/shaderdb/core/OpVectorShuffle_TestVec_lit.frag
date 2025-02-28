@@ -1,4 +1,11 @@
 #version 450
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 
 layout(location = 0) out vec4 fragColor;
 
@@ -20,8 +27,8 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 0
-; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i32 1
+; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i64 0
+; SHADERTEST: %{{.*}} = extractelement <2 x float> %{{.*}}, i64 1
 ; SHADERTEST-LABEL: {{^// LLPC}} FE lowering results
 ; SHADERTEST: [[VEC1:%.*]] = shufflevector <3 x float> %{{.*}}, <3 x float> {{undef|poison}}, <4 x i32> <i32 {{undef|poison}}, i32 1, i32 2, i32 {{undef|poison}}>
 ; SHADERTEST: [[VEC2:%.*]] = shufflevector <4 x float> <float {{undef|poison}}, float 5.000000e-01, float 5.000000e-01, float {{undef|poison}}>, <4 x float> [[VEC1]], <4 x i32> <i32 6, i32 1, i32 2, i32 5>

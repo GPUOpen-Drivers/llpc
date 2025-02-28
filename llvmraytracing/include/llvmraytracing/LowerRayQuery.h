@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -33,9 +33,9 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/PassManager.h"
 
-namespace CompilerUtils {
+namespace compilerutils {
 class TypeLowering;
-}
+} // namespace compilerutils
 
 namespace llvm_dialects {
 class Builder;
@@ -169,7 +169,7 @@ private:
   llvm::SmallVector<llvm::Instruction *> m_callsToLower;
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;
   llvm_dialects::Builder *m_builder = nullptr;
-  CompilerUtils::TypeLowering *m_typeLowering = nullptr;
+  compilerutils::TypeLowering *m_typeLowering = nullptr;
   llvm::Type *m_rtqType = nullptr;
   unsigned m_traceRayId = 0;
 };

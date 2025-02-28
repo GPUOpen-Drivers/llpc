@@ -41,7 +41,7 @@
 using namespace lgc;
 using namespace llvm;
 using namespace lgc::rt;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 namespace Llpc {
 PrepareContinuations::PrepareContinuations() {
@@ -64,7 +64,11 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
   mode.workgroupSizeZ = 1;
   mode.noLocalInvocationIdInCalls = true;
   Pipeline::setComputeShaderMode(module, mode);
-  ContHelper::setStackAddrspace(module, ContStackAddrspace::ScratchLLPC);
+  auto &rtContext = *static_cast<RayTracingContext *>(m_context->getPipelineContext());
+  ContHelper::setStackAddrspace(module, rtContext.getRayTracingPipelineBuildInfo()->cpsFlags &
+                                                Vkgc::CpsFlag::CpsFlagStackInGlobalMem
+                                            ? ContStackAddrspace::GlobalLLPC
+                                            : ContStackAddrspace::ScratchLLPC);
 
   if (module.getName().starts_with("main")) {
     m_shaderStage = ShaderStageRayTracingRayGen;
@@ -81,12 +85,9 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
     lgc::Pipeline::markShaderEntryPoint(entryFunc, lgc::ShaderStage::Compute);
   } else {
     m_entryPoint->setName(module.getName());
-    auto rtContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
-
     ContHelper::setMaxPayloadRegisterCount(module, cps::CpsPayloadMaxNumVgprs);
-
-    setMaxHitAttributeSize(&module, rtContext->getAttributeDataSizeInBytes());
-    setMaxPayloadSize(&module, rtContext->getPayloadSizeInBytes());
+    setMaxHitAttributeSize(&module, rtContext.getAttributeDataSizeInBytes());
+    setMaxPayloadSize(&module, rtContext.getPayloadSizeInBytes());
   }
 
   return PreservedAnalyses::none();

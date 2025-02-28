@@ -68,7 +68,7 @@ extern opt<bool> TrimDebugInfo;
 using namespace llvm;
 using namespace Llpc;
 using namespace lgc::rt;
-using namespace CompilerUtils;
+using namespace compilerutils;
 
 namespace SPIRV {
 extern const char *MetaNameSpirvOp;
@@ -218,7 +218,7 @@ private:
   llvm::Value *createLoadInstNodeAddr();
 
   lgc::rt::RayTracingShaderStage mapStageToLgcRtShaderStage(ShaderStage stage);
-  std::optional<CompilerUtils::CrossModuleInliner> m_crossModuleInliner;
+  std::optional<compilerutils::CrossModuleInliner> m_crossModuleInliner;
   unsigned m_spirvOpMetaKindId; // Metadata kind ID for "spirv.op"
 
   llvm::Value *m_traceParams[TraceParam::Count]; // Trace ray set parameters

@@ -1,4 +1,6 @@
 #version 450 core
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 
 layout(vertices = 5) out;
 

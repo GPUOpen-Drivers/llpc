@@ -1,3 +1,10 @@
+/*
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ **********************************************************************************************************************/
+
 // Check that an invalid gfxip generates the appropriate error
 /*
 ; RUN: not amdllpc -v -gfxip=1.2.3 %s | FileCheck -check-prefix=SHADERTEST %s

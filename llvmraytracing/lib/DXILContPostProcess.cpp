@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -107,7 +107,10 @@ void DXILContPostProcessPassImpl::lowerJumpOp(lgc::cps::JumpOp &JumpOp) {
 
   SmallVector<Value *> TailArgs{JumpOp.getTail()};
 
-  Value *JumpTarget = ensure64BitAddr(JumpOp.getTarget());
+  Value *JumpTarget = JumpOp.getTarget();
+  if (!ContHelper::tryGetDeferVpcUnpacking(*Mod))
+    JumpTarget = ensure64BitAddr(JumpTarget);
+
   Value *ShaderIndex = JumpOp.getShaderIndex();
   Value *RetAddr = JumpOp.getRcr();
   if (ContHelper::isWaitAwaitCall(JumpOp)) {

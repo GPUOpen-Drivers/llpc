@@ -266,7 +266,6 @@ Function *LowerMathConstFolding::getEntryPoint() {
 
 bool LowerMathPrecision::adjustExports(Module &module, bool disablePositionOpt) {
   bool changed = false;
-  ShaderStage preFragmentStage = getLastVertexProcessingStage();
   for (auto &func : module.functions()) {
     // Disable fast math for gl_Position.
     // TODO: This requires knowledge of the Builder implementation, which is not ideal.
@@ -292,24 +291,13 @@ bool LowerMathPrecision::adjustExports(Module &module, bool disablePositionOpt) 
         valueWritten = callInst->getOperand(0);
       }
 
-      if (valueWritten && builtIn == lgc::BuiltInPosition && m_shaderStage == preFragmentStage) {
+      if (valueWritten && builtIn == lgc::BuiltInPosition) {
         disableFastMath(valueWritten, disablePositionOpt);
         changed = true;
       }
     }
   }
   return changed;
-}
-
-Vkgc::ShaderStage LowerMathPrecision::getLastVertexProcessingStage() const {
-  auto stageMask = m_context->getShaderStageMask();
-  for (auto stage : {Vkgc::ShaderStageMesh, Vkgc::ShaderStageGeometry, Vkgc::ShaderStageTessEval,
-                     Vkgc::ShaderStageTessControl, Vkgc::ShaderStageVertex}) {
-    unsigned int stageBit = 1 << stage;
-    if (stageMask & stageBit)
-      return stage;
-  }
-  return Vkgc::ShaderStageInvalid;
 }
 
 static bool clearContractFlag(Instruction *inst) {

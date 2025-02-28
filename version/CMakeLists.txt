@@ -86,6 +86,9 @@ llpc_set_property(llpc_version INTERFACE LLPC_BUILD_GFX115 ON "HW_GFX115")
 #if LLPC_BUILD_STRIX1
 llpc_set_property(llpc_version INTERFACE LLPC_BUILD_STRIX1 ON "HW_STRIX1")
 #endif
+#if LLPC_BUILD_STRIX_HALO
+llpc_set_property(llpc_version INTERFACE LLPC_BUILD_STRIX_HALO ON "HW_STRIX_HALO")
+#endif
 
 # Report the summary of what is enabled.
 message(STATUS "llpc_version:${LLPC_SET_PROPERTY_SUMMARY_llpc_version}")

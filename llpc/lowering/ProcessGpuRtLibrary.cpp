@@ -132,7 +132,7 @@ PreservedAnalyses ProcessGpuRtLibrary::run(Module &module, ModuleAnalysisManager
     Function *func = argPromotionsFunc.first;
     if (func->getLinkage() == GlobalValue::InternalLinkage)
       continue;
-    CompilerUtils::promotePointerArguments(func, argPromotionsFunc.second);
+    compilerutils::promotePointerArguments(func, argPromotionsFunc.second);
   }
 
   // Process ray-tracing (i.e. non-rayQuery) functions in a separate loop; processLibraryFunction() may do
@@ -205,6 +205,7 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRayInitStaticId"] = &ProcessGpuRtLibrary::createInitStaticId;
 #endif
   m_libFuncPtrs["AmdTraceRayGetKnownSetRayFlags"] = &ProcessGpuRtLibrary::createGetKnownSetRayFlags;
+  m_libFuncPtrs["AmdTraceRayMakePC"] = &ProcessGpuRtLibrary::createMakePc;
   m_libFuncPtrs["AmdTraceRayGetKnownUnsetRayFlags"] = &ProcessGpuRtLibrary::createGetKnownUnsetRayFlags;
   m_libFuncPtrs["_AmdContStackAlloc"] = &ProcessGpuRtLibrary::createContStackAlloc;
   m_libFuncPtrs["_AmdContStackFree"] = &ProcessGpuRtLibrary::createContStackFree;
@@ -250,7 +251,7 @@ bool ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     // The intrinsic handling require first argument to be a pointer, the rest to be values.
     SmallBitVector promotionMask(func->arg_size(), true);
     promotionMask.reset(0);
-    auto newFunc = CompilerUtils::promotePointerArguments(func, promotionMask);
+    auto newFunc = compilerutils::promotePointerArguments(func, promotionMask);
     if (funcName.starts_with("_AmdValueGetI32"))
       ContHelper::handleValueGetI32(*newFunc, *m_builder);
     else
@@ -527,16 +528,17 @@ void ProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *func, 
 //
 // @param func : The function to create
 void ProcessGpuRtLibrary::createIntersectBvh(Function *func) {
-  assert(m_gpurtKey.bvhResDesc.size() != 0);
-  if (m_gpurtKey.bvhResDesc.size() < 4)
+  if (m_gpurtKey.bvhResDesc.size() < 4) {
+    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
     return;
+  }
 
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-    // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectBvhNode
-    // uint4 AmdExtD3DShaderIntrinsics_IntersectBvhNode(
+  // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectBvhNode
+  // uint4 AmdExtD3DShaderIntrinsics_IntersectBvhNode(
 #else
-    // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectInternal
-    // uint4 AmdExtD3DShaderIntrinsics_IntersectInternal(
+  // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectInternal
+  // uint4 AmdExtD3DShaderIntrinsics_IntersectInternal(
 #endif
   //     in uint2  address,
   //     in float  ray_extent,
@@ -838,6 +840,15 @@ void ProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
 // @param func : The function to create
 void ProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetKnownUnsetRayFlagsOp>());
+}
+
+// =====================================================================================================================
+// Fill in function to make a trace ray PC
+//
+// @param func : The function to create
+void ProcessGpuRtLibrary::createMakePc(llvm::Function *func) {
+  Value *addr32 = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->CreateRet(m_builder->create<GpurtMakePcOp>(func->getReturnType(), addr32));
 }
 
 // =====================================================================================================================

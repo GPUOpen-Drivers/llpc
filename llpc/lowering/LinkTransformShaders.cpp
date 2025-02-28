@@ -122,7 +122,7 @@ void LinkTransformShaders::processLibraryFunction(Function *&func, Function *tra
     args.push_back(v);
   }
 
-  CompilerUtils::CrossModuleInliner inliner;
+  compilerutils::CrossModuleInliner inliner;
   auto *vsOutput = inliner.inlineCall(*m_builder, transformVsFunc, {args}).returnValue;
 
   if (primCulling) {

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -32,7 +32,7 @@ class Function;
 class SmallBitVector;
 } // namespace llvm
 
-namespace CompilerUtils {
+namespace compilerutils {
 
 // Replace struct return type with its first element type.
 llvm::Function *unpackStructReturnType(llvm::Function *Fn);
@@ -44,4 +44,4 @@ llvm::Function *lowerStructRetArgument(llvm::Function *Fn);
 // and using pointee type metadata.
 llvm::Function *promotePointerArguments(llvm::Function *Fn, const llvm::SmallBitVector &PromotionMask);
 
-} // namespace CompilerUtils
+} // namespace compilerutils

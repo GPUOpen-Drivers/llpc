@@ -56,6 +56,7 @@
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "lgc/LgcRtqDialect.h"
+#include "lgc/LgcXdlDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/RuntimeContext.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -73,6 +74,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
@@ -88,6 +90,7 @@ using namespace lgc::rtq;
 using namespace llvm;
 using namespace lgc::cps;
 using namespace lgc::ilcps;
+using namespace lgc::xdl;
 
 namespace Llpc {
 
@@ -95,9 +98,9 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext =
-      llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcRtqDialect, LgcCpsDialect,
-                                          LgcIlCpsDialect, LlpcDialect, continuations::ContinuationsDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcRtqDialect,
+                                                         LgcCpsDialect, LgcIlCpsDialect, LlpcDialect, LgcXdlDialect,
+                                                         continuations::ContinuationsDialect>(*this);
 
   reset();
 }

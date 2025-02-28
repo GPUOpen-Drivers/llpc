@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -29,10 +29,10 @@
 
 #define DEBUG_TYPE "value-specialization"
 
-using namespace CompilerUtils;
+using namespace compilerutils;
 using namespace llvm;
 
-namespace CompilerUtils {
+namespace compilerutils {
 
 namespace {
 
@@ -355,4 +355,4 @@ Value *ValueSpecializer::replaceDwordsImpl(Value *RootVal, SmallVectorImpl<unsig
   return ReplacedRootVal != RootVal ? ReplacedRootVal : nullptr;
 }
 
-} // namespace CompilerUtils
+} // namespace compilerutils

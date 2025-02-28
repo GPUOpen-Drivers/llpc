@@ -23,9 +23,23 @@
  #
  #######################################################################################################################
 
+#
+# CMake file for top level of LLPC repository.
+#
+# Some variables that the client might set for enabling components:
+#
+# - ICD_BUILD_LLPC: Enable LLPC on Vulkan and OGLP.
+#
+#
+#
+#
+#
+
 cmake_minimum_required(VERSION 3.21)
 
 project(LLPCrepo LANGUAGES C CXX)
+
+set(LLPC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### Standalone LLPC build handling
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -37,6 +51,8 @@ endif()
 # Also runs findllvm.cmake.
 include(cmake/llpc_version.cmake)
 add_llpc_version_projects()
+
+include(CMakeDependentOption)
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
@@ -51,6 +67,8 @@ option(LLPC_AMD_YUV_IMAGE "Build with AMD_YUV_IMAGE" OFF)
 option(LLPC_AMD_LVR_INTEROP "Build with AMD_LVR_INTEROP" OFF)
 #endif
 
+cmake_dependent_option(LLPC_SHAREDME_XDL_BUILD_TEST "Build tests for xdl." ON "LLPC_BUILD_TOOLS" OFF)
+
 ### VKGC aspects ###################################################################
 # For drivers that use VKGC, as the interface to the LLPC front-end
 if (FALSE
@@ -59,11 +77,12 @@ if (FALSE
     include("cmake/vkgc.cmake")
 endif()
 
-### LGC for LLPC ###################################################################
+### LLPC dependencies ##############################################################
 if (ICD_BUILD_LLPC)
-    # Add LGC and its dependencies as LLVM external projects for LLPC to use.
-    include("cmake/lgc.cmake")
-    add_lgc_projects()
+    # Add LLPC's dependencies (including LGC) as LLVM external projects. This needs
+    # to be done before LLVM, whereas LLPC itself needs to be done after LLVM.
+    include("cmake/llpcdeps.cmake")
+    add_llpcdeps_projects()
 endif()
 
 ### LLVM ###########################################################################
@@ -153,10 +172,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             set_property(TARGET llvm-dialects-example PROPERTY FOLDER Misc)
         endif()
         if (NOT WIN32 AND LLVM_OPTIMIZED_TABLEGEN)
-#if _WIN32
-            # These targets don't exist on Windows when CMake is first invoked.
-            # They are created later at build time, when the cross-compilation takes place.
-#endif
             set_property(TARGET llvm_nm_target PROPERTY FOLDER Misc)
             set_property(TARGET llvm_readobj_target PROPERTY FOLDER Misc)
             set_property(TARGET llvm-min-tblgen-host PROPERTY FOLDER Misc)
@@ -164,12 +179,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             set_property(TARGET CONFIGURE_LLVM_NATIVE PROPERTY FOLDER Misc)
             set_property(TARGET CREATE_LLVM_NATIVE PROPERTY FOLDER Misc)
         endif()
-#if _WIN32
-        if(MSVC)
-            # The 32-bit llvm-tblgen can easily run out of memory. Tell the linker to allow addresses larger than 2GB.
-            set_property(TARGET llvm-tblgen PROPERTY LINK_FLAGS "/LARGEADDRESSAWARE")
-        endif()
-#endif
         if (LLPC_BUILD_TESTS)
             if(NOT LLPC_IS_STANDALONE)
                 set_property(TARGET check-amber PROPERTY FOLDER "LLPC Tests")
@@ -181,4 +190,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             set_property(TARGET check-lgc-units PROPERTY FOLDER "LGC Tests")
         endif()
     endif()
+
+    if (TARGET llvm-tblgen)
+        # The 32-bit llvm-tblgen can easily run out of memory. Tell the linker to allow addresses larger than 2GB.
+        set_property(TARGET llvm-tblgen PROPERTY LINK_FLAGS "/LARGEADDRESSAWARE")
+    endif()
+
 endif()

@@ -1,3 +1,5 @@
+/* Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved. */
+
 // This test case checks whether the emit instruction and the primitive type are well-handled when there is no output
 // of the geometry shader.
 // BEGIN_SHADERTEST

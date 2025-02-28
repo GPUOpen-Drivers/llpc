@@ -428,6 +428,7 @@ enum BufFormat {
   BUF_FORMAT_32_32_32_32_UINT_GFX11 = 0x0000003D,
   BUF_FORMAT_32_32_32_32_SINT_GFX11 = 0x0000003E,
   BUF_FORMAT_32_32_32_32_FLOAT_GFX11 = 0x0000003F,
+
 };
 
 // Enumerates destination selection of data in memory buffer.

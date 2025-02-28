@@ -1,0 +1,29 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; RUN: amdllpc --emit-llvm -v -gfxip=11.0 %s | FileCheck -check-prefix=CHECK %s
+
+; CHECK: {{^}}attributes #0 {{.*}} "amdgpu-sched-strategy"="max-ilp"
+; CHECK: {{^}}attributes #1 {{.*}} "amdgpu-sched-strategy"="max-memory-clause"
+; REQUIRES: do-not-run-me
+
+[VsGlsl]
+#version 450 core
+void main() { }
+
+[VsInfo]
+entryPoint = main
+options.scheduleStrategy = MaxIlp
+
+[FsGlsl]
+#version 450
+void main() { }
+
+[FsInfo]
+entryPoint = main
+options.scheduleStrategy = MaxMemoryClause

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -70,7 +70,7 @@ def SetLocalRootIndexOp : LgcIlCpsOp<"setLocalRootIndex", [WillReturn]> {
 }
 
 def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
-  let arguments = (ins I64:$shaderAddr, I32:$csp, I32:$shaderIndex, I32:$returnAddr, varargs:$tail);
+  let arguments = (ins (or I32, I64):$shaderAddr, I32:$csp, I32:$shaderIndex, I32:$returnAddr, varargs:$tail);
   let results = (outs);
 
   let summary =
@@ -91,7 +91,7 @@ def ContinueOp : LgcIlCpsOp<"continue", [NoReturn]> {
 }
 
 def WaitContinueOp : LgcIlCpsOp<"waitContinue", [NoReturn]> {
-  let arguments = (ins I64:$shaderAddr, I64:$waitMask, I32:$csp, I32:$shaderIndex, I32:$returnAddr, varargs:$tail);
+  let arguments = (ins (or I32, I64):$shaderAddr, I64:$waitMask, I32:$csp, I32:$shaderIndex, I32:$returnAddr, varargs:$tail);
   let results = (outs);
 
   let summary =

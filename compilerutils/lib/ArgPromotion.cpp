@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -35,7 +35,7 @@ using namespace llvm;
 
 static Function *cloneFunctionHeaderWithTypes(Function &F, TypedFuncTy NewType, AttributeList FnAttr) {
   FunctionType *FuncTy = NewType.asFunctionType();
-  Function *NewFunc = CompilerUtils::cloneFunctionHeader(F, FuncTy, FnAttr);
+  Function *NewFunc = compilerutils::cloneFunctionHeader(F, FuncTy, FnAttr);
   NewType.writeMetadata(NewFunc);
   return NewFunc;
 }
@@ -55,7 +55,7 @@ static Function *cloneFunctionWithTypes(Function *Fn, TypedFuncTy NewFnTy, Attri
 /// Unpack the return (struct) type of the input function, which means change
 /// the return type to its first element type. This may generate invalid IR in
 /// general, call this with extra caution.
-Function *CompilerUtils::unpackStructReturnType(Function *Fn) {
+Function *compilerutils::unpackStructReturnType(Function *Fn) {
   auto *RetTy = Fn->getReturnType();
   assert(RetTy->isStructTy());
   auto *NewRetTy = RetTy->getStructElementType(0);
@@ -87,7 +87,7 @@ Function *CompilerUtils::unpackStructReturnType(Function *Fn) {
 }
 
 // Turn `StructRet` argument into more canonical return statement.
-Function *CompilerUtils::lowerStructRetArgument(Function *Fn) {
+Function *compilerutils::lowerStructRetArgument(Function *Fn) {
   assert(Fn->getReturnType()->isVoidTy());
   auto *RetArg = Fn->getArg(0);
   if (!RetArg->hasStructRetAttr())
@@ -156,7 +156,7 @@ Function *CompilerUtils::lowerStructRetArgument(Function *Fn) {
 
 /// Promote pointer argument type to its value type if the corresponding bit in
 /// `PromotionMask` is being set.
-Function *CompilerUtils::promotePointerArguments(Function *Fn, const SmallBitVector &PromotionMask) {
+Function *compilerutils::promotePointerArguments(Function *Fn, const SmallBitVector &PromotionMask) {
   SmallVector<TypedArgTy> ArgTys;
   SmallVector<AttributeSet> ParamAttrs;
 

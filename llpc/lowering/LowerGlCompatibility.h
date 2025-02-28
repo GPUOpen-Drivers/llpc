@@ -84,7 +84,6 @@ private:
   void emulateTwoSideLighting();
   void emulateBitmap();
   void emulateSmoothStipple();
-  void patchAlphaScaling(Value *val, Type *valTy, Constant *metaVal, Value *alphaScaleVal);
   void lowerClipVertex();
   void lowerColor(llvm::User *color);
   void lowerFrontColor();
@@ -93,11 +92,10 @@ private:
   void lowerBackSecondaryColor();
   void lowerFragColor();
   void lowerAlphaTest();
+  Value *patchAlphaScaling(Value *val, Type *valTy, Constant *metaVal, Value *alphaScaleVal);
 
   llvm::SmallVector<llvm::CallInst *> m_emitCalls; // "Call" instructions to emit vertex (geometry shader).
   llvm::ReturnInst *m_retInst;                     // "Return" of the entry point.
-  llvm::BasicBlock *m_entryPointEnd;               // The end block of the entry point, use for early return.
-  llvm::BasicBlock *m_originalEntryBlock;          // The original entry block of entry point.
 
   // The resource use to lower gl_ClipVertex
   llvm::User *m_clipVertex;          // The global variable of gl_ClipVertex

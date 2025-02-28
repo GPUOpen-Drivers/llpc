@@ -1,3 +1,11 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 ; This test is to check output packing of mesh shader in LDS space. If we treat each location
 ; of a mesh shader output as vec4, the LDS usage will exceed HW limitation. But if we pack
 ; those outputs tightly in LDS space, the LDS usage will be reduced greatly.
@@ -13,8 +21,8 @@
 
 ; SHADERTEST-LABEL: // LLPC mesh shader LDS region info (in dwords) and general info
 
-; SHADERTEST-LABEL: Per-vertex Output                        : offset = 0x0083, size = 0x0C80
-; SHADERTEST-LABEL: Per-primitive Output                     : offset = 0x0D03, size = 0x0100
+; SHADERTEST-LABEL: Vertex Outputs                 : offset = 0x0083, size = 0x0C80
+; SHADERTEST-LABEL: Primitive Outputs              : offset = 0x0D03, size = 0x0100
 
 ; SHADERTEST-LABEL: Vertex Outputs Layout (stride = 25, exports = 25):
 ; SHADERTEST-LABEL: -- location = 0, components = 1, offset = 0
@@ -56,7 +64,7 @@
 #extension GL_EXT_mesh_shader: enable
 #extension GL_EXT_shader_explicit_arithmetic_types: enable
 
-layout(local_size_x=128, local_size_y=1, local_size_z=1) in;
+layout(local_size_x=128, local_size_y=2, local_size_z=1) in;
 layout(points, max_vertices = 128, max_primitives = 128) out;
 
 layout(location = 0) out float vertex[][25];
@@ -69,12 +77,12 @@ void main() {
   SetMeshOutputsEXT(128, 128);
 
   for (int i = 0; i < 25; i++)
-    vertex[gl_LocalInvocationIndex][i] = float(i / 25.0);
+    vertex[gl_LocalInvocationID.x][i] = float(i / 25.0);
 
-  primitive[gl_LocalInvocationIndex][0] = 0.0;
-  primitive[gl_LocalInvocationIndex][1] = 0.5;
+  primitive[gl_LocalInvocationID.x][0] = 0.0;
+  primitive[gl_LocalInvocationID.x][1] = 0.5;
 
-  sharedVar[gl_LocalInvocationIndex] = float(gl_LocalInvocationIndex);
+  sharedVar[gl_LocalInvocationID.x] = float(gl_LocalInvocationID.x);
 }
 
 [MeshInfo]

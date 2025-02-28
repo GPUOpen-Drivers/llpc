@@ -1,0 +1,2 @@
+# RUN: cp -f %S/Inputs/base_test.pipe %t.pipe && %update_llpc_test_checks %t.pipe --check-attributes --generalize-calls
+# RUN: diff -u %t.pipe %S/Inputs/check_attributes.pipe.expected

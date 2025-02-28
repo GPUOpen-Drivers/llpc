@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -29,6 +29,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "DXILEnums.h"
 #include "llvmraytracing/Continuations.h"
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/LgcIlCpsDialect.h"
@@ -50,40 +51,7 @@
 namespace {
 
 using namespace llvm;
-
-/// An enum to simplify fetching the attributes from reportHit operations.
-enum class ReportHitAttributeIndex { THit = 1, HitKind, Attributes, Count = Attributes };
-
-/// An enum to simplify fetching the attributes from callShader operations.
-enum class CallShaderAttributeIndex { ShaderIndex = 1, Param = 2, Count = Param };
-
-/// An enum to simplify fetching the attributes from traceRay operations.
-enum class TraceRayAttributeIndex {
-  AccelStruct = 1,
-  RayFlags,
-  InstanceInclusionMask,
-  RayContributionToHitGroupIndex,
-  MultiplierForGeometryContribution,
-  MissShaderIndex,
-  OriginX,
-  OriginY,
-  OriginZ,
-  TMin,
-  DirX,
-  DirY,
-  DirZ,
-  TMax,
-  Payload,
-  Count = Payload
-};
-
-template <typename T> llvm::Value *getEnumArgOperand(llvm::CallInst &CI, T Index) {
-  static_assert(std::is_enum<T>() && "T must be an enum!");
-
-  llvm::Value *Arg = CI.getArgOperand(static_cast<unsigned>(Index));
-  assert(Arg && "Requested argument should not be nullptr!");
-  return Arg;
-}
+using namespace llvmraytracing;
 
 static void analyzeShaderKinds(Module &M, MapVector<Function *, DXILShaderKind> &ShaderKinds) {
   auto *EntryPoints = M.getNamedMetadata("dx.entryPoints");
@@ -167,33 +135,30 @@ template <typename Op> Value *DXILContLgcRtOpConverterPass::handleSimpleCall(Cal
 
 /// Create a lgc.rt.trace.ray op from a dx.op.traceRay call.
 Value *DXILContLgcRtOpConverterPass::handleTraceRayOp(CallInst &CI) {
-  assert(CI.arg_size() >= static_cast<unsigned>(TraceRayAttributeIndex::Count) && "Invalid argument size!");
+  assert(CI.arg_size() == static_cast<unsigned>(TraceRayArgIndex::Count) && "Invalid argument size!");
 
   Builder->SetInsertPoint(&CI);
 
-  Value *AccelStructHandle = getEnumArgOperand(CI, TraceRayAttributeIndex::AccelStruct);
-  Value *RayFlags = getEnumArgOperand(CI, TraceRayAttributeIndex::RayFlags);
-  Value *InstanceInclusionMask = getEnumArgOperand(CI, TraceRayAttributeIndex::InstanceInclusionMask);
-  Value *RayContributionToHitGroupIndex = getEnumArgOperand(CI, TraceRayAttributeIndex::RayContributionToHitGroupIndex);
-  Value *MultiplierForGeometryContribution =
-      getEnumArgOperand(CI, TraceRayAttributeIndex::MultiplierForGeometryContribution);
-  Value *MissShaderIndex = getEnumArgOperand(CI, TraceRayAttributeIndex::MissShaderIndex);
-  Value *Origin = createVec3(getEnumArgOperand(CI, TraceRayAttributeIndex::OriginX),
-                             getEnumArgOperand(CI, TraceRayAttributeIndex::OriginY),
-                             getEnumArgOperand(CI, TraceRayAttributeIndex::OriginZ));
-  Value *TMin = getEnumArgOperand(CI, TraceRayAttributeIndex::TMin);
-  Value *Dir = createVec3(getEnumArgOperand(CI, TraceRayAttributeIndex::DirX),
-                          getEnumArgOperand(CI, TraceRayAttributeIndex::DirY),
-                          getEnumArgOperand(CI, TraceRayAttributeIndex::DirZ));
-  Value *TMax = getEnumArgOperand(CI, TraceRayAttributeIndex::TMax);
-  Value *Payload = getEnumArgOperand(CI, TraceRayAttributeIndex::Payload);
+  Value *AccelStructHandle = CI.getArgOperand(TraceRayArgIndex::AccelStruct);
+  Value *RayFlags = CI.getArgOperand(TraceRayArgIndex::RayFlags);
+  Value *InstanceInclusionMask = CI.getArgOperand(TraceRayArgIndex::InstanceInclusionMask);
+  Value *RayContributionToHitGroupIndex = CI.getArgOperand(TraceRayArgIndex::RayContributionToHitGroupIndex);
+  Value *MultiplierForGeometryContribution = CI.getArgOperand(TraceRayArgIndex::MultiplierForGeometryContribution);
+  Value *MissShaderIndex = CI.getArgOperand(TraceRayArgIndex::MissShaderIndex);
+  Value *Origin = createVec3(CI.getArgOperand(TraceRayArgIndex::OriginX), CI.getArgOperand(TraceRayArgIndex::OriginY),
+                             CI.getArgOperand(TraceRayArgIndex::OriginZ));
+  Value *TMin = CI.getArgOperand(TraceRayArgIndex::TMin);
+  Value *Dir = createVec3(CI.getArgOperand(TraceRayArgIndex::DirX), CI.getArgOperand(TraceRayArgIndex::DirY),
+                          CI.getArgOperand(TraceRayArgIndex::DirZ));
+  Value *TMax = CI.getArgOperand(TraceRayArgIndex::TMax);
+  Value *Payload = CI.getArgOperand(TraceRayArgIndex::Payload);
 
   Function *AccelStructGetter = getAccelStructAddr(*CI.getModule(), AccelStructHandle->getType());
   Value *AccelStructAddr = Builder->CreateCall(AccelStructGetter, AccelStructHandle);
 
   // TODO: This only creates a Paq array with the size of the payload data for
   // now.
-  Type *PaqTy = getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(TraceRayAttributeIndex::Payload));
+  Type *PaqTy = getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(TraceRayArgIndex::Payload));
   SmallVector<Constant *, 1> PaqArgs;
   if (PaqTy)
     PaqArgs.push_back(ConstantInt::get(Builder->getInt32Ty(), DL->getTypeAllocSize(PaqTy).getKnownMinValue()));
@@ -211,14 +176,14 @@ Value *DXILContLgcRtOpConverterPass::handleTraceRayOp(CallInst &CI) {
 
 /// Create a lgc.rt.report.hit op from a dx.op.reportHit call.
 Value *DXILContLgcRtOpConverterPass::handleReportHitOp(CallInst &CI) {
-  assert(CI.arg_size() >= static_cast<unsigned>(ReportHitAttributeIndex::Count) && "Invalid argument size!");
+  assert(CI.arg_size() == static_cast<unsigned>(ReportHitArgIndex::Count) && "Invalid argument size!");
 
   Builder->SetInsertPoint(&CI);
-  Value *THit = getEnumArgOperand(CI, ReportHitAttributeIndex::THit);
-  Value *HitKind = getEnumArgOperand(CI, ReportHitAttributeIndex::HitKind);
-  Value *Attributes = getEnumArgOperand(CI, ReportHitAttributeIndex::Attributes);
+  Value *THit = CI.getArgOperand(ReportHitArgIndex::THit);
+  Value *HitKind = CI.getArgOperand(ReportHitArgIndex::HitKind);
+  Value *Attributes = CI.getArgOperand(ReportHitArgIndex::Attributes);
   auto AttributeSizeBytes = DL->getTypeAllocSize(
-      getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(ReportHitAttributeIndex::Attributes)));
+      getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(ReportHitArgIndex::Attributes)));
 
   auto *Op = Builder->create<lgc::rt::ReportHitOp>(THit, HitKind, Attributes, AttributeSizeBytes);
 
@@ -229,14 +194,14 @@ Value *DXILContLgcRtOpConverterPass::handleReportHitOp(CallInst &CI) {
 
 /// Create a lgc.rt.call.callable.shader op from a dx.op.callShader call.
 Value *DXILContLgcRtOpConverterPass::handleCallShaderOp(CallInst &CI) {
-  assert(CI.arg_size() >= static_cast<unsigned>(CallShaderAttributeIndex::Count) && "Invalid argument size!");
+  assert(CI.arg_size() == static_cast<unsigned>(CallShaderArgIndex::Count) && "Invalid argument size!");
 
   Builder->SetInsertPoint(&CI);
-  Value *ShaderIndex = getEnumArgOperand(CI, CallShaderAttributeIndex::ShaderIndex);
-  Value *Param = getEnumArgOperand(CI, CallShaderAttributeIndex::Param);
+  Value *ShaderIndex = CI.getArgOperand(CallShaderArgIndex::ShaderIndex);
+  Value *Param = CI.getArgOperand(CallShaderArgIndex::Param);
 
   auto ParamSizeBytes = DL->getTypeAllocSize(
-      getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(CallShaderAttributeIndex::Param)));
+      getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(CallShaderArgIndex::Param)));
 
   auto *Op = Builder->create<lgc::rt::CallCallableShaderOp>(ShaderIndex, Param, ParamSizeBytes.getKnownMinValue());
 

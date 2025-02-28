@@ -104,7 +104,7 @@ PreservedAnalyses AddLoopMetadata::run(Loop &loop, LoopAnalysisManager &analysis
 
   LLVM_DEBUG(dbgs() << "Run the pass Add-Loop-Metadata\n");
 
-  Function *func = loop.getHeader()->getFirstNonPHI()->getFunction();
+  Function *func = loop.getHeader()->getParent();
   PipelineState *mPipelineState = pipelineState;
   m_context = &loop.getHeader()->getContext();
 

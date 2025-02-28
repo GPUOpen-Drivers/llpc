@@ -48,6 +48,7 @@ using namespace llvm;
 using namespace lgc;
 
 constexpr unsigned PrintfBufferBindingId = 6;
+
 namespace lgc {
 
 // =====================================================================================================================
@@ -144,14 +145,29 @@ void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
   m_elfInfos[hashValue].formatString = strDebugStr;
   m_elfInfos[hashValue].bit64Pos = bit64Vector;
 
+  writeToDebugPrintfBuffer(header, debugPrintfBuffer, printArgs, builder);
+}
+
+// =====================================================================================================================
+// Write the variable arguments to debug printf buffer
+// @header : 64 bit header {[0:15], [16:63]} entrySize,hash value for the string
+// @debugPrintfBuffer : debug printf buffer val
+// @varData : the variable arguments need to be written to buffer
+// @builder: builder to generate llvm
+void LowerDebugPrintf::writeToDebugPrintfBuffer(uint64_t header, Value *debugPrintfBuffer,
+                                                SmallVectorImpl<Value *> &varData, BuilderBase &builder) {
   uint32_t loEntryheader = uint32_t(header);
   uint32_t hiEntryheader = uint32_t(header >> 32);
+
+  static const uint32_t EntryHeaderSize = 2; // 2Dword EntrySize + stringId
+  uint32_t entrySize = EntryHeaderSize + varData.size();
 
   // uint64_t offset = AtomicAdd64(offsetPtr, entrySize);
   // maxOffset = 1 << 29; // corresponds to 2GiB
   // offset = offset < maxOffset ? offset : maxOffset;
   Value *entryOffset = builder.CreateAtomicRMW(AtomicRMWInst::Add, debugPrintfBuffer, builder.getInt64(entrySize),
                                                MaybeAlign(8), AtomicOrdering::Monotonic, SyncScope::System);
+
   Value *maxOffset = builder.getInt64(1U << 29);
   entryOffset = builder.CreateBinaryIntrinsic(Intrinsic::umin, entryOffset, maxOffset);
   entryOffset = builder.CreateTrunc(entryOffset, builder.getInt32Ty());
@@ -160,9 +176,9 @@ void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
   entryOffset = builder.CreateAdd(entryOffset, builder.getInt32(4));
 
   SmallVector<Value *> outputVals = {builder.getInt32(loEntryheader), builder.getInt32(hiEntryheader)};
-  outputVals.reserve(printArgs.size() + 2);
+  outputVals.reserve(varData.size() + 2);
   // Prepare the dword sequence of printf output variables
-  for (auto printArg : printArgs)
+  for (auto printArg : varData)
     outputVals.push_back(printArg);
 
   // Write the payload to debug buffer
@@ -254,25 +270,28 @@ void LowerDebugPrintf::setupElfsPrintfStrings() {
   auto printfStrings =
       document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::PrintfStrings].getMap(true);
   printfStrings[".version"] = 1;
-  printfStrings[".user_data_offset"] = m_topNode->offsetInDwords;
+  printfStrings[".user_data_offset"] = m_topNode ? m_topNode->offsetInDwords : 0;
   auto formatStrings = printfStrings[".strings"].getArray(true);
   unsigned i = 0;
   for (auto it = m_elfInfos.begin(); it != m_elfInfos.end(); ++it, ++i) {
     auto arrayElems = formatStrings[i].getMap(true);
     arrayElems[Util::Abi::PipelineMetadataKey::Index] = it->first;
-    arrayElems[Util::Abi::PipelineMetadataKey::String] = it->second.formatString;
-    auto &bitVector = it->second.bit64Pos;
-    unsigned argsCount = bitVector.size();
-    arrayElems[".argument_count"] = argsCount;
-    // Convert bit array to the 64bits array
-    unsigned bit64ArgsCount = (argsCount + 63) / 64;
-    SmallVector<uint64_t> bitInDword64s(bit64ArgsCount, 0);
-    for (unsigned j = 0; j < argsCount; ++j) {
-      bitInDword64s[j / 64] |= (bitVector[j] << (j % 64));
+    {
+      arrayElems[Util::Abi::PipelineMetadataKey::String] = it->second.formatString;
+
+      auto &bitVector = it->second.bit64Pos;
+      unsigned argsCount = bitVector.size();
+      arrayElems[".argument_count"] = argsCount;
+      // Convert bit array to the 64bits array
+      unsigned bit64ArgsCount = (argsCount + 63) / 64;
+      SmallVector<uint64_t> bitInDword64s(bit64ArgsCount, 0);
+      for (unsigned j = 0; j < argsCount; ++j) {
+        bitInDword64s[j / 64] |= (bitVector[j] << (j % 64));
+      }
+      auto bit64Args = arrayElems[".64bit_arguments"].getArray(true);
+      for (unsigned j = 0; j < bit64ArgsCount; ++j)
+        bit64Args[j] = bitInDword64s[j];
     }
-    auto bit64Args = arrayElems[".64bit_arguments"].getArray(true);
-    for (unsigned j = 0; j < bit64ArgsCount; ++j)
-      bit64Args[j] = bitInDword64s[j];
   }
 }
 

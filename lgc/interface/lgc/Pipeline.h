@@ -119,6 +119,13 @@ enum CpsFlag : unsigned {
   CpsFlagStackInGlobalMem = 1 << 0, // Put stack in global memory instead of scratch.
 };
 
+/// Enumerate llvm schedule strategy.
+enum class LlvmScheduleStrategy : unsigned {
+  None = 0,
+  MaxMemoryClause = 1, // Maximize memory clause
+  MaxIlp = 2           // Maximize ILP
+};
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
@@ -129,7 +136,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[50];
+  unsigned u32All[52];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -161,7 +168,7 @@ union Options {
     unsigned reserved0f;                 // Reserved for future functionality
     unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
                                          //  sizeInDwords/stride.
-    unsigned optimizeTessFactor;    // If set, we can determine either send HT_TessFactor message or write to TF buffer
+    unsigned optimizeTessFactor;    // If set, we can determine either send HS_TESSFACTOR message or write to TF buffer
                                     // depending the values of tessellation factors.
     unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
     unsigned pageMigrationEnabled;  // Enable page migration
@@ -195,7 +202,7 @@ union Options {
     bool enableExtendedRobustBufferAccess;         // Enable the extended robust buffer access
     bool sampleMaskExportOverridesAlphaToCoverage; // Whether to use sample mask export overriding alpha to coverage
     bool disableSampleCoverageAdjust;              // Disable the adjustment of sample coverage
-    bool forceFragColorDummyExport;                // Force dummy export is added to fragment shader color export.
+    bool forceNullFsDummyExport;                   // Force dummy export to be added for null fragment shader
     unsigned reserved22;
     bool dynamicTopology;    // Whether primitive topology is dynamic.
     bool robustBufferAccess; // Enable the core robust buffer access
@@ -208,8 +215,9 @@ union Options {
     unsigned reserved24;
     bool checkRawBufferAccessDescStride; // Check descriptor stride to workaround an issue that a strided buffer desc is
                                          // used for a raw buffer access instruction.
-
+    bool padBufferSizeToNextDword;       // Vulkan only, set if the driver rounds the buffer size up the next dword
     unsigned reserved26[2];
+    bool reserved27;
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -230,7 +238,7 @@ struct ColorExportInfo {
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 // The front-end should zero-initialize this with "= {}" in case future changes add new fields.
 union ShaderOptions {
-  unsigned u32All[34];
+  unsigned u32All[36];
   struct {
     uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
     unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
@@ -335,6 +343,9 @@ union ShaderOptions {
 
     /// Force underflow prevention for log and pow
     bool forceUnderflowPrevention;
+
+    /// Choose llvm's instruction scheduling strategy.
+    LlvmScheduleStrategy scheduleStrategy;
   };
 };
 static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));

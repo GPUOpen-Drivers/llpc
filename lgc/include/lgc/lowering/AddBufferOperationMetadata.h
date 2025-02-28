@@ -38,6 +38,8 @@
 
 namespace lgc {
 
+class LoadBufferDescOp;
+class LoadStridedBufferDescOp;
 // =====================================================================================================================
 // Represents the pass of LGC lowering operations for buffer operations
 class AddBufferOperationMetadata : public llvm::PassInfoMixin<AddBufferOperationMetadata> {
@@ -53,9 +55,13 @@ private:
   void visitMemMoveInst(llvm::MemMoveInst &memMoveInst);
   void visitMemSetInst(llvm::MemSetInst &memSetInst);
   bool isAnyBufferPointer(const llvm::Value *const value);
+  void visitLoadBufferDesc(LoadBufferDescOp &op);
+  void visitLoadStridedBufferDesc(LoadStridedBufferDescOp &op);
+  void addLlcMetadata(unsigned set, unsigned binding, llvm::Value *inst);
 
   llvm::LLVMContext *m_context = nullptr; // Associated LLVM context of the LLVM module that passes run on
-  llvm::MDNode *m_temporalHint = nullptr;
+  llvm::MDNode *m_stageMDNode = nullptr;
+  PipelineState *m_pipelineState = nullptr;
 };
 
 } // namespace lgc

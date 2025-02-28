@@ -103,29 +103,85 @@ void LowerPopsInterlock::legalizeInterlock(FunctionAnalysisManager &funcAnalysis
 
   //
   // Legalize begin_interlock by doing two steps:
-  //   1. Find the closest common dominator of all begin_interlocks
+  //   1. Find the nearest common dominator of all begin_interlocks
   //   2. If that is in a cycle, go up the dominator tree until it is not in a cycle.
   //
   assert(!m_beginInterlocks.empty()); // Must have at least one begin_interlock
-  auto nearestDom = m_beginInterlocks.front();
-  for (unsigned i = 1; i < m_beginInterlocks.size(); ++i)
-    nearestDom = domTree.findNearestCommonDominator(nearestDom, m_beginInterlocks[i]);
+  Instruction *nearestDom = nullptr;
+  for (auto beginInterlock : m_beginInterlocks) {
+    // Not initialized yet, take this begin_interlock as the initial value
+    if (!nearestDom) {
+      nearestDom = beginInterlock;
+      continue;
+    }
+
+    nearestDom = domTree.findNearestCommonDominator(nearestDom, beginInterlock);
+  }
 
   if (auto cycle = cycleInfo.getCycle(nearestDom->getParent()))
     nearestDom = cycle->getCyclePredecessor()->getTerminator();
 
-  m_builder->SetInsertPoint(nearestDom);
-  m_builder->create<PopsBeginInterlockOp>();
-
   //
   // Legalize end_interlock by doing two steps:
-  //   1. Find the closest common dominator of all end_interlocks
+  //   1. Find the nearest common post dominator of all end_interlocks
   //   2. If that is in a cycle, go down the dominator tree until it is not in a cycle.
   //
   assert(!m_endInterlocks.empty()); // Must have at least one end_interlock
-  auto nearestPostDom = m_endInterlocks.front();
-  for (unsigned i = 1; i < m_endInterlocks.size(); ++i) {
-    const auto endInterlock = m_endInterlocks[i];
+
+  // NOTE: Here, we first find the return block. This is because we may fail to find the nearest common post dominator
+  // block of two end_interlocks. See such case:
+  //
+  //   entry:
+  //     ...
+  //     begin_interlock
+  //     end_interlock
+  //     ...
+  //     switch i, default [
+  //       0, A
+  //       1, B
+  //     ]
+  //
+  //   A:
+  //     ...
+  //     br C
+  //
+  //   B:
+  //     ...
+  //     br C
+  //
+  //   default:
+  //     unreachable
+  //
+  //   C:
+  //     ...
+  //     begin_interlock
+  //     end_interlock
+  //     ...
+  //
+  // From execution of real shaders, all shader will exit from the sole return block. The unreachable block of the
+  // above case only has IR semantical meaning. Therefore, we can safely exclude those end_interlocks whose parent
+  // blocks are not post dominated by the return block.
+  BasicBlock *returnBlock = nullptr;
+  for (auto &block : *m_entryPoint) {
+    if (isa<ReturnInst>(block.getTerminator())) {
+      returnBlock = &block;
+      break;
+    }
+  }
+  assert(returnBlock); // Must find return block
+
+  Instruction *nearestPostDom = nullptr;
+  for (auto endInterlock : m_endInterlocks) {
+    // Not post dominated by return block, exclude the end_interlock
+    if (!postDomTree.dominates(returnBlock, endInterlock->getParent()))
+      continue;
+
+    // Not initialized yet, take this end_interlock as the initial value
+    if (!nearestPostDom) {
+      nearestPostDom = endInterlock;
+      continue;
+    }
+
     if (endInterlock->getParent() == nearestPostDom->getParent()) {
       // In the same block, maybe update nearest post dominator
       if (nearestPostDom->comesBefore(endInterlock))
@@ -133,6 +189,7 @@ void LowerPopsInterlock::legalizeInterlock(FunctionAnalysisManager &funcAnalysis
     } else {
       auto nearestPostDomBlock =
           postDomTree.findNearestCommonDominator(nearestPostDom->getParent(), endInterlock->getParent());
+      assert(nearestPostDomBlock);
       if (nearestPostDomBlock != nearestPostDom->getParent()) {
         // Block of the nearest post dominator is changed, have to update nearest post dominator
         if (nearestPostDomBlock == endInterlock->getParent()) {
@@ -151,6 +208,13 @@ void LowerPopsInterlock::legalizeInterlock(FunctionAnalysisManager &funcAnalysis
     nearestPostDom = &*succBlocks[0]->getFirstInsertionPt();
   };
 
+  // Insert new begin_interlock after we find the nearest common dominator of all begin_interlocks. Likewise, insert
+  // new end_interlock after we find the nearest common post dominator of all end_interlocks.
+  assert(nearestDom);
+  m_builder->SetInsertPoint(nearestDom);
+  m_builder->create<PopsBeginInterlockOp>();
+
+  assert(nearestPostDom);
   m_builder->SetInsertPoint(nearestPostDom);
   m_builder->create<PopsEndInterlockOp>();
 

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -33,7 +33,7 @@
 
 #include "llvm/ADT/StringRef.h"
 
-namespace CompilerUtils::dxil {
+namespace compilerutils::dxil {
 
 // Try to demangle function names in the DXIL format:
 // ...\01?FuncName@@...
@@ -61,4 +61,4 @@ inline llvm::StringRef tryDemangleFunctionName(llvm::StringRef inputName) {
   return inputName.substr(start, end - start);
 }
 
-} // namespace CompilerUtils::dxil
+} // namespace compilerutils::dxil

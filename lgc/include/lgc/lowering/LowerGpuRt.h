@@ -53,6 +53,7 @@ class GpurtLdsStackStoreOp;
 class GpurtGetBoxSortHeuristicModeOp;
 class GpurtGetRayQueryDispatchIdOp;
 class GpurtGetStaticFlagsOp;
+class GpurtMakePcOp;
 class GpurtGetTriangleCompressionModeOp;
 class GpurtGetFlattenedGroupThreadIdOp;
 class GpurtFloatWithRoundModeOp;
@@ -85,6 +86,7 @@ private:
   void visitGetBoxSortHeuristicMode(lgc::GpurtGetBoxSortHeuristicModeOp &inst);
   void visitGetRayQueryDispatchId(lgc::GpurtGetRayQueryDispatchIdOp &inst);
   void visitGetStaticFlags(lgc::GpurtGetStaticFlagsOp &inst);
+  void visitMakePc(lgc::GpurtMakePcOp &inst);
   void visitGetTriangleCompressionMode(lgc::GpurtGetTriangleCompressionModeOp &inst);
   void visitGetFlattenedGroupThreadId(lgc::GpurtGetFlattenedGroupThreadIdOp &inst);
   void visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst);
