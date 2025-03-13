@@ -63,6 +63,10 @@ class CooperativeMatrixTimesScalarOp;
 class CooperativeMatrixMulAddOp;
 class CooperativeMatrixPackOp;
 class CooperativeMatrixUnPackOp;
+#if LLPC_BUILD_GFX12
+class SparsityIndexLoadOp;
+class SparseCooperativeMatrixMulAddOp;
+#endif
 } // namespace xdl
 
 // =====================================================================================================================
@@ -117,6 +121,15 @@ private:
   ComputeAddressInfo computeAddressing(xdl::CooperativeMatrixLayout layout, xdl::CooperativeMatrixElementType elemType,
                                        int waveSize, llvm::Value *stride, bool isColMajor,
                                        llvm::Instruction *insertPos);
+#if LLPC_BUILD_GFX12
+  llvm::Value *computeLoadtrBaseAddressing(xdl::CooperativeMatrixLayout layout,
+                                           xdl::CooperativeMatrixElementType elemType, int waveSize,
+                                           llvm::Value *stride, llvm::Instruction *insertPos);
+  llvm::Value *getLoadTrIntrinsic(llvm::Value *dataptr, xdl::CooperativeMatrixLayout layout,
+                                  xdl::CooperativeMatrixElementType elemType, int numElements, bool isColMajor,
+                                  int waveSize, llvm::Value *stride, const llvm::Twine &instName,
+                                  llvm::Instruction *insertPos);
+#endif
 
   void visitCooperativeMatrixLengthOp(xdl::CooperativeMatrixLengthOp &matrixlength);
   void visitCooperativeMatrixLoadOp(xdl::CooperativeMatrixLoadOp &load);
@@ -226,12 +239,22 @@ private:
   llvm::Value *createDotProductInt(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator, unsigned flags,
                                    bool isSat, const llvm::Twine &instName, llvm::Instruction *insertPos);
 
+#if LLPC_BUILD_GFX12
+  void visitSparsityIndexLoadOp(xdl::SparsityIndexLoadOp &sparsityIndexload);
+  void visitSparseCooperativeMatrixMulAddOp(xdl::SparseCooperativeMatrixMulAddOp &sparseMatrixMulAdd);
+#endif
+
   llvm::Value *getLaneNumber(BuilderBase &builder);
 
   // Cooperative row acc operations.
   // Cooperative row acc data have two state: accumulate mode and finalize mode.
   // accumulate mode is matching the hardware accumulate matrix which benefit for accumulate operate.
   // finalize mode is general layout which benefit for load/store/splat operate.
+#if LLPC_BUILD_GFX12
+  // For gfx12 row acc layout:
+  // - finalize_lane[0:15] = accumulate_lane[0:15] + accumulate_lane[16:31]
+  // - finalize_lane[16:31] = finalize_lane[0:15]
+#endif
 
   // load the row acc from memory. The return row acc data is in finalize mode.
   void visitCooperativeRowAccLoadOp(xdl::CooperativeRowAccLoadOp &load);

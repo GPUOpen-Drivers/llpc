@@ -265,6 +265,12 @@ Options PipelineContext::computePipelineOptions() const {
   options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
+#if LLPC_BUILD_GFX12
+  options.cacheScopePolicyControl = getPipelineOptions()->cacheScopePolicyControl;
+  options.temporalHintControl = getPipelineOptions()->temporalHintControl;
+  options.disableDynamicVgpr = true;
+#endif
+
   options.threadGroupSwizzleMode =
       static_cast<lgc::ThreadGroupSwizzleMode>(getPipelineOptions()->threadGroupSwizzleMode);
 
@@ -308,6 +314,9 @@ Options PipelineContext::computePipelineOptions() const {
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
+#if LLPC_BUILD_GFX12
+  options.expertSchedulingMode = getPipelineOptions()->expertSchedulingMode;
+#endif
   options.optimizePointSizeWrite = getPipelineOptions()->optimizePointSizeWrite;
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
@@ -710,6 +719,9 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
 
   shaderOptions.waveSize = shaderInfo.options.waveSize;
   shaderOptions.wgpMode = shaderInfo.options.wgpMode;
+#if LLPC_BUILD_GFX12
+  shaderOptions.temporalHintShaderControl = shaderInfo.options.temporalHintShaderControl;
+#endif
   // If subgroupSize is specified, we should use the specified value.
   if (shaderInfo.options.subgroupSize != 0)
     shaderOptions.subgroupSize = shaderInfo.options.subgroupSize;
@@ -803,6 +815,9 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
                 "Mismatch");
   shaderOptions.aggressiveInvariantLoads =
       static_cast<InvariantLoadsOption>(shaderInfo.options.aggressiveInvariantLoads);
+#if LLPC_BUILD_GFX12
+  shaderOptions.workgroupRoundRobin = shaderInfo.options.workgroupRoundRobin;
+#endif
   shaderOptions.viewIndexFromDeviceIndex = shaderInfo.options.viewIndexFromDeviceIndex;
 
   shaderOptions.forceUnderflowPrevention = shaderInfo.options.forceUnderflowPrevention;

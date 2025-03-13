@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -38,6 +38,17 @@
 using namespace Vkgc;
 
 RtIpVersion gpurt::getRtIpVersion(GfxIpVersion gfxIpVersion) {
+#if LLPC_BUILD_GFX12
+  if (gfxIpVersion.major >= 12) {
+#if GPURT_BUILD_RTIP3_1
+    return {3, 1};
+#elif GPURT_BUILD_RTIP3
+    return {3, 0};
+#else
+    return {0, 0};
+#endif
+  }
+#endif
   if (gfxIpVersion.major >= 11)
     return {2, 0};
   if (gfxIpVersion >= GfxIpVersion{10, 3})
@@ -52,6 +63,10 @@ static Pal::RayTracingIpLevel getRtIpLevel(RtIpVersion rtIpVersion) {
       {{1, 0}, Pal::RayTracingIpLevel::RtIp1_0},
       {{1, 1}, Pal::RayTracingIpLevel::RtIp1_0},
       {{2, 0}, Pal::RayTracingIpLevel::RtIp2_0},
+#if LLPC_BUILD_GFX12
+    {{3, 0}, Pal::RayTracingIpLevel::RtIp3_0},
+    {{3, 1}, Pal::RayTracingIpLevel::RtIp3_1},
+#endif
   };
   // clang-format on
 
@@ -95,7 +110,15 @@ void gpurt::getFuncTable(RtIpVersion rtIpVersion, GpurtFuncTable &table) {
 
   Pal::RayTracingIpLevel rtIpLevel = getRtIpLevel(rtIpVersion);
   GpuRt::EntryFunctionTable gpurtTable;
+#if LLPC_BUILD_GFX12
+#if GPURT_BUILD_RTIP3
+  GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, true, &gpurtTable);
+#else
   GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, &gpurtTable);
+#endif
+#else
+  GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, &gpurtTable);
+#endif
 
   unmangleDxilName(table.pFunc[RT_ENTRY_TRACE_RAY], gpurtTable.traceRay.pTraceRay);
   unmangleDxilName(table.pFunc[RT_ENTRY_TRACE_RAY_INLINE], gpurtTable.rayQuery.pTraceRayInline);

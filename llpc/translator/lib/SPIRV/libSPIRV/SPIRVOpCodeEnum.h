@@ -339,6 +339,8 @@ _SPIRV_OP(CooperativeMatrixLoadKHR, 4457)
 _SPIRV_OP(CooperativeMatrixStoreKHR, 4458)
 _SPIRV_OP(CooperativeMatrixMulAddKHR, 4459)
 _SPIRV_OP(CooperativeMatrixLengthKHR, 4460)
+#if LLPC_BUILD_GFX12
+#endif
 _SPIRV_OP(BeginInvocationInterlockEXT, 5364)
 _SPIRV_OP(EndInvocationInterlockEXT, 5365)
 _SPIRV_OP(DemoteToHelperInvocationEXT, 5380)

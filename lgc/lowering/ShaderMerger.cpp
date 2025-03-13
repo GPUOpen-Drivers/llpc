@@ -272,6 +272,9 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   // LS VGPRs
   argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
   if (m_gfxIp.major <= 11) {
+#if LLPC_BUILD_GFX12
+    // NOTE: GFX12 removes those two LS VGPRs.
+#endif
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Unused
   }
@@ -407,7 +410,16 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     relVertexId = vgprArgs[3];
     instanceId = vgprArgs[5];
   } else {
+#if LLPC_BUILD_GFX12
+    Value *waveIdInGroup = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::waveIdInGroup));
+    waveIdInGroup = builder.CreateAnd(waveIdInGroup, 0x1F, "waveIdInGroup"); // waveIdInGroup = [4:0]
+
+    relVertexId = builder.CreateMul(builder.getInt32(waveSize), waveIdInGroup);
+    relVertexId = builder.CreateAdd(relVertexId, threadIdInWave);
+    instanceId = vgprArgs[3];
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   // Vertex fetch VGPRs
@@ -1426,6 +1438,14 @@ void ShaderMerger::writeValueToLds(Value *writeValue, Value *ldsOffset, IRBuilde
 //
 // @param builder : IR builder to insert instructions
 void ShaderMerger::createBarrier(IRBuilder<> &builder) {
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, builder.getInt32(WorkgroupNormalBarrierId));
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
+                            builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
+    return;
+  }
+#endif
 
   builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }

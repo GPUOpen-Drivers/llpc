@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -169,6 +169,12 @@ bool RayTracingContext::isContinuationsMode() const {
   // Continuations mode is only enabled for indirect mode.
   if (getIndirectStageMask() != 0) {
     if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Auto) {
+#if LLPC_BUILD_GFX12
+      if (getGfxIpVersion().major >= 12) {
+        // For GFX12+, enable continuations mode by default.
+        isContinuations = true;
+      }
+#endif
     } else if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
       // Client require continuations mode explicitly.
       isContinuations = true;
@@ -311,6 +317,11 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
     options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
 
   options.cpsFlags = m_pipelineInfo->cpsFlags;
+
+#if LLPC_BUILD_GFX12
+  options.disableDynamicVgpr = m_pipelineInfo->disableDynamicVgpr;
+  options.dynamicVgprBlockSize = m_pipelineInfo->dynamicVgprBlockSize;
+#endif
 
 #endif
 

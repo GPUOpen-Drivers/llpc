@@ -1065,6 +1065,31 @@ const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType n
   return nullptr;
 }
 
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Get the temporal hint.
+//
+// @param th : origin temporal hint, if it is not tuning, result is the same as th.
+// @param opType : Operation type
+// @para stage : Shader stage
+unsigned PipelineState::getTemporalHint(unsigned th, TemporalHintOpType opType, ShaderStageEnum stage) {
+  if (stage != ShaderStageEnum::Invalid) {
+    // per-shader settings
+    unsigned temporalhint = getShaderOptions(stage).temporalHintShaderControl >> opType & 0xF;
+    if (temporalhint >= 8) {
+      return (temporalhint - 8);
+    }
+  }
+
+  // global settings
+  unsigned temporalhint = m_options.temporalHintControl >> opType & 0xF;
+  if (temporalhint >= 8) {
+    return (temporalhint - 8);
+  }
+  return th;
+}
+#endif
+
 // =====================================================================================================================
 // Get the cached MDString for the name of a resource mapping node type, as used in IR metadata for user data nodes.
 //
@@ -1744,6 +1769,9 @@ bool PipelineState::exportAttributeByExportInstruction() const {
   case 10:
     return true; // Always use parameter export instruction
   case 11:
+#if LLPC_BUILD_GFX12
+  case 12:
+#endif
     return false; // Always use attribute-through-memory (ATM)
   default:
     llvm_unreachable("Unexpected GFX generation!");

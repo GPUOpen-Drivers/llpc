@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -59,6 +59,11 @@ struct RayTracingLibrarySummary {
   // The maximum hit attribute size in bytes used by any shader in the pipeline. Must be 0 if the library never uses hit
   // attributes (no AHS/IS/CHS).
   unsigned maxHitAttributeSize = 0;
+
+#if LLPC_BUILD_GFX12
+  // The maximum outgoing VGPR count for dynamic VGPRs.
+  unsigned maxOutgoingVgprCount = 0;
+#endif
 
   // Whether a kernel entry function was built for this library.
   bool hasKernelEntry = false;

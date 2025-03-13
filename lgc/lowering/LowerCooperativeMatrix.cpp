@@ -86,6 +86,10 @@ const auto FLOAT32 = CooperativeMatrixElementType::Float32;
 const auto INT8 = CooperativeMatrixElementType::Int8;
 const auto INT32 = CooperativeMatrixElementType::Int32;
 const auto BFLOAT16 = CooperativeMatrixElementType::BFloat16;
+#if LLPC_BUILD_GFX12
+const auto FLOAT8 = CooperativeMatrixElementType::Float8;
+const auto BFLOAT8 = CooperativeMatrixElementType::BFloat8;
+#endif
 const auto INT4 = CooperativeMatrixElementType::Int4;
 
 static const std::map<Properties, Intrinsic::AMDGCNIntrinsics> WmmaIntrinsicTable = {
@@ -100,7 +104,36 @@ static const std::map<Properties, Intrinsic::AMDGCNIntrinsics> WmmaIntrinsicTabl
     {Properties(INT8, INT8, INT32, INT32, 1, 0), Intrinsic::amdgcn_wmma_i32_16x16x16_iu8},
 
     {Properties(INT4, INT4, INT32, INT32, 1, 0), Intrinsic::amdgcn_wmma_i32_16x16x16_iu4},
+#if LLPC_BUILD_GFX12
+    {Properties(INT4, INT4, INT32, INT32, 2, 0), Intrinsic::amdgcn_wmma_i32_16x16x32_iu4},
+
+    {Properties(FLOAT8, FLOAT8, FLOAT32, FLOAT32, 1, 0), Intrinsic::amdgcn_wmma_f32_16x16x16_fp8_fp8},
+    {Properties(FLOAT8, BFLOAT8, FLOAT32, FLOAT32, 1, 0), Intrinsic::amdgcn_wmma_f32_16x16x16_fp8_bf8},
+    {Properties(BFLOAT8, FLOAT8, FLOAT32, FLOAT32, 1, 0), Intrinsic::amdgcn_wmma_f32_16x16x16_bf8_fp8},
+    {Properties(BFLOAT8, BFLOAT8, FLOAT32, FLOAT32, 1, 0), Intrinsic::amdgcn_wmma_f32_16x16x16_bf8_bf8},
+
+#endif
 };
+
+#if LLPC_BUILD_GFX12
+static const std::map<Properties, Intrinsic::AMDGCNIntrinsics> SWmmaIntrinsicTable_gfx12 = {
+    {Properties(FLOAT16, FLOAT16, FLOAT16, FLOAT16, 1), Intrinsic::amdgcn_swmmac_f16_16x16x32_f16},
+    {Properties(FLOAT16, FLOAT16, FLOAT32, FLOAT32, 1), Intrinsic::amdgcn_swmmac_f32_16x16x32_f16},
+
+    {Properties(BFLOAT16, BFLOAT16, BFLOAT16, BFLOAT16, 1), Intrinsic::amdgcn_swmmac_bf16_16x16x32_bf16},
+    {Properties(BFLOAT16, BFLOAT16, FLOAT32, FLOAT32, 1), Intrinsic::amdgcn_swmmac_f32_16x16x32_bf16},
+
+    {Properties(INT8, INT8, INT32, INT32, 1), Intrinsic::amdgcn_swmmac_i32_16x16x32_iu8},
+
+    {Properties(INT4, INT4, INT32, INT32, 1), Intrinsic::amdgcn_swmmac_i32_16x16x32_iu4},
+    {Properties(INT4, INT4, INT32, INT32, 2), Intrinsic::amdgcn_swmmac_i32_16x16x64_iu4},
+
+    {Properties(FLOAT8, FLOAT8, FLOAT32, FLOAT32, 1), Intrinsic::amdgcn_swmmac_f32_16x16x32_fp8_fp8},
+    {Properties(FLOAT8, BFLOAT8, FLOAT32, FLOAT32, 1), Intrinsic::amdgcn_swmmac_f32_16x16x32_fp8_bf8},
+    {Properties(BFLOAT8, FLOAT8, FLOAT32, FLOAT32, 1), Intrinsic::amdgcn_swmmac_f32_16x16x32_bf8_fp8},
+    {Properties(BFLOAT8, BFLOAT8, FLOAT32, FLOAT32, 1), Intrinsic::amdgcn_swmmac_f32_16x16x32_bf8_bf8},
+};
+#endif
 
 static Intrinsic::AMDGCNIntrinsics
 GetWmmaIntrinsicID(const std::map<Properties, Intrinsic::AMDGCNIntrinsics> &intrinsicTable,
@@ -159,6 +192,10 @@ void LowerCooperativeMatrix::processCoopMatrixFunction(Module &module) {
                             .add(&LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp)
                             .add(&LowerCooperativeMatrix::visitCooperativeMatrixPackOp)
                             .add(&LowerCooperativeMatrix::visitCooperativeMatrixUnPackOp)
+#if LLPC_BUILD_GFX12
+                            .add(&LowerCooperativeMatrix::visitSparsityIndexLoadOp)
+                            .add(&LowerCooperativeMatrix::visitSparseCooperativeMatrixMulAddOp)
+#endif
                             .build();
 
   visitor.visit(*this, module);
@@ -227,7 +264,43 @@ LowerCooperativeMatrix::TypeProperties LowerCooperativeMatrix::getTypeProperties
   } else if (layout == CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout ||
              layout == CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout) {
     props.numFlatElements = 8;
-  } else {
+  }
+#if LLPC_BUILD_GFX12
+  else if (layout == CooperativeMatrixLayout::Gfx12BaseLayout) {
+    props.numFlatElements = waveSize == 32 ? 8 : 4;
+    props.numMatrixElements = 8;
+    if (isTypeNCooperativeMatrix(elemType, 4)) {
+      props.numFlatElements = 4;
+      props.numMatrixElements = 4;
+      props.numMatrixWords = 1;
+    } else if (isTypeNCooperativeMatrix(elemType, 8)) {
+      props.numMatrixWords = 2;
+    } else if (isTypeNCooperativeMatrix(elemType, 16)) {
+      props.numMatrixWords = 4;
+    } else {
+      props.numMatrixWords = 8;
+    }
+  } else if (layout == CooperativeMatrixLayout::Gfx12SwizzledKX16Layout) {
+    if (isTypeNCooperativeMatrix(elemType, 16)) {
+      props.numFlatElements = waveSize == 32 ? 16 : 8;
+      props.numMatrixElements = 16;
+      props.numMatrixWords = 8;
+    } else if (isTypeNCooperativeMatrix(elemType, 8)) {
+      props.numFlatElements = waveSize == 32 ? 16 : 8;
+      props.numMatrixElements = 16;
+      props.numMatrixWords = 4;
+    } else if (isTypeNCooperativeMatrix(elemType, 4)) {
+      assert(kSize >= 32);
+      const unsigned kMultiplier = kSize / 32;
+      props.numFlatElements = (waveSize == 32 ? 8 : 4) * kMultiplier;
+      props.numMatrixElements = 8 * kMultiplier;
+      props.numMatrixWords = 2 * kMultiplier;
+    } else {
+      llvm_unreachable("not implemented!");
+    }
+  }
+#endif
+  else {
     llvm_unreachable("Unsupported layout!");
   }
 
@@ -330,7 +403,52 @@ LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, Cooper
     rowOffsetInFirstVgpr = builder.CreateSelect(evenGroup, builder.getInt32(0), builder.getInt32(2));
     addrInfo.macroStep = builder.getInt32(4);
     addrInfo.microStep = builder.getInt32(1);
-  } else {
+  }
+#if LLPC_BUILD_GFX12
+  else if (layout == CooperativeMatrixLayout::Gfx12BaseLayout) {
+    Value *baseIn32lane = builder.CreateMul(builder.CreateUDiv(threadId, builder.getInt32(32)), builder.getInt32(4));
+
+    if (!(isTypeNCooperativeMatrix(elemType, 16) || isTypeNCooperativeMatrix(elemType, 8)) ||
+        isTypeNCooperativeMatrix(elemType, 4)) {
+      unsigned baseStride = 4;
+      unsigned rowOffsetStride = 8;
+      if (isTypeNCooperativeMatrix(elemType, 4) && isColMajor) {
+        baseStride = 2;
+        rowOffsetStride = 4;
+      }
+      // NOTE: A/B with int4 from first subv only in wave 64 mode
+      unsigned divisor = isTypeNCooperativeMatrix(elemType, 4) ? 64 : 32;
+
+      Value *baseIn32lane =
+          builder.CreateMul(builder.CreateUDiv(threadId, builder.getInt32(divisor)), builder.getInt32(baseStride));
+      Value *laneGroupIdx = builder.CreateUDiv(threadId, builder.getInt32(16));
+      Value *evenGroup =
+          builder.CreateICmpEQ(builder.CreateAnd(laneGroupIdx, builder.getInt32(1)), builder.getInt32(0));
+      rowOffsetInFirstVgpr = builder.CreateSelect(evenGroup, baseIn32lane,
+                                                  builder.CreateAdd(baseIn32lane, builder.getInt32(rowOffsetStride)));
+    } else {
+      Value *offsetIn32lane =
+          builder.CreateUDiv(builder.CreateSRem(threadId, builder.getInt32(32)), builder.getInt32(16));
+      offsetIn32lane = builder.CreateMul(offsetIn32lane, builder.getInt32(8));
+      rowOffsetInFirstVgpr = builder.CreateAdd(baseIn32lane, offsetIn32lane);
+    }
+    addrInfo.macroStep = builder.getInt32(1);
+  } else if (layout == CooperativeMatrixLayout::Gfx12SwizzledKX16Layout) {
+    unsigned rowOffsetStride = 8;  // 32 elements are divided into 4 groups
+    unsigned macroStepStride = 16; // The first group is not next to the second group
+    if (isColMajor && isTypeNCooperativeMatrix(elemType, 4)) {
+      // i4vec2 is occupied a byte so the stride is cut in half for continuous accessing in memory
+      rowOffsetStride = 4;
+      macroStepStride = 8;
+    }
+    rowOffsetInFirstVgpr =
+        builder.CreateMul(builder.CreateUDiv(threadId, builder.getInt32(16)), builder.getInt32(rowOffsetStride));
+    addrInfo.macroStep = (waveSize == 64 ? builder.getInt32(1) : builder.getInt32(macroStepStride));
+    addrInfo.microStep = (waveSize == 64 ? builder.getInt32(0) : builder.getInt32(1));
+    addrInfo.microCount = (waveSize == 64 ? 1 : rowOffsetStride);
+  }
+#endif
+  else {
     llvm_unreachable("This layout is not supported now.");
   }
 
@@ -361,6 +479,139 @@ LowerCooperativeMatrix::computeAddressing(CooperativeMatrixLayout layout, Cooper
   return addrInfo;
 }
 
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Load contiguous elements from the specified location of the memory.
+// @param layout : This is identify for factor(A/B) or accumulator(C) for 16 bit element matrix.
+// @param elemType : The element type for the matrix.
+// @param waveSize : Identify it's in wave32 or wave64.
+// @param stride : The stride in bytes in memory between the first elements of consecutive rows (orcolumns) in the
+// source data. Guaranteed to be a multiple of the matrix element size.
+// @param insertPos : Where to insert the instruction
+Value *LowerCooperativeMatrix::computeLoadtrBaseAddressing(CooperativeMatrixLayout layout,
+                                                           CooperativeMatrixElementType elemType, int waveSize,
+                                                           Value *stride, Instruction *insertPos) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+  Value *threadId = getLaneNumber(builder);
+  Value *rowOffsetPerLane = nullptr;
+  Value *colOffsetPerLane = nullptr;
+  Value *base = nullptr;
+  (void)elemType;
+  assert(waveSize == 32 || waveSize == 64);
+
+  if (layout == CooperativeMatrixLayout::Gfx12BaseLayout) {
+    if (isTypeNCooperativeMatrix(elemType, 16)) {
+      Value *rowOffsetAddEight = waveSize == 32
+                                     ? builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt32Ty(),
+                                                               builder.getInt32(0xffff0000))
+                                     : builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(),
+                                                               builder.getInt64(0xffff0000ffff0000));
+      Value *macroRowOffset = builder.CreateSelect(rowOffsetAddEight, builder.getInt32(8), builder.getInt32(0));
+      Value *microRowOffset = builder.CreateSRem(threadId, builder.getInt32(8));
+      rowOffsetPerLane = builder.CreateAdd(macroRowOffset, microRowOffset);
+
+      Value *colOffsetAddEight = waveSize == 32
+                                     ? builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt32Ty(),
+                                                               builder.getInt32(0xff00ff00))
+                                     : builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(),
+                                                               builder.getInt64(0xff00ff00ff00ff00));
+      colOffsetPerLane = builder.CreateSelect(colOffsetAddEight, builder.getInt32(8), builder.getInt32(0));
+
+    } else if (isTypeNCooperativeMatrix(elemType, 8)) {
+      Value *rowOffsetAddEight = waveSize == 32
+                                     ? builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt32Ty(),
+                                                               builder.getInt32(0xffff0000))
+                                     : builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(),
+                                                               builder.getInt64(0xffff0000ffff0000));
+      Value *rowOffsetAddFour = waveSize == 32
+                                    ? builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt32Ty(),
+                                                              builder.getInt32(0xff00ff00))
+                                    : builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(),
+                                                              builder.getInt64(0xff00ff00ff00ff00));
+      Value *macroRowOffset = builder.CreateSelect(rowOffsetAddEight, builder.getInt32(8), builder.getInt32(0));
+      Value *subMacroRowOffset = builder.CreateSelect(rowOffsetAddFour, builder.getInt32(4), builder.getInt32(0));
+      Value *microRowOffset = builder.CreateSRem(threadId, builder.getInt32(4));
+      rowOffsetPerLane = builder.CreateAdd(macroRowOffset, subMacroRowOffset);
+      rowOffsetPerLane = builder.CreateAdd(rowOffsetPerLane, microRowOffset);
+
+      Value *colOffsetAddEight = waveSize == 32
+                                     ? builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt32Ty(),
+                                                               builder.getInt32(0xf0f0f0f0))
+                                     : builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(),
+                                                               builder.getInt64(0xf0f0f0f0f0f0f0f0));
+      colOffsetPerLane = builder.CreateSelect(colOffsetAddEight, builder.getInt32(8), builder.getInt32(0));
+    }
+  } else {
+    llvm_unreachable("This layout is not supported now.");
+  }
+
+  // RowMajor for MatrixB
+  base = builder.CreateAdd(builder.CreateMul(rowOffsetPerLane, stride), colOffsetPerLane);
+  return base;
+}
+
+// =====================================================================================================================
+// Get the global_load_tr intrinsic to load the element if it's supported on hw
+// @param dataPtr : The pointer to a data array.
+// @param layout : This is identify for factor(A/B) or accumulator(C) for 16 bit element matrix.
+// @param elemType : The element type for the matrix.
+// @param numElements: The element number in one lane.
+// @param isColMajor : Identify the order for the data stored in memory, col-major/row-major
+// @param waveSize : Identify it's in wave32 or wave64.
+// @param instName : Name to give instruction(s).
+// @param insertPos : Where to insert the instruction
+Value *LowerCooperativeMatrix::getLoadTrIntrinsic(Value *dataPtr, CooperativeMatrixLayout layout,
+                                                  CooperativeMatrixElementType elemType, int numElements,
+                                                  bool isColMajor, int waveSize, Value *stride, const Twine &instName,
+                                                  Instruction *insertPos) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  bool canUserLoadTr =
+      m_gfxIp.major >= 12 && (isTypeNCooperativeMatrix(elemType, 16) || isTypeNCooperativeMatrix(elemType, 8));
+
+  if (!canUserLoadTr)
+    return nullptr;
+
+  // global_load_tr instrinsc are only used on Gfx12BaseLayout
+  // The basePtr for the instruction will be recalculated basing on GFX12_WMMA_Matrix_load document.
+  if (layout == CooperativeMatrixLayout::Gfx12BaseLayout) {
+    Type *trloadType = nullptr;
+    Value *trMatrix = nullptr;
+    Type *castType = nullptr;
+    Value *elementOffset = computeLoadtrBaseAddressing(layout, elemType, waveSize, stride, insertPos);
+    Value *elePtr = builder.CreateGEP(transCooperativeMatrixElementType(builder, elemType), dataPtr, elementOffset);
+    switch (elemType) {
+    case CooperativeMatrixElementType::Float16:
+    case CooperativeMatrixElementType::BFloat16:
+    case CooperativeMatrixElementType::Int16:
+      castType = FixedVectorType::get(transCooperativeMatrixElementType(builder, elemType), numElements);
+      trloadType = FixedVectorType::get(builder.getInt16Ty(), numElements);
+      trMatrix =
+          builder.CreateIntrinsic(trloadType, Intrinsic::amdgcn_global_load_tr_b128, {elePtr}, nullptr, instName);
+      return builder.CreateBitCast(trMatrix, castType);
+    case CooperativeMatrixElementType::Int8:
+    case CooperativeMatrixElementType::Float8:
+    case CooperativeMatrixElementType::BFloat8:
+    case CooperativeMatrixElementType::Int4:
+      // Use <2 x i32>(or i32) @llvm.amdgcn.global.load.tr for load_tr then bitcase from i32 to i8
+      if (waveSize == 32 && !isTypeNCooperativeMatrix(elemType, 4)) {
+        trloadType = FixedVectorType::get(builder.getInt32Ty(), numElements / 4);
+      } else {
+        trloadType = builder.getInt32Ty();
+      }
+      trMatrix = builder.CreateIntrinsic(trloadType, Intrinsic::amdgcn_global_load_tr_b64, {elePtr}, nullptr, instName);
+      castType = FixedVectorType::get(transCooperativeMatrixElementType(builder, elemType), numElements);
+      return builder.CreateBitCast(trMatrix, castType);
+    default:
+      // Global_load_tr intrinsic is only used for 8bit/16bit elements loading
+      return nullptr;
+    }
+  }
+  return nullptr;
+}
+#endif
 // =====================================================================================================================
 // Visit "CooperativeMatrixLengthOp" instruction
 //
@@ -385,6 +636,15 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLengthOp(CooperativeMatrixLen
   case CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout:
     length = 8;
     break;
+#if LLPC_BUILD_GFX12
+  case CooperativeMatrixLayout::Gfx12BaseLayout:
+    length = (waveSize == 32) ? 8 : 4;
+    break;
+  case CooperativeMatrixLayout::Gfx12SwizzledKX16Layout:
+    length = (waveSize == 32) ? 16 : 8;
+    length *= kSize / 32;
+    break;
+#endif
   default:
     llvm_unreachable("unhandled matrix layout");
   }
@@ -429,6 +689,22 @@ void LowerCooperativeMatrix::visitCooperativeMatrixLoadOp(CooperativeMatrixLoadO
   bool isTemporal = memoryAccess & (unsigned)(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
 
   auto props = getTypeProperties(elemType, layout, kSize);
+
+#ifdef LLPC_BUILD_GFX12
+  if ((m_gfxIp.major >= 12) && (addrSpace == ADDR_SPACE_GLOBAL)) {
+    // Global_load_tr can only be used for row_major@B and col_major@A under global_address_space
+    if (!isColMajor) {
+      Value *trLoadInst = getLoadTrIntrinsic(dataPtr, layout, elemType, props.numFlatElements, isColMajor, waveSize,
+                                             stride, load.getName(), &load);
+      if (trLoadInst) {
+        Value *coMatrix = convFlatVecToCoopMatrixVec(builder, trLoadInst, elemType, layout, kSize);
+        m_coopMatrixCalls.push_back(&load);
+        load.replaceAllUsesWith(coMatrix);
+        return;
+      }
+    }
+  }
+#endif
 
   bool isLoadingPackedVal = !isColMajor && elemType == CooperativeMatrixElementType::Int4;
   auto addrInfo = computeAddressing(layout, elemType, waveSize, stride, isColMajor, &load);
@@ -700,10 +976,58 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
   Type *dstType = nullptr;
   if (dstElemType == CooperativeMatrixElementType::BFloat16)
     dstType = FixedVectorType::get(builder.getBFloatTy(), vecSize);
+#if LLPC_BUILD_GFX12
+  else if (dstElemType == CooperativeMatrixElementType::BFloat8 ||
+           dstElemType == CooperativeMatrixElementType::Float8) {
+    dstType = FixedVectorType::get(builder.getFloatTy(), vecSize);
+
+    // Dest type is float32, if it is the conversion between floats, FPTrunc needs to be changed to FPExt.
+    if (castOp == Instruction::Instruction::FPTrunc) {
+      castOp = Instruction::Instruction::FPExt;
+    }
+  }
+#endif
   else
     dstType = FixedVectorType::get(transCooperativeMatrixElementType(builder, dstElemType), vecSize);
 
-  if (srcElemType == CooperativeMatrixElementType::BFloat16) {
+#if LLPC_BUILD_GFX12
+  if (srcElemType == CooperativeMatrixElementType::Float8 || srcElemType == CooperativeMatrixElementType::BFloat8) {
+    assert(m_gfxIp.major >= 12 && "bf8/fp8 is only supported on gfx12+");
+    // If the source is bf8/fp8, convert it float32 first, then convert dest type.
+
+    // Use amd intrinsic convert
+    // llvm.amdgcn.cvt.pk.f32.bf8
+    // llvm.amdgcn.cvt.pk.f32.fp8
+    const Intrinsic::AMDGCNIntrinsics toF32Intrinsic = (srcElemType == CooperativeMatrixElementType::BFloat8)
+                                                           ? Intrinsic::amdgcn_cvt_pk_f32_bf8
+                                                           : Intrinsic::amdgcn_cvt_pk_f32_fp8;
+
+    assert(vecSize == 8);
+    source = builder.CreateBitCast(source, FixedVectorType::get(builder.getInt32Ty(), 2));
+
+    Type *retTy = FixedVectorType::get(builder.getFloatTy(), 2);
+
+    // Convert the first four elements
+    auto element = builder.CreateExtractElement(source, uint64_t(0));
+    auto elementWord0 = builder.CreateIntrinsic(retTy, toF32Intrinsic, {element, builder.getFalse()});
+    auto elementWord1 = builder.CreateIntrinsic(retTy, toF32Intrinsic, {element, builder.getTrue()});
+    auto element0 = builder.CreateShuffleVector(elementWord0, elementWord1, {0, 1, 2, 3});
+
+    // Convert the last four elements
+    element = builder.CreateExtractElement(source, 1);
+    elementWord0 = builder.CreateIntrinsic(retTy, toF32Intrinsic, {element, builder.getFalse()});
+    elementWord1 = builder.CreateIntrinsic(retTy, toF32Intrinsic, {element, builder.getTrue()});
+    auto element1 = builder.CreateShuffleVector(elementWord0, elementWord1, {0, 1, 2, 3});
+
+    source = builder.CreateShuffleVector(element0, element1, {0, 1, 2, 3, 4, 5, 6, 7});
+
+    // Source is converted to float32, FPExt needs to be changed to FPTrunc.
+    if (castOp == Instruction::Instruction::FPExt) {
+      castOp = Instruction::Instruction::FPTrunc;
+    }
+  } else
+#endif
+      if (srcElemType == CooperativeMatrixElementType::BFloat16) {
     assert(source->getType()->isIntOrIntVectorTy());
     auto *bfloat16Vec = FixedVectorType::get(builder.getBFloatTy(), vecSize);
     source = builder.CreateBitCast(source, bfloat16Vec);
@@ -798,6 +1122,37 @@ Value *LowerCooperativeMatrix::cooperativeMatrixConvertInternal(CastInst::CastOp
     return builder.CreateBitCast(resultValue, FixedVectorType::get(builder.getInt16Ty(), vecSize));
   }
 
+#if LLPC_BUILD_GFX12
+  if (dstElemType == CooperativeMatrixElementType::BFloat8 || dstElemType == CooperativeMatrixElementType::Float8) {
+    // Use amd intrinsic convert
+    // llvm.amdgcn.cvt.pk.bf8.f32
+    // llvm.amdgcn.cvt.pk.fp8.f32
+    const Intrinsic::AMDGCNIntrinsics toF8Intrinsic = (dstElemType == CooperativeMatrixElementType::BFloat8)
+                                                          ? Intrinsic::amdgcn_cvt_pk_bf8_f32
+                                                          : Intrinsic::amdgcn_cvt_pk_fp8_f32;
+
+    Value *i32Vec = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 2));
+    for (unsigned idx = 0; idx < vecSize; idx += 4) {
+      // Low 16-bits
+      auto element0 = builder.CreateExtractElement(resultValue, idx);
+      auto element1 = builder.CreateExtractElement(resultValue, idx + 1);
+      auto int32 = builder.CreateIntrinsic(builder.getInt32Ty(), toF8Intrinsic,
+                                           {element0, element1, builder.getInt32(0), builder.getFalse()});
+
+      // High 16-bits
+      element0 = builder.CreateExtractElement(resultValue, idx + 2);
+      element1 = builder.CreateExtractElement(resultValue, idx + 3);
+      int32 =
+          builder.CreateIntrinsic(builder.getInt32Ty(), toF8Intrinsic, {element0, element1, int32, builder.getTrue()});
+
+      // Insert
+      i32Vec = builder.CreateInsertElement(i32Vec, int32, idx / 4);
+    }
+    auto f8Type = transCooperativeMatrixElementType(builder, dstElemType);
+    return builder.CreateBitCast(i32Vec, FixedVectorType::get(f8Type, vecSize));
+  }
+#endif
+
   return resultValue;
 }
 
@@ -846,6 +1201,25 @@ void LowerCooperativeMatrix::visitCooperativeMatrixConvertOp(CooperativeMatrixCo
     // Step 2: Just do flatElement conversion without any layout change.
     resultValue =
         cooperativeMatrixConvertInternal(castOp, source, srcElemType, dstElemType, convert.getName(), &convert);
+
+#if LLPC_BUILD_GFX12
+    if (m_gfxIp.major == 12 && m_pipelineState->getShaderWaveSize(m_shaderStage.value()) == 64) {
+      if (dstElemType == CooperativeMatrixElementType::Int4) {
+        // Get the high half of wave64 result and combine with the low half of wave64 result to get the final result
+        resultValue = builder.CreateBitCast(resultValue, builder.getInt16Ty());
+        resultValue = builder.CreateZExt(resultValue, builder.getInt32Ty());
+        Value *permlane64 = builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {resultValue});
+        Value *result0 = builder.CreateOr(resultValue, builder.CreateShl(permlane64, 16));
+        Value *result1 = builder.CreateOr(permlane64, builder.CreateShl(resultValue, 16));
+        resultValue = builder.CreateSelect(builder.CreateICmpULT(threadId, builder.getInt32(32)), result0, result1);
+      } else if (srcElemType == CooperativeMatrixElementType::Int4) {
+        // lane32~63 repeat the result of lane0~31 for int4.
+        Value *result0 = builder.CreateShuffleVector(resultValue, resultValue, {0, 1, 2, 3});
+        Value *result1 = builder.CreateShuffleVector(resultValue, resultValue, {4, 5, 6, 7});
+        resultValue = builder.CreateSelect(builder.CreateICmpULT(threadId, builder.getInt32(32)), result0, result1);
+      }
+    }
+#endif
 
     // Step 3: Some cases need change the layout due to different element types after conversion.
     if ((numSrcBit > numDstBit) && (srcLayout != dstLayout)) {
@@ -1634,6 +2008,39 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
   StringRef instName = muladd.getName();
   unsigned kMultiplier = muladd.getKMultiplier();
 
+#if LLPC_BUILD_GFX12
+  // Gfx12：
+  // wave64:
+  // declare <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.f16(<4 x half>, <4 x half>, <4 x float>)
+  // declare <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.bf16(<4 x i16>, <4 x i16>, <4 x float>)
+  // declare <8 x half> @llvm.amdgcn.wmma.f16.16x16x16.f16(<4 x half>, <4 x half>, <4 x half>, i1 immarg)
+  // declare <8 x i16> @llvm.amdgcn.wmma.bf16.16x16x16.bf16(<4 x i16>, <4 x i16>, <4 x i16>, i1 immarg)
+  // declare <4 x i32> @llvm.amdgcn.wmma.i32.16x16x16.iu8(i1 immarg, i32, i1 immarg, i32, <4 x i32>, i1
+  // immarg)
+  // declare <4 x i32> @llvm.amdgcn.wmma.i32.16x16x16.iu4(i1 immarg, i32, i1 immarg, i32, <4 x i32>, i1
+  // immarg)
+  // declare <4 x i32> @llvm.amdgcn.wmma.i32.16x16x32.iu4.v4i32.i32(i1 immarg, i32, i1 immarg, i32,
+  // <4 x i32>, i1 immarg)
+  // <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.bf8.bf8.v4f32.i32(i32, i32, <4 x float>)
+  // <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.bf8.fp8.v4f32.i32(i32, i32, <4 x float>)
+  // <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.fp8.bf8.v4f32.i32(i32, i32, <4 x float>)
+  // <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.fp8.fp8.v4f32.i32(i32, i32, <4 x float>)
+  // wave32:
+  // declare <8 x float> @llvm.amdgcn.wmma.f32.16x16x16.f16(<8 x half>, <8 x half> , <8 x float>)
+  // declare <8 x float> @llvm.amdgcn.wmma.f32.16x16x16.bf16(<8 x i16>, <8 x i16> , <8 x float>)
+  // declare <16 x half> @llvm.amdgcn.wmma.f16.16x16x16.f16(<8 x half>, <8 x half> , <8 x half>, i1 immarg)
+  // declare <16 x i16> @llvm.amdgcn.wmma.bf16.16x16x16.bf16(<8 x i16>, <8 x i16> , <8 x i16>, i1 immarg)
+  // declare <8 x i32> @llvm.amdgcn.wmma.i32.16x16x16.iu8(i1 immarg, <2 x i32>, i1 immarg, <2 x i32> , <8 x i32>, i1
+  // immarg)
+  // declare <8 x i32> @llvm.amdgcn.wmma.i32.16x16x16.iu4(i1 immarg, i32, i1 immarg, i32 , <8 x i32>, i1
+  // immarg)
+  // declare <8 x i32> @llvm.amdgcn.wmma.i32.16x16x32.iu4.v8i32.v2i32(i1 immarg, <2 x i32>, i1 immarg, <2 x i32>,
+  // <8 x i32>, i1 immarg)
+  // <8 x float> @llvm.amdgcn.wmma.f32.16x16x16.bf8.bf8.v8f32.v2i32(<2 x i32>, <2 x i32>, <8 x float>
+  // <8 x float> @llvm.amdgcn.wmma.f32.16x16x16.bf8.fp8.v8f32.v2i32(<2 x i32>, <2 x i32>, <8 x float>
+  // <8 x float> @llvm.amdgcn.wmma.f32.16x16x16.fp8.bf8.v8f32.v2i32(<2 x i32>, <2 x i32>, <8 x float>
+  // <8 x float> @llvm.amdgcn.wmma.f32.16x16x16.fp8.fp8.v8f32.v2i32(<2 x i32>, <2 x i32>, <8 x float>
+#endif
   // Gfx11:
   // wave64:
   // declare <4 x float> @llvm.amdgcn.wmma.f32.16x16x16.f16(<16 x half>, <16 x half>, <4 x float>)
@@ -1662,12 +2069,44 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
       assert(matrixAType == matrixBType);
       if (m_gfxIp.major <= 11)
         factorFlatElemNum = 16;
+#if LLPC_BUILD_GFX12
+      if (m_gfxIp.major == 12) {
+        if (waveSize == 64) {
+          factorFlatElemNum = 4;
+          matrixA = builder.CreateShuffleVector(matrixA, ArrayRef<int>({0, 1}));
+          matrixB = builder.CreateShuffleVector(matrixB, ArrayRef<int>({0, 1}));
+        } else {
+          factorFlatElemNum = 8;
+          matrixA = builder.CreateShuffleVector(matrixA, ArrayRef<int>({0, 1, 2, 3}));
+          matrixB = builder.CreateShuffleVector(matrixB, ArrayRef<int>({0, 1, 2, 3}));
+        }
+      }
+#endif
       Type *factorType =
           FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixAType), factorFlatElemNum);
       matrixA = builder.CreateBitCast(matrixA, factorType);
       matrixB = builder.CreateBitCast(matrixB, factorType);
     } else if (isTypeNCooperativeMatrix(matrixAType, 8)) {
+#if LLPC_BUILD_GFX12
+      if (m_gfxIp.major == 12) {
+        if (waveSize == 64) {
+          matrixA = builder.CreateExtractElement(matrixA, builder.getInt32(0));
+          matrixB = builder.CreateExtractElement(matrixB, builder.getInt32(0));
+        } else {
+          matrixA = builder.CreateShuffleVector(matrixA, ArrayRef<int>({0, 1}));
+          matrixB = builder.CreateShuffleVector(matrixB, ArrayRef<int>({0, 1}));
+        }
+      }
+#endif
     } else if (isTypeNCooperativeMatrix(matrixAType, 4)) {
+#if LLPC_BUILD_GFX12
+      if (m_gfxIp.major == 12) {
+        if (waveSize == 64 && kMultiplier > 1) {
+          matrixA = builder.CreateExtractElement(matrixA, builder.getInt32(0));
+          matrixB = builder.CreateExtractElement(matrixB, builder.getInt32(0));
+        }
+      }
+#endif
     } else {
       llvm_unreachable("Factor element type is not supported!");
     }
@@ -1710,6 +2149,12 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
 
     SmallVector<Value *, 3> args;
     switch (intrinsic) {
+#if LLPC_BUILD_GFX12
+    case Intrinsic::amdgcn_wmma_f32_16x16x16_fp8_fp8:
+    case Intrinsic::amdgcn_wmma_f32_16x16x16_fp8_bf8:
+    case Intrinsic::amdgcn_wmma_f32_16x16x16_bf8_fp8:
+    case Intrinsic::amdgcn_wmma_f32_16x16x16_bf8_bf8:
+#endif
     case Intrinsic::amdgcn_wmma_f32_16x16x16_f16:
     case Intrinsic::amdgcn_wmma_f32_16x16x16_bf16:
       args.push_back(matrixA);
@@ -1734,6 +2179,9 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
       args.push_back(builder.getInt1(isSatOrOpsel));
       break;
     case Intrinsic::amdgcn_wmma_i32_16x16x16_iu4:
+#if LLPC_BUILD_GFX12
+    case Intrinsic::amdgcn_wmma_i32_16x16x32_iu4:
+#endif
       args.push_back(builder.getInt1(isSignedA));
       args.push_back(matrixA);
       args.push_back(builder.getInt1(isSignedB));
@@ -1757,6 +2205,13 @@ void LowerCooperativeMatrix::visitCooperativeMatrixMulAddOp(CooperativeMatrixMul
       unsigned coopVeclength = cast<FixedVectorType>(matrixD->getType())->getNumElements();
       Type *wordTy = isUnderlyingIntegerCooperativeMatrix(matrixCType) ? builder.getInt32Ty() : builder.getFloatTy();
       matrixD = builder.CreateBitCast(matrixD, FixedVectorType::get(wordTy, coopVeclength / 2));
+#if LLPC_BUILD_GFX12
+      if (m_gfxIp.major >= 12) {
+        matrixD = waveSize == 64 ? builder.CreateShuffleVector(matrixD, PoisonValue::get(matrixD->getType()),
+                                                               ArrayRef<int>{0, 1, 2, 3})
+                                 : matrixD;
+      } else
+#endif
       {
         matrixD = waveSize == 64 ? builder.CreateShuffleVector(matrixD, PoisonValue::get(matrixD->getType()),
                                                                ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7})
@@ -2149,6 +2604,267 @@ Value *LowerCooperativeMatrix::getLaneNumber(BuilderBase &builder) {
   return result;
 }
 
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Visit "SparsityIndexLoadOp" instruction
+//
+// @param indexload: The dialect instruction to process
+void LowerCooperativeMatrix::visitSparsityIndexLoadOp(SparsityIndexLoadOp &indexload) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&indexload);
+  Value *stride = indexload.getStride();
+  Value *dataPtr = indexload.getPointer();
+  auto memoryAccess = indexload.getMemoryAccess();
+
+  Value *threadId = getLaneNumber(builder);
+  auto waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage.value());
+
+  Value *isEvenGroup = waveSize == 32 ? builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt32Ty(),
+                                                                builder.getInt32(0xffff))
+                                      : builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(),
+                                                                builder.getInt64(0xffff0000ffff));
+  Value *rowOffsetPerLane = builder.CreateSRem(threadId, builder.getInt32(16));
+
+  // TODO: For lane_N and lane_N+16, they will load same dword corresponding to the 16 entries for one row of matrix A.
+  // Maybe use v_perm_b32 later to get the correct bytes for each lane later.
+  Value *offset = builder.CreateMul(rowOffsetPerLane, stride);
+
+  // calc memoryAccess
+  bool isVolatile = memoryAccess & unsigned(CooperativeMatrixMemoryAccess::MemoryAccessVolatileMask);
+  bool isCoherent = memoryAccess & unsigned(CooperativeMatrixMemoryAccess::MemoryAccessCoherentMask);
+  bool isTemporal = memoryAccess & unsigned(CooperativeMatrixMemoryAccess::MemoryAccessTemporalMask);
+
+  Value *sparseIndexPtr = builder.CreateGEP(builder.getInt32Ty(), dataPtr, offset);
+  Value *sparseIndexVal = builder.CreateLoad(builder.getInt32Ty(), sparseIndexPtr, isVolatile, indexload.getName());
+  const unsigned addrSpace = dataPtr->getType()->getPointerAddressSpace();
+
+  if (isCoherent && !(addrSpace == ADDR_SPACE_LOCAL))
+    cast<LoadInst>(sparseIndexVal)->setAtomic(AtomicOrdering::Unordered);
+  if (isTemporal)
+    cast<LoadInst>(sparseIndexVal)->setMetadata(LLVMContext::MD_nontemporal, MDNode::get(builder.getContext(), {}));
+
+  // Lane_0: {i0_0,i0_1,i0_2,i0_3,i0_8,i0_9,i0_a,i0_b}, Lane_16:{i0_4,i0_5,i0_6,i0_7,i0_c,i0_d,i0_e,i0_f}
+  // When load index from i0_0 to i0_f, it needs to select the correct 16bits according lane_id saved in low 16bit.
+  Value *permMask = builder.CreateSelect(isEvenGroup, builder.getInt32(0x00020405), builder.getInt32(0x01030405));
+
+  if (waveSize == 64) {
+    // Lane_0:{i0_0,i0_1,i0_2,i0_3} Lane_16:{i0_8,i0_9,i0_a,i0_b} Lane_32:{i0_4,i0_5,i0_6,i0_7}
+    // Lane_48:{i0_c,i0_d,i0_e,i0_f} It needs to get correct 8bit index saved in low 8bit.
+    Value *const laneIdLessThan32 =
+        builder.CreateIntrinsic(Intrinsic::amdgcn_inverse_ballot, builder.getInt64Ty(), builder.getInt64(0xffffffff));
+    permMask = builder.CreateSelect(laneIdLessThan32, permMask, builder.CreateShl(permMask, 8));
+  }
+
+  Value *indexValue = builder.CreateIntrinsic(Intrinsic::amdgcn_perm, builder.getInt32Ty(),
+                                              {sparseIndexVal, PoisonValue::get(sparseIndexVal->getType()), permMask});
+
+  // Now indexValue should be [unused_16bit | index_16bit] for wave32 or [unused_24bit | index_8bit] for wave64.
+  m_coopMatrixCalls.push_back(&indexload);
+  indexload.replaceAllUsesWith(indexValue);
+}
+
+// =====================================================================================================================
+// Visit "SparseCooperativeMatrixMulAddOp" instruction
+//
+// @param sparseMulAdd: The dialect instruction to process
+void LowerCooperativeMatrix::visitSparseCooperativeMatrixMulAddOp(SparseCooperativeMatrixMulAddOp &sparseMulAdd) {
+  if (m_gfxIp.major < 12)
+    // Swmma is only supported after gfx12.
+    return;
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&sparseMulAdd);
+
+  Value *matrixA = sparseMulAdd.getMatrixA();
+  Value *matrixB = sparseMulAdd.getMatrixB();
+  Value *matrixC = sparseMulAdd.getMatrixC();
+  auto isSignedA = sparseMulAdd.getIsSignedA();
+  auto isSignedB = sparseMulAdd.getIsSignedB();
+  auto isSat = sparseMulAdd.getIsSat();
+  auto matrixAType = sparseMulAdd.getMatrixAElemType();
+  auto matrixBType = sparseMulAdd.getMatrixBElemType();
+  auto matrixCType = sparseMulAdd.getMatrixCElemType();
+  auto matrixDType = sparseMulAdd.getMatrixDElemType();
+  Value *sparseIndex = sparseMulAdd.getSparseIndex();
+  assert(sparseIndex->getType() == builder.getInt32Ty());
+  unsigned kMultiplier = sparseMulAdd.getKMultiplier();
+
+  // clang-format off
+  // wave64:
+  // declare<4 x float> @llvm.amdgcn.swmmac.f32.16x16x32.f16.v4f32.v4f16.v8f16.v4f32.i8(<4 x half>, <8 x half>, <4 x
+  // float>, i8)
+  // declare<4 x float> @llvm.amdgcn.swmmac.f32.16x16x32.bf16.v4f32.v4i16.v8i16.v4f32.i8(<4 x i16>, <8 x i16>,
+  // <4 x float>, i8)
+  // declare<4 x half> @llvm.amdgcn.swmmac.f16.16x16x32.f16.v4f16.v4f16.v8f16.v4f16.i8(<4 x half>, <8 x half>,
+  // <4 x half>, i8)
+  // declare<4 x i16> @llvm.amdgcn.swmmac.bf16.16x16x32.bf16.v4i16.v4i16.v8i16.v4i16.i8(<4 x i16>, <8 x i16>,
+  // <4 x i16>,i8)
+  // declare<4 x i32> @llvm.amdgcn.swmmac.i32.16x16x32.iu8.v4i32.i32.v2i32.v4i32.i8(i1 immarg, i32, i1 immarg,
+  // <2 x i32>, <4 x i32>, i8 % Index,i1 immarg)
+  // declare<4 x i32> @llvm.amdgcn.swmmac.i32 .16x16x32.iu4.v4i32.i32.i32.v4i32.i16(i1 immarg, i32, i1 immarg, i32,
+  // <4 x i32>, i16 % Index, i1 immarg)
+  // declare<4 x i32> @llvm.amdgcn.swmmac.i32.16x16x64.iu4.v4i32.i32.v2i32.v4i32.i16(i1 immarg, i32, i1 immarg,
+  // <2 x i32>, <4 x i32>, i16 % Index, i1 immarg)
+  // declare<4 x float> @llvm.amdgcn.swmmac.f32.16x16x32.fp8.fp8.v4f32.i32.v2i32.v4f32.i8(i32, <2 x i32>, <4 x float>,
+  // i8)
+  // declare<4 x float> @llvm.amdgcn.swmmac.f32.16x16x32.fp8.bf8.v4f32.i32.v2i32.v4f32.i8(i32, <2 x i32>, <4 x float>,
+  // i8)
+  // declare<4 x float> @llvm.amdgcn.swmmac.f32.16x16x32.bf8.fp8.v4f32.i32.v2i32.v4f32.i8(i32, <2 x i32>, <4 x float>,
+  // i8)
+  // declare<4 x float> @llvm.amdgcn.swmmac.f32 .16x16x32.bf8.bf8.v4f32.i32.v2i32.v4f32.i8(i32, <2 x i32>, <4 x float>,
+  // i8)
+
+  // wave32:
+  // declare <8 x float> @llvm.amdgcn.swmmac.f32.16x16x32.f16.v8f32.v8f16.v16f16.v8f32.i16(<8 x half>, <16 x half>, <8
+  // x float>, i16)
+  // declare<8 x float> @llvm.amdgcn.swmmac.f32.16x16x32.bf16.v8f32.v8i16.v16i16.v8f32.i16(<8 x i16>, <16 x i16>,
+  // <8 x float>, i16)
+  // declare<8 x half> @llvm.amdgcn.swmmac.f16.16x16x32.f16.v8f16.v8f16.v16f16.v8f16.i16(<8 x half>, <16 x half>,
+  // <8 x half>, i16)
+  // declare<8 x i16> @llvm.amdgcn.swmmac.bf16.16x16x32.bf16.v8i16.v8i16.v16i16.v8i16.i16(<8 x i16>, <16 x i16>,
+  // <8 x i16>, i16)
+  // declare<8 x i32> @llvm.amdgcn.swmmac.i32.16x16x32.iu8.v8i32.v2i32.v4i32.v8i32.i16(i1 immarg, <2 x i32>, i1 immarg,
+  // <4 x i32>, <8 x i32>,i16 % Index, i1 immarg)
+  // declare<8 x i32> @llvm.amdgcn.swmmac.i32.16x16x32.iu4.v8i32.i32.v2i32.v8i32.i16(i1 immarg, i32, i1 immarg,
+  // <2 x i32>, <8 x i32>, i16 % Index,i1 immarg)
+  // declare<8 x i32> @llvm.amdgcn.swmmac.i32.16x16x64.iu4.v8i32.v2i32.v4i32.v8i32.i32(i1 immarg, <2 x i32>, i1 immarg,
+  // <4 x i32>, <8 x i32>,i32 % Index, i1 immarg)
+  // declare<8 x float> @llvm.amdgcn.swmmac.f32.16x16x32.fp8.fp8.v8f32.v2i32.v4i32.v8f32.i16(<2 x i32>, <4 x i32>,
+  // <8 x float>, i16)
+  // declare<8 x float> @llvm.amdgcn.swmmac.f32.16x16x32.fp8.bf8.v8f32.v2i32.v4i32.v8f32.i16(<2 x i32>, <4 x i32>,
+  // <8 x float>, i16)
+  // declare<8 x float> @llvm.amdgcn.swmmac.f32 .16x16x32.bf8.fp8.v8f32.v2i32.v4i32.v8f32.i16(<2 x i32>, <4 x i32>,
+  // <8 x float>, i16)
+  // declare<8 x float> @llvm.amdgcn.swmmac.f32.16x16x32.bf8.bf8.v8f32.v2i32.v4i32.v8f32.i16(<2 x i32>, <4 x i32>,
+  // <8 x float>, i16)
+  // clang-format on
+
+  Value *matrixD;
+  Value *IndexOfSparseMatrix;
+  unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage.value());
+
+  unsigned factorAFlatElemNum = 0;
+  unsigned factorBFlatElemNum = 0;
+  if (isTypeNCooperativeMatrix(matrixAType, 16)) {
+    if (m_gfxIp.major == 12 && waveSize == 64) {
+      factorAFlatElemNum = 4;
+      factorBFlatElemNum = 8;
+      matrixA = builder.CreateShuffleVector(matrixA, ArrayRef<int>({0, 1}));
+      matrixB = builder.CreateShuffleVector(matrixB, ArrayRef<int>({0, 1, 2, 3}));
+    } else {
+      factorAFlatElemNum = 8;
+      factorBFlatElemNum = 16;
+    }
+    Type *factorAType =
+        FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixAType), factorAFlatElemNum);
+    Type *factorBType =
+        FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixBType), factorBFlatElemNum);
+    matrixA = builder.CreateBitCast(matrixA, factorAType);
+    matrixB = builder.CreateBitCast(matrixB, factorBType);
+  } else if (isTypeNCooperativeMatrix(matrixAType, 8)) {
+    if (m_gfxIp.major == 12 && waveSize == 64) {
+      matrixA = builder.CreateExtractElement(matrixA, builder.getInt32(0));
+      matrixB = builder.CreateShuffleVector(matrixB, ArrayRef<int>({0, 1}));
+    }
+  } else if (isTypeNCooperativeMatrix(matrixAType, 4)) {
+    if (m_gfxIp.major == 12 && waveSize == 64) {
+      matrixB = builder.CreateExtractElement(matrixB, builder.getInt32(0));
+    }
+  } else {
+    llvm_unreachable("Factor element type is not supported!");
+  }
+
+  unsigned matrixLength = 0;
+  if (isTypeNCooperativeMatrix(matrixCType, 32)) {
+    matrixC =
+        waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1, 2, 3}), "shuffleVector") : matrixC;
+  } else if (isTypeNCooperativeMatrix(matrixCType, 16)) {
+    matrixC = waveSize == 64 ? builder.CreateShuffleVector(matrixC, ArrayRef<int>({0, 1}), "shuffleVector") : matrixC;
+    matrixLength = cast<FixedVectorType>(matrixC->getType())->getNumElements();
+    Type *castType = nullptr;
+    if (matrixCType == CooperativeMatrixElementType::BFloat16) {
+      // HW instructions require i16 type for bfloat16.
+      castType = builder.getInt16Ty();
+    } else
+      castType = builder.getHalfTy();
+    Type *accumType = FixedVectorType::get(castType, matrixLength * 2);
+    matrixC = builder.CreateBitCast(matrixC, accumType);
+  } else {
+    llvm_unreachable("Accumulator element type is not supported!");
+  }
+
+  Type *sparseIndexTy =
+      waveSize == 64 ? FixedVectorType::get(builder.getInt8Ty(), 4) : FixedVectorType::get(builder.getInt16Ty(), 2);
+  sparseIndex = builder.CreateBitCast(sparseIndex, sparseIndexTy);
+
+  // TODO: indexkeyPos is set to 0 but needs to update in future.
+  unsigned indexkeyPos = 0;
+  IndexOfSparseMatrix = builder.CreateExtractElement(sparseIndex, indexkeyPos);
+
+  Intrinsic::AMDGCNIntrinsics swmmaInst = InvalidIntrinsicID;
+  {
+    swmmaInst =
+        GetWmmaIntrinsicID(SWmmaIntrinsicTable_gfx12, matrixAType, matrixBType, matrixCType, matrixDType, kMultiplier);
+  }
+  if (swmmaInst == InvalidIntrinsicID)
+    llvm_unreachable("HW intrinsics not supported!");
+
+  SmallVector<Value *, 4> args;
+  switch (swmmaInst) {
+  case Intrinsic::amdgcn_swmmac_f16_16x16x32_f16:
+  case Intrinsic::amdgcn_swmmac_f32_16x16x32_f16:
+  case Intrinsic::amdgcn_swmmac_bf16_16x16x32_bf16:
+  case Intrinsic::amdgcn_swmmac_f32_16x16x32_bf16:
+  case Intrinsic::amdgcn_swmmac_f32_16x16x32_fp8_fp8:
+  case Intrinsic::amdgcn_swmmac_f32_16x16x32_fp8_bf8:
+  case Intrinsic::amdgcn_swmmac_f32_16x16x32_bf8_fp8:
+  case Intrinsic::amdgcn_swmmac_f32_16x16x32_bf8_bf8:
+    args.push_back(matrixA);
+    args.push_back(matrixB);
+    args.push_back(matrixC);
+    args.push_back(IndexOfSparseMatrix);
+    break;
+  case Intrinsic::amdgcn_swmmac_i32_16x16x32_iu8:
+  case Intrinsic::amdgcn_swmmac_i32_16x16x32_iu4:
+  case Intrinsic::amdgcn_swmmac_i32_16x16x64_iu4:
+    args.push_back(builder.getInt1(isSignedA));
+    args.push_back(matrixA);
+    args.push_back(builder.getInt1(isSignedB));
+    args.push_back(matrixB);
+    args.push_back(matrixC);
+    args.push_back(IndexOfSparseMatrix);
+    args.push_back(builder.getInt1(isSat));
+    break;
+  default:
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+
+  auto retTy = matrixC->getType();
+  if (matrixCType != matrixDType) {
+    assert(matrixDType == CooperativeMatrixElementType::Float32 && matrixCType == CooperativeMatrixElementType::Int32);
+    retTy = sparseMulAdd.getResult()->getType();
+  }
+  matrixD = builder.CreateIntrinsic(retTy, swmmaInst, args, nullptr, sparseMulAdd.getName());
+
+  if (isTypeNCooperativeMatrix(matrixCType, 16)) {
+    unsigned coopVeclength = cast<FixedVectorType>(matrixD->getType())->getNumElements();
+    Type *wordTy = isUnderlyingIntegerCooperativeMatrix(matrixCType) ? builder.getInt32Ty() : builder.getFloatTy();
+    matrixD = builder.CreateBitCast(matrixD, FixedVectorType::get(wordTy, coopVeclength / 2));
+#if LLPC_BUILD_GFX12
+    matrixD = waveSize == 64 ? builder.CreateShuffleVector(matrixD, PoisonValue::get(matrixD->getType()),
+                                                           ArrayRef<int>{0, 1, 2, 3})
+                             : matrixD;
+#endif
+  } else {
+    matrixD = waveSize == 64 ? builder.CreateShuffleVector(matrixD, PoisonValue::get(matrixD->getType()),
+                                                           ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7})
+                             : matrixD;
+  }
+  m_coopMatrixCalls.push_back(&sparseMulAdd);
+  sparseMulAdd.replaceAllUsesWith(matrixD);
+}
+#endif
+
 // =====================================================================================================================
 // Visit "CooperativeRowAccLoadOp" instruction
 //
@@ -2323,7 +3039,12 @@ void LowerCooperativeMatrix::visitCooperativeRowAccExpandOp(CooperativeRowAccExp
   else
     assert(rowAccElemType == matrixElemType);
 
+#if LLPC_BUILD_GFX12
+  assert(matrixLayout == CooperativeMatrixLayout::AccumulatorMatrixLayout ||
+         matrixLayout == CooperativeMatrixLayout::Gfx12BaseLayout);
+#else
   assert(matrixLayout == CooperativeMatrixLayout::AccumulatorMatrixLayout);
+#endif
   auto props = getTypeProperties(matrixElemType, matrixLayout, 16);
   Type *flatType =
       FixedVectorType::get(transCooperativeMatrixElementType(builder, matrixElemType), props.numFlatElements);
@@ -2392,7 +3113,60 @@ void LowerCooperativeMatrix::visitCooperativeRowAccExpandOp(CooperativeRowAccExp
                                     DppCtrl::DppRowShare12, DppCtrl::DppRowShare14};
         memcpy(expandCtrl, ctrl, sizeof(ctrl));
       }
-    } else
+    }
+#if LLPC_BUILD_GFX12
+    else if (matrixLayout == CooperativeMatrixLayout::Gfx12BaseLayout) {
+      if (waveSize == 64) {
+        // Gfx12 Gfx12BaseLayout F32/I32@Wave64:
+        // VGPR/Lane . 0 . . . . 1 . . . . 15 . . . . 16 . . . . 31
+        // VGPR[8]:  C0_0 . . . C0_1 . . . C0_f . . . C8_0 . . . C8_f
+        // VGPR[9]:  C1_0 . . . C1_1 . . . C1_f . . . C9_0 . . . C9_f
+        // VGPR[10]: C2_0 . . . C2_1 . . . C2_f . . . Ca_0 . . . Ca_f
+        // VGPR[11]: C3_0 . . . C3_1 . . . C3_f . . . Cb_0 . . . Cb_f
+        // VGPR/Lane . 32 . . . 33 . . . . 47 . . . . 48 . . . . 63
+        // VGPR[8]:  C4_0 . . . C4_1 . . . C4_f . . . Cc_0 . . . Cc_f
+        // VGPR[9]:  C5_0 . . . C5_1 . . . C5_f . . . Cd_0 . . . Cd_f
+        // VGPR[10]: C6_0 . . . C6_1 . . . C6_f . . . Ce_0 . . . Ce_f
+        // VGPR[11]: C7_0 . . . C7_1 . . . C7_f . . . Cf_0 . . . Cf_f
+        // F16/I16@Wave64:
+        // Similar with wave32 which will only use 2 Vgprs.
+        // Row accumulator data is in finalized state and duplciated in each 16 lanes.
+        // Change row accumulator data lanes:
+        // 16 - 31 to [C8, C9, Ca, Cb, Cc, Cd, Ce, Cf, XX, XX, XX, XX, XX, XX, XX, XX].
+        // 32 - 47 to [C4, C5, C6, C7, C8, C9, Ca, Cb, Cc, Cd, Ce, Cf, XX, XX, XX, XX].
+        // 48 - 63 to [Cc, Cd, Ce, Cf, XX, XX, XX, XX, XX, XX, XX, XX, XX, XX, XX, XX].
+        shuffleCtrl[1] = DppCtrl::DppRowSl8;
+        shuffleCtrl[2] = DppCtrl::DppRowSl4;
+        shuffleCtrl[3] = DppCtrl::DppRowSl12;
+        expandCtrl[0] = DppCtrl::DppRowShare0;
+        expandCtrl[1] = DppCtrl::DppRowShare1;
+        expandCtrl[2] = DppCtrl::DppRowShare2;
+        expandCtrl[3] = DppCtrl::DppRowShare3;
+      } else {
+        // Gfx12 Gfx12BaseLayout F32/I32@Wave32:
+        // VGPR/Lane . 0 . . . . 1 . . . . 15 . . . . 16 . . . . 31
+        // VGPR[8]:  C0_0 . . . C0_1 . . . C0_f . . . C8_0 . . . C8_f
+        // VGPR[9]:  C1_0 . . . C1_1 . . . C1_f . . . C9_0 . . . C9_f
+        // VGPR[10]: C2_0 . . . C2_1 . . . C2_f . . . Ca_0 . . . Ca_f
+        // VGPR[11]: C3_0 . . . C3_1 . . . C3_f . . . Cb_0 . . . Cb_f
+        // VGPR[12]: C4_0 . . . C4_1 . . . C4_f . . . Cc_0 . . . Cc_f
+        // VGPR[13]: C5_0 . . . C5_1 . . . C5_f . . . Cd_0 . . . Cd_f
+        // VGPR[14]: C6_0 . . . C6_1 . . . C6_f . . . Ce_0 . . . Ce_f
+        // VGPR[15]: C7_0 . . . C7_1 . . . C7_f . . . Cf_0 . . . Cf_f
+        // F16/I16@Wave32:
+        // all the elements are fully packed in GFX12 which is similar with F32/I32, which will only use 4 Vgprs in
+        // wave32.
+        // Change row accumulator data lanes:
+        // 16 - 31 to [C8, C9, Ca, Cb, Cc, Cd, Ce, Cf, XX, XX, XX, XX, XX, XX, XX, XX].
+        shuffleCtrl[1] = DppCtrl::DppRowSl8;
+        constexpr DppCtrl ctrl[] = {DppCtrl::DppRowShare0, DppCtrl::DppRowShare1, DppCtrl::DppRowShare2,
+                                    DppCtrl::DppRowShare3, DppCtrl::DppRowShare4, DppCtrl::DppRowShare5,
+                                    DppCtrl::DppRowShare6, DppCtrl::DppRowShare7};
+        memcpy(expandCtrl, ctrl, sizeof(ctrl));
+      }
+    }
+#endif
+    else
       llvm_unreachable("unknow layout");
 
     Value *rowAccShuffleVal = rowAccVal;
@@ -2436,7 +3210,12 @@ void LowerCooperativeMatrix::visitCooperativeRowAccSumAccumulateOp(CooperativeRo
   auto rowAccElemType = sumAccumulate.getRowAccElemType();
   auto isSigned = sumAccumulate.getIsSigned();
 
+#if LLPC_BUILD_GFX12
+  assert(matrixLayout == CooperativeMatrixLayout::FactorMatrixLayout ||
+         matrixLayout == CooperativeMatrixLayout::Gfx12BaseLayout);
+#else
   assert(matrixLayout == CooperativeMatrixLayout::FactorMatrixLayout);
+#endif
 
   Value *vcFlat = convCoopMatrixVecToFlatVec(builder, matrixVal, matrixElemType, matrixLayout);
   const unsigned numElems = cast<FixedVectorType>(vcFlat->getType())->getNumElements();
@@ -2535,6 +3314,11 @@ void LowerCooperativeMatrix::visitCooperativeRowAccScalarOp(CooperativeRowAccSca
   assert(transCooperativeMatrixElementType(builder, elemType) == rowAccVal->getType());
   assert(transCooperativeMatrixElementType(builder, elemType) == scalarVal->getType());
 
+#if LLPC_BUILD_GFX12
+  // gfx12 row accumulator layout:
+  // - finalize_lane[0:15] = accumulate_lane[0:15] + accumulate_lane[16:31]
+  // - finalize_lane[16:31] = finalize_lane[0:15]
+#endif
   bool needHandleAccumulateMode = accumulateMode && (m_gfxIp.major >= 12);
 
   if (needHandleAccumulateMode) {

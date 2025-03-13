@@ -1,0 +1,109 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;  Permission is hereby granted, free of charge, to any person obtaining a copy
+ ;  of this software and associated documentation files (the "Software"), to
+ ;  deal in the Software without restriction, including without limitation the
+ ;  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ ;  sell copies of the Software, and to permit persons to whom the Software is
+ ;  furnished to do so, subject to the following conditions:
+ ;
+ ;  The above copyright notice and this permission notice shall be included in all
+ ;  copies or substantial portions of the Software.
+ ;
+ ;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ ;  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ ;  IN THE SOFTWARE.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; This test is to verify that dot(f16vec2, f16vec2) is not translated to the HW instruction v_dot2_f16_f16
+; in RTZ mode on GFX12. v_dot2_f16_f16 only respects RTE mode so the SPIR-V dot operation is still emulated
+; by mul+add.
+
+; RUN: amdllpc -v -gfxip=12.0.1 %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+; SHADERTEST: [[TMP:%.*]] = fmul reassoc arcp contract afn half %{{[0-9]*}}, %{{[0-9]*}}
+; SHADERTEST-NEXT: fadd reassoc arcp contract afn half [[TMP]], [[TMP]]
+
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; SHADERTEST: s_mul_f16 [[TMP:s.*]], s{{[0-9]*}}, s{{[0-9]*}}
+; SHADERTEST-NEXT: s_delay_alu instid0(SALU_CYCLE_3) | instskip(NEXT) | instid1(SALU_CYCLE_3)
+; SHADERTEST-NEXT: s_add_f16 s{{[0-9]*}}, [[TMP]], [[TMP]]
+; SHADERTEST: .float_mode: 0x00000000000000CC
+
+               OpCapability Shader
+               OpCapability RoundingModeRTZ
+               OpCapability UniformAndStorageBuffer16BitAccess
+               OpCapability Float16
+               OpExtension "SPV_KHR_float_controls"
+               OpExtension "SPV_KHR_16bit_storage"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %2 "main" %gl_GlobalInvocationID
+               OpExecutionMode %2 LocalSize 1 1 1
+               OpExecutionMode %2 RoundingModeRTZ 16
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpMemberDecorate %_struct_4 0 Offset 0
+               OpDecorate %_struct_4 BufferBlock
+               OpDecorate %5 DescriptorSet 0
+               OpDecorate %5 Binding 0
+               OpDecorate %5 NonWritable
+               OpMemberDecorate %_struct_6 0 Offset 0
+               OpDecorate %_struct_6 BufferBlock
+               OpDecorate %7 DescriptorSet 0
+               OpDecorate %7 Binding 1
+               OpDecorate %_arr_half_int_1 ArrayStride 2
+               OpDecorate %_arr_half_int_2 ArrayStride 2
+       %void = OpTypeVoid
+         %11 = OpTypeFunction %void
+       %bool = OpTypeBool
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+     %v2uint = OpTypeVector %uint 2
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+     %uint_1 = OpConstant %uint 1
+       %half = OpTypeFloat 16
+%_ptr_Uniform_half = OpTypePointer Uniform %half
+%_ptr_Function_half = OpTypePointer Function %half
+     %v2half = OpTypeVector %half 2
+     %v3half = OpTypeVector %half 3
+     %v4half = OpTypeVector %half 4
+%_ptr_Input_v4half = OpTypePointer Input %v4half
+%_ptr_Output_v4half = OpTypePointer Output %v4half
+ %mat2v2half = OpTypeMatrix %v2half 2
+%_arr_half_int_1 = OpTypeArray %half %int_1
+%_arr_half_int_2 = OpTypeArray %half %int_2
+  %_struct_4 = OpTypeStruct %_arr_half_int_2
+%_ptr_Uniform__struct_4 = OpTypePointer Uniform %_struct_4
+          %5 = OpVariable %_ptr_Uniform__struct_4 Uniform
+  %_struct_6 = OpTypeStruct %_arr_half_int_1
+%_ptr_Uniform__struct_6 = OpTypePointer Uniform %_struct_6
+          %7 = OpVariable %_ptr_Uniform__struct_6 Uniform
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+          %2 = OpFunction %void None %11
+         %34 = OpLabel
+         %35 = OpAccessChain %_ptr_Uniform_half %5 %int_0 %int_0
+         %36 = OpLoad %half %35
+         %37 = OpAccessChain %_ptr_Uniform_half %5 %int_0 %int_1
+         %38 = OpLoad %half %37
+         %39 = OpCompositeConstruct %v2half %36 %36
+         %40 = OpCompositeConstruct %v2half %38 %38
+         %41 = OpDot %half %39 %40
+         %42 = OpAccessChain %_ptr_Uniform_half %7 %int_0 %int_0
+               OpStore %42 %41
+               OpReturn
+               OpFunctionEnd

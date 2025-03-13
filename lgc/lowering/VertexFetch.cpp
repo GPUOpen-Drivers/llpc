@@ -158,7 +158,11 @@ private:
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const VertexNumFormatInfo m_vertexNumFormatInfo[];   // Info table of vertex num format
   static const unsigned char m_vertexFormatMapGfx10[][9];     // Info table of vertex format mapping for GFX10
-  static const unsigned char m_vertexFormatMapGfx11[][9];     // Info table of vertex format mapping for GFX11
+#if LLPC_BUILD_GFX12
+  static const unsigned char m_vertexFormatMapGfx11[][9]; // Info table of vertex format mapping for GFX11~12
+#else
+  static const unsigned char m_vertexFormatMapGfx11[][9]; // Info table of vertex format mapping for GFX11
+#endif
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
@@ -1535,6 +1539,9 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
     format = m_vertexFormatMapGfx10[dfmt][nfmt];
     break;
   case 11:
+#if LLPC_BUILD_GFX12
+  case 12:
+#endif
     assert(dfmt < sizeof(m_vertexFormatMapGfx11) / sizeof(m_vertexFormatMapGfx11[0]));
     assert(nfmt < sizeof(m_vertexFormatMapGfx11[0]) / sizeof(m_vertexFormatMapGfx11[0][0]));
     format = m_vertexFormatMapGfx11[dfmt][nfmt];

@@ -872,6 +872,15 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
     Value *isPreviousLaneValid = CreateICmpNE(preClusterMask, constZero);
     Value *previousLaneIndex = createFindMsb(preClusterMask);
     Value *previousLaneValue = nullptr;
+#if LLPC_BUILD_GFX12
+    // v_permLane16_var can only shuffle within clusters of 16. For log2ClusterSize == 4, v_permLanex16_var needs to be
+    // used to fetch a value from the other 16-row. For log2ClusterSize == 5, we need the full power of the subgroup
+    // shuffle.
+    if (log2ClusterSize < 5 && supportPermLaneVar()) {
+      previousLaneValue = log2ClusterSize < 4 ? createPermLane16Var(result, result, previousLaneIndex, false, true)
+                                              : createPermLaneX16Var(result, result, previousLaneIndex, false, true);
+    } else
+#endif
     {
       previousLaneValue = createSubgroupShuffle(SubgroupHelperLaneState::get(std::nullopt, state.requireHelperLanes),
                                                 result, previousLaneIndex, m_shaderStage.value(), instName);
@@ -906,6 +915,15 @@ Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const
   Value *result = PoisonValue::get(value->getType());
 
   const unsigned indexBits = index->getType()->getPrimitiveSizeInBits();
+#if LLPC_BUILD_GFX12
+  if (supportPermLaneVar()) {
+    Value *laneId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+
+    // The gather lane pattern = (laneId & ~0x3 | index & 0x3)
+    Value *select = CreateOr(CreateAnd(laneId, CreateNot(getInt32(0x3))), CreateAnd(index, getInt32(0x3)));
+    result = createPermLane16Var(value, value, select, false, true);
+  } else
+#endif
   {
     Value *compare = CreateICmpEQ(index, getIntN(indexBits, 0));
     result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm0000, 0xF, 0xF, true), result);
@@ -1586,3 +1604,55 @@ Value *BuilderImpl::CreateQuadAny(Value *const value, bool requireFullQuads, con
     result = createWqm(result);
   return result;
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Create a call to permute var lane within a row.
+//
+// @param origValue : The original value we are going to update.
+// @param updateValue : The value to update with.
+// @param select : Select VGPR.
+// @param fetchInactive : FI mode, whether to fetch inactive lane.
+// @param boundCtrl : Whether bound_ctrl is used or not.
+Value *BuilderImpl::createPermLane16Var(Value *const origValue, Value *const updateValue, Value *const select,
+                                        bool fetchInactive, bool boundCtrl) {
+  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(
+        getInt32Ty(), Intrinsic::amdgcn_permlane16_var,
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2]});
+  };
+
+  return CreateMapToSimpleType(mapFunc,
+                               {
+                                   origValue,
+                                   updateValue,
+                               },
+                               {select, getInt1(fetchInactive), getInt1(boundCtrl)});
+}
+
+// =====================================================================================================================
+// Create a call to permute var lane across two rows.
+//
+// @param origValue : The original value we are going to update.
+// @param updateValue : The value to update with.
+// @param select : Select VGPR.
+// @param fetchInactive : FI mode, whether to fetch inactive lane.
+// @param boundCtrl : Whether bound_ctrl is used or not.
+Value *BuilderImpl::createPermLaneX16Var(Value *const origValue, Value *const updateValue, Value *const select,
+                                         bool fetchInactive, bool boundCtrl) {
+  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateIntrinsic(
+        getInt32Ty(), Intrinsic::amdgcn_permlanex16_var,
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2]});
+  };
+
+  return CreateMapToSimpleType(mapFunc,
+                               {
+                                   origValue,
+                                   updateValue,
+                               },
+                               {select, getInt1(fetchInactive), getInt1(boundCtrl)});
+}
+#endif

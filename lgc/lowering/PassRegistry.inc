@@ -78,6 +78,9 @@ LLPC_FUNCTION_PASS("lgc-lower-mul-dx9-zero", LowerMulDx9Zero)
 LLPC_MODULE_PASS("lgc-generate-null-frag-shader", GenerateNullFragmentShader)
 LLPC_MODULE_PASS("lgc-passthrough-hull-shader", PassthroughHullShader)
 LLPC_MODULE_PASS("lgc-collect-image-operations", CollectImageOperations)
+#if LLPC_BUILD_GFX12
+LLPC_FUNCTION_PASS("lgc-add-buffer-operations-metadata", AddBufferOperationMetadata)
+#endif
 LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
 LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragmentColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)

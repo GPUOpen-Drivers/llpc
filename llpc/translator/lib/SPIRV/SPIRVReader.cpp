@@ -292,6 +292,23 @@ static Value *vectorCompositeConstruct(Type *vecTy, const std::vector<Value *> &
   return v;
 }
 
+#if LLPC_BUILD_GFX12
+static bool isNoAllocResource(unsigned descSet, unsigned binding, const PipelineShaderOptions *shaderOption) {
+  Vkgc::CachePolicyLlc::NoAllocResource noAllocResource = {};
+  noAllocResource.set = descSet;
+  noAllocResource.binding = binding;
+
+  Vkgc::CachePolicyLlc::NoAllocResource resourceTuning = {};
+  for (unsigned i = 0; i < shaderOption->cachePolicyLlc.resourceCount; i++) {
+    resourceTuning.u32All = shaderOption->cachePolicyLlc.noAllocs[i];
+    if (resourceTuning.resourceId == noAllocResource.resourceId)
+      if (resourceTuning.noAlloc)
+        return true;
+  }
+  return false;
+}
+#endif
+
 bool SPIRVToLLVM::isStorageClassExplicitlyLaidOut(SPIRVStorageClassKind storageClass) {
   return llvm::is_contained({StorageClassStorageBuffer, StorageClassUniform, StorageClassPushConstant,
                              StorageClassPhysicalStorageBufferEXT},
@@ -1012,6 +1029,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(SPIRVType *co
   return lgc::xdl::getCooperativeMatrixTy(*getBuilder(), elemType, matrixLayout, kSize);
 }
 
+#if LLPC_BUILD_GFX12
+#endif
+
 // =====================================================================================================================
 // Get pointee type from SPIRV Value.
 //
@@ -1180,6 +1200,8 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
   case OpTypeCooperativeMatrixKHR: {
     return transTypeWithOpcode<OpTypeCooperativeMatrixKHR>(t, matrixStride, columnMajor, layout);
   }
+#if LLPC_BUILD_GFX12
+#endif
   default: {
     llvm_unreachable("Not implemented");
   }
@@ -5402,10 +5424,25 @@ SPIRVToLLVM::getCooperativeMatrixKHRLayout(CooperativeMatrixUse use, lgc::xdl::C
   [[maybe_unused]] const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAKHR ||
       use == CooperativeMatrixUse::CooperativeMatrixUseMatrixBKHR) {
+#if LLPC_BUILD_GFX12
+    if (gfxIp.major == 12) {
+      if (lgc::xdl::isTypeNCooperativeMatrix(elemType, 16) || lgc::xdl::isTypeNCooperativeMatrix(elemType, 8)) {
+        if (rows == 16 && columns == 16)
+          return lgc::xdl::CooperativeMatrixLayout::Gfx12BaseLayout;
+        return lgc::xdl::CooperativeMatrixLayout::Gfx12SwizzledKX16Layout;
+      }
+      llvm_unreachable("Invalid element type!");
+      return lgc::xdl::CooperativeMatrixLayout::InvalidLayout;
+    }
+#endif
 
     return lgc::xdl::CooperativeMatrixLayout::FactorMatrixLayout;
   }
   if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAccumulatorKHR) {
+#if LLPC_BUILD_GFX12
+    if (gfxIp.major == 12)
+      return lgc::xdl::CooperativeMatrixLayout::Gfx12BaseLayout;
+#endif
     if (gfxIp.major == 11)
       return lgc::xdl::CooperativeMatrixLayout::AccumulatorMatrixLayout;
     if (lgc::xdl::isTypeNCooperativeMatrix(elemType, 32))
@@ -5648,6 +5685,12 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCooperativeMatrixMulAddKH
 
   [[maybe_unused]] const Vkgc::GfxIpVersion gfxIp = getPipelineContext()->getGfxIpVersion();
   unsigned kMultiplier = 1;
+#if LLPC_BUILD_GFX12
+  if (gfxIp.major == 12) {
+    if (lgc::xdl::isTypeNCooperativeMatrix(elemBasicTypeA, 4) && isa<FixedVectorType>(coopMatrixB->getType()))
+      kMultiplier = 2;
+  }
+#endif
 
   Type *coopMatrixDType = coopMatrixC->getType();
   lgc::xdl::CooperativeMatrixElementType elemBasicTypeD = elemBasicTypeC;
@@ -5676,6 +5719,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpRayQueryInitializeKHR>(SP
   Value *tmax = transValue(spvOperands[7], func, block);
   return getBuilder()->create<InitializeOp>(rayQuery, accStru, rayFlags, mask, origin, tmin, dir, tmax);
 }
+
+#if LLPC_BUILD_GFX12
+#endif
 
 /// For instructions, this function assumes they are created in order
 /// and appended to the given basic block. An instruction may use a
@@ -7391,6 +7437,16 @@ static void scanImageDescNonUniformCV(SPIRVToLLVM::ExtractedImageInfo *info, SPI
         info->flags |= lgc::Builder::ImageFlagCoherent;
       if (spvValue->hasDecorate(DecorationVolatile))
         info->flags |= lgc::Builder::ImageFlagVolatile;
+#if LLPC_BUILD_GFX12
+      if (spvValue->hasDecorate(DecorationBinding)) {
+        SPIRVWord binding = SPIRVID_INVALID;
+        unsigned descSet = 0;
+        spvValue->hasDecorate(DecorationBinding, 0, &binding);
+        spvValue->hasDecorate(DecorationDescriptorSet, 0, &descSet);
+        if (isNoAllocResource(descSet, binding, shaderOption))
+          info->flags |= lgc::Builder::ImageFlagLlcNoAlloc;
+      }
+#endif
     }
 
     const auto opcode = spvValue->getOpCode();
@@ -9408,6 +9464,12 @@ bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, ArrayRef<Value *> values) {
         auto resMdNode = MDNode::get(*m_context, resMDs);
         if (!gv->hasMetadata(gSPIRVMD::Resource))
           gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
+
+#if LLPC_BUILD_GFX12
+        if (!gv->hasMetadata(gSPIRVMD::ResourceNoAlloc))
+          if (isNoAllocResource(descSet, binding, m_shaderOptions))
+            gv->addMetadata(gSPIRVMD::ResourceNoAlloc, *MDNode::get(*m_context, {}));
+#endif
 
         // Build block metadata
         const bool isUniformBlock = bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer &&

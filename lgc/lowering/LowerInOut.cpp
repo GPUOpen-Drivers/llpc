@@ -145,6 +145,9 @@ PreservedAnalyses LowerInOut::run(Module &module, ModuleAnalysisManager &analysi
     m_buffFormats = &BufferFormatsGfx10;
     break;
   case 11:
+#if LLPC_BUILD_GFX12
+  case 12:
+#endif
     m_buffFormats = &BufferFormatsGfx11;
     break;
   default:
@@ -502,6 +505,41 @@ void LowerInOut::processShader() {
         unsigned workgroupSizeY = mode.workgroupSizeY;
         unsigned workgroupSizeZ = mode.workgroupSizeZ;
         SwizzleWorkgroupLayout layout = calculateWorkgroupLayout(m_pipelineState, m_shaderStage.value());
+#if LLPC_BUILD_GFX12
+        if (m_gfxIp.major >= 12) {
+          // For HW swizzle, the large-pattern unroll is basically the same Z-order pattern used for 2x2
+          WorkgroupLayout swizzleWgLayout = WorkgroupLayout::Unknown;
+          if (layout.macroLayout == WorkgroupLayout::Unknown)
+            swizzleWgLayout = layout.microLayout;
+          else
+            swizzleWgLayout = layout.macroLayout;
+
+          PalMetadata *metadata = m_pipelineState->getPalMetadata();
+          if (m_pipelineState->getOptions().xInterleave != 0 || m_pipelineState->getOptions().yInterleave != 0) {
+            metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(
+                true)[Util::Abi::ComputeRegisterMetadataKey::XInterleave] = m_pipelineState->getOptions().xInterleave;
+            metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(
+                true)[Util::Abi::ComputeRegisterMetadataKey::YInterleave] = m_pipelineState->getOptions().yInterleave;
+          } else {
+            switch (swizzleWgLayout) {
+            case WorkgroupLayout::Quads:
+              metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(
+                  true)[Util::Abi::ComputeRegisterMetadataKey::XInterleave] = 1;
+              metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(
+                  true)[Util::Abi::ComputeRegisterMetadataKey::YInterleave] = 1;
+              break;
+            case WorkgroupLayout::SexagintiQuads:
+              metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(
+                  true)[Util::Abi::ComputeRegisterMetadataKey::XInterleave] = 3;
+              metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(
+                  true)[Util::Abi::ComputeRegisterMetadataKey::YInterleave] = 3;
+              break;
+            default:
+              break;
+            }
+          }
+        }
+#endif
         while (!func.use_empty()) {
           CallInst *reconfigCall = cast<CallInst>(*func.user_begin());
           Value *localInvocationId = reconfigCall->getArgOperand(0);
@@ -4280,7 +4318,14 @@ Value *LowerInOut::readValueFromLds(bool offChip, Type *readTy, Value *ldsOffset
     } else if (m_gfxIp.major == 11) {
       // NOTE: dlc depends on MALL NOALLOC which isn't used by now.
       coherent.bits.glc = true;
-    } else
+    }
+#if LLPC_BUILD_GFX12
+    else if (m_gfxIp.major >= 12) {
+      coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+      coherent.gfx12.th = m_pipelineState->getTemporalHint(TH::TH_RT, TemporalHintTessRead);
+    }
+#endif
+    else
       llvm_unreachable("Not implemented!");
 
     for (unsigned i = 0, combineCount = 0; i < numChannels; i += combineCount)
@@ -4370,6 +4415,12 @@ void LowerInOut::writeValueToLds(bool offChip, Value *writeValue, Value *ldsOffs
     CoherentFlag coherent = {};
     if (m_gfxIp.major <= 11)
       coherent.bits.glc = true;
+#if LLPC_BUILD_GFX12
+    else {
+      coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+      coherent.gfx12.th = m_pipelineState->getTemporalHint(TH::TH_WB, TemporalHintTessWrite);
+    }
+#endif
 
     for (unsigned i = 0, combineCount = 0; i < numChannels; i += combineCount) {
       combineCount =

@@ -2802,6 +2802,9 @@ _SPIRV_OP(AssumeTrueKHR, false, 2, false)
 _SPIRV_OP(ExpectKHR, true, 5, false)
 #undef _SPIRV_OP
 
+#if LLPC_BUILD_GFX12
+#endif
+
 } // namespace SPIRV
 
 #endif

@@ -126,6 +126,41 @@ enum class LlvmScheduleStrategy : unsigned {
   MaxIlp = 2           // Maximize ILP
 };
 
+#if LLPC_BUILD_GFX12
+// Enumerate the cache policy type
+enum CacheScopePolicyType {
+  AtmWriteUseSystemScope = 0x1, // Attributes through memory stores will use system scope and avoid occupying any
+                                // lines in GL2.
+};
+
+// Handle temporal hint, a store/load occupies 4 bits.
+enum TemporalHintOpType {
+  TemporalHintAtmWrite = 0,
+  TemporalHintImageRead = 4,
+  TemporalHintImageWrite = 8,
+  TemporalHintTessFactorWrite = 12,
+  TemporalHintTessRead = 16,
+  TemporalHintTessWrite = 20,
+  TemporalHintBufferRead = 24,
+  TemporalHintBufferWrite = 28,
+};
+
+// Enumerates temporal hints
+enum TH {
+  TH_RT = 0,    // regular
+  TH_NT = 1,    // non-temporal
+  TH_HT = 2,    // high-temporal
+  TH_LU = 3,    // last use
+  TH_WB = 3,    // regular (CU, SE), high-temporal with write-back (MALL)
+  TH_NT_RT = 4, // non-temporal (CU, SE), regular (MALL)
+  TH_RT_NT = 5, // regular (CU, SE), non-temporal (MALL)
+  TH_NT_HT = 6, // non - temporal(CU, SE), high - temporal(MALL)
+  TH_NT_WB = 7, // non-temporal (CU, SE), high-temporal with write-back (MALL)
+
+  TH_RESERVED = 7, // unused value for load insts
+};
+#endif
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
@@ -179,13 +214,21 @@ union Options {
     unsigned reverseThreadGroupBufferBinding; // Binding ID of the internal buffer for reverse thread group optimization
     bool internalRtShaders;                   // Enable internal RT shader intrinsics
     bool enableUberFetchShader;               // Enable UberShader
+#if LLPC_BUILD_GFX12
+    bool expertSchedulingMode; // Enable gfx12 expert scheduling mode 2.
+#else
     bool reserved16;
+#endif
     bool disableTruncCoordForGather; // If set, trunc_coord of sampler srd is disabled for gather4
     bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
+#if LLPC_BUILD_GFX12
+    unsigned cacheScopePolicyControl; // Control cache scope policy. attributes-through-memory read/write is available
+#else
     unsigned reserved20;
+#endif
     RayTracingIndirectMode rtIndirectMode;   // Ray tracing indirect mode
     bool enablePrimGeneratedQuery;           // Whether to enable primitive generated counter
     bool enableFragColor;                    // If enabled, do frag color broadcast
@@ -195,7 +238,12 @@ union Options {
     unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
     unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
     bool useGpurt;                           // Whether GPURT is used
+#if LLPC_BUILD_GFX12
+    bool disableDynamicVgpr; // Whether to disable dynamic VGPR mode for continuations. If not set, dVGPR mode is
+                             // enabled by default.
+#else
     bool reserved21;
+#endif
     bool disablePerCompFetch;                      // Disable per component fetch in uber fetch shader.
     bool maskOffNullDescriptorTypeField;           // If true, mask off the type field of word3 from a null descriptor.
     bool vbAddressLowBitsKnown;                    // Use vertex buffer offset low bits from driver.
@@ -203,7 +251,11 @@ union Options {
     bool sampleMaskExportOverridesAlphaToCoverage; // Whether to use sample mask export overriding alpha to coverage
     bool disableSampleCoverageAdjust;              // Disable the adjustment of sample coverage
     bool forceNullFsDummyExport;                   // Force dummy export to be added for null fragment shader
+#if LLPC_BUILD_GFX12
+    unsigned dynamicVgprBlockSize; // The VGPR allocation granule for dynamic VGPR mode.
+#else
     unsigned reserved22;
+#endif
     bool dynamicTopology;    // Whether primitive topology is dynamic.
     bool robustBufferAccess; // Enable the core robust buffer access
     bool reserved23;
@@ -212,11 +264,25 @@ union Options {
                                  // eliminating it if the write value is 1.0.
     bool enableMapClipDistMask;  // For OGL only, whether to remap the clip distances.
     unsigned clipPlaneMask;      // For OGL only, defines the bitmask for enabling/disabling clip planes.
+#if LLPC_BUILD_GFX12
+    unsigned temporalHintControl; // Override value for temporal hint.  A load/store occupies 4 bits. The highest bit
+                                  // of 4 bits marks whether to override temporal hint.
+                                  // Arrange from the low bit to high bit in the following order:
+                                  // TemporalHintAtmWrite,TemporalHintImageRead, TemporalHintImageWrite,
+                                  // TemporalHintTessFactorWrite, TemporalHintTessRead, TemporalHintTessWrite
+                                  // TemporalHintBufferRead, TemporalHintBufferWrite
+#else
     unsigned reserved24;
+#endif
     bool checkRawBufferAccessDescStride; // Check descriptor stride to workaround an issue that a strided buffer desc is
                                          // used for a raw buffer access instruction.
     bool padBufferSizeToNextDword;       // Vulkan only, set if the driver rounds the buffer size up the next dword
+#if LLPC_BUILD_GFX12
+    unsigned xInterleave; // Log2 X interleave size.
+    unsigned yInterleave; // Log2 Y interleave size.
+#else
     unsigned reserved26[2];
+#endif
     bool reserved27;
   };
 };
@@ -333,7 +399,12 @@ union ShaderOptions {
     /// Aggressively mark shader loads as invariant (where it is safe to do so).
     InvariantLoadsOption aggressiveInvariantLoads;
 
+#if LLPC_BUILD_GFX12
+    // Enable shader round-robin mode for waves within workgroup.
+    bool workgroupRoundRobin;
+#else
     bool reserved;
+#endif
     /// Let dmask bits be fully enabled when call 'image.sample.c', for depth compare mode swizzling workaround.
     bool imageSampleDrefReturnsRgba;
 
@@ -343,6 +414,11 @@ union ShaderOptions {
 
     /// Force underflow prevention for log and pow
     bool forceUnderflowPrevention;
+
+#if LLPC_BUILD_GFX12
+    /// Override value for temporal hint for image and buffer
+    unsigned temporalHintShaderControl;
+#endif
 
     /// Choose llvm's instruction scheduling strategy.
     LlvmScheduleStrategy scheduleStrategy;

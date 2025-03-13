@@ -146,6 +146,15 @@ private:
   void createGetShaderRecordIndex(llvm::Function *func);
   void createShaderMarker(llvm::Function *func);
   void createWaveScan(llvm::Function *func);
+#if LLPC_BUILD_GFX12
+  void createDualIntersectRay(llvm::Function *func);
+  void createIntersectRayBvh8(llvm::Function *func);
+  void createDsStackPush8Pop1(llvm::Function *func);
+  void createDsStackPush8Pop2(llvm::Function *func);
+  void createIntersectRay(llvm::Function *func, bool isDualNode);
+  void createDsStackPush8Pop1PrimRangeEnabled(llvm::Function *func);
+  void createDsStackPush8PopN(llvm::Function *func, unsigned returnNodeCount, bool primRangeEnable);
+#endif
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

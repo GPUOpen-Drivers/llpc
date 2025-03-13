@@ -35,6 +35,9 @@
 #include "lgc/state/ResourceUsage.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/BuilderBase.h"
+#if LLPC_BUILD_GFX12
+#include "llvm/IR/IntrinsicsAMDGPU.h"
+#endif
 
 using namespace lgc;
 using namespace llvm;
@@ -301,6 +304,10 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
     return "FixedXY";
   case ShaderInput::LocalInvocationId:
     return "LocalInvocationId";
+#if LLPC_BUILD_GFX12
+  case ShaderInput::CsWaveId:
+    return "CsWaveId";
+#endif
   default:
     llvm_unreachable("Unknown shader input kind");
   }
@@ -359,6 +366,22 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
         continue;
 
       Value *value = nullptr;
+#if LLPC_BUILD_GFX12
+      GfxIpVersion gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
+      if (gfxIp.major >= 12 && kind == static_cast<unsigned>(ShaderInput::WorkgroupId)) {
+        auto &entryBlock = func.getEntryBlock();
+        BuilderBase builder(&entryBlock.front());
+        value = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
+        unsigned intrinsics[3] = {Intrinsic::amdgcn_workgroup_id_x, Intrinsic::amdgcn_workgroup_id_y,
+                                  Intrinsic::amdgcn_workgroup_id_z};
+        for (auto [i, id] : enumerate(intrinsics))
+          value = builder.CreateInsertElement(value, builder.CreateIntrinsic(id, {}, {}), i);
+      } else if (gfxIp.major >= 12 && kind == static_cast<unsigned>(ShaderInput::CsWaveId)) {
+        auto &entryBlock = func.getEntryBlock();
+        BuilderBase builder(&entryBlock.front());
+        value = builder.CreateIntrinsic(Intrinsic::amdgcn_wave_id, {}, {});
+      } else
+#endif
       {
         if (inputUsage->entryArgIdx != 0)
           value = getFunctionArgument(&func, inputUsage->entryArgIdx);
@@ -706,6 +729,11 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       ShaderInputsUsage *inputsUsage = getShaderInputsUsage(shaderStage);
       assert(inputDesc.inputKind < ShaderInput::Count);
       ShaderInputUsage *inputUsage = inputsUsage->inputs[static_cast<unsigned>(inputDesc.inputKind)].get();
+#if LLPC_BUILD_GFX12
+      if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 12 &&
+          (inputDesc.inputKind == ShaderInput::WorkgroupId || inputDesc.inputKind == ShaderInput::MultiDispatchInfo))
+        continue;
+#endif
       // We don't want this input if it is not marked "always" and it is not used.
       if (!inputDesc.always && (!inputUsage || inputUsage->users.empty()))
         continue;

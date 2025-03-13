@@ -37,6 +37,9 @@
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
+#if LLPC_BUILD_GFX12
+#include "lgc/lowering/AddBufferOperationMetadata.h"
+#endif
 #include "lgc/lowering/AddLoopMetadata.h"
 #include "lgc/lowering/ApplyWorkarounds.h"
 #include "lgc/lowering/CheckShaderCache.h"
@@ -201,6 +204,11 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(LowerVertexFetch());
   passMgr.addPass(LowerFragmentColorExport());
   passMgr.addPass(LowerDebugPrintf());
+#if LLPC_BUILD_GFX12
+  // Mark shader stage for load/store.
+  if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 12)
+    passMgr.addPass(createModuleToFunctionPassAdaptor(AddBufferOperationMetadata()));
+#endif
   passMgr.addPass(LowerDesc());
   passMgr.addPass(MutateEntryPoint());
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerPopsInterlock()));

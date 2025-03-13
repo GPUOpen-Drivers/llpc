@@ -132,6 +132,10 @@ private:
                                          const llvm::function_ref<llvm::Value *(llvm::Value *)> callback);
   llvm::Value *createLoadDesc(llvm::Value *buffAddress, bool forceRawView, bool isCompact);
 
+#if LLPC_BUILD_GFX12
+  ShaderStageEnum getMemoryInstShaderStage(llvm::Instruction *inst);
+#endif
+
   compilerutils::TypeLowering &m_typeLowering;
   BuilderImpl m_builder;
 

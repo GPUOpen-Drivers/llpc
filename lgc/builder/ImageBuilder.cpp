@@ -537,7 +537,29 @@ static const Intrinsic::ID ImageAtomicIntrinsicTable[][8] = {
      Intrinsic::amdgcn_image_atomic_fmax_3d, Intrinsic::amdgcn_image_atomic_fmax_cube,
      Intrinsic::amdgcn_image_atomic_fmax_1darray, Intrinsic::amdgcn_image_atomic_fmax_2darray,
      Intrinsic::amdgcn_image_atomic_fmax_2dmsaa, Intrinsic::amdgcn_image_atomic_fmax_2darraymsaa},
+#if LLPC_BUILD_GFX12
+    {Intrinsic::amdgcn_image_atomic_add_flt_1d, Intrinsic::amdgcn_image_atomic_add_flt_2d,
+     Intrinsic::amdgcn_image_atomic_add_flt_3d, Intrinsic::amdgcn_image_atomic_add_flt_cube,
+     Intrinsic::amdgcn_image_atomic_add_flt_1darray, Intrinsic::amdgcn_image_atomic_add_flt_2darray,
+     Intrinsic::amdgcn_image_atomic_add_flt_2dmsaa, Intrinsic::amdgcn_image_atomic_add_flt_2darraymsaa},
+#endif
 };
+
+#if LLPC_BUILD_GFX12
+// Intrinsic ID table for GFX12 image fmin atomic
+static const Intrinsic::ID ImageAtomicFMinIntrinsicTableGfx12[8] = {
+    Intrinsic::amdgcn_image_atomic_min_flt_1d,      Intrinsic::amdgcn_image_atomic_min_flt_2d,
+    Intrinsic::amdgcn_image_atomic_min_flt_3d,      Intrinsic::amdgcn_image_atomic_min_flt_cube,
+    Intrinsic::amdgcn_image_atomic_min_flt_1darray, Intrinsic::amdgcn_image_atomic_min_flt_2darray,
+    Intrinsic::amdgcn_image_atomic_min_flt_2dmsaa,  Intrinsic::amdgcn_image_atomic_min_flt_2darraymsaa};
+
+// Intrinsic ID table for GFX12 image fmax atomic
+static const Intrinsic::ID ImageAtomicFMaxIntrinsicTableGfx12[8] = {
+    Intrinsic::amdgcn_image_atomic_max_flt_1d,      Intrinsic::amdgcn_image_atomic_max_flt_2d,
+    Intrinsic::amdgcn_image_atomic_max_flt_3d,      Intrinsic::amdgcn_image_atomic_max_flt_cube,
+    Intrinsic::amdgcn_image_atomic_max_flt_1darray, Intrinsic::amdgcn_image_atomic_max_flt_2darray,
+    Intrinsic::amdgcn_image_atomic_max_flt_2dmsaa,  Intrinsic::amdgcn_image_atomic_max_flt_2darraymsaa};
+#endif
 
 // =====================================================================================================================
 // Convert an integer or vector of integer type to the equivalent (vector of) half/float/double
@@ -1355,6 +1377,10 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
   unsigned imageDescArgIndex = 0;
   if (!isTexelBuffer) {
     // Resource descriptor. Use the image atomic instruction.
+#if LLPC_BUILD_GFX12
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 12 && atomicOp == ImageAtomicFAdd)
+      report_fatal_error("ImageAtomicFAdd only supported on GFX12+");
+#endif
 
     args.push_back(inputValue);
     if (atomicOp == AtomicOpCompareSwap)
@@ -1368,6 +1394,15 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
     // Get the intrinsic ID from the load intrinsic ID table, and create the intrinsic.
     // Rectangle image uses the same Intrinsic ID with 2D image.
     Intrinsic::ID intrinsicId = ImageAtomicIntrinsicTable[atomicOp][dim == DimRect ? Dim2D : dim];
+#if LLPC_BUILD_GFX12
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
+      // The intrinsics for ImageAtomicFMin/ImageAtomicFMax are renamed from GFX12+.
+      if (atomicOp == ImageAtomicFMin)
+        intrinsicId = ImageAtomicFMinIntrinsicTableGfx12[dim == DimRect ? Dim2D : dim];
+      else if (atomicOp == ImageAtomicFMax)
+        intrinsicId = ImageAtomicFMaxIntrinsicTableGfx12[dim == DimRect ? Dim2D : dim];
+    }
+#endif
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION >= 511095
     atomicInst = CreateIntrinsic(inputValue->getType(), intrinsicId, args, nullptr, instName);
 #else
@@ -1472,6 +1507,12 @@ Value *BuilderImpl::CreateImageQuerySamples(unsigned dim, unsigned flags, Value 
     // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
     lastLevel = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descWord3, getInt32(16), getInt32(4)});
   }
+#if LLPC_BUILD_GFX12
+  else {
+    // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:15])
+    lastLevel = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descWord3, getInt32(15), getInt32(5)});
+  }
+#endif
   // Sample number = 1 << LAST_LEVEL
   Value *sampleNumber = CreateShl(getInt32(1), lastLevel);
 
@@ -2352,6 +2393,25 @@ CoherentFlag BuilderImpl::getImageCoherentFlag(unsigned flags, bool isRead) {
     if (flags & ImageFlagLlcNoAlloc)
       coherent.bits.dlc = true;
   }
+#if LLPC_BUILD_GFX12
+  else {
+    if (flags & ImageFlagCoherent)
+      coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+    // We do not need to set SCOPE_SYS for volatile because images won't be modified by CPU.
+
+    coherent.gfx12.th = m_pipelineState->getTemporalHint(
+        TH::TH_RT, isRead ? TemporalHintImageRead : TemporalHintImageWrite, m_shaderStage.value());
+
+    const bool nearNt = flags & ImageFlagCoherent;
+    const bool farNt = flags & ImageFlagLlcNoAlloc;
+    if (nearNt && farNt)
+      coherent.gfx12.th = TH::TH_NT;
+    else if (nearNt && !farNt)
+      coherent.gfx12.th = TH::TH_NT_RT;
+    else if (!nearNt && farNt)
+      coherent.gfx12.th = TH::TH_RT_NT;
+  }
+#endif
 
   return coherent;
 }

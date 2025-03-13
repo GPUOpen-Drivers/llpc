@@ -66,6 +66,11 @@ static const unsigned CopyShaderEntryArgIdxStreamOffset = 4;
 // Entry-point argument index for the LDS offset of current vertices in GS-VS ring
 static const unsigned CopyShaderEntryArgIdxVertexOffset = 8;
 
+#if LLPC_BUILD_GFX12
+// Barrier ID of per-workgroup normal barrier (-2 is for trap barrier while 0 is for null barrier)
+static const unsigned WorkgroupNormalBarrierId = -1;
+#endif
+
 // Enumerates the target for "export" instruction.
 enum ExportTarget {
   EXP_TARGET_MRT_0 = 0,       // MRT 0..7
@@ -548,6 +553,18 @@ union SqBufRsrcWord3 {
     unsigned : 2;
   } gfx11;
 
+#if LLPC_BUILD_GFX12
+  struct {
+    unsigned : 12;
+    unsigned format : 6;
+    unsigned : 7;
+    unsigned compressionEn : 1;
+    unsigned : 2;
+    unsigned oobSelect : 2;
+    unsigned : 2;
+  } gfx12;
+#endif
+
   unsigned u32All;
 };
 
@@ -639,6 +656,11 @@ enum PolyModeType {
   POLY_MODE_TRIANGLES = 2,
 };
 
+#if LLPC_BUILD_GFX12
+// Enumerates scope of memory
+enum MemoryScope { MEMORY_SCOPE_CU, MEMORY_SCOPE_SE, MEMORY_SCOPE_DEV, MEMORY_SCOPE_SYS };
+#endif
+
 // Represents the coherent flag used in buffer intrinsics
 union CoherentFlag {
   struct {
@@ -649,6 +671,15 @@ union CoherentFlag {
     unsigned : 28;
   } bits;
 
+#if LLPC_BUILD_GFX12
+  struct {
+    unsigned th : 3;    // Temporal hints
+    unsigned scope : 2; // Scope of memory
+    unsigned nv : 1;    // Non-volatile
+    unsigned swz : 1;   // Swizzled buffer
+    unsigned : 25;
+  } gfx12;
+#endif
   unsigned u32All;
 };
 

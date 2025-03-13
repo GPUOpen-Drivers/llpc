@@ -190,6 +190,10 @@ static constexpr char UserDataRegMap[] = ".user_data_reg_map";
 static constexpr char ImageOp[] = ".image_op";
 static constexpr char FrontendStackSize[] = ".frontend_stack_size";
 static constexpr char ShaderSpillThreshold[] = ".shader_spill_threshold";
+#if LLPC_BUILD_GFX12
+static constexpr char WorkgroupRoundRobin[] = ".wg_round_robin";
+static constexpr char OutgoingVgprCount[] = ".outgoing_vgpr_count";
+#endif
 }; // namespace HardwareStageMetadataKey
 
 namespace ShaderMetadataKey {
@@ -204,6 +208,10 @@ static constexpr char TgidYEn[] = ".tgid_y_en";
 static constexpr char TgidZEn[] = ".tgid_z_en";
 static constexpr char TgSizeEn[] = ".tg_size_en";
 static constexpr char TidigCompCnt[] = ".tidig_comp_cnt";
+#if LLPC_BUILD_GFX12
+static constexpr char XInterleave[] = ".x_interleave";
+static constexpr char YInterleave[] = ".y_interleave";
+#endif
 }; // namespace ComputeRegisterMetadataKey
 
 namespace GraphicsRegisterMetadataKey {
@@ -705,6 +713,9 @@ constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE = 0xA29B;
 constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE_GFX11 = 0xC266;
 
 constexpr unsigned mmSPI_SHADER_PGM_LO_GS = 0x2C88;
+#if LLPC_BUILD_GFX12
+constexpr unsigned mmSPI_SHADER_PGM_LO_GS_GFX12 = 0x2C84;
+#endif
 
 // Register bitfield layout.
 

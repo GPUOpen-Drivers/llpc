@@ -5,7 +5,7 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -222,6 +222,9 @@ uint32_t SPIRVType::getCooperativeMatrixKHRUse() const {
   return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getUse()->getZExtIntValue();
 }
 
+#if LLPC_BUILD_GFX12
+#endif
+
 bool SPIRVType::isTypeVoid() const {
   return OpCode == OpTypeVoid;
 }
@@ -297,6 +300,9 @@ bool SPIRVType::isTypeRayQueryKHR() const {
 bool SPIRVType::isTypeCooperativeMatrixKHR() const {
   return OpCode == OpTypeCooperativeMatrixKHR;
 }
+
+#if LLPC_BUILD_GFX12
+#endif
 
 void SPIRVTypeFloat::decode(std::istream &I) {
   getDecoder(I) >> (Id) >> (BitWidth);

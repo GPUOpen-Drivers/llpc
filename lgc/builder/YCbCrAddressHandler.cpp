@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -57,6 +57,9 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   Value *pipeBankXorNone = m_builder->getInt32(0);
 
   switch (m_gfxIp->major) {
+#if LLPC_BUILD_GFX12
+  case 12:
+#endif
   case 11: {
     pipeBankXor1 = pipeBankXorNone;
     pipeBankXor2 = pipeBankXorNone;
@@ -136,6 +139,9 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
   m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
+#if LLPC_BUILD_GFX12
+  case 12:
+#endif
   case 11:
   case 10: {
     const unsigned elementBytes = bpp >> 3;

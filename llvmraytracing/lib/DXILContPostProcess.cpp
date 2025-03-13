@@ -90,6 +90,22 @@ Value *DXILContPostProcessPassImpl::ensure64BitAddr(Value *Src) {
   Value *Addr64 = Builder.CreateZExt(Src, I64);
   Addr64 = Builder.CreateAnd(Addr64, 0xFFFFFFC0);
 
+#if LLPC_BUILD_GFX12
+  // Extract the dVGPR requirements and priority, encode it in the target VPC
+  // vgprCount = (((vpc32 >> 3) & 0x7) + 1) * 16
+  // vpc64 |= vgprCount << 32
+  // Rewritten as:
+  // vgprCount = ((vpc32 & 0x38) << 1) + 16
+  // vpc64 |= vgprCount << 32
+  constexpr static uint32_t VgprBlockSize = 16;
+  Value *VgprBlockCountTmp1 = Builder.CreateAnd(Src, 0x38);
+  Value *VgprBlockCountTmp2 = Builder.CreateShl(VgprBlockCountTmp1, 1);
+  Value *VgprCount = Builder.CreateAdd(VgprBlockCountTmp2, Builder.getInt32(VgprBlockSize));
+  VgprCount = Builder.CreateZExt(VgprCount, I64);
+  VgprCount = Builder.CreateShl(VgprCount, 32);
+  Addr64 = Builder.CreateOr(Addr64, VgprCount);
+#endif
+
   Value *Priority = Builder.CreateAnd(Src, Builder.getInt32(0x7));
   // firstMetadataBit = 32
   // firstPriorityBitInMetadata = 16

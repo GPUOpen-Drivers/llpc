@@ -178,6 +178,15 @@ private:
   void processDriverTableLoad(llvm::Module &module);
   void lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp);
 
+#if LLPC_BUILD_GFX12
+  bool isDynamicVgprEnabled() {
+    return (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) &&
+           !(m_pipelineState->getOptions().disableDynamicVgpr);
+  }
+
+  llvm::Function *createRetryVgprAllocFunc(llvm::FixedVectorType *sgprsTy);
+#endif
+
   bool useInitWholeWave() const;
 
   bool m_hasTs;                             // Whether the pipeline has tessllation shader

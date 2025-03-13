@@ -422,7 +422,16 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc, Value *stride) {
       sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
       sqBufRsrcWord3.gfx11.oobSelect = stride ? 3 : 2;
       assert(sqBufRsrcWord3.u32All == 0x20014FAC || sqBufRsrcWord3.u32All == 0x30014FAC);
-    } else {
+    }
+#if LLPC_BUILD_GFX12
+    else if (gfxIp.major == 12) {
+      sqBufRsrcWord3.gfx12.format = BUF_FORMAT_32_UINT;
+      sqBufRsrcWord3.gfx12.compressionEn = 1;
+      sqBufRsrcWord3.gfx12.oobSelect = stride ? 3 : 2;
+      assert(sqBufRsrcWord3.u32All == 0x22014FAC || sqBufRsrcWord3.u32All == 0x32014FAC);
+    }
+#endif
+    else {
       llvm_unreachable("Not implemented!");
     }
     bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);

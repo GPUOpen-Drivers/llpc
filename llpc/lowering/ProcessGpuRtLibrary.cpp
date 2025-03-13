@@ -183,6 +183,14 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 #endif
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ShaderMarker"] = &ProcessGpuRtLibrary::createShaderMarker;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_WaveScan"] = &ProcessGpuRtLibrary::createWaveScan;
+#if LLPC_BUILD_GFX12
+  m_libFuncPtrs["AmdTraceRayDualIntersectRay"] = &ProcessGpuRtLibrary::createDualIntersectRay;
+  m_libFuncPtrs["AmdTraceRayIntersectRayBvh8"] = &ProcessGpuRtLibrary::createIntersectRayBvh8;
+  m_libFuncPtrs["AmdTraceRayDsStackPush8Pop1"] = &ProcessGpuRtLibrary::createDsStackPush8Pop1;
+  m_libFuncPtrs["AmdTraceRayDsStackPush8Pop2"] = &ProcessGpuRtLibrary::createDsStackPush8Pop2;
+  m_libFuncPtrs["AmdTraceRayDsStackPush8Pop1PrimRangeEnabled"] =
+      &ProcessGpuRtLibrary::createDsStackPush8Pop1PrimRangeEnabled;
+#endif
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] = &ProcessGpuRtLibrary::createFloatOpWithRoundMode;
   m_libFuncPtrs["AmdExtDispatchThreadIdFlat"] = &ProcessGpuRtLibrary::createDispatchThreadIdFlat;
   m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &ProcessGpuRtLibrary::createSampleGpuTimer;
@@ -1000,5 +1008,235 @@ void ProcessGpuRtLibrary::createWaveScan(llvm::Function *func) {
   Value *src0 = m_builder->CreateLoad(retType, argIt);
   m_builder->CreateRet(m_builder->create<GpurtWaveScanOp>(waveOp, flags, src0));
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+void ProcessGpuRtLibrary::createDualIntersectRay(Function *func) {
+  createIntersectRay(func, true);
+}
+
+void ProcessGpuRtLibrary::createIntersectRayBvh8(Function *func) {
+  createIntersectRay(func, false);
+}
+
+// =====================================================================================================================
+// Create function to return dual ray intersection result
+//
+// @param func : The function to create
+void ProcessGpuRtLibrary::createIntersectRay(Function *func, bool isDualNode) {
+  auto rtip = m_gpurtKey.rtipVersion;
+  if (m_gpurtKey.bvhResDesc.size() < 4 || (rtip < Vkgc::RtIpVersion({3, 0}) && rtip != Vkgc::RtIpVersion({1, 5}))) {
+    // Don't generate code for non fitting RTIP.
+    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
+    return;
+  }
+  auto argIt = func->arg_begin();
+  // 1.
+  // struct DualIntersectResult
+  // {
+  //   uint4 first;
+  //   uint4 second;
+  //   uint2 geometryId;
+  // };
+  // DualIntersectResult AmdTraceRayDualIntersectRay(
+  //   in uint2     baseNodePtr,
+  //   inout float3 rayOrigin,
+  //   inout float3 rayDir,
+  //   in float     rayExtent,
+  //   in uint      instanceMask,
+  //   in uint      boxSortHeuristic,
+  //   in uint      node0,
+  //   in uint      node1)
+  // {
+  //   bvhSrd = generateBvhSrd()
+  //   offsets.x = node0
+  //   offsets.y = node1
+  //   call {<10 x i32>, <3 x float>, <3 x float>} @llvm.amdgcn.image.bvh.dual.intersect.ray(i64 %node_ptr, float
+  //   %ray_extent, i8 %instance_mask, <3 x float> %ray_origin, <3 x float> %ray_dir, <2 x i32> %offsets,
+  //   <4 x i32> %tdescr)
+  // }
+
+  // 2.
+  // struct Bvh8IntersectResult
+  //  {
+  //    uint4 slot0;
+  //    uint4 slot1;
+  //    uint2 ext;
+  //  }
+
+  // Bvh8IntersectResult AmdTraceRayIntersectRayBvh8(
+  //     in uint2     baseNodePtr,
+  //     inout float3 rayOrigin,
+  //     inout float3 rayDir,
+  //     in float     rayExtent,
+  //     in uint      instanceMask,
+  //     in uint      boxSortHeuristic,
+  //     in uint      node)
+  // {
+  //   bvhSrd = generateBvhSrd()
+  //   offsets = node
+  //   call {<10 x i32>, <3 x float>, <3 x float>} @llvm.amdgcn.image.bvh8.intersect.ray(i64 %node_ptr, float
+  //   %ray_extent, i8 %instance_mask, <3 x float> %ray_origin, <3 x float> %ray_dir, <i32> %offsets,
+  //   <4 x i32> %tdescr)
+  // }
+
+  // uint2 baseNodePtr
+  Value *baseNodePtr = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
+  baseNodePtr = m_builder->CreateBitCast(baseNodePtr, m_builder->getInt64Ty());
+  argIt++;
+
+  // float3 rayOrigin
+  Value *rayOrigin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
+  argIt++;
+
+  // float3 rayDir
+  Value *rayDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
+  argIt++;
+
+  // float rayExtent
+  Value *rayExtent = m_builder->CreateLoad(m_builder->getFloatTy(), argIt);
+  argIt++;
+
+  // uint instanceMask
+  Value *instanceMask = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
+  instanceMask = m_builder->CreateTrunc(instanceMask, m_builder->getInt8Ty());
+  argIt++;
+
+  // uint boxSortHeuristic
+  Value *boxSortHeuristic = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
+  argIt++;
+
+  // uint node0
+  Value *node0 = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
+  Value *dualNodes = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+  if (isDualNode) {
+    argIt++;
+    // uint node1
+    Value *node1 = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
+    // Pack two node together
+    dualNodes = m_builder->CreateInsertElement(dualNodes, node0, uint64_t(0));
+    dualNodes = m_builder->CreateInsertElement(dualNodes, node1, 1);
+  }
+
+  Value *imageDesc = createGetBvhSrd(nullptr, boxSortHeuristic);
+
+  auto intx10Ty = llvm::FixedVectorType::get(m_builder->getInt32Ty(), 10);
+  auto floatx3Ty = llvm::FixedVectorType::get(m_builder->getFloatTy(), 3);
+  Type *returnTy = llvm::StructType::get(m_builder->getContext(), {intx10Ty, floatx3Ty, floatx3Ty});
+  std::string callName =
+      (isDualNode == 1) ? "llvm.amdgcn.image.bvh.dual.intersect.ray" : "llvm.amdgcn.image.bvh8.intersect.ray";
+
+  Value *result = m_builder->CreateNamedCall(
+      callName, returnTy,
+      {baseNodePtr, rayExtent, instanceMask, rayOrigin, rayDir, isDualNode ? dualNodes : node0, imageDesc}, {});
+
+  // @llvm.amdgcn.image.bvh.dual.intersect.ray and @llvm.amdgcn.image.bvh8.intersect.ray intrinsic
+  // returns {<10 x i32>, <3 x float>, <3 x float>}, which are:
+  // DualIntersectResult/Bvh8IntersectResult, ray_origin, ray_dir.
+  Value *dualIntersectOrBvh8Result = m_builder->CreateExtractValue(result, 0);
+  Value *resultFirst = m_builder->CreateShuffleVector(dualIntersectOrBvh8Result, ArrayRef<int>{0, 1, 2, 3});
+  Value *resultSecond = m_builder->CreateShuffleVector(dualIntersectOrBvh8Result, ArrayRef<int>{4, 5, 6, 7});
+  Value *resultGeometryId = m_builder->CreateShuffleVector(dualIntersectOrBvh8Result, ArrayRef<int>{8, 9});
+
+  Value *resultRayOrigin = m_builder->CreateExtractValue(result, 1);
+  Value *resultRayDir = m_builder->CreateExtractValue(result, 2);
+
+  assert(func->getReturnType()->isStructTy() && (func->getReturnType()->getStructNumElements() == 3));
+  Value *ret = PoisonValue::get(func->getReturnType());
+  ret = m_builder->CreateInsertValue(ret, resultFirst, 0);
+  ret = m_builder->CreateInsertValue(ret, resultSecond, 1);
+  ret = m_builder->CreateInsertValue(ret, resultGeometryId, 2);
+
+  // Store rayOrigin and rayDir back.
+  m_builder->CreateStore(resultRayOrigin, func->getArg(1));
+  m_builder->CreateStore(resultRayDir, func->getArg(2));
+
+  m_builder->CreateRet(ret);
+}
+
+// =====================================================================================================================
+// Push 8 nodes to LDS stack and Pop N nodes
+//
+// @param func : The function to create
+// @param returnNodeCount : Number of returned node
+// @param primRangeEnable : Whether to enable primitive range
+void ProcessGpuRtLibrary::createDsStackPush8PopN(Function *func, unsigned returnNodeCount, bool primRangeEnable) {
+  assert((returnNodeCount == 1) || (returnNodeCount == 2));
+  assert(m_context->getGfxIpVersion().major >= 12);
+
+  auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
+  const static unsigned MaxLdsStackEntries = 16;
+
+  auto argIt = func->arg_begin();
+  Value *stackAddr = argIt++;
+  Value *stackAddrVal = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
+  Value *lastNodePtr = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
+  Value *data0 = m_builder->CreateLoad(int32x4Ty, argIt++);
+  Value *data1 = m_builder->CreateLoad(int32x4Ty, argIt);
+
+  Value *data = m_builder->CreateShuffleVector(data0, data1, ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
+
+  // OFFSET = {OFFSET1, OFFSET0}
+  // stack_size[4:0] = OFFSET0[4:0]
+  assert(MaxLdsStackEntries == 16);
+  unsigned offsetVal = MaxLdsStackEntries;
+  if (primRangeEnable) {
+    assert(returnNodeCount == 1);
+    // NOTE: For the push8-pop1 variant, bit 1 of OFFSET1 indicates if primitive range is enabled. We set the bit
+    // here by request.
+    offsetVal |= 1 << 9;
+  }
+
+  Value *offset = m_builder->getInt32(offsetVal);
+
+  Intrinsic::AMDGCNIntrinsics intrinsic = (returnNodeCount == 1) ? Intrinsic::amdgcn_ds_bvh_stack_push8_pop1_rtn
+                                                                 : Intrinsic::amdgcn_ds_bvh_stack_push8_pop2_rtn;
+  Value *result = m_builder->CreateIntrinsic(intrinsic, {}, {stackAddrVal, lastNodePtr, data, offset});
+
+  m_builder->CreateStore(m_builder->CreateExtractValue(result, 1), stackAddr);
+
+  Value *ret = m_builder->CreateExtractValue(result, 0);
+
+  if (returnNodeCount == 1) {
+    m_builder->CreateRet(ret);
+  } else {
+    // llvm.amdgcn.ds.bvh.stack.push8.pop2.rtn returns i64, cast it to uvec2.
+    m_builder->CreateRet(m_builder->CreateBitCast(ret, FixedVectorType::get(m_builder->getInt32Ty(), 2)));
+  }
+}
+
+// =====================================================================================================================
+// Create function to do LDS stack push 8 pop 1
+//
+// @param func : The function to create
+void ProcessGpuRtLibrary::createDsStackPush8Pop1(Function *func) {
+  if (m_gpurtKey.rtipVersion >= Vkgc::RtIpVersion({3, 0}))
+    createDsStackPush8PopN(func, 1, false);
+  else
+    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
+}
+
+// =====================================================================================================================
+// Create function to do LDS stack push 8 pop 2
+//
+// @param func : The function to create
+void ProcessGpuRtLibrary::createDsStackPush8Pop2(Function *func) {
+  if (m_gpurtKey.rtipVersion >= Vkgc::RtIpVersion({3, 0}) || m_gpurtKey.rtipVersion == Vkgc::RtIpVersion({1, 5}))
+    createDsStackPush8PopN(func, 2, false);
+  else
+    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
+}
+
+// =====================================================================================================================
+// Create function to do LDS stack push 8 pop 1 with primitive range enabled
+//
+// @param func : The function to create
+void ProcessGpuRtLibrary::createDsStackPush8Pop1PrimRangeEnabled(Function *func) {
+  if (m_gpurtKey.rtipVersion >= Vkgc::RtIpVersion({3, 0}))
+    createDsStackPush8PopN(func, 1, true);
+  else
+    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
+}
+#endif
 
 } // namespace Llpc

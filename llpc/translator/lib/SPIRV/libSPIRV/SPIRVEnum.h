@@ -5,7 +5,7 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -211,6 +211,8 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityMeshShadingEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityFragmentBarycentricKHR, {CapabilityShader});
   ADD_VEC_INIT(CapabilityCooperativeMatrixKHR, {CapabilityShader});
+#if LLPC_BUILD_GFX12
+#endif
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearNV, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupQuadsNV, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearKHR, {CapabilityShader});

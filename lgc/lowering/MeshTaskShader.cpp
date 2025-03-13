@@ -1693,6 +1693,10 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
 
     CoherentFlag coherent = {};
+#if LLPC_BUILD_GFX12
+    if (m_gfxIp.major >= 12)
+      coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_SYS;
+#endif
 
     m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                               {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset,
@@ -1803,10 +1807,21 @@ void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &set
   //
   // HW requires the primitive connectivity data has the following bit layout:
   //
+#if LLPC_BUILD_GFX12
+  // Pre-GFX12:
+#endif
   //   +----------------+---------------+---------------+---------------+
   //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
+#if LLPC_BUILD_GFX12
+  //
+  // GFX12:
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+  //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+#endif
   //
   auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   Value *primitiveData = nullptr;
@@ -1823,7 +1838,12 @@ void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &set
       primitiveData = m_builder.CreateShl(vertex1, 10);
       primitiveData = m_builder.CreateOr(primitiveData, vertex0);
     } else {
+#if LLPC_BUILD_GFX12
+      primitiveData = m_builder.CreateShl(vertex1, 9);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
   } else {
     assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
@@ -1837,7 +1857,14 @@ void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &set
       primitiveData = m_builder.CreateShl(primitiveData, 10);
       primitiveData = m_builder.CreateOr(primitiveData, vertex0);
     } else {
+#if LLPC_BUILD_GFX12
+      primitiveData = m_builder.CreateShl(vertex2, 9);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex1);
+      primitiveData = m_builder.CreateShl(primitiveData, 9);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
   }
 
@@ -2141,6 +2168,11 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
     // Task shader
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Task)->entryArgIdxs.task;
 
+#if LLPC_BUILD_GFX12
+    if (m_gfxIp.major >= 12) {
+      m_waveThreadInfo.waveIdInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_wave_id, {}, {});
+    } else
+#endif
     {
       // waveId = dispatchInfo[24:20]
       m_waveThreadInfo.waveIdInSubgroup =
@@ -2216,7 +2248,15 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
         workgroupIds[1] = m_builder.CreateExtractElement(workgroupId, 1);
         workgroupIds[2] = m_builder.CreateExtractElement(workgroupId, 2);
       } else {
+#if LLPC_BUILD_GFX12
+        // NOTE: On GFX12+, we use the intrinsics to get workgroup ID X/Y/Z instead of getting them from entry-point
+        // arguments. This is because the IDs are modeled by architected dispatch ID GPRs rather than normal SGPRs.
+        workgroupIds[0] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_x, {}, {});
+        workgroupIds[1] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_y, {}, {});
+        workgroupIds[2] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_z, {}, {});
+#else
         llvm_unreachable("Not implemented!");
+#endif
       }
       auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
 
@@ -3026,6 +3066,11 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
           coherent.bits.glc = true;
         }
+#if LLPC_BUILD_GFX12
+        else {
+          coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+        }
+#endif
 
         m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
                                   {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.primOrVertexIndex,
@@ -3635,7 +3680,12 @@ bool MeshTaskShader::checkNeedBarrierFlag(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
   auto module = entryPoint->getParent();
   for (auto &func : module->functions()) {
+#if LLPC_BUILD_GFX12
+    if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier ||
+                               func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier_signal)) {
+#else
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier) {
+#endif
       for (auto user : func.users()) {
         CallInst *const call = cast<CallInst>(user);
         if (call->getParent()->getParent() == entryPoint)
@@ -3776,6 +3826,14 @@ void MeshTaskShader::createFenceAndBarrier() {
 // =====================================================================================================================
 // Create LDS barrier to guarantee the synchronization of LDS operations.
 void MeshTaskShader::createBarrier() {
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, m_builder.getInt32(WorkgroupNormalBarrierId));
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
+                              m_builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
+    return;
+  }
+#endif
 
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }

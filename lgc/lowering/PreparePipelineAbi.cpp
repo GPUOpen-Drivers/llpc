@@ -208,6 +208,11 @@ void PreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *t
   CoherentFlag coherent = {};
   if (pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
     coherent.bits.glc = true;
+#if LLPC_BUILD_GFX12
+  } else {
+    coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_SYS;
+    coherent.gfx12.th = pipelineState->getTemporalHint(TH::TH_WB, TemporalHintTessFactorWrite);
+#endif
   }
 
   auto primitiveMode = pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
@@ -324,6 +329,11 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
   CoherentFlag coherent = {};
   if (gfxIp.major <= 11) {
     coherent.bits.glc = true;
+#if LLPC_BUILD_GFX12
+  } else {
+    coherent.gfx12.th = TH::TH_WB;
+    coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+#endif
   }
 
   LLPC_OUTS("===============================================================================\n");

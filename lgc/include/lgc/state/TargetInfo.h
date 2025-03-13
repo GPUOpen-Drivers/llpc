@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -126,6 +126,17 @@ struct WorkaroundFlags {
     };
     unsigned u32All;
   } gfx11;
+
+#if LLPC_BUILD_GFX12
+  union {
+    struct {
+      // Due to an issue in the DB, we cannot support ReZ in the compiler when this workaround is active.
+      unsigned waNoReZSupport : 1;
+      unsigned reserved : 31;
+    };
+    unsigned u32All;
+  } gfx12;
+#endif
 };
 
 // =====================================================================================================================

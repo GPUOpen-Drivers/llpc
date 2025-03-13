@@ -1,0 +1,129 @@
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;  Permission is hereby granted, free of charge, to any person obtaining a copy
+ ;  of this software and associated documentation files (the "Software"), to
+ ;  deal in the Software without restriction, including without limitation the
+ ;  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ ;  sell copies of the Software, and to permit persons to whom the Software is
+ ;  furnished to do so, subject to the following conditions:
+ ;
+ ;  The above copyright notice and this permission notice shall be included in all
+ ;  copies or substantial portions of the Software.
+ ;
+ ;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ ;  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ ;  IN THE SOFTWARE.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+; This test is to verify that dot(f16vec2, f16vec2) is not translated to the HW instruction v_dot2_f16_f16
+; in signed zero mode on GFX12. The test checks this result: dot2(<-0.0, -0.0>, <1.0, 1.0>) ?= -0.0.
+; v_dot2_f16_f16 is not IEEE compliant and doesn't respect signed zeros.
+
+; RUN: amdllpc -v -gfxip=12.0.1 %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
+; SHADERTEST: [[MUL:%.*]] = fmul nnan ninf arcp contract <2 x half> %{{.*}}, %{{.*}}
+; SHADERTEST-NEXT: [[ELEM0:%.*]] = extractelement <2 x half> [[MUL]], i64 0
+; SHADERTEST-NEXT: [[ELEM1:%.*]] = extractelement <2 x half> [[MUL]], i64 0
+; SHADERTEST-NEXT: fadd nnan ninf arcp contract half [[ELEM0]], [[ELEM1]]
+  
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; SHADERTEST: s_mul_f16 [[TMP:s.*]], s{{[0-9]*}}, s{{[0-9]*}}
+; SHADERTEST: s_add_f16 s{{[0-9]*}}, [[TMP]], [[TMP]]
+
+; SPIR-V
+; Version: 1.2
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 59
+; Schema: 0
+               OpCapability Shader
+               OpCapability FloatControls2
+               OpCapability Float16
+               OpExtension "SPV_KHR_float_controls2"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %2 "main" %gl_GlobalInvocationID
+               OpExecutionMode %2 LocalSize 1 1 1
+               OpExecutionModeId %2 FPFastMathDefault %half %uint_458763
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpMemberDecorate %_struct_6 0 Offset 0
+               OpDecorate %_struct_6 BufferBlock
+               OpDecorate %7 DescriptorSet 0
+               OpDecorate %7 Binding 0
+               OpDecorate %7 NonWritable
+               OpMemberDecorate %_struct_8 0 Offset 0
+               OpDecorate %_struct_8 BufferBlock
+               OpDecorate %9 DescriptorSet 0
+               OpDecorate %9 Binding 1
+               OpDecorate %_arr_half_int_1 ArrayStride 2
+               OpDecorate %_arr_half_int_2 ArrayStride 2
+               OpDecorate %_arr_uint_int_1 ArrayStride 4
+       %void = OpTypeVoid
+         %14 = OpTypeFunction %void
+       %bool = OpTypeBool
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+     %v2uint = OpTypeVector %uint 2
+     %v3uint = OpTypeVector %uint 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+       %half = OpTypeFloat 16
+%_ptr_Uniform_half = OpTypePointer Uniform %half
+%_ptr_Function_half = OpTypePointer Function %half
+     %v2half = OpTypeVector %half 2
+     %v3half = OpTypeVector %half 3
+     %v4half = OpTypeVector %half 4
+%_ptr_Input_v4half = OpTypePointer Input %v4half
+%_ptr_Output_v4half = OpTypePointer Output %v4half
+ %mat2v2half = OpTypeMatrix %v2half 2
+%_arr_half_int_1 = OpTypeArray %half %int_1
+%_arr_half_int_2 = OpTypeArray %half %int_2
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
+%_arr_uint_int_1 = OpTypeArray %uint %int_1
+  %_struct_6 = OpTypeStruct %_arr_uint_int_1
+%_ptr_Uniform__struct_6 = OpTypePointer Uniform %_struct_6
+          %7 = OpVariable %_ptr_Uniform__struct_6 Uniform
+  %_struct_8 = OpTypeStruct %_arr_uint_int_1
+%_ptr_Uniform__struct_8 = OpTypePointer Uniform %_struct_8
+          %9 = OpVariable %_ptr_Uniform__struct_8 Uniform
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+%half_n0x1p_0 = OpConstant %half -0x1p+0
+%half_n0x1_4ap_1 = OpConstant %half -0x1.4ap+1
+%half_0x0p_0 = OpConstant %half 0x0p+0
+%half_0x1pn1 = OpConstant %half 0x1p-1
+%half_0x1p_0 = OpConstant %half 0x1p+0
+%half_0x1p_1 = OpConstant %half 0x1p+1
+%half_0x1_8p_1 = OpConstant %half 0x1.8p+1
+%half_0x1p_2 = OpConstant %half 0x1p+2
+%half_0x1_4p_2 = OpConstant %half 0x1.4p+2
+%half_0x1_8p_2 = OpConstant %half 0x1.8p+2
+%half_0x1pn14 = OpConstant %half 0x1p-14
+%uint_458763 = OpConstant %uint 458763
+          %2 = OpFunction %void None %14
+         %47 = OpLabel
+         %48 = OpAccessChain %_ptr_Uniform_uint %7 %int_0 %int_0
+         %49 = OpLoad %uint %48
+         %50 = OpBitcast %v2half %49
+         %51 = OpCompositeExtract %half %50 0
+         %52 = OpCompositeExtract %half %50 1
+         %53 = OpCompositeConstruct %v2half %51 %51
+         %54 = OpCompositeConstruct %v2half %52 %52
+         %55 = OpDot %half %53 %54
+         %56 = OpCompositeConstruct %v2half %55 %half_0x0p_0
+         %57 = OpBitcast %uint %56
+         %58 = OpAccessChain %_ptr_Uniform_uint %9 %int_0 %int_0
+               OpStore %58 %57
+               OpReturn
+               OpFunctionEnd

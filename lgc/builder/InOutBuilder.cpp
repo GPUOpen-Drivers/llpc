@@ -1396,6 +1396,13 @@ Value *BuilderImpl::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInSubgroupId: {
     GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
     // From Navi21, it should load the subgroupid from sgpr initialized at wave launch.
+#if LLPC_BUILD_GFX12
+    if (gfxIp.major >= 12) {
+      Value *waveIdInSubgroup =
+          ShaderInputs::getInput(ShaderInput::CsWaveId, BuilderBase::get(*this), *getLgcContext());
+      return waveIdInSubgroup;
+    } else
+#endif
     {
       if (gfxIp >= GfxIpVersion({10, 3})) {
         Value *multiDispatchInfo =
