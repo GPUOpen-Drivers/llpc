@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -68,6 +68,9 @@ static const struct {
   MsgPackScanner::Item           funcLdsSize = {MsgPackScanner::ItemType::Scalar, ".lds_size"};
   MsgPackScanner::Item           funcSgprCount = {MsgPackScanner::ItemType::Scalar, ".sgpr_count"};
   MsgPackScanner::Item           funcVgprCount = {MsgPackScanner::ItemType::Scalar, ".vgpr_count"};
+#if LLPC_BUILD_GFX12
+  MsgPackScanner::Item           funcOutgoingVgprCount = {MsgPackScanner::ItemType::Scalar, ".outgoing_vgpr_count"};
+#endif
   MsgPackScanner::Item         endTheFunc = {MsgPackScanner::ItemType::EndContainer};
   MsgPackScanner::Item       endShaderFunctions = {MsgPackScanner::ItemType::EndContainer};
   MsgPackScanner::Item       shaders = {MsgPackScanner::ItemType::Map, ".shaders"};
@@ -129,6 +132,9 @@ struct Usage {
   unsigned ldsSize;
   unsigned sgprCount;
   unsigned vgprCount;
+#if LLPC_BUILD_GFX12
+  unsigned outgoingVgprCount;
+#endif
   bool cpsGlobal;
   bool scratchEn;
   bool memOrdered;
@@ -146,6 +152,9 @@ struct Usage {
          << "  ldsSize " << usage.ldsSize << "\n"
          << "  sgprCount " << usage.sgprCount << "\n"
          << "  vgprCount " << usage.vgprCount << "\n"
+#if LLPC_BUILD_GFX12
+         << "  outgoingVgprCount " << usage.outgoingVgprCount << "\n"
+#endif
          << "  cpsGlobal " << usage.cpsGlobal << "\n"
          << "  scratchEn " << usage.scratchEn << "\n"
          << "  memOrdered " << usage.memOrdered << "\n";
@@ -232,6 +241,12 @@ void RegStackUsage::finalizeAndUpdate(SmallVectorImpl<char> &elfBuffer, size_t s
   m_impl->finalizeAndUpdate(elfBuffer, startOffset, frontendGlobalAlignment);
 }
 
+#if LLPC_BUILD_GFX12
+unsigned RegStackUsage::getMaxOutgoingVgprCount() const {
+  return m_impl->getUsage().outgoingVgprCount;
+}
+#endif
+
 // =====================================================================================================================
 // Construct from ELF blob. This reads the reg/stack usage from the ELF's PAL metadata.
 // This is passed rayGenUsage to allow for a future enhancement where frontend stack size is calculated in a
@@ -305,6 +320,10 @@ void RegStackUsageImpl::scanPalMetadata() {
       m_usage.sgprCount = std::max(m_usage.sgprCount, unsigned(msgPackScanner.asInt(item).value_or(0)));
     else if (&item == &items.csVgprCount || &item == &items.funcVgprCount)
       m_usage.vgprCount = std::max(m_usage.vgprCount, unsigned(msgPackScanner.asInt(item).value_or(0)));
+#if LLPC_BUILD_GFX12
+    else if (&item == &items.funcOutgoingVgprCount)
+      m_usage.outgoingVgprCount = std::max(m_usage.outgoingVgprCount, unsigned(msgPackScanner.asInt(item).value_or(0)));
+#endif
     else if (&item == &items.csMemOrdered)
       m_usage.memOrdered = msgPackScanner.asBool(item).value_or(false);
     // scratchEn and scratchMemorySize are read solely for the "Re-scan the new blob" check (in updateAndWrite)
@@ -364,6 +383,9 @@ void RegStackUsageImpl::merge(const RegStackUsageImpl &shaderUsage) {
   m_usage.ldsSize = std::max(m_usage.ldsSize, shaderUsage.m_usage.ldsSize);
   m_usage.sgprCount = std::max(m_usage.sgprCount, shaderUsage.m_usage.sgprCount);
   m_usage.vgprCount = std::max(m_usage.vgprCount, shaderUsage.m_usage.vgprCount);
+#if LLPC_BUILD_GFX12
+  m_usage.outgoingVgprCount = std::max(m_usage.outgoingVgprCount, shaderUsage.m_usage.outgoingVgprCount);
+#endif
   m_usage.memOrdered = std::max(m_usage.memOrdered, shaderUsage.m_usage.memOrdered);
 
   m_usage.callableShaderCount += shaderUsage.m_usage.callableShaderCount;

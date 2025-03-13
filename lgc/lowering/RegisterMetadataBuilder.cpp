@@ -210,7 +210,12 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
     else
       lsVgprCompCnt = 1; // Must enable relative vertex ID (LS VGPR2 and VGPR3)
   } else {
+#if LLPC_BUILD_GFX12
+    if (m_hasVs && vsBuiltInUsage.instanceIndex)
+      lsVgprCompCnt = 1; // Enable instance ID (LS VGPR3）
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::LsVgprCompCnt] = lsVgprCompCnt;
 
@@ -414,7 +419,21 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
         gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
     }
   } else {
+#if LLPC_BUILD_GFX12
+    if (m_hasGs) {
+      if (hwConfig.inputVertices > 3 && geometryMode.inputPrimitive != InputPrimitives::Patch)
+        gsVgprCompCnt = 2; // Enable primitive connectivity data for adjacency (GS VGPR2)
+      else if (gsBuiltInUsage.primitiveIdIn)
+        gsVgprCompCnt = 1; // Enable primitive ID (GS VGPR1)
+    } else if (m_hasVs) {
+      // NOTE: When GS is absent, only those VGPRs are required: primitive connectivity data,
+      // primitive ID (only for VS).
+      if (!hasTs && vsBuiltInUsage.primitiveId)
+        gsVgprCompCnt = 1; // Enable primitive ID (GS VGPR1)
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::GsVgprCompCnt] = gsVgprCompCnt;
 
@@ -431,7 +450,19 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
         esVgprCompCnt = 3; // Enable instance ID (ES VGPR8)
     }
   } else {
+#if LLPC_BUILD_GFX12
+    if (hasTs) {
+      if (tesBuiltInUsage.primitiveId)
+        esVgprCompCnt = 3; // Enable patch ID (ES VGPR6)
+      else
+        esVgprCompCnt = 2; // Must enable relative patch ID (ES VGPR5)
+    } else if (m_hasVs) {
+      if (vsBuiltInUsage.instanceIndex)
+        esVgprCompCnt = 1; // Enable instance ID (ES VGPR4)
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::EsVgprCompCnt] = esVgprCompCnt;
 
@@ -619,7 +650,12 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     if (!nggControl->passthroughMode) {
       // If the NGG culling data buffer is not already specified by a hardware stage's user_data_reg_map, then this
       // field specified the register offset that is expected to point to the low 32-bits of address to the buffer.
+#if LLPC_BUILD_GFX12
+      getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::NggCullingDataReg] =
+          m_gfxIp.major >= 12 ? mmSPI_SHADER_PGM_LO_GS_GFX12 : mmSPI_SHADER_PGM_LO_GS;
+#else
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::NggCullingDataReg] = mmSPI_SHADER_PGM_LO_GS;
+#endif
     }
   }
 
@@ -781,6 +817,10 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       m_pipelineState->getShaderResourceUsage(shaderStage)->builtInUsage.fs.runAtSampleRate > 0;
 
   bool allowRez = shaderOptions.allowReZ;
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx12.waNoReZSupport)
+    allowRez = false;
+#endif
   // DB_SHADER_CONTROL
   ZOrder zOrder = LATE_Z;
   bool execOnHeirFail = false;
@@ -1112,6 +1152,10 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     const auto &shaderOptions = m_pipelineState->getShaderOptions(apiStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::DebugMode] = shaderOptions.debugMode;
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::TrapPresent] = shaderOptions.trapPresent;
+#if LLPC_BUILD_GFX12
+    if (m_gfxIp.major >= 12)
+      hwShaderNode[Util::Abi::HardwareStageMetadataKey::WorkgroupRoundRobin] = shaderOptions.workgroupRoundRobin;
+#endif
   }
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::UserSgprs] = userDataCount;
 

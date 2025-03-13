@@ -306,6 +306,15 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
       m_builder->CreateGEP(m_stackTy, m_stack, {m_builder->getInt32(0), stackBasePerThread}), m_builder->getInt32Ty());
 
   Value *stackAddr;
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
+    // stack_addr[29:15] = stack_base[15:2]
+    // stack_addr[14:10] = stack_index[5:0]
+    // Note that this relies on stackAddr being a multiple of 4, so that bits 15 and 14 are 0.
+    // stackAddrDw = (stackAddr >> 2) << 15.
+    stackAddr = m_builder->CreateShl(stackBaseAsInt, 13);
+  } else
+#endif
   {
     // stack_addr[31:18] = stack_base[15:2]
     // stack_addr[17:0] = stack_index[17:0]

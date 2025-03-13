@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -74,6 +74,11 @@ public:
   // @param Alignment of frontend stack for global CPS; 0 for scratch CPS
   //
   void finalizeAndUpdate(llvm::SmallVectorImpl<char> &elfBuffer, size_t startOffset, unsigned frontendGlobalAlignment);
+
+#if LLPC_BUILD_GFX12
+  // Get the max outgoing VGPR count.
+  unsigned getMaxOutgoingVgprCount() const;
+#endif
 
 private:
   std::unique_ptr<RegStackUsageImpl> m_impl;

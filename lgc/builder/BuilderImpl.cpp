@@ -74,6 +74,51 @@ Type *BuilderBase::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecT
 // @param vector2 : The float vector 2
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
+#if LLPC_BUILD_GFX12
+  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 12) {
+    // Use a chain of v_dot2_f16_f16/v_dot2_bf16_bf16 on gfx12+.
+    //
+    // Note: GFX11 has this instruction, but its precision doesn't satisfy Vulkan requirements.
+    //
+    // Note: GFX10 chips may have v_dot2_f32_f16, which we could consider generating in cases where bitexact results
+    //       are not required.
+    //
+    // Note: v_dot2_f16_f16/v_dot2_bf16_bf16 only respects RTE mode according to HW spec. We must check the
+    //       specified rounding mode before using it. Also, v_dot2_f16_f16/v_dot2_bf16_bf16 is not IEEE compliant
+    //       so we must check NSZ as well.
+    const auto fp16RoundMode =
+        getPipelineState()->getShaderModes()->getCommonShaderMode(m_shaderStage.value()).fp16RoundMode;
+    const auto vectorTy = dyn_cast<FixedVectorType>(vector1->getType());
+    if (vectorTy && (vectorTy->getScalarSizeInBits() == 16) &&
+        (fp16RoundMode == FpRoundMode::DontCare || fp16RoundMode == FpRoundMode::Even) &&
+        getFastMathFlags().noSignedZeros()) {
+      int compCount = vectorTy->getNumElements();
+      Value *result = nullptr;
+      Type *basicType = getHalfTy();
+      Intrinsic::AMDGCNIntrinsics inst = Intrinsic::amdgcn_fdot2_f16_f16;
+      if (vectorTy->getScalarType()->isBFloatTy()) {
+        basicType = getBFloatTy();
+        inst = Intrinsic::amdgcn_fdot2_bf16_bf16;
+      }
+
+      if (compCount % 2 == 0) {
+        result = ConstantFP::get(basicType, 0.0);
+      } else {
+        // If the component count is odd, prefer feeding the last product (odd one out) as initial value.
+        Value *lhs = CreateExtractElement(vector1, compCount - 1);
+        Value *rhs = CreateExtractElement(vector2, compCount - 1);
+        result = CreateFMul(lhs, rhs);
+      }
+
+      for (int i = 0; i + 1 < compCount; i += 2) {
+        Value *lhs = CreateShuffleVector(vector1, {i, i + 1});
+        Value *rhs = CreateShuffleVector(vector2, {i, i + 1});
+        result = CreateIntrinsic(basicType, inst, {lhs, rhs, result});
+      }
+      return result;
+    }
+  }
+#endif
 
   Value *product = CreateFMul(vector1, vector2);
   if (!isa<VectorType>(product->getType()))
@@ -254,6 +299,9 @@ Value *BuilderImpl::CreateIntegerDotProduct(Value *vector1, Value *vector2, Valu
 bool BuilderImpl::supportWaveWideBPermute(ShaderStageEnum shaderStage) const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
+#if LLPC_BUILD_GFX12
+  supportBPermute = supportBPermute || (gfxIp == 12);
+#endif
   auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage);
   supportBPermute = supportBPermute || waveSize == 32;
   return supportBPermute;
@@ -264,6 +312,14 @@ bool BuilderImpl::supportWaveWideBPermute(ShaderStageEnum shaderStage) const {
 bool BuilderImpl::supportPermLane64Dpp() const {
   return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11;
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Get whether the context we are building in supports permute lane var operations.
+bool BuilderImpl::supportPermLaneVar() const {
+  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 12;
+}
+#endif
 
 // =====================================================================================================================
 // Create an "if..endif" or "if..else..endif" structure. The current basic block becomes the "endif" block, and all

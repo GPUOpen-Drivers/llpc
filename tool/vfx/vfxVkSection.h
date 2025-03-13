@@ -260,11 +260,18 @@ public:
 
   SectionShaderOption() : Section(getAddrTable(), SectionTypeUnset, "options"), m_clientHash{} {
     memset(&m_state, 0, sizeof(m_state));
+#if LLPC_BUILD_GFX12
+    m_cachePolicyLlc = &m_memory;
+#endif
   }
 
   void getSubState(SubState &state) {
     m_state.clientHash.lower = m_clientHash.i64Vec2[0];
     m_state.clientHash.upper = m_clientHash.i64Vec2[1];
+#if LLPC_BUILD_GFX12
+    m_state.cachePolicyLlc.resourceCount = m_cachePolicyLlc->size();
+    m_state.cachePolicyLlc.noAllocs = m_cachePolicyLlc->data();
+#endif
     state = m_state;
   };
   SubState &getSubStateRef() { return m_state; }
@@ -320,9 +327,16 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, backwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, constantBufferBindingOffset, MemberTypeInt, false);
+#if LLPC_BUILD_GFX12
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workgroupRoundRobin, MemberTypeBool, false);
+#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, imageSampleDrefReturnsRgba, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableGlPositionOpt, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, viewIndexFromDeviceIndex, MemberTypeBool, false);
+#if LLPC_BUILD_GFX12
+      INIT_MEMBER_NAME_TO_ADDR(SectionShaderOption, m_cachePolicyLlc, MemberTypeUArray, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, temporalHintShaderControl, MemberTypeInt, false);
+#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceUnderflowPrevention, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceMemoryBarrierScope, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scheduleStrategy, MemberTypeEnum, false);
@@ -333,6 +347,10 @@ private:
 
   SubState m_state;
   IUFValue m_clientHash;
+#if LLPC_BUILD_GFX12
+  std::vector<uint32_t> *m_cachePolicyLlc;
+  std::vector<uint32_t> m_memory;
+#endif
 };
 
 // =====================================================================================================================
@@ -591,10 +609,17 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableInterpModePatch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, pageMigrationEnabled, MemberTypeBool, false);
+#if LLPC_BUILD_GFX12
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, expertSchedulingMode, MemberTypeBool, false);
+#endif
 
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_glState, MemberTypeGlState, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
+#if LLPC_BUILD_GFX12
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, cacheScopePolicyControl, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, temporalHintControl, MemberTypeInt, false);
+#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizePointSizeWrite, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, padBufferSizeToNextDword, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_compileTimeConstants, MemberTypeCompileConstInfo, true);
@@ -1229,6 +1254,10 @@ public:
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_clientMetadata, MemberTypeU8Array, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, cpsFlags, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, rtIgnoreDeclaredPayloadSize, MemberTypeBool, false);
+#if LLPC_BUILD_GFX12
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, disableDynamicVgpr, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, dynamicVgprBlockSize, MemberTypeInt, false);
+#endif
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_gpurtOptions, MemberTypeGpurtOption, true);
       return addrTableInitializer;
     }();

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -115,6 +115,9 @@ SqImgSampRegHandler::SqImgSampRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   switch (gfxIpVersion->major) {
   case 10:
   case 11:
+#if LLPC_BUILD_GFX12
+  case 12:
+#endif
     m_bitsInfo = SqImgSampRegBitsGfx9;
     break;
   default:
@@ -212,6 +215,34 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {6, 0, 7},   // MinLodHi
 };
 
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// SqImgSampReg Bits information look up table (Gfx12)
+// TODO: update comment when the registers file is available
+static constexpr BitsInfo SqImgRsrcRegBitsGfx12[static_cast<unsigned>(SqRsrcRegs::Count)] = {
+    {0, 0, 32},  // BaseAddress
+    {1, 0, 8},   // BaseAddressHi
+    {1, 17, 8},  // Format
+    {},          // Width
+    {2, 14, 16}, // Height
+    {3, 0, 12},  // DstSelXYZW
+    {3, 20, 5},  // SwizzleMode
+    {3, 28, 4},  // Type
+    {4, 0, 14},  // Depth
+    {},          // Pitch
+    {3, 25, 3},  // BcSwizzle
+    {1, 25, 5},  // BaseLevel
+    {3, 15, 5},  // LastLevel
+    {4, 16, 13}, // BaseArray
+    {1, 30, 2},  // WidthLo
+    {2, 0, 14},  // WidthHi
+    {5, 4, 1},   // ArrayPitch (aka UAV3D)
+    {},          // MinLod
+    {5, 26, 6},  // MinLodLo
+    {6, 0, 7},   // MinLodHi
+};
+#endif
+
 // =====================================================================================================================
 // Helper class for handling Registers defined in SQ_IMG_RSRC_WORD
 //
@@ -229,6 +260,11 @@ SqImgRsrcRegHandler::SqImgRsrcRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   case 11:
     m_bitsInfo = SqImgRsrcRegBitsGfx11;
     break;
+#if LLPC_BUILD_GFX12
+  case 12:
+    m_bitsInfo = SqImgRsrcRegBitsGfx12;
+    break;
+#endif
   default:
     llvm_unreachable("GFX IP is not supported!");
     break;
@@ -258,6 +294,9 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     case 10:
       return getRegCommon(static_cast<unsigned>(regId));
     case 11:
+#if LLPC_BUILD_GFX12
+    case 12:
+#endif
       return getRegCombine(static_cast<unsigned>(SqRsrcRegs::MinLodLo), static_cast<unsigned>(SqRsrcRegs::MinLodHi));
     default:
       llvm_unreachable("GFX IP is not supported!");
@@ -272,6 +311,9 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     switch (m_gfxIpVersion->major) {
     case 10:
     case 11:
+#if LLPC_BUILD_GFX12
+    case 12:
+#endif
       return m_builder->CreateAdd(
           getRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi)), m_one);
       return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(SqRsrcRegs::Width)), m_one);
@@ -311,6 +353,9 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
       setRegCommon(static_cast<unsigned>(regId), regValue);
       break;
     case 11:
+#if LLPC_BUILD_GFX12
+    case 12:
+#endif
       setRegCombine(static_cast<unsigned>(SqRsrcRegs::MinLodLo), static_cast<unsigned>(SqRsrcRegs::MinLodHi), regValue);
       break;
     default:
@@ -327,6 +372,9 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
     switch (m_gfxIpVersion->major) {
     case 10:
     case 11:
+#if LLPC_BUILD_GFX12
+    case 12:
+#endif
       setRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi),
                     m_builder->CreateSub(regValue, m_one));
       break;

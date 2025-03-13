@@ -89,10 +89,43 @@ llvm::Type *lgc::xdl::getCooperativeMatrixTy(llvm_dialects::Builder &builder, Co
     if (elemType == CooperativeMatrixElementType::Int8)
       return llvm::FixedVectorType::get(wordTy, 4);
     return llvm::FixedVectorType::get(wordTy, 8);
+#if LLPC_BUILD_GFX12
+  case CooperativeMatrixLayout::Gfx12BaseLayout:
+    assert(kSize == 16);
+    // Total elementNumber * element_bit_width/ (waveSize * vgpr_size_perlane);
+    // Use wave32 as default, wave64 will have some poison values in later process.
+    cntDwords = (16 * 16 * getBitWidthOfCooperativeMatrixElement(elemType)) / (32 * 32);
+    if (cntDwords > 1)
+      return llvm::FixedVectorType::get(wordTy, cntDwords);
+    return builder.getInt32Ty();
+  case CooperativeMatrixLayout::Gfx12SwizzledKX16Layout:
+    assert(kSize >= 32);
+    cntDwords = (kSize * 16 * getBitWidthOfCooperativeMatrixElement(elemType)) / (32 * 32);
+    if (cntDwords > 1)
+      return llvm::FixedVectorType::get(wordTy, cntDwords);
+    return builder.getInt32Ty();
+#endif
   default:
     llvm_unreachable("Type is not supported!");
   }
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Get the LLVM type of a sparse index for the sparseCooperativeMatrix.
+//
+// @param format : The sparse index for the sparseCooperativeMatrix
+llvm::Type *lgc::xdl::getSparseIndexTy(llvm_dialects::Builder &builder, SparseCooperativeMatrixSparsityFormat format) {
+  // Note: the layout currently has no influence on the type. In the long run, we should switch to genuinely opaque
+  // types at the LGC level, and parameterize the type using both the element type and the layout.
+  switch (format) {
+  case SparseCooperativeMatrixSparsityFormat::Sparsity2to4AMD:
+    return builder.getInt32Ty();
+  default:
+    llvm_unreachable("The sparsity index type is not supported now.");
+  }
+}
+#endif
 
 // =====================================================================================================================
 // Whether the underlying type of a cooperative matrix is integer.

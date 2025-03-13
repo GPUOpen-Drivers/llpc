@@ -197,6 +197,12 @@ target_sources(LLVMlgc PRIVATE
     lowering/LowerRayQueryWrapper.cpp
 )
 
+#if LLPC_BUILD_GFX12
+if(LLPC_BUILD_GFX12)
+    target_sources(LLVMlgc PRIVATE lowering/AddBufferOperationMetadata.cpp)
+endif()
+#endif
+
 # include/lgc/lowering
 target_sources(LLVMlgc PRIVATE
     include/lgc/lowering/AddLoopMetadata.h
@@ -234,6 +240,12 @@ target_sources(LLVMlgc PRIVATE
     include/lgc/lowering/VertexFetch.h
     include/lgc/lowering/WorkaroundDsSubdwordWrite.h
 )
+
+#if LLPC_BUILD_GFX12
+if(LLPC_BUILD_GFX12)
+    target_sources(LLVMlgc PRIVATE include/lgc/lowering/AddBufferOperationMetadata.h)
+endif()
+#endif
 
 # lgc/state
 target_sources(LLVMlgc PRIVATE

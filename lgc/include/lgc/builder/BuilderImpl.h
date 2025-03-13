@@ -79,6 +79,11 @@ protected:
   // Get whether the context we are building in supports permute lane 64 DPP operations.
   bool supportPermLane64Dpp() const;
 
+#if LLPC_BUILD_GFX12
+  // Get whether the context we are building in supports permute lane var operations.
+  bool supportPermLaneVar() const;
+#endif
+
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
 
@@ -482,6 +487,14 @@ private:
     IMG_FMT_BG_RG_UNORM__GFX104PLUS = 86,
   };
 
+#if LLPC_BUILD_GFX12
+  enum ImgFmtGfx12 {
+    IMG_FMT_8_8_8_8_UNORM = 42,
+    IMG_FMT_GB_GR_UNORM = 82,
+    IMG_FMT_BG_RG_UNORM = 86,
+  };
+#endif
+
   static const unsigned AtomicOpCompareSwap = 1;
 
   bool m_isFmaskLoad = false; // If set true, we need load a full descriptor
@@ -850,6 +863,13 @@ protected:
                                      llvm::Value *const index, ShaderStageEnum shaderStage,
                                      const llvm::Twine &instName);
   llvm::Value *createWqm(llvm::Value *const value);
+
+#if LLPC_BUILD_GFX12
+  llvm::Value *createPermLane16Var(llvm::Value *const origValue, llvm::Value *const updateValue,
+                                   llvm::Value *const select, bool fetchInactive, bool boundCtrl);
+  llvm::Value *createPermLaneX16Var(llvm::Value *const origValue, llvm::Value *const updateValue,
+                                    llvm::Value *const select, bool fetchInactive, bool boundCtrl);
+#endif
 };
 
 } // namespace lgc

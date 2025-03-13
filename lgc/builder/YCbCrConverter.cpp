@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -385,6 +385,18 @@ void YCbCrConverter::genImgDescChroma() {
                                   m_builder->getInt32(BuilderImpl::ImgFmtGfx11::IMG_FMT_8_8_8_8_UNORM__GFX104PLUS));
       break;
     }
+#if LLPC_BUILD_GFX12
+    case 12: {
+      isGbGrFmt =
+          m_builder->CreateICmpEQ(imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx12::IMG_FMT_BG_RG_UNORM));
+      isBgRgFmt =
+          m_builder->CreateICmpEQ(imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx12::IMG_FMT_GB_GR_UNORM));
+
+      proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
+                                  m_builder->getInt32(BuilderImpl::ImgFmtGfx12::IMG_FMT_8_8_8_8_UNORM));
+      break;
+    }
+#endif
     default:
       llvm_unreachable("GFX IP not supported!");
       break;

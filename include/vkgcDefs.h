@@ -453,6 +453,20 @@ struct CompileTimeConst {
   } values;          ///< The compile-time values for this slot.
 };
 
+#if LLPC_BUILD_GFX12
+/// Handle temporal hint
+enum TemporalHintOpType {
+  TemporalHintAtmWrite = 0,
+  TemporalHintImageRead = 4,
+  TemporalHintImageWrite = 8,
+  TemporalHintTessFactorWrite = 12,
+  TemporalHintTessRead = 16,
+  TemporalHintTessWrite = 20,
+  TemporalHintBufferRead = 24,
+  TemporalHintBufferWrite = 28,
+};
+#endif
+
 /// Represents info of compile-time constants within a shader of a specified stage.
 struct CompileConstInfo {
   unsigned numCompileTimeConstants;        ///< Number of compile time constants.
@@ -496,7 +510,11 @@ struct PipelineOptions {
   bool reverseThreadGroup;                        ///< If set, enable thread group reversing
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
+#if LLPC_BUILD_GFX12
+  bool expertSchedulingMode;
+#else
   bool reserved16;
+#endif
 
   struct GLState {
     bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
@@ -519,14 +537,27 @@ struct PipelineOptions {
   } glState;
   const auto &getGlState() const { return glState; }
 
+#if LLPC_BUILD_GFX12
+  unsigned cacheScopePolicyControl; ///< Control cache scope policy. attributes-through-memory read/write is
+                                    ///  available.
+#else
   unsigned reserved20;
+#endif
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
   bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
   bool reserved21;
   bool optimizePointSizeWrite;        ///< If set, the write of PointSize in the last vertex processing stage will be
                                       ///< eliminated if the write value is 1.0.
   CompileConstInfo *compileConstInfo; ///< Compile time constant data.
+#if LLPC_BUILD_GFX12
+  unsigned temporalHintControl; ///< Override value for temporal hint. A load/store occupies 4 bits. The highest bit
+                                ///  of 4 bits marks whether to override temporal hint.
+                                ///  Arrange from the low bit to high bit in the following order:
+                                ///  TemporalHintAtmWrite,TemporalHintImageRead, TemporalHintImageWrite,
+                                ///  TemporalHintTessFactorWrite, TemporalHintTessRead, TemporalHintTessWrite
+#else
   unsigned reserved22;
+#endif
   bool padBufferSizeToNextDword; ///< Vulkan only, set if the driver rounds the buffer size up the next dword
 };
 
@@ -776,6 +807,28 @@ inline unsigned compact32(ShaderHash hash) {
 /// Represent a pipeline option which can be automatic as well as explicitly set.
 enum InvariantLoads : unsigned { Auto = 0, EnableOptimization = 1, DisableOptimization = 2, ClearInvariants = 3 };
 
+#if LLPC_BUILD_GFX12
+/// Control cache policy: whether to use LLC (last level cache, aka set noAlloc).
+struct CachePolicyLlc {
+  union NoAllocResource {
+    struct {
+      unsigned set : 5;      ///< Resource set
+      unsigned binding : 16; ///< Resource binding
+      unsigned noAlloc : 1;  ///< llc_noAlloc policy
+      unsigned : 10;
+    };
+    struct {
+      unsigned resourceId : 21; ///< Resource set
+      unsigned : 11;
+    };
+    unsigned u32All;
+  };
+
+  const unsigned *noAllocs; // Set for each resource.
+  unsigned resourceCount;   // The count of resources
+};
+#endif
+
 /// Represents per shader stage options.
 struct PipelineShaderOptions {
   ShaderHash clientHash;      ///< Client-supplied unique shader hash. A value of zero indicates that LLPC should
@@ -918,6 +971,10 @@ struct PipelineShaderOptions {
   /// Application workaround: forward propagate NoContraction decoration to any related FAdd operation.
   bool forwardPropagateNoContract;
 
+#if LLPC_BUILD_GFX12
+  /// Enable round-robin mode for waves in workgroup.
+  bool workgroupRoundRobin;
+#endif
   /// Binding ID offset of default uniform block
   unsigned constantBufferBindingOffset;
 
@@ -930,6 +987,15 @@ struct PipelineShaderOptions {
   /// Specifies that any shader input variables decorated as ViewIndex
   /// will be assigned values as if they were decorated as DeviceIndex.
   bool viewIndexFromDeviceIndex;
+
+#if LLPC_BUILD_GFX12
+  /// Control LLC cache policy
+  CachePolicyLlc cachePolicyLlc;
+
+  /// Override value for temporal hint. A load/store occupies 4 bits. The highest bit of 4 bits marks whether to
+  /// override temporal hint.
+  unsigned temporalHintShaderControl;
+#endif
 
   /// Indicate whether the vertex shader is used by transform pipeline
   bool enableTransformShader;
@@ -1471,13 +1537,18 @@ struct RayTracingPipelineBuildInfo {
   unsigned pipelineLibStageMask; ///< Pipeline library stage mask
   //@}
 
-  unsigned payloadSizeMaxInLib;     ///< Pipeline library maxPayloadSize
-  unsigned attributeSizeMaxInLib;   ///< Pipeline library maxAttributeSize
-  bool isReplay;                    ///< Pipeline is created for replaying
-  const void *pClientMetadata;      ///< Pointer to (optional) client-defined data to be
-                                    ///  stored inside the ELF
-  size_t clientMetadataSize;        ///< Size (in bytes) of the client-defined data
-  unsigned cpsFlags;                ///< Cps feature flags
+  unsigned payloadSizeMaxInLib;   ///< Pipeline library maxPayloadSize
+  unsigned attributeSizeMaxInLib; ///< Pipeline library maxAttributeSize
+  bool isReplay;                  ///< Pipeline is created for replaying
+  const void *pClientMetadata;    ///< Pointer to (optional) client-defined data to be
+                                  ///  stored inside the ELF
+  size_t clientMetadataSize;      ///< Size (in bytes) of the client-defined data
+  unsigned cpsFlags;              ///< Cps feature flags
+#if LLPC_BUILD_GFX12
+  bool disableDynamicVgpr;       ///< Whether to disable dynamic VGPR mode for continuations. If not set, dVGPR mode is
+                                 /// enabled by default.
+  unsigned dynamicVgprBlockSize; ///< The size of the VGPR allocation granule used in dVGPR mode.
+#endif
   GpurtOption *pGpurtOptions;       ///< Array of GPURT options
   unsigned gpurtOptionCount;        ///< Number of GPURT options
   bool rtIgnoreDeclaredPayloadSize; ///< Ignore the declared payload size in the shader to address issues with Proton.

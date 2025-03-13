@@ -387,6 +387,28 @@ static void setGfx1151Info(TargetInfo *targetInfo) {
 }
 #endif
 
+#if LLPC_BUILD_GFX12
+// gfx12
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx12Info(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+}
+#endif
+
+#if LLPC_BUILD_NAVI48
+// gfx1201
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1201Info(TargetInfo *targetInfo) {
+  setGfx12Info(targetInfo);
+
+  targetInfo->getGpuProperty().numShaderEngines = 4;
+  targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
+  targetInfo->getGpuWorkarounds().gfx12.waNoReZSupport = 1;
+}
+#endif
+
 // Represents device infos.
 struct GpuNameStringMap {
   const char *gpuName;
@@ -415,6 +437,9 @@ static const GpuNameStringMap GpuNameMap[] = {
 #endif
 #if LLPC_BUILD_STRIX_HALO
     {"gfx1151", "Strix_halo", &setGfx1151Info}, // gfx1151
+#endif
+#if LLPC_BUILD_NAVI48
+    {"gfx1201", "Navi48", &setGfx1201Info}, // gfx1201
 #endif
 };
 

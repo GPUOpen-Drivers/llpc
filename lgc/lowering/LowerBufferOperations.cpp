@@ -409,6 +409,10 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
     CoherentFlag coherent = {};
     if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11)
       coherent.bits.slc = isNonTemporal ? 1 : 0;
+#if LLPC_BUILD_GFX12
+    else
+      coherent.gfx12.th = isNonTemporal ? TH::TH_NT : TH::TH_RT;
+#endif
 
     Value *atomicCall;
     if (atomicCmpXchgInst.getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
@@ -575,6 +579,30 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
       if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
         coherent.bits.slc = isNonTemporal ? 1 : 0;
       }
+#if LLPC_BUILD_GFX12
+      else {
+        coherent.gfx12.th = isNonTemporal ? TH::TH_NT : TH::TH_RT;
+
+        SyncScope::ID id = atomicRmwInst.getSyncScopeID();
+        unsigned scope = MemoryScope::MEMORY_SCOPE_CU;
+        if (id == SyncScope::System) {
+          scope = MemoryScope::MEMORY_SCOPE_SYS;
+        } else if (id == SyncScope::SingleThread) {
+          scope = MemoryScope::MEMORY_SCOPE_CU;
+        } else {
+          StringRef name = m_builder.getContext().getSyncScopeName(id).value_or("");
+          if (name == "agent")
+            scope = MemoryScope::MEMORY_SCOPE_DEV;
+          else if (name == "workgroup")
+            scope = MemoryScope::MEMORY_SCOPE_SE;
+          else if (name == "wavefront")
+            scope = MemoryScope::MEMORY_SCOPE_CU;
+          else
+            llvm_unreachable("Invalid sync scope!");
+        }
+        coherent.gfx12.scope = scope;
+      }
+#endif
 
       Value *atomicCall;
       if (isStructBuffer) {
@@ -1690,6 +1718,18 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       if (!isInvariant)
         coherent.bits.slc = isNonTemporal;
     }
+#if LLPC_BUILD_GFX12
+    else {
+      coherent.gfx12.scope = isGlc ? MemoryScope::MEMORY_SCOPE_DEV : MemoryScope::MEMORY_SCOPE_CU;
+      if (!isInvariant)
+        coherent.gfx12.th = m_pipelineState.getTemporalHint(isNonTemporal ? TH::TH_NT : TH::TH_RT,
+                                                            isLoad ? TemporalHintBufferRead : TemporalHintBufferWrite,
+                                                            getMemoryInstShaderStage(&inst));
+      if (inst.hasMetadata(MetaNameBufferOpLlc)) {
+        coherent.gfx12.th = TH::TH_RT_NT;
+      }
+    }
+#endif
 
     Value *indexValue = isStridedPointer ? pointerValues[2] : nullptr;
     if (isLoad) {
@@ -1699,6 +1739,13 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         coherent.bits.dlc = isDlc;
         accessSizeAllowed = accessSize >= 4;
       }
+
+#if LLPC_BUILD_GFX12
+      if (!m_pipelineState.getOptions().padBufferSizeToNextDword &&
+          m_pipelineState.getTargetInfo().getGfxIpVersion().major == 12) {
+        accessSizeAllowed = accessSize >= 4;
+      }
+#endif
 
       const bool isDivergentPtr = m_uniformityInfo.isDivergent(pointerOperand);
 
@@ -1992,3 +2039,17 @@ Value *BufferOpLowering::createLoadDesc(Value *buffAddress, bool forceRawView, b
   }
   return descriptor;
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Get the shader stage
+//
+// @param inst : The memory operation instruction
+// @returns ： Return the shader stage to which the instruction belongs.
+ShaderStageEnum BufferOpLowering::getMemoryInstShaderStage(llvm::Instruction *inst) {
+  MDNode *stageMetaNode = inst->getMetadata(MetaNameBufferOpStage);
+  if (stageMetaNode)
+    return ShaderStageEnum(mdconst::extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
+  return ShaderStageEnum::Invalid;
+}
+#endif

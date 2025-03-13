@@ -156,6 +156,26 @@ void SetUpTargetFeatures::setupTargetFeatures(Module *module) {
 
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
+#if LLPC_BUILD_GFX12
+    if (gfxIp.major >= 12) {
+      if (m_pipelineState->getOptions().expertSchedulingMode)
+        builder.addAttribute("amdgpu-expert-scheduling", "true");
+
+      if (m_pipelineState->getOptions().disableDynamicVgpr ||
+          m_pipelineState->getOptions().rtIndirectMode <= RayTracingIndirectMode::Legacy) {
+        targetFeatures += ",-dynamic-vgpr";
+      } else {
+        targetFeatures += ",+dynamic-vgpr";
+
+        // Set the dVGPR block size, unless it's unspecified or equal to LLVM's
+        // default value.
+        auto blockSize = m_pipelineState->getOptions().dynamicVgprBlockSize;
+        if (blockSize != 0 && blockSize != 16)
+          targetFeatures += ",+dynamic-vgpr-block-size-" + std::to_string(blockSize);
+      }
+    }
+#endif
+
     // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
     // pass know we are in which wavesize mode. Here, we read back it and append it to finalized target
     // feature strings.

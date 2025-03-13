@@ -397,5 +397,27 @@ TEST(PipelineDumperTest, TestForceNonUniformResourceIndexStageMaskCompute) {
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
 
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Test the expertSchedulingMode option.
+
+TEST(PipelineDumperTest, TestExpertSchedulingModeGraphics) {
+  ModifyGraphicsBuildInfo modifyBuildInfo = [](GraphicsPipelineBuildInfo *buildInfo) {
+    buildInfo->options.expertSchedulingMode = true;
+  };
+
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+  runGraphicsPipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
+TEST(PipelineDumperTest, TestExpertSchedulingModeCompute) {
+  ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
+    buildInfo->options.expertSchedulingMode = true;
+  };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
+  runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+#endif
+
 } // namespace
 } // namespace Llpc

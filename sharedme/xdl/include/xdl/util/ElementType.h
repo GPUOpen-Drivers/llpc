@@ -46,6 +46,11 @@ namespace lgc::xdl {
 llvm::Type *getCooperativeMatrixTy(llvm_dialects::Builder &builder, CooperativeMatrixElementType elemType,
                                    CooperativeMatrixLayout layout, unsigned kSize = 16);
 
+#if LLPC_BUILD_GFX12
+// Get the llvm type of a sparse index for the sparseCooperativeMatrix.
+llvm::Type *getSparseIndexTy(llvm_dialects::Builder &builder, SparseCooperativeMatrixSparsityFormat format);
+#endif
+
 // Whether the type of a cooperative matrix is integer.
 bool isUnderlyingIntegerCooperativeMatrix(CooperativeMatrixElementType elemType);
 

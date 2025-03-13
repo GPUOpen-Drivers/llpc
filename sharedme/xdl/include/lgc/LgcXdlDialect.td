@@ -60,3 +60,6 @@ class LgcXdlIntrinOp<string mnemonic_, list<Trait> traits_ = []>
 
 include "lgc/CooperativeMatrix.td"
 include "lgc/RowAccumulator.td"
+#ifdef LLPC_BUILD_GFX12
+include "lgc/Sparse.td"
+#endif

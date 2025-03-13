@@ -486,6 +486,14 @@ void MutateEntryPoint::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCps
   Value *reloc = nullptr;
   Function &callee = *cast<Function>(asCpsReferenceOp.getFn());
 
+#if LLPC_BUILD_GFX12
+  if (isDynamicVgprEnabled()) {
+    auto funcName = callee.getName();
+    std::string relocName = "_dvgpr$" + funcName.str();
+    reloc = builder.CreateRelocationConstant(relocName);
+  }
+#endif
+
   Value *loweredReference = lgc::cps::lowerAsContinuationReference(builder, asCpsReferenceOp, reloc);
 
   assert(asCpsReferenceOp.getType()->getIntegerBitWidth() == 32);
@@ -545,7 +553,17 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   } else {
     numShaderArg = m_cpsShaderInputCache.getTypes().size();
     numUserdata = haveLocalInvocationId ? numShaderArg - 1 : numShaderArg;
+#if LLPC_BUILD_GFX12
+    if (isDynamicVgprEnabled()) {
+      numUserdata--;
+      assert(m_cpsShaderInputCache.getNames().back() == "MaxOutgoingVgprCount");
+      assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames()[numShaderArg - 2] == "LocalInvocationId"));
+    } else {
+      assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
+    }
+#else
     assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
+#endif
   }
 
   // Get all the return instructions.
@@ -733,6 +751,39 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   AddressExtender addressExtender(func, tailBlock);
   Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
 
+#if LLPC_BUILD_GFX12
+  Value *numVgpr = nullptr;
+  if (isDynamicVgprEnabled()) {
+    // dVGPRs only support wave 32 mode.
+    assert(waveSize == 32);
+    // The required number of VGPR blocks minus 1 is stored in 3~5 bit of continuation reference.
+    numVgpr = builder.CreateAnd(targetVcr, builder.getInt32(0x38u));
+    // Each block means 16 VGPRs
+    // numVgpr = (vcr[bit 3..5] >> 3 + 1) * 16 -> numVgpr = vcr[bit 3..5] << 1 + 16
+    numVgpr = builder.CreateShl(numVgpr, 1);
+    numVgpr = builder.CreateAdd(numVgpr, builder.getInt32(16));
+
+    // Take the maximum number of VGPRs that may be live out of any shader in the pipeline into consideration.
+    // The number is stored in the last SGPR argument.
+    if (auto maxOutgoingVgprCount = cps::tryGetMaxOutgoingVgprCount(*func)) {
+      // NOTE: If this metadata is set, it means that this is kernel entry and it will initialize the SGPR of max
+      // outgoing VGPR count.
+      assert(!isCpsFunc);
+      sgprArgs.push_back(builder.getInt32(maxOutgoingVgprCount.value()));
+    } else {
+      // Max outgoing VGPR count is the last argument.
+      assert(func->getArg(numShaderArg - 1)->getName() == "MaxOutgoingVgprCount");
+      sgprArgs.push_back(func->getArg(numShaderArg - 1));
+    }
+    numVgpr = builder.CreateBinaryIntrinsic(Intrinsic::umax, numVgpr, sgprArgs.back());
+
+    // Always pass %addr32, %execMask and %num_vgprs to fallback function using the last 3 SGPRs.
+    sgprArgs.push_back(addr32);
+    sgprArgs.push_back(execMask);
+    sgprArgs.push_back(numVgpr);
+  }
+#endif
+
   const DataLayout &layout = func->getParent()->getDataLayout();
   SmallVector<Value *> sgprI32;
   splitIntoI32(layout, builder, sgprArgs, sgprI32);
@@ -740,6 +791,17 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
 
   SmallVector<Value *> chainArgs = {jumpTarget, execMask, sgprVec, vgprArg};
 
+#if LLPC_BUILD_GFX12
+  if (isDynamicVgprEnabled()) {
+    // Bit 0 of flags set to 1 means dVGPR mode enabled
+    chainArgs.push_back(builder.getInt32(1));
+    chainArgs.push_back(numVgpr);
+    chainArgs.push_back(builder.getInt32(~0u)); // fallback_exec
+
+    auto fallbackFunc = createRetryVgprAllocFunc(cast<FixedVectorType>(sgprVec->getType()));
+    chainArgs.push_back(fallbackFunc);
+  } else
+#endif
   {
     // No flags
     chainArgs.push_back(builder.getInt32(0));
@@ -762,9 +824,73 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
                               .getMap(true)[Util::Abi::PipelineMetadataKey::ShaderFunctions]
                               .getMap(true);
   shaderFunctions[funcName].getMap(true)[Util::Abi::HardwareStageMetadataKey::FrontendStackSize] = stackSize;
+#if LLPC_BUILD_GFX12
+  if (isDynamicVgprEnabled()) {
+    // There are 8 VGPRs reserved for amdgpu_cs_chain call.
+    shaderFunctions[funcName].getMap(true)[Util::Abi::HardwareStageMetadataKey::OutgoingVgprCount] =
+        unsigned(vgprNum) + 8;
+  }
+#endif
 
   return true;
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Create a function to do retry vgpr alloc
+//
+// @param sgprsTy : the types of SGPRs used for llvm.amdgcn.cs.chain call
+Function *lgc::MutateEntryPoint::createRetryVgprAllocFunc(FixedVectorType *sgprsTy) {
+  IRBuilder<> builder(*m_context);
+
+  std::string funcName = "retry_vgpr_alloc.";
+  funcName += getTypeName(sgprsTy);
+
+  // If function already exists, just return it.
+  if (auto func = m_module->getFunction(funcName))
+    return func;
+
+  auto funcTy = FunctionType::get(builder.getVoidTy(), {sgprsTy}, false);
+  auto func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, m_module);
+  func->addParamAttr(0, Attribute::InReg);
+  func->setCallingConv(CallingConv::AMDGPU_CS_ChainPreserve);
+  auto bb = BasicBlock::Create(func->getContext(), "", func);
+  builder.SetInsertPoint(bb);
+
+  auto sgprs = func->getArg(0);
+  auto sgprCount = sgprsTy->getNumElements();
+  // NOTE: %addr32, %execMask and %num_vgprs are always placed at the last of SGPRs.
+  auto addr32 = builder.CreateExtractElement(sgprs, sgprCount - 3);
+  auto execMask = builder.CreateExtractElement(sgprs, sgprCount - 2);
+  auto numVgprs = builder.CreateExtractElement(sgprs, sgprCount - 1);
+
+  AddressExtender addressExtender(func);
+  Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
+
+  // The retry function uses amdgpu_cs_chain_preserve calling convention, no VGPRs passing is required
+  Value *vgprs = PoisonValue::get(StructType::get(*m_context));
+
+  Value *chainArgs[] = {jumpTarget, execMask, sgprs, vgprs, builder.getInt32(1), numVgprs, builder.getInt32(~0u), func};
+
+  // Sleep a little so as not to overwhelm the instruction fetch
+  // TODO: Experiment and pick ideal sleep time on real hardware.
+  constexpr unsigned RetrySleepCount = 2;
+  builder.CreateIntrinsic(Intrinsic::amdgcn_s_sleep, {}, builder.getInt32(RetrySleepCount));
+
+  // TODO: Release extraneous VGPRs on failure so that other waves have a higher chance of making progress (may be done
+  // in LLVM)
+
+  Type *chainTys[] = {builder.getPtrTy(), builder.getInt32Ty(), sgprs->getType(), vgprs->getType()};
+  auto *chainCall = builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
+  // Add inreg attribute for (fn, exec, sgprs).
+  for (unsigned arg = 0; arg < 3; arg++)
+    chainCall->addParamAttr(arg, Attribute::InReg);
+
+  builder.CreateUnreachable();
+
+  return func;
+}
+#endif
 
 // =====================================================================================================================
 // Mutate the argument list of the cps function
@@ -830,12 +956,21 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
 
   SmallVector<AttributeSet, 8> argAttrs;
   unsigned numUserdataArg = haveLocalInvocationId ? fixedShaderArgTys.size() - 1 : fixedShaderArgTys.size();
+#if LLPC_BUILD_GFX12
+  if (isDynamicVgprEnabled())
+    numUserdataArg--;
+#endif
   for (unsigned idx = 0; idx != numUserdataArg; ++idx)
     argAttrs.push_back(inRegAttrSet);
 
   // %LocalInvocationId when required
   if (haveLocalInvocationId)
     argAttrs.push_back(emptyAttrSet);
+
+#if LLPC_BUILD_GFX12
+  if (isDynamicVgprEnabled())
+    argAttrs.push_back(inRegAttrSet);
+#endif
 
   // %vcr attribute
   argAttrs.push_back(emptyAttrSet);
@@ -1344,6 +1479,15 @@ void MutateEntryPoint::processComputeFuncs(ShaderInputs *shaderInputs, Module &m
           shaderInputTys.pop_back();
           shaderInputNames.pop_back();
         }
+#if LLPC_BUILD_GFX12
+        if (isDynamicVgprEnabled()) {
+          // Add MaxOutgoingVgprCount as the last argument.
+          // NOTE: Not doing this in generateEntryPointArgTys() as `MaxOutgoingVgprCount` is not essentially a userdata,
+          // and it only exists in CPS functions.
+          shaderInputTys.push_back(Type::getInt32Ty(module.getContext()));
+          shaderInputNames.push_back("MaxOutgoingVgprCount");
+        }
+#endif
         m_cpsShaderInputCache.set(shaderInputTys, shaderInputNames);
       }
       newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
@@ -1924,9 +2068,18 @@ void MutateEntryPoint::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &user
     }
   }
 
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->enableSwXfb() ||
+      (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12 && m_pipelineState->enablePrimStats())) {
+    // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the stream-out control
+    // buffer address. And for GFX12+, we still need this special user data SGPR when we enable primitive statistics
+    // counting. This is because primitive counters in GDS are removed and are replaced by those defined in stream-out
+    // control buffer.
+#else
   // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the stream-out control
   // buffer address.
   if (m_pipelineState->enableSwXfb()) {
+#endif
     unsigned *controlBufPtr = nullptr;
 
     switch (m_shaderStage.value()) {

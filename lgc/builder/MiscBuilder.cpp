@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -75,6 +75,13 @@ Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
 // =====================================================================================================================
 // Create a workgroup control barrier.
 Instruction *BuilderImpl::CreateBarrier() {
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
+    CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, getInt32(WorkgroupNormalBarrierId));
+    return CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
+                           getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
+  }
+#endif
 
   return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }

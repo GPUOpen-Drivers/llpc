@@ -3375,6 +3375,13 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       return result;
   }
 
+#if LLPC_BUILD_GFX12
+  if (rtContext.isDynamicVgprEnabled()) {
+    // Set up max outgoing VGPR count metadata for kernel entry
+    lgc::cps::setMaxOutgoingVgprCount(*getEntryPoint(entry.get()),
+                                      rtContext.getRayTracingLibrarySummary().maxOutgoingVgprCount);
+  }
+#endif
   // Build entry module at very last.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 75
   const bool needEntry = true;
@@ -3445,6 +3452,67 @@ void Compiler::adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *r
     shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[0] = pipelineHash[0];
     shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[1] = pipelineHash[1];
   }
+
+#if LLPC_BUILD_GFX12
+  if (rtContext->isDynamicVgprEnabled()) {
+    // 3. Resolve DVGPR requirement and relocations
+    ElfReader<Elf64> reader(m_gfxIp);
+    size_t readSize = 0;
+    result = reader.ReadFromBuffer(pipelineElf->data(), &readSize);
+    assert(result == Result::Success);
+
+    constexpr unsigned dvgprBitsInShaderId = 0x38;
+
+    auto entryFuncVgprCount =
+        shaderFunctionSection.begin()->second.getMap(true)[PalAbi::HardwareStageMetadataKey::VgprCount].getUInt();
+    // The required number of VGPR blocks minus 1 is stored at 3..5 bit.
+    assert((shaderProp.shaderIdExtraBits & dvgprBitsInShaderId) == 0);
+    assert(entryFuncVgprCount <= 128);
+    shaderProp.shaderIdExtraBits |= (llvm::divideCeil(entryFuncVgprCount, 16) - 1) << 3;
+
+    for (unsigned i = 0; i < reader.getRelocationCount(); ++i) {
+      ElfReloc reloc = {};
+      reader.getRelocation(i, &reloc);
+      ElfSymbol elfSym = {};
+      reader.getSymbol(reloc.symIdx, &elfSym);
+      StringRef relocName = elfSym.pSymName;
+
+      constexpr const char dvgprRelocPrefix[] = "_dvgpr$";
+      if (relocName.starts_with(dvgprRelocPrefix)) {
+        StringRef targetFuncName = relocName.substr(strlen(dvgprRelocPrefix));
+        assert(reader.isValidSymbol(targetFuncName.data()) && "Target function for dVGPR does not exist");
+        auto &funcMeta = shaderFunctionSection[targetFuncName].getMap(true);
+        auto &vgprCount = funcMeta[PalAbi::HardwareStageMetadataKey::VgprCount].getUInt();
+
+        // The required number of VGPR blocks minus 1 is stored at 3..5 bit.
+        unsigned relocValue = (llvm::divideCeil(vgprCount, 16) - 1) << 3;
+        // Change the relocation from `_dvgpr$<name>` to `<name>`, so that we can get the function address.
+        unsigned targetSymbolIndex = reader.getSymbolIndexByName(targetFuncName.data());
+        writer.fixupRelocation(i, relocValue, targetSymbolIndex, dvgprBitsInShaderId);
+      }
+    }
+
+    // 4. Collect maximum outgoing VGPR count and update library summary
+    unsigned maxOutGoingVgprCount = 0;
+    for (auto &funcSection : shaderFunctionSection) {
+      auto &funcMeta = funcSection.second.getMap(true);
+      // FIXME: g_palPipelineAbiMetadata.h isn't getting PAL_BUILD_GFX12 enabled here
+      auto outgoingVgprCountMeta = funcMeta.find(".outgoing_vgpr_count");
+      if (outgoingVgprCountMeta != funcMeta.end()) {
+        unsigned outGoingVgprCount = outgoingVgprCountMeta->second.getUInt();
+        maxOutGoingVgprCount = std::max(maxOutGoingVgprCount, outGoingVgprCount);
+      }
+    }
+    assert(maxOutGoingVgprCount > 0);
+    {
+      // Library summary in rtContext could be shared between threads, need to ensure it is only modified by one thread
+      // at a time.
+      std::lock_guard<sys::Mutex> lock(getHelperThreadMutex());
+      auto &summary = rtContext->getRayTracingLibrarySummary();
+      summary.maxOutgoingVgprCount = std::max(summary.maxOutgoingVgprCount, maxOutGoingVgprCount);
+    }
+  }
+#endif
 
   // Write modified metadata to the pipeline ELF
   ElfNote newMetaNote = metaNote;

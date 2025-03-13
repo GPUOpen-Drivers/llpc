@@ -139,6 +139,9 @@ enum class ShaderInput : unsigned {
 
   // Task/CS VGPRs
   LocalInvocationId, // LocalInvocationId (v3i32)
+#if LLPC_BUILD_GFX12
+  CsWaveId, // CS wave Id
+#endif
   Count
 };
 

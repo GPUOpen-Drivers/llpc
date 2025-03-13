@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -67,6 +67,10 @@ const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
 const static char TcsPassthroughEntryPoint[] = "lgc.shader.TCS.passthrough.main";
 
+#if LLPC_BUILD_GFX12
+const static char SparsityIndexLoad[] = "lgc.xdl.sparsityindex.load";
+const static char SparseCooperativeMatrixMulAdd[] = "lgc.xdl.sparseCooperativeMatrix.muladd";
+#endif
 } // namespace lgcName
 
 // Value for high half of address that means "use PC".
@@ -75,6 +79,10 @@ const static unsigned HighAddrPc = ~0U;
 // Well-known metadata names
 const static char MetaNameUniform[] = "amdgpu.uniform";
 
+#if LLPC_BUILD_GFX12
+const static char MetaNameBufferOpStage[] = "lgc.bufferOp.stage";
+const static char MetaNameBufferOpLlc[] = "lgc.bufferOp.llc";
+#endif
 // Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify
 static const unsigned MaxInOutLocCount = 32;
 

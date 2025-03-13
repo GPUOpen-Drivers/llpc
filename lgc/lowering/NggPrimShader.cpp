@@ -632,7 +632,25 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
       vgprArgs[8]->setName("instanceId");
     }
   } else {
+#if LLPC_BUILD_GFX12
+    // GS VGPRs
+    vgprArgs[0]->setName("primData");
+    vgprArgs[1]->setName("primitiveId");
+    vgprArgs[2]->setName("primDataAdjacency");
+
+    // ES VGPRs
+    if (m_hasTes) {
+      vgprArgs[3]->setName("tessCoordX");
+      vgprArgs[4]->setName("tessCoordY");
+      vgprArgs[5]->setName("relPatchId");
+      vgprArgs[6]->setName("patchId");
+    } else {
+      vgprArgs[3]->setName("vertexId");
+      vgprArgs[4]->setName("instanceId");
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   // Setup LDS layout
@@ -862,7 +880,25 @@ FunctionType *NggPrimShader::getPrimShaderType(uint64_t &inRegMask) {
       argTys.push_back(m_builder.getInt32Ty()); // Instance ID
     }
   } else {
+#if LLPC_BUILD_GFX12
+    // GS VGPRs
+    argTys.push_back(m_builder.getInt32Ty()); // Primitive connectivity data
+    argTys.push_back(m_builder.getInt32Ty()); // Primitive ID (primitive based)
+    argTys.push_back(m_builder.getInt32Ty()); // Primitive connectivity data (adjacency)
+
+    // ES VGPRs
+    if (m_hasTes) {
+      argTys.push_back(m_builder.getFloatTy()); // X of TessCoord (U)
+      argTys.push_back(m_builder.getFloatTy()); // Y of TessCoord (V)
+      argTys.push_back(m_builder.getInt32Ty()); // Relative patch ID
+      argTys.push_back(m_builder.getInt32Ty()); // Patch ID
+    } else {
+      argTys.push_back(m_builder.getInt32Ty()); // Vertex ID
+      argTys.push_back(m_builder.getInt32Ty()); // Instance ID
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   return FunctionType::get(m_builder.getVoidTy(), argTys, false);
@@ -928,6 +964,34 @@ void NggPrimShader::calcStreamOutControlCbOffsets() {
                                                   4;
     }
   }
+
+#if LLPC_BUILD_GFX12
+  // Following calculations are only available on GFX12+ (caused by GDS removal)
+  if (m_gfxIp.major >= 12) {
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      m_streamOutControlCbOffsets.primsNeeded[i] = (offsetof(Util::Abi::StreamOutControlCb, primsNeeded[0]) +
+                                                    sizeof(Util::Abi::StreamOutControlCb::primsNeeded[0]) * i) /
+                                                   4;
+    }
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      m_streamOutControlCbOffsets.primsWritten[i] = (offsetof(Util::Abi::StreamOutControlCb, primsWritten[0]) +
+                                                     sizeof(Util::Abi::StreamOutControlCb::primsWritten[0]) * i) /
+                                                    4;
+    }
+
+    if (m_pipelineState->enableSwXfb()) {
+      const unsigned orderedIdPairOffset = offsetof(Util::Abi::StreamOutControlCb, orderedIdPair[0]);
+      const unsigned orderedIdPairSize = sizeof(Util::Abi::OrderedIdPair);
+      for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+        m_streamOutControlCbOffsets.orderedIdPair[i].orderedWaveId =
+            (orderedIdPairOffset + orderedIdPairSize * i + offsetof(Util::Abi::OrderedIdPair, orderedWaveId)) / 4;
+        m_streamOutControlCbOffsets.orderedIdPair[i].dwordsWritten =
+            (orderedIdPairOffset + orderedIdPairSize * i + offsetof(Util::Abi::OrderedIdPair, dwordsWritten)) / 4;
+      }
+    }
+  }
+#endif
 }
 
 // =====================================================================================================================
@@ -966,7 +1030,11 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   if (m_gfxIp.major <= 11)
     primitiveId = vgprArgs[2];
   else
+#if LLPC_BUILD_GFX12
+    primitiveId = vgprArgs[1];
+#else
     llvm_unreachable("Not implemented!");
+#endif
 
   //
   // For pass-through mode, the processing is something like this:
@@ -1037,10 +1105,27 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
 
     // Primitive connectivity data have such layout:
     //
+#if LLPC_BUILD_GFX12
+    // Pre-GFX12:
+#endif
     //   +----------------+---------------+---------------+---------------+
     //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
     //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
     //   +----------------+---------------+---------------+---------------+
+#if LLPC_BUILD_GFX12
+    //
+    // GFX12 (from GE):
+    //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+    //   | GS Instance ID | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+    //   | [31:27]        | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+    //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+    //
+    // GFX12 (to PA):
+    //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+    //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+    //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+    //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+#endif
 
     // Record relative vertex indices
     if (m_gfxIp.major <= 11) {
@@ -1048,7 +1133,13 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       m_nggInputs.vertexIndex1 = createUBfe(primData, 10, 9);
       m_nggInputs.vertexIndex2 = createUBfe(primData, 20, 9);
     } else {
+#if LLPC_BUILD_GFX12
+      m_nggInputs.vertexIndex0 = createUBfe(primData, 0, 8);
+      m_nggInputs.vertexIndex1 = createUBfe(primData, 9, 8);
+      m_nggInputs.vertexIndex2 = createUBfe(primData, 18, 8);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
 
     // Distribute primitive ID if needed
@@ -1221,7 +1312,21 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       instanceId = vgprArgs[8];
     }
   } else {
+#if LLPC_BUILD_GFX12
+    primitiveId = vgprArgs[1];
+
+    if (m_hasTes) {
+      tessCoordX = vgprArgs[3];
+      tessCoordY = vgprArgs[4];
+      relPatchId = vgprArgs[5];
+      patchId = vgprArgs[6];
+    } else {
+      vertexId = vgprArgs[3];
+      instanceId = vgprArgs[4];
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   //
@@ -1390,13 +1495,28 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // Record primitive shader table address info
     m_nggInputs.primShaderTableAddr = std::make_pair(primShaderTableAddrLow, primShaderTableAddrHigh);
 
+#if LLPC_BUILD_GFX12
+    if (m_gfxIp.major >= 12) {
+      // NOTE: From GFX12+, GE will always send the primitive connectivity data to us (the highest 5 bits are GS
+      // instance ID, which is not valid when API GS is absent). We can record this data and use it
+      // when exporting primitive to PA without reconstructing it like what we have done on pre-GFX12.
+      m_nggInputs.primData = createUBfe(vgprArgs[0], 0, 27);
+    }
+#endif
+
     // Record vertex indices
     if (m_gfxIp.major <= 11) {
       m_nggInputs.vertexIndex0 = createUBfe(vgprArgs[0], 0, 16);
       m_nggInputs.vertexIndex1 = createUBfe(vgprArgs[0], 16, 16);
       m_nggInputs.vertexIndex2 = createUBfe(vgprArgs[1], 0, 16);
     } else {
+#if LLPC_BUILD_GFX12
+      m_nggInputs.vertexIndex0 = createUBfe(vgprArgs[0], 0, 8);
+      m_nggInputs.vertexIndex1 = createUBfe(vgprArgs[0], 9, 8);
+      m_nggInputs.vertexIndex2 = createUBfe(vgprArgs[0], 18, 8);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
 
     vertexItemOffset = m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(esGsRingItemSize));
@@ -2874,6 +2994,11 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
   if (m_pipelineState->enablePrimStats() && !m_pipelineState->enableSwXfb() && m_gfxIp.major <= 11) {
+#if LLPC_BUILD_GFX12
+    // NOTE: For pre-GFX12, if we only want to do primitive statistics counting (no SW XFB), there is no need of load
+    // stream-out buffer info. The primitive counters are in GDS. For GFX12+, GDS is removed and the counters are
+    // defined in stream-out control buffer. We still have to load the info.
+#endif
     return;
   }
 
@@ -3200,10 +3325,27 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
 
   // Primitive connectivity data have such layout:
   //
+#if LLPC_BUILD_GFX12
+  // pre-GFX12:
+#endif
   //   +----------------+---------------+---------------+---------------+
   //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
+#if LLPC_BUILD_GFX12
+  //
+  // GFX12 (from GE):
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //   | GS Instance ID | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+  //   | [31:27]        | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //
+  // GFX12 (to PA):
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+  //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+#endif
   Value *primData = nullptr;
   if (m_gfxIp.major <= 11) {
     primData = m_builder.CreateShl(vertexIndex2, 10);
@@ -3212,7 +3354,21 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
     primData = m_builder.CreateShl(primData, 10);
     primData = m_builder.CreateOr(primData, vertexIndex0);
   } else {
+#if LLPC_BUILD_GFX12
+    if (m_compactVertex) {
+      primData = m_builder.CreateShl(vertexIndex2, 9);
+      primData = m_builder.CreateOr(primData, vertexIndex1);
+
+      primData = m_builder.CreateShl(primData, 9);
+      primData = m_builder.CreateOr(primData, vertexIndex0);
+    } else {
+      // NOTE: If vertex compaction is disabled, we can use the recorded primitive connectivity data straightforwardly
+      // (sent by GE) without reconstructing it from relative vertex indices.
+      primData = m_nggInputs.primData;
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   if (primitiveCulled)
@@ -3270,10 +3426,27 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
 
   // Primitive connectivity data have such layout:
   //
+#if LLPC_BUILD_GFX12
+  // pre-GFX12:
+#endif
   //   +----------------+---------------+---------------+---------------+
   //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
+#if LLPC_BUILD_GFX12
+  //
+  // GFX12 (from GE):
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //   | GS Instance ID | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+  //   | [31:27]        | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //
+  // GFX12 (to PA):
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+  //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
+  //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
+  //   +----------------+------------+---------------+------------+---------------+------------+---------------+
+#endif
   Value *newPrimData = nullptr;
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
 
@@ -3287,7 +3460,11 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
     if (m_gfxIp.major <= 11)
       newPrimData = m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex0);
     else
+#if LLPC_BUILD_GFX12
+      newPrimData = m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 9), vertexIndex0);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     break;
   }
   case OutputPrimitives::TriangleStrip: {
@@ -3321,7 +3498,12 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
           m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 10), vertexIndex1), 10),
           vertexIndex0);
     } else {
+#if LLPC_BUILD_GFX12
+      newPrimData = m_builder.CreateOr(
+          m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 9), vertexIndex1), 9), vertexIndex0);
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
     break;
   }
@@ -3473,7 +3655,19 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
       instanceId = vgprArgs[8];
     }
   } else {
+#if LLPC_BUILD_GFX12
+    if (m_hasTes) {
+      tessCoordX = vgprArgs[3];
+      tessCoordY = vgprArgs[4];
+      relPatchId = vgprArgs[5];
+      patchId = vgprArgs[6];
+    } else {
+      vertexId = vgprArgs[3];
+      instanceId = vgprArgs[4];
+    }
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   SmallVector<Value *, 32> esArgs;
@@ -3701,7 +3895,23 @@ void NggPrimShader::runGs(ArrayRef<Argument *> args) {
     // purposes according to GE-SPI interface.
     invocationId = m_builder.CreateAnd(vgprArgs[3], m_builder.getInt32(0xFF));
   } else {
+#if LLPC_BUILD_GFX12
+    const auto esGsRingItemSize = m_builder.getInt32(
+        m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize);
+
+    esGsOffset0 = m_builder.CreateMul(createUBfe(vgprArgs[0], 0, 8), esGsRingItemSize);
+    esGsOffset1 = m_builder.CreateMul(createUBfe(vgprArgs[0], 9, 8), esGsRingItemSize);
+    esGsOffset2 = m_builder.CreateMul(createUBfe(vgprArgs[0], 18, 8), esGsRingItemSize);
+    esGsOffset3 = m_builder.CreateMul(createUBfe(vgprArgs[2], 0, 8), esGsRingItemSize);
+    esGsOffset4 = m_builder.CreateMul(createUBfe(vgprArgs[2], 9, 8), esGsRingItemSize);
+    esGsOffset5 = m_builder.CreateMul(createUBfe(vgprArgs[2], 18, 8), esGsRingItemSize);
+
+    primitiveId = vgprArgs[1];
+    // NOTE: For GFX12, GS invocation ID is stored in highest 5 bits ([31:27])
+    invocationId = createUBfe(vgprArgs[0], 27, 5);
+#else
     llvm_unreachable("Not implemented!");
+#endif
   }
 
   SmallVector<Value *, 32> gsArgs;
@@ -6496,7 +6706,19 @@ void NggPrimShader::collectExports(ArrayRef<Argument *> args, Function *&fromFun
         instanceId = vgprArgs[8];
       }
     } else {
+#if LLPC_BUILD_GFX12
+      if (m_hasTes) {
+        tessCoordX = vgprArgs[3];
+        tessCoordY = vgprArgs[4];
+        relPatchId = vgprArgs[5];
+        patchId = vgprArgs[6];
+      } else {
+        vertexId = vgprArgs[3];
+        instanceId = vgprArgs[4];
+      }
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
 
     if (m_compactVertex) {
@@ -6802,6 +7024,19 @@ void NggPrimShader::exportAttributes(const SmallVectorImpl<VertexExport> &attrib
       CoherentFlag coherent = {};
       if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
         coherent.bits.glc = true;
+#if LLPC_BUILD_GFX12
+      } else {
+        coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+        coherent.gfx12.th = TH::TH_NT_WB;
+
+        unsigned cachePolicy = m_pipelineState->getOptions().cacheScopePolicyControl;
+        if (cachePolicy & CacheScopePolicyType::AtmWriteUseSystemScope) {
+          coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_SYS;
+          coherent.gfx12.th = TH::TH_WB;
+        }
+        coherent.gfx12.th =
+            m_pipelineState->getTemporalHint(coherent.gfx12.th, TemporalHintOpType::TemporalHintAtmWrite);
+#endif
       }
 
       m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
@@ -6949,6 +7184,11 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args, const SmallVectorImp
       if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
         coherent.bits.glc = true;
         coherent.bits.slc = true;
+#if LLPC_BUILD_GFX12
+      } else {
+        coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+        coherent.gfx12.th = TH::TH_HT;
+#endif
       }
 
       // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
@@ -7374,6 +7614,11 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args, const SmallVec
           if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
             coherent.bits.glc = true;
             coherent.bits.slc = true;
+#if LLPC_BUILD_GFX12
+          } else {
+            coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
+            coherent.gfx12.th = TH::TH_HT;
+#endif
           }
 
           // vertexOffset = (threadIdInSubgroup * outVertsPerPrim + vertexIndex) * xfbStride
@@ -7619,7 +7864,329 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
     return;
   }
 
+#if LLPC_BUILD_GFX12
+  // GFX12+ SW emulated stream-out with global ordered atomic add support
+  assert(m_gfxIp.major >= 12);
+
+  //
+  // The processing is something like this:
+  //
+  // PREPARE_XFB() {
+  //   if (threadIdInSubgroup < MaxGsStreams && streamActive)
+  //     numPrimsToWrite[X] = primCountInSubgroup[X]
+  //
+  //   if (threadIdInSubgroup < MaxTransformFeedbackBuffers && bufferActive) {
+  //     Load ordered ID pair from stream-out control buffer and try to increment dwordsWritten[X]
+  //     while (orderedWaveId != readyOrderedWaveId) {
+  //       Sleep for a while
+  //       Reload ordered ID pair from stream-out control buffer and try to increment dwordsWritten[X]
+  //     }
+  //
+  //     Calculate primsToWrite and dwordsToWrite
+  //     Revise dwordsWritten[X]
+  //     Store XFB statistics info to LDS
+  //   }
+  //
+  //   if (threadIdInSubgroup < MaxGsStreams && streamActive)
+  //     Increment primsNeeded[X] and primsWritten[X]
+  //
+  unsigned numActiveBuffers = 0;
+  unsigned activeBufferMask = 0;
+  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+    if (!bufferActive[i])
+      continue; // XFB buffer is inactive
+
+    ++numActiveBuffers;
+    activeBufferMask |= (1U << i);
+  }
+
+  unsigned numActiveStreams = 0;
+  unsigned activeStreamMask = 0;
+  for (unsigned i = 0; i < MaxGsStreams; ++i) {
+    if (!m_pipelineState->isVertexStreamActive(i))
+      continue; // Vertex stream is inactive
+
+    ++numActiveStreams;
+    activeStreamMask |= (1U << i);
+  }
+
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(
+      m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex));
+
+  const unsigned xfbStatsRegionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbStats);
+
+  auto insertBlock = m_builder.GetInsertBlock();
+  auto primShader = insertBlock->getParent();
+
+  auto initPrimitivesToWriteBlock = createBlock(primShader, ".initPrimitivesToWrite");
+  initPrimitivesToWriteBlock->moveAfter(insertBlock);
+
+  auto endInitPrimitivesToWriteBlock = createBlock(primShader, ".endInitPrimitivesToWrite");
+  endInitPrimitivesToWriteBlock->moveAfter(initPrimitivesToWriteBlock);
+
+  auto waveOrderingHeaderBlock = createBlock(primShader, ".waveOrderingHeader");
+  waveOrderingHeaderBlock->moveAfter(endInitPrimitivesToWriteBlock);
+
+  auto waveOrderingBodyBlock = createBlock(primShader, ".waveOrderingBody");
+  waveOrderingBodyBlock->moveAfter(waveOrderingHeaderBlock);
+
+  auto endWaveOrderingBlock = createBlock(primShader, ".endWaveOrdering");
+  endWaveOrderingBlock->moveAfter(waveOrderingBodyBlock);
+
+  auto checkUpdatePrimitiveCounterBlock = createBlock(primShader, ".checkUpdatePrimitiveCounter");
+  checkUpdatePrimitiveCounterBlock->moveAfter(endWaveOrderingBlock);
+
+  auto updatePrimitiveCounterBlock = createBlock(primShader, ".updatePrimitiveCounter");
+  updatePrimitiveCounterBlock->moveAfter(checkUpdatePrimitiveCounterBlock);
+
+  auto endUpdatePrimitiveCounterBlock = createBlock(primShader, ".endUpdatePrimitiveCounter");
+  endUpdatePrimitiveCounterBlock->moveAfter(updatePrimitiveCounterBlock);
+
+  // Continue to construct insert block
+  Value *validStream = nullptr;
+  Value *numPrimsInStream = nullptr;
+  {
+    numPrimsInStream = PoisonValue::get(m_builder.getInt32Ty());
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!m_pipelineState->isVertexStreamActive(i))
+        continue;
+
+      if (numActiveStreams > 1) {
+        // Multiple active vertex streams, promote the values to VGPRs
+        numPrimsInStream = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
+                                                     {primCountInSubgroup[i], m_builder.getInt32(i), numPrimsInStream});
+      } else {
+        // Single active vertex stream, keep the values in SGPR
+        assert(numActiveStreams == 1);
+        numPrimsInStream = primCountInSubgroup[i];
+        break;
+      }
+    }
+
+    validStream = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(MaxGsStreams));
+    assert(activeStreamMask != 0);
+    Value *mask = m_builder.getIntN(waveSize, activeStreamMask);
+    auto activeStream = m_builder.CreateIntrinsic(m_builder.getInt1Ty(), Intrinsic::amdgcn_inverse_ballot, mask);
+
+    validStream = m_builder.CreateAnd(validStream, activeStream);
+    m_builder.CreateCondBr(validStream, initPrimitivesToWriteBlock, endInitPrimitivesToWriteBlock);
+  }
+
+  // Construct ".initPrimitivesToWrite" block
+  {
+    m_builder.SetInsertPoint(initPrimitivesToWriteBlock);
+
+    auto ldsOffset = m_builder.CreateAdd(m_builder.getInt32(xfbStatsRegionStart + MaxTransformFeedbackBuffers),
+                                         m_nggInputs.threadIdInSubgroup);
+    writeValueToLds(numPrimsInStream, ldsOffset);
+
+    m_builder.CreateBr(endInitPrimitivesToWriteBlock);
+  }
+
+  // Construct ".endInitPrimitivesToWrite" block
+  Value *dwordsPerPrim = nullptr;
+  Value *bufferSizeInDwords = nullptr;
+  Value *streamOutBufOffset = nullptr;
+  Value *dwordsNeeded = nullptr;
+  Value *bufferToStream = nullptr;
+  {
+    m_builder.SetInsertPoint(endInitPrimitivesToWriteBlock);
+
+    dwordsPerPrim = PoisonValue::get(m_builder.getInt32Ty());
+    bufferSizeInDwords = PoisonValue::get(m_builder.getInt32Ty());
+    streamOutBufOffset = PoisonValue::get(m_builder.getInt32Ty());
+    Value *primitiveCount = primCountInSubgroup[0];
+    bufferToStream = m_builder.getInt32(0);
+
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      if (!bufferActive[i])
+        continue;
+
+      Value *primitiveSize =
+          m_builder.CreateMul(m_verticesPerPrimitive, m_builder.getInt32(xfbStrides[i] / sizeof(unsigned)));
+
+      // NUM_RECORDS = SQ_BUF_RSRC_WORD2
+      Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
+      // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
+      Value *bufferSize = m_builder.CreateLShr(numRecords, 2);
+
+      if (numActiveBuffers > 1) {
+        // Multiple active XFB buffers, promote the values to VGPRs for later handling
+        dwordsPerPrim = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
+                                                  {primitiveSize, m_builder.getInt32(i), dwordsPerPrim});
+
+        bufferSizeInDwords = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
+                                                       {bufferSize, m_builder.getInt32(i), bufferSizeInDwords});
+
+        streamOutBufOffset =
+            m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
+                                      {m_streamOutBufOffsets[i], m_builder.getInt32(i), streamOutBufOffset});
+
+        if (m_hasGs) {
+          primitiveCount = m_builder.CreateIntrinsic(
+              m_builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
+              {primCountInSubgroup[xfbBufferToStream[i]], m_builder.getInt32(i), primitiveCount});
+
+          bufferToStream = m_builder.CreateIntrinsic(
+              m_builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
+              {m_builder.getInt32(xfbBufferToStream[i]), m_builder.getInt32(i), bufferToStream});
+        }
+      } else {
+        // Single active XFB buffer, keep the values in SGPR
+        assert(numActiveBuffers == 1);
+        dwordsPerPrim = primitiveSize;
+        bufferSizeInDwords = bufferSize;
+        streamOutBufOffset = m_streamOutBufOffsets[i];
+        if (m_hasGs) {
+          primitiveCount = primCountInSubgroup[xfbBufferToStream[i]];
+          bufferToStream = m_builder.getInt32(xfbBufferToStream[i]);
+        }
+
+        break; // We can exit the loop since we just handle one active XFB buffer
+      }
+    }
+
+    dwordsNeeded = m_builder.CreateMul(dwordsPerPrim, primitiveCount);
+
+    auto validBuffer =
+        m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(MaxTransformFeedbackBuffers));
+    assert(activeBufferMask != 0);
+    Value *mask = m_builder.getIntN(waveSize, activeBufferMask);
+    auto activeBuffer = m_builder.CreateIntrinsic(m_builder.getInt1Ty(), Intrinsic::amdgcn_inverse_ballot, mask);
+    validBuffer = m_builder.CreateAnd(validBuffer, activeBuffer);
+    m_builder.CreateCondBr(validBuffer, waveOrderingHeaderBlock, checkUpdatePrimitiveCounterBlock);
+  }
+
+  // Construct ".waveOrderingHeader" block
+  Value *readyOrderedWaveId = nullptr;
+  Value *dwordsWritten = nullptr;
+  {
+    m_builder.SetInsertPoint(waveOrderingHeaderBlock);
+
+    const unsigned orderedIdPairStride = m_streamOutControlCbOffsets.orderedIdPair[1].orderedWaveId -
+                                         m_streamOutControlCbOffsets.orderedIdPair[0].orderedWaveId;
+    auto orderedIdPairOffset =
+        m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(orderedIdPairStride));
+    orderedIdPairOffset = m_builder.CreateAdd(
+        m_builder.getInt32(m_streamOutControlCbOffsets.orderedIdPair[0].orderedWaveId), orderedIdPairOffset);
+
+    auto oldOrderedIdPair = globalAtomicOrderedAdd(std::make_pair(m_nggInputs.orderedWaveId, dwordsNeeded),
+                                                   m_streamOutControlBufPtr, orderedIdPairOffset);
+    readyOrderedWaveId = oldOrderedIdPair.first;
+    dwordsWritten = oldOrderedIdPair.second;
+
+    auto needToWait = m_builder.CreateICmpNE(m_nggInputs.orderedWaveId, readyOrderedWaveId);
+    m_builder.CreateCondBr(needToWait, waveOrderingBodyBlock, endWaveOrderingBlock);
+  }
+
+  // Construct ".waveOrderingBody" block
+  {
+    m_builder.SetInsertPoint(waveOrderingBodyBlock);
+
+    // NOTE: We use such rules to derive a variable amount of wait time based on the difference between orderedWaveId
+    // and readyOrderedWaveId:
+    //
+    //   - If the difference value is only 1, we at most ~1/2 L2 latency time (~128 clocks).
+    //   - For every additional unit of the difference value, we add ~2 round trip times (~512 clocks) to the sleep
+    //     duration.
+    //
+    // The formula is therefore as follow (the unit of the sleep duration of s_sleep is 64 clocks):
+    //   waitTime = 8 * (orderedWaveId - readyOrderedWaveId - 1) + 2
+    auto waitTime = m_builder.CreateSub(m_nggInputs.orderedWaveId, readyOrderedWaveId);
+    waitTime = m_builder.CreateSub(waitTime, m_builder.getInt32(1));
+    waitTime = m_builder.CreateMul(waitTime, m_builder.getInt32(8));
+    waitTime = m_builder.CreateAdd(waitTime, m_builder.getInt32(2));
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sleep_var, {}, waitTime);
+
+    m_builder.CreateBr(waveOrderingHeaderBlock);
+  }
+
+  // Construct ".endWaveOrdering" block
+  {
+    m_builder.SetInsertPoint(endWaveOrderingBlock);
+
+    // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
+    Value *dwordsRemaining =
+        m_builder.CreateSub(bufferSizeInDwords, m_builder.CreateAdd(streamOutBufOffset, dwordsWritten));
+    dwordsRemaining = m_builder.CreateIntrinsic(Intrinsic::smax, dwordsRemaining->getType(),
+                                                {dwordsRemaining, m_builder.getInt32(0)});
+    // primsCanWrite = dwordsRemaining / dwordsPerPrim
+    Value *primsCanWrite = m_builder.CreateUDiv(dwordsRemaining, dwordsPerPrim);
+    // numPrimsToWrite = ds_min(primsCanWrite, numPrimsToWrite)
+    auto ldsOffset =
+        m_builder.CreateAdd(m_builder.getInt32(xfbStatsRegionStart + MaxTransformFeedbackBuffers), bufferToStream);
+    atomicOp(AtomicRMWInst::UMin, primsCanWrite, ldsOffset);
+    auto numPrimsToWrite =
+        readValueFromLds(m_builder.getInt32Ty(), ldsOffset); // Read back the final result of numPrimsToWrite
+
+    ldsOffset = m_builder.CreateAdd(m_builder.getInt32(xfbStatsRegionStart), m_nggInputs.threadIdInSubgroup);
+    writeValueToLds(dwordsWritten, ldsOffset);
+
+    // dwordsToWrite = numPrimsToWrite * dwordsPerPrim
+    auto dwordsToWrite = m_builder.CreateMul(numPrimsToWrite, dwordsPerPrim);
+    // dwordsWrittenDelta = dwordsNeeded - dwordsToWrite
+    auto dwordsWrittenDelta = m_builder.CreateSub(dwordsNeeded, dwordsToWrite);
+
+    // Revise dwordsWritten[X]
+    const unsigned dwordsWrittenStride = m_streamOutControlCbOffsets.orderedIdPair[1].dwordsWritten -
+                                         m_streamOutControlCbOffsets.orderedIdPair[0].dwordsWritten;
+    auto dwordsWrittenOffset =
+        m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(dwordsWrittenStride));
+    dwordsWrittenOffset = m_builder.CreateAdd(
+        m_builder.getInt32(m_streamOutControlCbOffsets.orderedIdPair[0].dwordsWritten), dwordsWrittenOffset);
+
+    globalAtomicOp(AtomicRMWInst::BinOp::Sub, dwordsWrittenDelta, m_streamOutControlBufPtr, dwordsWrittenOffset);
+
+    m_builder.CreateBr(checkUpdatePrimitiveCounterBlock);
+  }
+
+  // Construct ".checkUpdatePrimitiveCounter" block
+  {
+    m_builder.SetInsertPoint(checkUpdatePrimitiveCounterBlock);
+
+    m_builder.CreateCondBr(validStream, updatePrimitiveCounterBlock, endUpdatePrimitiveCounterBlock);
+  }
+
+  // Construct ".updatePrimitiveCounter" block
+  {
+    m_builder.SetInsertPoint(updatePrimitiveCounterBlock);
+
+    // Update the counters primsNeed[X] and primsWritten[X]
+    const unsigned primsNeededStride =
+        m_streamOutControlCbOffsets.primsNeeded[1] - m_streamOutControlCbOffsets.primsNeeded[0];
+    auto primsNeededOffset = m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(primsNeededStride));
+    primsNeededOffset =
+        m_builder.CreateAdd(m_builder.getInt32(m_streamOutControlCbOffsets.primsNeeded[0]), primsNeededOffset);
+
+    globalAtomicOp(AtomicRMWInst::Add, m_builder.CreateZExt(numPrimsInStream, m_builder.getInt64Ty()),
+                   m_streamOutControlBufPtr, primsNeededOffset);
+
+    auto ldsOffset = m_builder.CreateAdd(m_builder.getInt32(xfbStatsRegionStart + MaxTransformFeedbackBuffers),
+                                         m_nggInputs.threadIdInSubgroup);
+    Value *numPrimsToWrite = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
+
+    const unsigned primsWrittenStride =
+        m_streamOutControlCbOffsets.primsWritten[1] - m_streamOutControlCbOffsets.primsWritten[0];
+    auto primsWrittenOffset =
+        m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(primsWrittenStride));
+    primsWrittenOffset =
+        m_builder.CreateAdd(m_builder.getInt32(m_streamOutControlCbOffsets.primsWritten[0]), primsWrittenOffset);
+
+    globalAtomicOp(AtomicRMWInst::Add, m_builder.CreateZExt(numPrimsToWrite, m_builder.getInt64Ty()),
+                   m_streamOutControlBufPtr, primsWrittenOffset);
+
+    m_builder.CreateBr(endUpdatePrimitiveCounterBlock);
+  }
+
+  // Construct ".endUpdatePrimitiveCounter" block
+  {
+    m_builder.SetInsertPoint(endUpdatePrimitiveCounterBlock);
+    // Nothing to do
+  }
+#else
   llvm_unreachable("Not implemented!");
+#endif
 }
 
 // =====================================================================================================================
@@ -7667,7 +8234,16 @@ void NggPrimShader::collectPrimitiveStats() {
                                   {m_builder.getInt32(0),                                  // value to add
                                    m_builder.getInt32(GDS_STRMOUT_PRIMS_WRITTEN_0 << 2)}); // count index
       } else {
+#if LLPC_BUILD_GFX12
+        globalAtomicOp(AtomicRMWInst::Add,
+                       m_builder.CreateZExt(m_nggInputs.primCountInSubgroup, m_builder.getInt64Ty()),
+                       m_streamOutControlBufPtr, m_builder.getInt32(m_streamOutControlCbOffsets.primsNeeded[0]));
+
+        globalAtomicOp(AtomicRMWInst::Add, m_builder.getInt64(0), m_streamOutControlBufPtr,
+                       m_builder.getInt32(m_streamOutControlCbOffsets.primsWritten[0]));
+#else
         llvm_unreachable("Not implemented!");
+#endif
       }
 
       m_builder.CreateBr(endCollectPrimitiveStatsBlock);
@@ -7848,7 +8424,15 @@ void NggPrimShader::collectPrimitiveStats() {
                                   {m_builder.getInt32(0),                                            // value to add
                                    m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
       } else {
+#if LLPC_BUILD_GFX12
+        globalAtomicOp(AtomicRMWInst::Add, m_builder.CreateZExt(primCountInSubgroup[i], m_builder.getInt64Ty()),
+                       m_streamOutControlBufPtr, m_builder.getInt32(m_streamOutControlCbOffsets.primsNeeded[i]));
+
+        globalAtomicOp(AtomicRMWInst::Add, m_builder.getInt64(0), m_streamOutControlBufPtr,
+                       m_builder.getInt32(m_streamOutControlCbOffsets.primsWritten[i]));
+#else
         llvm_unreachable("Not implemented!");
+#endif
       }
     }
 
@@ -8081,6 +8665,14 @@ void NggPrimShader::createFenceAndBarrier() {
 // =====================================================================================================================
 // Create LDS barrier to guarantee the synchronization of LDS operations.
 void NggPrimShader::createBarrier() {
+#if LLPC_BUILD_GFX12
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, m_builder.getInt32(WorkgroupNormalBarrierId));
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
+                              m_builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
+    return;
+  }
+#endif
 
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
@@ -8170,5 +8762,65 @@ llvm::Value *NggPrimShader::readValueFromCb(Type *readyTy, Value *bufPtr, Value 
 
   return loadValue;
 }
+
+#if LLPC_BUILD_GFX12
+// =====================================================================================================================
+// Do global atomic operation with the value stored in the specified pointer
+//
+// @param atomicOp : Atomic operation
+// @param value : Value to do global atomic operation
+// @param basePtr : Base pointer
+// @param offset : Dword offset from the base pointer
+// @returns : Result value after doing global atomic operation
+Value *NggPrimShader::globalAtomicOp(AtomicRMWInst::BinOp atomicOp, Value *value, Value *basePtr, Value *offset) {
+  assert(basePtr->getType()->isPointerTy());
+  assert(value->getType() == m_builder.getInt32Ty() ||
+         value->getType() == m_builder.getInt64Ty()); // Must be i32 or i64
+
+  // Cast the address space to global
+  if (basePtr->getType()->getPointerAddressSpace() != ADDR_SPACE_GLOBAL)
+    basePtr = m_builder.CreateAddrSpaceCast(basePtr, PointerType::get(m_builder.getContext(), ADDR_SPACE_GLOBAL));
+
+  auto entryPtr = m_builder.CreateGEP(m_builder.getInt32Ty(), basePtr, offset);
+  if (value->getType() == m_builder.getInt64Ty())
+    entryPtr = m_builder.CreateBitCast(entryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
+
+  return m_builder.CreateAtomicRMW(atomicOp, entryPtr, value, MaybeAlign(), AtomicOrdering::Monotonic,
+                                   m_builder.getContext().getOrInsertSyncScopeID("agent"));
+}
+
+// =====================================================================================================================
+// Do global ordered atomic add with the value stored in the specified pointer
+//
+// @param orderedIdPair : Ordered ID pair to do global ordered atomic add
+// @param basePtr : Base pointer
+// @param offset : Dword offset from the base pointer
+// @returns : Old ordered ID pair before doing global ordered atomic add
+std::pair<Value *, Value *> NggPrimShader::globalAtomicOrderedAdd(std::pair<Value *, Value *> orderedIdPair,
+                                                                  Value *basePtr, Value *offset) {
+  assert(basePtr->getType()->isPointerTy());
+  assert(orderedIdPair.first->getType() == m_builder.getInt32Ty());
+  assert(orderedIdPair.second->getType() == m_builder.getInt32Ty());
+
+  auto int32x2Ty = FixedVectorType::get(m_builder.getInt32Ty(), 2);
+  Value *value = PoisonValue::get(int32x2Ty);
+  value = m_builder.CreateInsertElement(value, orderedIdPair.first, static_cast<uint64_t>(0));
+  value = m_builder.CreateInsertElement(value, orderedIdPair.second, 1);
+  value = m_builder.CreateBitCast(value, m_builder.getInt64Ty());
+
+  // Cast the address space to global
+  if (basePtr->getType()->getPointerAddressSpace() != ADDR_SPACE_GLOBAL)
+    basePtr = m_builder.CreateAddrSpaceCast(basePtr, PointerType::get(m_builder.getContext(), ADDR_SPACE_GLOBAL));
+
+  auto entryPtr = m_builder.CreateGEP(m_builder.getInt32Ty(), basePtr, offset);
+  entryPtr = m_builder.CreateBitCast(entryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
+  Value *oldOrderedIdPair = m_builder.CreateIntrinsic(
+      m_builder.getInt64Ty(), Intrinsic::amdgcn_global_atomic_ordered_add_b64, {entryPtr, value});
+  oldOrderedIdPair = m_builder.CreateBitCast(oldOrderedIdPair, int32x2Ty);
+
+  return std::make_pair(m_builder.CreateExtractElement(oldOrderedIdPair, static_cast<uint64_t>(0)),
+                        m_builder.CreateExtractElement(oldOrderedIdPair, 1));
+}
+#endif
 
 } // namespace lgc

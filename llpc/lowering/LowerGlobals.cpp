@@ -1536,6 +1536,9 @@ void LowerGlobals::lowerBufferBlock() {
 
     const unsigned descSet = mdconst::extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
     const unsigned binding = mdconst::extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
+#if LLPC_BUILD_GFX12
+    bool isNoAllocResource = global.hasMetadata(gSPIRVMD::ResourceNoAlloc);
+#endif
 
     // AtomicCounter is emulated following same impl of SSBO, only qualifier 'offset' will be used in its
     // MD now. Using a new MD kind to detect it. AtomicCounter's type should be uint, not a structure.
@@ -1633,6 +1636,10 @@ void LowerGlobals::lowerBufferBlock() {
             // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
             m_builder->SetInsertPoint(replaceInstsInfo.otherInst);
             unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+#if LLPC_BUILD_GFX12
+            if (isNoAllocResource)
+              bufferFlags |= lgc::Builder::BufferFlagLLcNoAlloc;
+#endif
 
             auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
             Value *const bufferDesc =
@@ -1720,6 +1727,10 @@ void LowerGlobals::lowerBufferBlock() {
                 bufferFlags |= lgc::Builder::BufferFlagNonUniform;
               if (!global.isConstant())
                 bufferFlags |= lgc::Builder::BufferFlagWritten;
+#if LLPC_BUILD_GFX12
+              if (isNoAllocResource)
+                bufferFlags |= lgc::Builder::BufferFlagLLcNoAlloc;
+#endif
 
               Value *bufferDescs[2] = {nullptr};
               unsigned descSets[2] = {descSet, 0};
@@ -1800,6 +1811,11 @@ void LowerGlobals::lowerBufferBlock() {
       } else {
         m_builder->SetInsertPointPastAllocas(func);
         unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+
+#if LLPC_BUILD_GFX12
+        if (isNoAllocResource)
+          bufferFlags |= lgc::Builder::BufferFlagLLcNoAlloc;
+#endif
 
         auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
         Value *const bufferDesc =

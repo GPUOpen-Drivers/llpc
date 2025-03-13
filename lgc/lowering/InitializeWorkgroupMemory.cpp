@@ -235,7 +235,13 @@ void InitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, BuilderB
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
       builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
     } else {
+#if LLPC_BUILD_GFX12
+      builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, builder.getInt32(WorkgroupNormalBarrierId));
+      builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
+                              builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
+#else
       llvm_unreachable("Not implemented!");
+#endif
     }
     builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
   }
