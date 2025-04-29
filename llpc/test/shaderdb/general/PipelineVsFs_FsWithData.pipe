@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Test that constant data in the fragment shader is handled correctly.
 ; BEGIN_SHADERTEST
@@ -71,7 +71,6 @@
 ; SHADERTEST2_PP0-NEXT: {{[0-9]*}}: 3F800000
 ; SHADERTEST2_PP0-NEXT: {{[0-9]*}}: 3F800000
 ; END_SHADERTEST
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx1010 -d -j .text -j .rodata -r %t.elf | FileCheck -check-prefix=SHADERTEST2_PP1 %s

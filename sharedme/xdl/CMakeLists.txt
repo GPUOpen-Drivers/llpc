@@ -58,13 +58,6 @@ set_compiler_options(sharedme_xdl)
 
 set(SHAREDME_XDL_TABLEGEN_DEFINES)
 
-#if LLPC_BUILD_GFX12
-if(LLPC_BUILD_GFX12)
-  target_compile_definitions(sharedme_xdl PUBLIC LLPC_BUILD_GFX12=1)
-  list(APPEND SHAREDME_XDL_TABLEGEN_DEFINES -DLLPC_BUILD_GFX12)
-endif()
-#endif
-
 # TableGen for dialects
 include("${LLPC_SOURCE_DIR}/cmake/DialectsTablegen.cmake")
 set_dialects_tablegen_exe(SHAREDME_XDL)

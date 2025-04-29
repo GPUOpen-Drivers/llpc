@@ -57,7 +57,7 @@ PreservedAnalyses ApplyWorkarounds::run(Module &module, ModuleAnalysisManager &a
 
   LLVM_DEBUG(dbgs() << "Run the pass Apply-Workarounds\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   m_pipelineState = pipelineState;
   m_builder = std::make_unique<IRBuilder<>>(*m_context);
@@ -65,7 +65,7 @@ PreservedAnalyses ApplyWorkarounds::run(Module &module, ModuleAnalysisManager &a
 
   m_changed = false;
 
-  // Patch image resource descriptor when app provides wrong type
+  // Workaround image resource descriptor when app provides wrong type
   applyImageDescWorkaround();
 
   return m_changed ? PreservedAnalyses::none() : PreservedAnalyses::all();

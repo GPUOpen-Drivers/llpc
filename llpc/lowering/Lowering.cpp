@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  Lowering.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLower.
+ * @brief LLPC source file: contains implementation of class Llpc::Lowering.
  ***********************************************************************************************************************
  */
 #include "Lowering.h"
@@ -43,6 +43,7 @@
 #include "LowerTerminator.h"
 #include "LowerTranslator.h"
 #include "LoweringUtil.h"
+#include "MemCpyRecognize.h"
 #include "ScalarReplacementOfBuiltins.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
@@ -96,8 +97,8 @@ namespace Llpc {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
 // @param lowerFlag : Add the required pass based on the flag
-void SpirvLower::addPasses(Context *context, ShaderStage stage, ModulePassManager &passMgr, Timer *lowerTimer,
-                           LowerFlag lowerFlag) {
+void Lowering::addPasses(Context *context, ShaderStage stage, ModulePassManager &passMgr, Timer *lowerTimer,
+                         LowerFlag lowerFlag) {
   // Start timer for lowering passes.
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
@@ -144,7 +145,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, ModulePassManage
   passMgr.addPass(LowerMemoryOp());
 
   // Remove redundant load/store operations and do minimal optimization
-  // It is required by SpirvLowerImageOp.
+  // It is required by CollectImageOperations.
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass(SROAOptions::ModifyCFG)));
 
   // Lower SPIR-V precision / adjust fast math flags.
@@ -157,6 +158,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, ModulePassManage
 
   auto instCombineOpt = InstCombineOptions().setMaxIterations(2);
   passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
+  passMgr.addPass(MemCpyRecognize());
   passMgr.addPass(createModuleToFunctionPassAdaptor(SimplifyCFGPass()));
   passMgr.addPass(createModuleToFunctionPassAdaptor(EarlyCSEPass()));
 
@@ -168,11 +170,11 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, ModulePassManage
 
   // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
   // lgc.gpurt dialect handling.
-  // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
+  // And do inlining after LowerRayTracing as it will produce some extra functions.
   if (lowerFlag.isRayTracing) {
     assert(context->getPipelineType() == PipelineType::RayTracing);
     if (!static_cast<RayTracingContext *>(context->getPipelineContext())->isContinuationsMode()) {
-      passMgr.addPass(SpirvLowerRayTracing());
+      passMgr.addPass(LowerRayTracing());
       passMgr.addPass(AlwaysInlinerPass());
     }
   }
@@ -201,25 +203,25 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, ModulePassManage
 // Register all the translation passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
-template <typename PassManagerT> void SpirvLower::registerTranslationPasses(PassManagerT &passMgr) {
+template <typename PassManagerT> void Lowering::registerTranslationPasses(PassManagerT &passMgr) {
   passMgr.registerPass("lower-translator", LowerTranslator::name());
   passMgr.registerPass("lower-gpurt-library", ProcessGpuRtLibrary::name());
 }
 
-template void SpirvLower::registerTranslationPasses<lgc::PassManager>(lgc::PassManager &);
-template void SpirvLower::registerTranslationPasses<lgc::MbPassManager>(lgc::MbPassManager &);
+template void Lowering::registerTranslationPasses<lgc::PassManager>(lgc::PassManager &);
+template void Lowering::registerTranslationPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
 // =====================================================================================================================
 // Register all the lowering passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
-template <typename PassManagerT> void SpirvLower::registerLoweringPasses(PassManagerT &passMgr) {
+template <typename PassManagerT> void Lowering::registerLoweringPasses(PassManagerT &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
 }
 
-template void SpirvLower::registerLoweringPasses<lgc::PassManager>(lgc::PassManager &);
-template void SpirvLower::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPassManager &);
+template void Lowering::registerLoweringPasses<lgc::PassManager>(lgc::PassManager &);
+template void Lowering::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
 // =====================================================================================================================
 // Replace global variable with another global variable
@@ -227,7 +229,7 @@ template void SpirvLower::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPass
 // @param context : The context
 // @param original : Replaced global variable
 // @param replacement : Replacing global variable
-void SpirvLower::replaceGlobal(Context *context, GlobalVariable *original, GlobalVariable *replacement) {
+void Lowering::replaceGlobal(Context *context, GlobalVariable *original, GlobalVariable *replacement) {
   convertUsersOfConstantsToInstructions(original);
   original->replaceAllUsesWith(replacement);
   original->eraseFromParent();
@@ -239,7 +241,7 @@ void SpirvLower::replaceGlobal(Context *context, GlobalVariable *original, Globa
 // NOTE: This function should be called at the beginning of "runOnModule()".
 //
 // @param module : LLVM module
-void SpirvLower::init(Module *module) {
+void Lowering::init(Module *module) {
   m_module = module;
   m_context = static_cast<Context *>(&m_module->getContext());
   SmallVector<Function *> entries;

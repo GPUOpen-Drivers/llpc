@@ -1,0 +1,121 @@
+
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;  Permission is hereby granted, free of charge, to any person obtaining a copy
+ ;  of this software and associated documentation files (the "Software"), to
+ ;  deal in the Software without restriction, including without limitation the
+ ;  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ ;  sell copies of the Software, and to permit persons to whom the Software is
+ ;  furnished to do so, subject to the following conditions:
+ ;
+ ;  The above copyright notice and this permission notice shall be included in all
+ ;  copies or substantial portions of the Software.
+ ;
+ ;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ ;  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ ;  IN THE SOFTWARE.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Check that when ray query is used in CPS and traversal counter is enabled, the compilation does not fail.
+; The point is that traversal counter for ray query requires dispatch ID, we translated GpurtGetRayQueryDispatchIdOp
+; to GlobalInvocationID before, which indirectly uses LocalInvocationId, and we don't have it in CPS mode.
+
+; RUN: amdllpc -v -gfxip 11.0 %s | FileCheck -check-prefix=CHECK %s
+; CHECK: AMDLLPC SUCCESS
+
+[Version]
+version = 75
+
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_ray_query : require
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT g_bvh;
+layout(binding = 1, set = 0) buffer DummyResult { bool dummy; };
+
+void main() {
+  rayQueryEXT q;
+  rayQueryInitializeEXT(q, g_bvh, 0, 0xFF, vec3(0.0), 0.0, vec3(1.0), 1.0);
+  // A dummy use to keep the call
+  dummy = rayQueryProceedEXT(q);
+}
+
+[rgenInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 0xffffffff
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = DescriptorImage
+userDataNode[0].next[1].offsetInDwords = 4
+userDataNode[0].next[1].sizeInDwords = 8
+userDataNode[0].next[1].set = 0x00000000
+userDataNode[0].next[1].binding = 1
+userDataNode[1].visibility = 0xffffffff
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = DescriptorConstBufferCompact
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 2
+userDataNode[1].next[0].set = 0x0000005D
+userDataNode[1].next[0].binding = 17
+userDataNode[1].next[1].type = DescriptorConstBuffer
+userDataNode[1].next[1].offsetInDwords = 2
+userDataNode[1].next[1].sizeInDwords = 4
+userDataNode[1].next[1].set = 0x0000005D
+userDataNode[1].next[1].binding = 0
+userDataNode[1].next[2].type = DescriptorBuffer
+userDataNode[1].next[2].offsetInDwords = 6
+userDataNode[1].next[2].sizeInDwords = 4
+userDataNode[1].next[2].set = 0x0000005D
+userDataNode[1].next[2].binding = 1
+
+[RayTracingPipelineState]
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+maxRecursionDepth = 1
+indirectStageMask = 0xffffffff
+mode = 3
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2164261887
+rtState.nodeStrideShift = 7
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.outerTileSize = 4
+rtState.dispatchDimSwizzleMode = 0
+rtState.enableDispatchRaysInnerSwizzle = 1
+rtState.enableDispatchRaysOuterSwizzle = 1
+rtState.enableOptimalLdsStackSizeForIndirect = 1
+rtState.enableOptimalLdsStackSizeForUnified = 1
+rtState.gpurtFeatureFlags = 1
+rtState.counterMode = 1
+rtState.pipelineFlags = 8192
+rtState.staticPipelineFlags = 830472704

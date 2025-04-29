@@ -74,8 +74,6 @@ CpsSchedulingLevel getCpsLevelForShaderStage(lgc::rt::RayTracingShaderStage stag
 uint8_t getPotentialCpsReturnLevels(lgc::rt::RayTracingShaderStage stage);
 llvm::Value *lowerAsContinuationReference(llvm::IRBuilder<> &Builder, lgc::cps::AsContinuationReferenceOp &AsCROp,
                                           llvm::Value *Relocation = nullptr);
-#if LLPC_BUILD_GFX12
 void setMaxOutgoingVgprCount(llvm::Function &fn, unsigned maxOutgoingVgprCount);
 std::optional<unsigned> tryGetMaxOutgoingVgprCount(const llvm::Function &fn);
-#endif
 } // namespace lgc::cps

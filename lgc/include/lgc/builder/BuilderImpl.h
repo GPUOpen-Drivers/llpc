@@ -54,9 +54,15 @@ public:
                                        unsigned flags, const llvm::Twine &instName = "");
 
   // Create a waterfall loop containing the specified instruction.
-  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
-                                         bool scalarizeDescriptorLoads = false, bool useVgprForOperands = false,
-                                         const llvm::Twine &instName = "");
+  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, unsigned operandIdx,
+                                         bool useVgprForOperands = false, const llvm::Twine &instName = "");
+
+  // Create waterfallLoop begin and readfirstlane on the 32-bit indices transformed from non-uniform descriptor pointers
+  llvm::Value *beginWaterfallLoop(llvm::SmallVectorImpl<llvm::Value *> &ptrToIntInfos, llvm::Instruction *insertPt,
+                                  const llvm::Twine &instName = "");
+
+  // Create waterfallEnd at the given non-uniform instruction with the given waterfallBegin
+  llvm::Value *endWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::Value *waterfallBegin);
 
   // Set the current shader stage, clamp shader stage to the ShaderStage::Compute
   void setShaderStage(std::optional<ShaderStageEnum> stage) {
@@ -79,10 +85,8 @@ protected:
   // Get whether the context we are building in supports permute lane 64 DPP operations.
   bool supportPermLane64Dpp() const;
 
-#if LLPC_BUILD_GFX12
   // Get whether the context we are building in supports permute lane var operations.
   bool supportPermLaneVar() const;
-#endif
 
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
@@ -349,7 +353,7 @@ private:
 
 public:
   // Create an image load.
-  llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+  llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
                                llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "");
 
   // Create an image load with F-mask.
@@ -358,12 +362,12 @@ public:
                                         const llvm::Twine &instName = "");
 
   // Create an image store.
-  llvm::Value *CreateImageStore(llvm::Value *texel, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+  llvm::Value *CreateImageStore(llvm::Value *texel, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
                                 llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "");
 
   // Create an image sample.
-  llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                 llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
+  llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
+                                 llvm::Value *samplerDescPointer, llvm::ArrayRef<llvm::Value *> address,
                                  const llvm::Twine &instName = "");
 
   // Create an image sample with conversion.
@@ -377,18 +381,18 @@ public:
                                              const llvm::Twine &instName = "");
 
   // Create an image gather
-  llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                 llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
+  llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
+                                 llvm::Value *samplerDescPointer, llvm::ArrayRef<llvm::Value *> address,
                                  const llvm::Twine &instName = "");
 
   // Create an image atomic operation other than compare-and-swap.
   llvm::Value *CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                 llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                 llvm::Value *imageDescPointer, llvm::Value *coord, llvm::Value *inputValue,
                                  const llvm::Twine &instName = "");
 
   // Create an image atomic compare-and-swap.
   llvm::Value *CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                            llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                            llvm::Value *imageDescPointer, llvm::Value *coord, llvm::Value *inputValue,
                                             llvm::Value *comparatorValue, const llvm::Twine &instName = "");
 
   // Create a query of the number of mipmap levels in an image. Returns an i32 value.
@@ -405,7 +409,7 @@ public:
 
   // Create a get of the LOD that would be used for an image sample with the given coordinates
   // and implicit LOD.
-  llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
+  llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDescPointer, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
 
   // Create a query of the sample position of given sample id in an image.
@@ -416,17 +420,26 @@ public:
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                           llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
                                           const llvm::Twine &instName = "");
+  // Represent the required information to process a descriptor
+  struct DescriptorInfo {
+    llvm::Value *descPtr;
+    bool isNonUniform;
+    bool needFullDesc;
+    bool isTexelBuffer;
+    bool fixupImageDescNeeded;
+    llvm::function_ref<llvm::Value *(llvm::Value *)> fixupSamplerDesc;
+  };
 
 private:
   // Common code to create an image sample or gather.
   llvm::Value *CreateImageSampleGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *coord,
                                        llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                        llvm::ArrayRef<llvm::Value *> address, const llvm::Twine &instName,
-                                       bool isSample);
+                                       bool isSample, llvm::function_ref<llvm::Value *(llvm::Value *)> fixupSampleDesc);
 
   // Common code for CreateImageAtomic and CreateImageAtomicCompareSwap
   llvm::Value *CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                       llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                       llvm::Value *imageDescPointer, llvm::Value *coord, llvm::Value *inputValue,
                                        llvm::Value *comparatorValue, const llvm::Twine &instName = "");
 
   // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
@@ -445,9 +458,6 @@ private:
   // Fix image descriptor before an operation that reads the image
   llvm::Value *fixImageDescForRead(llvm::Value *imageDesc);
 
-  // Enforce readfirstlane on the image or sampler descriptors
-  void enforceReadFirstLane(llvm::Instruction *imageInst, unsigned descIdx);
-
   // Modify sampler descriptor to force set trunc_coord as 0 for gather4 instruction.
   llvm::Value *modifySamplerDescForGather(llvm::Value *samplerDesc);
 
@@ -458,13 +468,15 @@ private:
   llvm::Value *transformSamplerDesc(llvm::Value *samplerDesc, bool mustLoad);
 
   // Check if we need a full descriptor
-  bool isFullDescriptorNeeded(llvm::Value *descPtr, bool isImage, llvm::Type *origTexelTy = nullptr,
-                              llvm::Type *texelTy = nullptr);
+  bool isFullImageDescriptorNeeded(llvm::Type *origTexelTy = nullptr, llvm::Type *texelTy = nullptr);
 
   // Check if the descriptor is uniform
   bool isUniformDescriptor(llvm::Value *descPtr, unsigned flags, bool isImage);
 
   CoherentFlag getImageCoherentFlag(unsigned flags, bool isRead);
+
+  // Process the give descriptor based on the given infos
+  llvm::Value *processDescriptors(llvm::SmallVectorImpl<DescriptorInfo> &descPtrInfos, unsigned flags);
 
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
@@ -487,13 +499,11 @@ private:
     IMG_FMT_BG_RG_UNORM__GFX104PLUS = 86,
   };
 
-#if LLPC_BUILD_GFX12
   enum ImgFmtGfx12 {
     IMG_FMT_8_8_8_8_UNORM = 42,
     IMG_FMT_GB_GR_UNORM = 82,
     IMG_FMT_BG_RG_UNORM = 86,
   };
-#endif
 
   static const unsigned AtomicOpCompareSwap = 1;
 
@@ -864,12 +874,10 @@ protected:
                                      const llvm::Twine &instName);
   llvm::Value *createWqm(llvm::Value *const value);
 
-#if LLPC_BUILD_GFX12
   llvm::Value *createPermLane16Var(llvm::Value *const origValue, llvm::Value *const updateValue,
                                    llvm::Value *const select, bool fetchInactive, bool boundCtrl);
   llvm::Value *createPermLaneX16Var(llvm::Value *const origValue, llvm::Value *const updateValue,
                                     llvm::Value *const select, bool fetchInactive, bool boundCtrl);
-#endif
 };
 
 } // namespace lgc

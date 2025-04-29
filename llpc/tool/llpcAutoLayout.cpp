@@ -561,42 +561,31 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
     return;
 
   // Collect ResourceMappingNode entries in sets.
-  for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i) {
-    auto var = module->getVariable(i);
-    switch (var->getStorageClass()) {
-    case StorageClassFunction: {
-      break;
-    }
+  auto fillResourceMappingNode = [&](SPIRVBaseVariable *var) {
+    SPIRVWord binding = SPIRVID_INVALID;
+    SPIRVWord descSet = 0;
+    if (var->hasDecorate(DecorationBinding, 0, &binding)) {
+      // Test shaderdb/OpDecorationGroup_TestGroupAndGroupMember_lit.spvasm
+      // defines a variable with a binding but no set. Handle that case.
+      var->hasDecorate(DecorationDescriptorSet, 0, &descSet);
 
-    case StorageClassPushConstant: {
-      // Push constant: Get the size of the data and add to the total.
+      // Find/create the node entry for this set and binding.
+      ResourceNodeSet &resNodeSet = resNodeSets[descSet];
+      auto iteratorAndCreated = resNodeSet.bindingMap.insert({binding, resNodeSet.nodes.size()});
+      unsigned nodesIndex = iteratorAndCreated.first->second;
+      if (iteratorAndCreated.second) {
+        resNodeSet.nodes.push_back({});
+        resNodeSet.nodes.back().type = ResourceMappingNodeType::Unknown;
+      }
+      resNodeSet.visibility |= shaderStageToMask(shaderStage);
+      ResourceMappingNode *node = &resNodeSet.nodes[nodesIndex];
+
+      // Get the element type and array size.
       auto varElemTy = var->getType()->getPointerElementType();
-      pushConstSize += (getTypeDataSize(varElemTy) + 3) / 4;
-      break;
-    }
-
-    default: {
-      SPIRVWord binding = SPIRVID_INVALID;
-      SPIRVWord descSet = 0;
-      if (var->hasDecorate(DecorationBinding, 0, &binding)) {
-        // Test shaderdb/OpDecorationGroup_TestGroupAndGroupMember_lit.spvasm
-        // defines a variable with a binding but no set. Handle that case.
-        var->hasDecorate(DecorationDescriptorSet, 0, &descSet);
-
-        // Find/create the node entry for this set and binding.
-        ResourceNodeSet &resNodeSet = resNodeSets[descSet];
-        auto iteratorAndCreated = resNodeSet.bindingMap.insert({binding, resNodeSet.nodes.size()});
-        unsigned nodesIndex = iteratorAndCreated.first->second;
-        if (iteratorAndCreated.second) {
-          resNodeSet.nodes.push_back({});
-          resNodeSet.nodes.back().type = ResourceMappingNodeType::Unknown;
-        }
-        resNodeSet.visibility |= shaderStageToMask(shaderStage);
-        ResourceMappingNode *node = &resNodeSet.nodes[nodesIndex];
-
-        // Get the element type and array size.
-        auto varElemTy = var->getType()->getPointerElementType();
-        unsigned arraySize = 1;
+      unsigned arraySize = 1;
+      ResourceMappingNodeType nodeType;
+      unsigned sizeInDwords;
+      if (varElemTy) {
         while (varElemTy->isTypeArray()) {
           if (varElemTy->isTypeRuntimeArray())
             arraySize *= 16; // arbitrarily pick something semi-plausible
@@ -604,10 +593,7 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
             arraySize *= varElemTy->getArrayLength();
           varElemTy = varElemTy->getArrayElementType();
         }
-
         // Map the SPIR-V opcode to descriptor type and size.
-        ResourceMappingNodeType nodeType;
-        unsigned sizeInDwords;
         switch (varElemTy->getOpCode()) {
         case OpTypeSampler: {
           // Sampler descriptor.
@@ -636,35 +622,58 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
           break;
         }
         }
+      } else {
+        // Normal buffer.
+        nodeType = ResourceMappingNodeType::DescriptorBuffer;
+        sizeInDwords = 4 * arraySize;
+      }
 
-        // Check if the node already had a different type set. A DescriptorResource/DescriptorTexelBuffer
-        // and a DescriptorSampler can use the same set/binding, in which case it is
-        // DescriptorCombinedTexture.
-        if (node->type == ResourceMappingNodeType::Unknown)
-          node->type = nodeType;
-        else if (node->type != nodeType) {
-          {
-            assert(nodeType == ResourceMappingNodeType::DescriptorCombinedTexture ||
-                   nodeType == ResourceMappingNodeType::DescriptorResource ||
-                   nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
-                   nodeType == ResourceMappingNodeType::DescriptorSampler);
-          }
-          {
-            assert(node->type == ResourceMappingNodeType::DescriptorCombinedTexture ||
-                   node->type == ResourceMappingNodeType::DescriptorResource ||
-                   node->type == ResourceMappingNodeType::DescriptorTexelBuffer ||
-                   node->type == ResourceMappingNodeType::DescriptorSampler);
-          }
-
-          node->type = ResourceMappingNodeType::DescriptorCombinedTexture;
-          sizeInDwords = 12 * arraySize;
+      // Check if the node already had a different type set. A DescriptorResource/DescriptorTexelBuffer
+      // and a DescriptorSampler can use the same set/binding, in which case it is
+      // DescriptorCombinedTexture.
+      if (node->type == ResourceMappingNodeType::Unknown)
+        node->type = nodeType;
+      else if (node->type != nodeType) {
+        {
+          assert(nodeType == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                 nodeType == ResourceMappingNodeType::DescriptorResource ||
+                 nodeType == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                 nodeType == ResourceMappingNodeType::DescriptorSampler);
+        }
+        {
+          assert(node->type == ResourceMappingNodeType::DescriptorCombinedTexture ||
+                 node->type == ResourceMappingNodeType::DescriptorResource ||
+                 node->type == ResourceMappingNodeType::DescriptorTexelBuffer ||
+                 node->type == ResourceMappingNodeType::DescriptorSampler);
         }
 
-        // Fill out the rest of the node.
-        node->sizeInDwords = sizeInDwords;
-        node->srdRange.set = descSet;
-        node->srdRange.binding = binding;
+        node->type = ResourceMappingNodeType::DescriptorCombinedTexture;
+        sizeInDwords = 12 * arraySize;
       }
+
+      // Fill out the rest of the node.
+      node->sizeInDwords = sizeInDwords;
+      node->srdRange.set = descSet;
+      node->srdRange.binding = binding;
+    }
+  };
+
+  for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i) {
+    auto var = module->getVariable(i);
+    switch (var->getStorageClass()) {
+    case StorageClassFunction: {
+      break;
+    }
+
+    case StorageClassPushConstant: {
+      // Push constant: Get the size of the data and add to the total.
+      auto varElemTy = var->getType()->getPointerElementType();
+      pushConstSize += (getTypeDataSize(varElemTy) + 3) / 4;
+      break;
+    }
+
+    default: {
+      fillResourceMappingNode(var);
       break;
     }
     }

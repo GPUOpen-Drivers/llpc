@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -76,7 +76,6 @@ void main(void)
 
 [VsInfo]
 entryPoint = main
-
 
 [TcsGlsl]
 #version 450 core
@@ -157,10 +156,8 @@ void main()
     }
 }
 
-
 [GsInfo]
 entryPoint = main
-
 
 [FsGlsl]
 #version 450 core
@@ -224,7 +221,6 @@ options.scalarBlockLayout = 1
 options.includeIr = 0
 options.robustBufferAccess = 0
 options.reconfigWorkgroupLayout = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

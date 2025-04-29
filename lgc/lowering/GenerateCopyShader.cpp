@@ -61,7 +61,7 @@ PreservedAnalyses GenerateCopyShader::run(Module &module, ModuleAnalysisManager 
 
   LLVM_DEBUG(dbgs() << "Run the pass Generate-Copy-Shader\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   m_pipelineState = pipelineState;
   m_pipelineSysValues.initialize(m_pipelineState);
@@ -180,7 +180,7 @@ PreservedAnalyses GenerateCopyShader::run(Module &module, ModuleAnalysisManager 
   }
 
   if (m_pipelineState->isGsOnChip())
-    m_lds = Patch::getLdsVariable(m_pipelineState, entryPoint);
+    m_lds = LgcLowering::getLdsVariable(m_pipelineState, entryPoint);
 
   SmallVector<unsigned, MaxGsStreams> activeStreams;
   for (unsigned i = 0; i < MaxGsStreams; ++i) {

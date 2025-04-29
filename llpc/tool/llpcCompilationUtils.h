@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -103,6 +103,7 @@ struct CompileInfo {
   bool doAutoLayout;                                       // Whether to auto layout descriptors
   bool autoLayoutDesc;                     // Whether to automatically create descriptor layout based on resource usages
   optional_bool robustBufferAccess;        // Whether to enable robust buffer access
+  optional_bool enableRobustUnboundVertex; // Whether to enable robust unbound vertex
   optional_bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
   optional_bool enableImplicitInvariantExports; // Whether to enable implicit marking of position exports as invariant
   VfxPipelineType pipelineType;                 // Pipeline type

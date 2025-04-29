@@ -42,7 +42,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering CFG merges.
-class LowerCfgMerges : public SpirvLower, public llvm::PassInfoMixin<LowerCfgMerges> {
+class LowerCfgMerges : public Lowering, public llvm::PassInfoMixin<LowerCfgMerges> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

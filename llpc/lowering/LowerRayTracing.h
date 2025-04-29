@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerRayTracing.h
- * @brief LLPC header file: contains declaration of Llpc::SpirvLowerRayTracing
+ * @brief LLPC header file: contains declaration of Llpc::LowerRayTracing
  ***********************************************************************************************************************
  */
 #pragma once
@@ -175,6 +175,7 @@ enum RayHitStatus : unsigned {
 
 constexpr unsigned SqttWellKnownTypeFunctionCallCompact = 0x11;
 constexpr unsigned SqttWellKnownTypeFunctionReturn = 0x10;
+constexpr unsigned SqttWellKnownTypeIndirectFunctionCall = 0x4;
 
 // Corresponds to gl_RayFlags* in GLSL_EXT_ray_tracing.txt
 enum RayFlag : unsigned {
@@ -191,7 +192,7 @@ enum RayFlag : unsigned {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering ray tracing.
-class SpirvLowerRayTracing : public llvm::PassInfoMixin<SpirvLowerRayTracing> {
+class LowerRayTracing : public llvm::PassInfoMixin<LowerRayTracing> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

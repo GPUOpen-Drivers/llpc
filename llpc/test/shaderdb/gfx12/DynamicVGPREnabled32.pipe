@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; RUN: amdllpc -gfxip 12.0.1 -llpc-raytracing-mode=continuations -emit-llvm -o - %s | FileCheck --implicit-check-not=-dynamic-vgpr,+dynamic-vgpr-block-size-32 --implicit-check-not=block-size-0 -check-prefixes=CHECK %s
 

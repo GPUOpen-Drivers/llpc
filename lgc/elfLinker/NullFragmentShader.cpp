@@ -55,7 +55,11 @@ Module *NullFragmentShader::generate() {
 Module *NullFragmentShader::generateEmptyModule() const {
   Module *module = new Module("nullFragmentShader", getContext());
   TargetMachine *targetMachine = m_lgcContext->getTargetMachine();
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 529559
   module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+#else
+  module->setTargetTriple(targetMachine->getTargetTriple());
+#endif
   module->setDataLayout(targetMachine->createDataLayout());
   return module;
 }

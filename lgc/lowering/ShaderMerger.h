@@ -123,6 +123,7 @@ private:
                                            BuilderBase &builder);
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
+  void atomicAdd(llvm::Value *value, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
   void createBarrier(llvm::IRBuilder<> &builder);
 
   PipelineState *m_pipelineState; // Pipeline state

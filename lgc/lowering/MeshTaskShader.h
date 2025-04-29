@@ -219,9 +219,8 @@ private:
   void createFenceAndBarrier();
   void createBarrier();
 
-  static constexpr unsigned PayloadRingEntrySize = 16 * 1024;    // 16K bytes per group
-  static constexpr unsigned DrawDataRingEntrySize = 16;          // 16 bytes per group
-  static constexpr unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
+  static constexpr unsigned PayloadRingEntrySize = 16 * 1024; // 16K bytes per group
+  static constexpr unsigned DrawDataRingEntrySize = 16;       // 16 bytes per group
 
   PipelineState *m_pipelineState = nullptr; // Pipeline state
 

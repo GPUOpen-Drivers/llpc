@@ -52,7 +52,7 @@ struct StoreExpandInfo {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering memory operations.
-class LowerMemoryOp : public SpirvLower,
+class LowerMemoryOp : public Lowering,
                       public llvm::InstVisitor<LowerMemoryOp>,
                       public llvm::PassInfoMixin<LowerMemoryOp> {
 public:

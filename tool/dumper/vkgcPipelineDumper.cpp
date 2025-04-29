@@ -578,20 +578,13 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
   case ResourceMappingNodeType::DescriptorAtomicCounter:
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-  case ResourceMappingNodeType::DescriptorMutable:
-#endif
-  {
+  case ResourceMappingNodeType::DescriptorMutable: {
     char setHexvalue[64] = {};
     snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
     dumpFile << prefix << ".set = " << setHexvalue << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     dumpFile << prefix << ".strideInDwords = " << userDataNode->srdRange.strideInDwords << "\n";
-#endif
     break;
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
@@ -706,29 +699,26 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.nsaThreshold = " << shaderInfo->options.nsaThreshold << "\n";
   dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
   dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
-  dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
   dumpFile << "options.disableFMA = " << shaderInfo->options.disableFMA << "\n";
   dumpFile << "options.disableReadFirstLaneWorkaround = " << shaderInfo->options.disableReadFirstLaneWorkaround << "\n";
   dumpFile << "options.backwardPropagateNoContract = " << shaderInfo->options.backwardPropagateNoContract << "\n";
   dumpFile << "options.forwardPropagateNoContract = " << shaderInfo->options.forwardPropagateNoContract << "\n";
-#if LLPC_BUILD_GFX12
   dumpFile << "options.workgroupRoundRobin = " << shaderInfo->options.workgroupRoundRobin << "\n";
-#endif
   dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
   dumpFile << "options.imageSampleDrefReturnsRgba = " << shaderInfo->options.imageSampleDrefReturnsRgba << "\n";
   dumpFile << "options.disableGlPositionOpt = " << shaderInfo->options.disableGlPositionOpt << "\n";
   dumpFile << "options.viewIndexFromDeviceIndex = " << shaderInfo->options.viewIndexFromDeviceIndex << "\n";
-#if LLPC_BUILD_GFX12
   for (unsigned idx = 0; idx < shaderInfo->options.cachePolicyLlc.resourceCount; idx++) {
     dumpFile << "options.cachePolicyLlc = " << "0x" << std::hex << shaderInfo->options.cachePolicyLlc.noAllocs[idx]
              << "," << std::dec << "\n";
   }
   dumpFile << "options.resourceCount = " << shaderInfo->options.cachePolicyLlc.resourceCount << "\n";
   dumpFile << "options.temporalHintShaderControl = " << shaderInfo->options.forceUnderflowPrevention << "\n";
-#endif
   dumpFile << "options.forceUnderflowPrevention = " << shaderInfo->options.forceUnderflowPrevention << "\n";
   dumpFile << "options.forceMemoryBarrierScope = " << shaderInfo->options.forceMemoryBarrierScope << "\n";
   dumpFile << "options.scheduleStrategy = " << shaderInfo->options.scheduleStrategy << "\n";
+  dumpFile << "options.promoteAllocaRegLimit = " << shaderInfo->options.promoteAllocaRegLimit << "\n";
+  dumpFile << "options.promoteAllocaRegRatio = " << shaderInfo->options.promoteAllocaRegRatio << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -939,19 +929,6 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
   dumpFile << "deviceIndex = " << pipelineInfo->deviceIndex << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  // Output shader library binary
-  if (pipelineInfo->shaderLibrary.codeSize > 0) {
-    MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(pipelineInfo->shaderLibrary.pCode),
-                      pipelineInfo->shaderLibrary.codeSize, hash.bytes);
-    DumpSpirvBinary(dumpDir, &pipelineInfo->shaderLibrary, &hash);
-
-    std::string shaderLibraryName = getSpirvBinaryFileName(&hash);
-    dumpFile << "shaderLibrary = " << shaderLibraryName << "\n";
-  }
-#endif
-
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
 
   if (pipelineInfo->pUniformMap) {
@@ -978,6 +955,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.forceCsThreadIdSwizzling = " << options->forceCsThreadIdSwizzling << "\n";
   dumpFile << "options.includeIr = " << options->includeIr << "\n";
   dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
+  dumpFile << "options.enableRobustUnboundVertex = " << options->enableRobustUnboundVertex << "\n";
   dumpFile << "options.enableRelocatableShaderElf = " << options->enableRelocatableShaderElf << "\n";
   dumpFile << "options.disableImageResourceCheck = " << options->disableImageResourceCheck << "\n";
   dumpFile << "options.enableScratchAccessBoundsChecks = " << options->enableScratchAccessBoundsChecks << "\n";
@@ -1003,9 +981,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
-#if LLPC_BUILD_GFX12
   dumpFile << "options.expertSchedulingMode = " << options->expertSchedulingMode << "\n";
-#endif
 
   const char *glStatePrefix = "options.glState.";
   dumpFile << glStatePrefix << "replaceSetWithResourceType = " << options->getGlState().replaceSetWithResourceType
@@ -1026,11 +1002,11 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << glStatePrefix << "enablePointSmooth = " << options->getGlState().enablePointSmooth << "\n";
   dumpFile << glStatePrefix << "enableRemapLocation = " << options->getGlState().enableRemapLocation << "\n";
   dumpFile << glStatePrefix << "enableDepthCompareParam = " << options->getGlState().enableDepthCompareParam << "\n";
-#if LLPC_BUILD_GFX12
+  dumpFile << glStatePrefix << "enableDepthCompareFailValue = " << options->getGlState().enableDepthCompareFailValue
+           << "\n";
   dumpFile << "options.cacheScopePolicyControl = " << options->cacheScopePolicyControl << "\n";
   dumpFile << "options.temporalHintControl = "
            << "0x" << std::hex << options->temporalHintControl << std::dec << "\n";
-#endif
   dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
   dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
   dumpFile << "options.optimizePointSizeWrite = " << options->optimizePointSizeWrite << "\n";
@@ -1118,6 +1094,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "dynamicSampleInfo = " << pipelineInfo->rsState.dynamicSampleInfo << "\n";
   dumpFile << "rasterStream = " << pipelineInfo->rsState.rasterStream << "\n";
   dumpFile << "enableMapClipDistMask = " << pipelineInfo->glState.enableMapClipDistMask << "\n";
+  dumpFile << "disablePointCoord = " << pipelineInfo->glState.disablePointCoord << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
@@ -1182,6 +1159,10 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "alphaTestFunc = " << pipelineInfo->glState.alphaTestFunc << "\n";
   dumpFile << "enableInitialUndefVar = " << pipelineInfo->enableInitUndefZero << "\n";
 
+  for (unsigned i = 0; i < pipelineInfo->glState.numTexPointSprite; i++) {
+    dumpFile << "texPointSpriteLocs[" << i << "] = " << pipelineInfo->glState.texPointSpriteLocs[i] << "\n";
+  }
+
   dumpFile << "originUpperLeft = " << pipelineInfo->getGlState().originUpperLeft << "\n";
   if (pipelineInfo->clientMetadataSize > 0) {
     dumpFile << "clientMetadata = ";
@@ -1223,19 +1204,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "advancedBlendInfo.enableRov = " << pipelineInfo->advancedBlendInfo.enableRov << "\n";
   dumpFile << "advancedBlendInfo.binding = " << pipelineInfo->advancedBlendInfo.binding << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  // Output shader library binary
-  if (pipelineInfo->shaderLibrary.codeSize > 0) {
-    MetroHash::Hash hash = {};
-    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(pipelineInfo->shaderLibrary.pCode),
-                      pipelineInfo->shaderLibrary.codeSize, hash.bytes);
-    DumpSpirvBinary(dumpDir, &pipelineInfo->shaderLibrary, &hash);
-
-    std::string shaderLibraryName = getSpirvBinaryFileName(&hash);
-    dumpFile << "shaderLibrary = " << shaderLibraryName << "\n";
-  }
-#endif
 
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
   dumpFile << "\n\n";
@@ -1370,40 +1338,19 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
              << "\n";
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  // Output trace ray shader binary
-  MetroHash::Hash hash = {};
-  MetroHash64::Hash(reinterpret_cast<const uint8_t *>(pipelineInfo->shaderTraceRay.pCode),
-                    pipelineInfo->shaderTraceRay.codeSize, hash.bytes);
-  DumpSpirvBinary(dumpDir, &pipelineInfo->shaderTraceRay, &hash);
-
-  std::string traceRayName = getSpirvBinaryFileName(&hash);
-  dumpFile << "shaderTraceRay = " << traceRayName << "\n";
-#endif
-
   dumpFile << "maxRecursionDepth = " << pipelineInfo->maxRecursionDepth << "\n";
   dumpFile << "indirectStageMask = " << pipelineInfo->indirectStageMask << "\n";
   dumpFile << "libraryMode = " << static_cast<unsigned>(pipelineInfo->libraryMode) << "\n";
   dumpFile << "mode = " << static_cast<unsigned>(pipelineInfo->mode) << "\n";
   dumpFile << "cpsFlags = " << pipelineInfo->cpsFlags << "\n";
-#if LLPC_BUILD_GFX12
   dumpFile << "disableDynamicVgpr = " << pipelineInfo->disableDynamicVgpr << "\n";
   dumpFile << "dynamicVgprBlockSize =" << pipelineInfo->dynamicVgprBlockSize << "\n";
-#endif
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
   dumpFile << "payloadSizeMaxInLib = " << pipelineInfo->payloadSizeMaxInLib << "\n";
   dumpFile << "attributeSizeMaxInLib = " << pipelineInfo->attributeSizeMaxInLib << "\n";
   dumpFile << "hasPipelineLibrary = " << pipelineInfo->hasPipelineLibrary << "\n";
   dumpFile << "pipelineLibStageMask = " << pipelineInfo->pipelineLibStageMask << "\n";
   dumpFile << "rtIgnoreDeclaredPayloadSize = " << pipelineInfo->rtIgnoreDeclaredPayloadSize << "\n";
-
-  for (unsigned i = 0; i < pipelineInfo->gpurtOptionCount; ++i) {
-    auto gpurtOption = &pipelineInfo->pGpurtOptions[i];
-    dumpFile << "gpurtOptions[" << i << "].nameHash = "
-             << "0x" << std::hex << gpurtOption->nameHash << std::dec << "\n";
-    dumpFile << "gpurtOptions[" << i << "].value = "
-             << "0x" << std::hex << gpurtOption->value << std::dec << "\n";
-  }
 }
 
 // =====================================================================================================================
@@ -1458,6 +1405,8 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, const char *d
   dumpStream << "rtState.exportConfig.enableDynamicLaunch = " << rtState->exportConfig.enableDynamicLaunch << "\n";
   dumpStream << "rtState.exportConfig.emitRaytracingShaderDataToken = "
              << rtState->exportConfig.emitRaytracingShaderDataToken << "\n";
+  dumpStream << "rtState.exportConfig.emitRaytracingShaderHashToken = "
+             << rtState->exportConfig.emitRaytracingShaderHashToken << "\n";
   dumpStream << "rtState.enableRayQueryCsSwizzle = " << rtState->enableRayQueryCsSwizzle << "\n";
   dumpStream << "rtState.enableDispatchRaysInnerSwizzle = " << rtState->enableDispatchRaysInnerSwizzle << "\n";
   dumpStream << "rtState.enableDispatchRaysOuterSwizzle = " << rtState->enableDispatchRaysOuterSwizzle << "\n";
@@ -1488,6 +1437,14 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, const char *d
   dumpStream << "rtState.rtIpVersion = " << rtState->rtIpVersion.major << "." << rtState->rtIpVersion.minor << "\n";
   dumpStream << "rtState.gpurtOverride = " << rtState->gpurtOverride << "\n";
   dumpStream << "rtState.rtIpOverride = " << rtState->rtIpOverride << "\n";
+
+  for (unsigned i = 0; i < rtState->gpurtOptionCount; ++i) {
+    auto gpurtOption = &rtState->pGpurtOptions[i];
+    dumpStream << "rtState.gpurtOptions[" << i << "].nameHash = "
+               << "0x" << std::hex << gpurtOption->nameHash << std::dec << "\n";
+    dumpStream << "rtState.gpurtOptions[" << i << "].value = "
+               << "0x" << std::hex << gpurtOption->value << std::dec << "\n";
+  }
 }
 
 // =====================================================================================================================
@@ -1579,6 +1536,7 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   hasher->Update(rtState->exportConfig.readsDispatchRaysIndex);
   hasher->Update(rtState->exportConfig.enableDynamicLaunch);
   hasher->Update(rtState->exportConfig.emitRaytracingShaderDataToken);
+  hasher->Update(rtState->exportConfig.emitRaytracingShaderHashToken);
   hasher->Update(rtState->enableRayQueryCsSwizzle);
   hasher->Update(rtState->enableDispatchRaysInnerSwizzle);
   hasher->Update(rtState->enableDispatchRaysOuterSwizzle);
@@ -1612,6 +1570,13 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
     hasher->Update(rtState->rtIpVersion);
     hasher->Update(rtState->gpurtOverride);
     hasher->Update(rtState->rtIpOverride);
+  }
+
+  hasher->Update(rtState->gpurtOptionCount);
+  for (unsigned i = 0; i < rtState->gpurtOptionCount; ++i) {
+    auto gpurtOption = &rtState->pGpurtOptions[i];
+    hasher->Update(gpurtOption->nameHash);
+    hasher->Update(gpurtOption->value);
   }
 }
 
@@ -1811,10 +1776,8 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
   hasher.Update(pipeline->indirectStageMask);
   hasher.Update(pipeline->mode);
   hasher.Update(pipeline->cpsFlags);
-#if LLPC_BUILD_GFX12
   hasher.Update(pipeline->disableDynamicVgpr);
   hasher.Update(pipeline->dynamicVgprBlockSize);
-#endif
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
 
   hasher.Update(pipeline->libraryMode);
@@ -1831,23 +1794,8 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
   hasher.Update(pipeline->attributeSizeMaxInLib);
   hasher.Update(pipeline->rtIgnoreDeclaredPayloadSize);
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  if (isCacheHash) {
-    hasher.Update(pipeline->shaderTraceRay.codeSize);
-    if (pipeline->shaderTraceRay.codeSize > 0) {
-      hasher.Update(static_cast<const uint8_t *>(pipeline->shaderTraceRay.pCode), pipeline->shaderTraceRay.codeSize);
-    }
-  }
-#endif
   if (pipeline->clientMetadataSize > 0) {
     hasher.Update(reinterpret_cast<const uint8_t *>(pipeline->pClientMetadata), pipeline->clientMetadataSize);
-  }
-
-  hasher.Update(pipeline->gpurtOptionCount);
-  for (unsigned i = 0; i < pipeline->gpurtOptionCount; ++i) {
-    auto gpurtOption = &pipeline->pGpurtOptions[i];
-    hasher.Update(gpurtOption->nameHash);
-    hasher.Update(gpurtOption->value);
   }
 
   MetroHash::Hash hash = {};
@@ -1969,6 +1917,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   }
 
   hasher->Update(glState->enableMapClipDistMask);
+  hasher->Update(glState->disablePointCoord);
   hasher->Update(glState->enableFlatShade);
   hasher->Update(glState->enableColorClampVs);
   hasher->Update(glState->apiXfbOutData.forceDisableStreamOut);
@@ -2037,6 +1986,8 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
   hasher->Update(glState->pixelTransferBias);
   hasher->Update(glState->lineSmooth);
   hasher->Update(glState->pointSmooth);
+  hasher->Update(glState->numTexPointSprite);
+  hasher->Update(glState->texPointSpriteLocs);
 
   for (unsigned i = 0; i < glState->numUniformConstantMaps; i++) {
     if (glState->ppUniformMaps[i] != nullptr && (glState->ppUniformMaps[i]->visibility & ShaderStageFragmentBit))
@@ -2059,6 +2010,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->forceCsThreadIdSwizzling);
   hasher->Update(options->includeIr);
   hasher->Update(options->robustBufferAccess);
+  hasher->Update(options->enableRobustUnboundVertex);
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);
@@ -2087,9 +2039,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->reverseThreadGroup);
   hasher->Update(options->internalRtShaders);
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
-#if LLPC_BUILD_GFX12
   hasher->Update(options->expertSchedulingMode);
-#endif
   hasher->Update(options->getGlState().replaceSetWithResourceType);
   hasher->Update(options->getGlState().buildResourcesDataForShaderModule);
   hasher->Update(options->getGlState().disableTruncCoordForGather);
@@ -2097,10 +2047,8 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().vertex64BitsAttribSingleLoc);
   hasher->Update(options->getGlState().enableFragColor);
   hasher->Update(options->getGlState().disableBaseVertex);
-#if LLPC_BUILD_GFX12
   hasher->Update(options->cacheScopePolicyControl);
   hasher->Update(options->temporalHintControl);
-#endif
   hasher->Update(options->enablePrimGeneratedQuery);
   hasher->Update(options->getGlState().enablePolygonStipple);
   hasher->Update(options->getGlState().enableLineSmooth);
@@ -2108,6 +2056,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->getGlState().enablePointSmooth);
   hasher->Update(options->getGlState().enableRemapLocation);
   hasher->Update(options->getGlState().enableDepthCompareParam);
+  hasher->Update(options->getGlState().enableDepthCompareFailValue);
   // disablePerCompFetch has been handled in updateHashForNonFragmentState
   hasher->Update(options->optimizePointSizeWrite);
   hasher->Update(options->padBufferSizeToNextDword);
@@ -2205,27 +2154,24 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
       hasher->Update(options.workaroundStorageImageFormats);
-      hasher->Update(options.workaroundInitializeOutputsToZero);
       hasher->Update(options.disableFMA);
       hasher->Update(options.constantBufferBindingOffset);
       hasher->Update(options.backwardPropagateNoContract);
       hasher->Update(options.forwardPropagateNoContract);
-#if LLPC_BUILD_GFX12
       hasher->Update(options.workgroupRoundRobin);
-#endif
       hasher->Update(options.imageSampleDrefReturnsRgba);
       hasher->Update(options.disableGlPositionOpt);
       hasher->Update(options.viewIndexFromDeviceIndex);
-#if LLPC_BUILD_GFX12
       if (options.cachePolicyLlc.resourceCount > 0) {
         hasher->Update(reinterpret_cast<const uint8_t *>(options.cachePolicyLlc.noAllocs),
                        sizeof(unsigned) * options.cachePolicyLlc.resourceCount);
       }
       hasher->Update(options.temporalHintShaderControl);
-#endif
       hasher->Update(options.forceUnderflowPrevention);
       hasher->Update(options.forceMemoryBarrierScope);
       hasher->Update(options.scheduleStrategy);
+      hasher->Update(options.promoteAllocaRegLimit);
+      hasher->Update(options.promoteAllocaRegRatio);
     }
   }
 }
@@ -2310,13 +2256,8 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
   case ResourceMappingNodeType::DescriptorAtomicCounter:
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-  case ResourceMappingNodeType::DescriptorMutable:
-#endif
-  {
+  case ResourceMappingNodeType::DescriptorMutable: {
     hasher->Update(userDataNode->srdRange);
     break;
   }

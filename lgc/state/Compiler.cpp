@@ -159,7 +159,11 @@ std::unique_ptr<Module> PipelineState::irLink(MutableArrayRef<std::unique_ptr<Mo
     bool result = true;
     pipelineModule = std::unique_ptr<Module>(new Module("lgcPipeline", getContext()));
     TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 529559
     pipelineModule->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+#else
+    pipelineModule->setTargetTriple(targetMachine->getTargetTriple());
+#endif
     pipelineModule->setDataLayout(modules.front()->getDataLayout());
 
     Linker linker(*pipelineModule);
@@ -216,11 +220,11 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
   // Set up "whole pipeline" passes, where we have a single module representing the whole pipeline.
   std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(getLgcContext()));
   passMgr->setPassIndex(&passIndex);
-  Patch::registerPasses(*passMgr);
+  LgcLowering::registerPasses(*passMgr);
   passMgr->registerFunctionAnalysis([&] { return getLgcContext()->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
 
-  // Ensure m_stageMask is set up in this PipelineState, as Patch::addPasses uses it.
+  // Ensure m_stageMask is set up in this PipelineState, as LgcLowering::addPasses uses it.
   readShaderStageMask(&*pipelineModule);
 
   // Manually add a PipelineStateWrapper pass.
@@ -238,9 +242,9 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
     // Run the "whole pipeline" passes.
     passMgr->run(*pipelineModule);
   } else {
-    // Patching.
-    Patch::addPasses(this, *passMgr, patchTimer, optTimer, std::move(checkShaderCacheFunc),
-                     static_cast<uint32_t>(getLgcContext()->getOptimizationLevel()));
+    // LGC lowering.
+    LgcLowering::addPasses(this, *passMgr, patchTimer, optTimer, std::move(checkShaderCacheFunc),
+                           static_cast<uint32_t>(getLgcContext()->getOptimizationLevel()));
 
     // Add pass to clear pipeline state from IR
     passMgr->addPass(PipelineStateClearer());

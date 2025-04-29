@@ -211,7 +211,7 @@ LowerGlobals::LowerGlobals() : m_lastVertexProcessingStage(ShaderStageInvalid) {
 PreservedAnalyses LowerGlobals::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Globals\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   changeRtFunctionSignature();
 
@@ -650,6 +650,13 @@ void LowerGlobals::lowerInOutUsersInPlace(llvm::GlobalVariable *globalVar, llvm:
 }
 
 // =====================================================================================================================
+// Helper function to process SPIRV Ops with a global hit object
+template <typename OpT> Value *LowerGlobals::processOpWithGlobalHitObject() {
+  Type *allocaPtrTy = m_module->getDataLayout().getAllocaPtrType(m_builder->getContext());
+  return m_builder->create<OpT>(m_builder->create<lgc::rt::GlobalHitObjectOp>(allocaPtrTy));
+}
+
+// =====================================================================================================================
 // @param builtIn : BuiltIn value
 // @param elemIdx : Element Index of struct
 Value *LowerGlobals::createRaytracingBuiltIn(BuiltIn builtIn) {
@@ -659,42 +666,42 @@ Value *LowerGlobals::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInLaunchSizeKHR:
     return m_builder->create<DispatchRaysDimensionsOp>();
   case BuiltInWorldRayOriginKHR:
-    return m_builder->create<WorldRayOriginOp>();
+    return processOpWithGlobalHitObject<WorldRayOriginOp>();
   case BuiltInWorldRayDirectionKHR:
-    return m_builder->create<WorldRayDirectionOp>();
+    return processOpWithGlobalHitObject<WorldRayDirectionOp>();
   case BuiltInObjectRayOriginKHR:
-    return m_builder->create<ObjectRayOriginOp>();
+    return processOpWithGlobalHitObject<ObjectRayOriginOp>();
   case BuiltInObjectRayDirectionKHR:
-    return m_builder->create<ObjectRayDirectionOp>();
+    return processOpWithGlobalHitObject<ObjectRayDirectionOp>();
   case BuiltInRayTminKHR:
-    return m_builder->create<RayTminOp>();
+    return processOpWithGlobalHitObject<RayTminOp>();
   case BuiltInHitTNV:
   case BuiltInRayTmaxKHR:
-    return m_builder->create<RayTcurrentOp>();
+    return processOpWithGlobalHitObject<RayTcurrentOp>();
   case BuiltInInstanceCustomIndexKHR:
     // Note: GPURT(HLSL) has just the opposite naming of index/ID compares to SPIR-V. For dialect calls, we use
     // GPURT-style.
-    return m_builder->create<InstanceIdOp>();
+    return processOpWithGlobalHitObject<InstanceIdOp>();
   case BuiltInObjectToWorldKHR:
-    return m_builder->create<ObjectToWorldOp>();
+    return processOpWithGlobalHitObject<ObjectToWorldOp>();
   case BuiltInWorldToObjectKHR:
-    return m_builder->create<WorldToObjectOp>();
+    return processOpWithGlobalHitObject<WorldToObjectOp>();
   case BuiltInHitKindKHR:
-    return m_builder->create<HitKindOp>();
+    return processOpWithGlobalHitObject<HitKindOp>();
   case BuiltInHitTriangleVertexPositionsKHR:
-    return m_builder->create<TriangleVertexPositionsOp>();
+    return processOpWithGlobalHitObject<TriangleVertexPositionsOp>();
   case BuiltInIncomingRayFlagsKHR:
-    return m_builder->create<RayFlagsOp>();
+    return processOpWithGlobalHitObject<RayFlagsOp>();
   case BuiltInRayGeometryIndexKHR:
-    return m_builder->create<GeometryIndexOp>();
+    return processOpWithGlobalHitObject<GeometryIndexOp>();
   case BuiltInInstanceId:
     // Note: GPURT(HLSL) has just the opposite naming of index/ID compares to SPIR-V. For dialect calls, we use
     // GPURT-style.
-    return m_builder->create<InstanceIndexOp>();
+    return processOpWithGlobalHitObject<InstanceIndexOp>();
   case BuiltInPrimitiveId:
-    return m_builder->create<PrimitiveIndexOp>();
+    return processOpWithGlobalHitObject<PrimitiveIndexOp>();
   case BuiltInCullMaskKHR:
-    return m_builder->create<InstanceInclusionMaskOp>();
+    return processOpWithGlobalHitObject<InstanceInclusionMaskOp>();
   default:
     llvm_unreachable("Should never be called");
     return nullptr;
@@ -1531,14 +1538,16 @@ void LowerGlobals::lowerBufferBlock() {
     if (global.getAddressSpace() == SPIRAS_Constant && !isAccelerationStructure)
       continue;
 
-    MDNode *const resMetaNode = global.getMetadata(gSPIRVMD::Resource);
-    assert(resMetaNode);
+    const MDNode *resMetaNode = nullptr;
+    unsigned descSet = 0;
+    unsigned binding = 0;
+    {
+      resMetaNode = global.getMetadata(gSPIRVMD::Resource);
+      descSet = mdconst::extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
+      binding = mdconst::extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
+    }
 
-    const unsigned descSet = mdconst::extract<ConstantInt>(resMetaNode->getOperand(0))->getZExtValue();
-    const unsigned binding = mdconst::extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
-#if LLPC_BUILD_GFX12
     bool isNoAllocResource = global.hasMetadata(gSPIRVMD::ResourceNoAlloc);
-#endif
 
     // AtomicCounter is emulated following same impl of SSBO, only qualifier 'offset' will be used in its
     // MD now. Using a new MD kind to detect it. AtomicCounter's type should be uint, not a structure.
@@ -1566,26 +1575,34 @@ void LowerGlobals::lowerBufferBlock() {
     bool isReadOnly = true;
 
     for (Function *const func : funcsUsedIn) {
-      SmallVector<Value *, 4> worklist;
-      for (User *const user : global.users())
-        worklist.push_back(user);
+      SmallVector<Use *, 4> worklist(make_pointer_range(global.uses()));
 
       while (!worklist.empty()) {
-        Value *current = worklist.pop_back_val();
+        Use *currentUse = worklist.pop_back_val();
+        Value *current = currentUse->getUser();
         if (auto inst = dyn_cast<Instruction>(current)) {
           if (inst->getFunction() != func)
             continue;
 
           // treat buffer index ops the same as geps
           if (isa<GetElementPtrInst, lgc::BufferIndexOp>(inst)) {
-            for (auto *user : inst->users())
-              worklist.push_back(user);
+            append_range(worklist, make_pointer_range(inst->uses()));
             continue;
           }
 
           if (auto load = dyn_cast<LoadInst>(inst))
             if (!load->isAtomic())
               continue;
+
+          if (auto *callBase = dyn_cast<CallBase>(inst)) {
+            if (callBase->onlyReadsMemory()) {
+              if (callBase->isArgOperand(currentUse)) {
+                unsigned argNo = callBase->getArgOperandNo(currentUse);
+                if (callBase->doesNotCapture(argNo))
+                  continue;
+              }
+            }
+          }
 
           // Anything that is not a load prevents the buffer being treated as readonly.
           isReadOnly = false;
@@ -1636,16 +1653,18 @@ void LowerGlobals::lowerBufferBlock() {
             // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
             m_builder->SetInsertPoint(replaceInstsInfo.otherInst);
             unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
-#if LLPC_BUILD_GFX12
             if (isNoAllocResource)
               bufferFlags |= lgc::Builder::BufferFlagLLcNoAlloc;
-#endif
 
             auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
-            Value *const bufferDesc =
-                isAccelerationStructure
-                    ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
-                    : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
+
+            Value *bufferDesc = nullptr;
+            {
+              bufferDesc =
+                  isAccelerationStructure
+                      ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
+                      : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
+            }
 
             // If the global variable is a constant, the data it points to is invariant.
             if (isConstant)
@@ -1727,10 +1746,8 @@ void LowerGlobals::lowerBufferBlock() {
                 bufferFlags |= lgc::Builder::BufferFlagNonUniform;
               if (!global.isConstant())
                 bufferFlags |= lgc::Builder::BufferFlagWritten;
-#if LLPC_BUILD_GFX12
               if (isNoAllocResource)
                 bufferFlags |= lgc::Builder::BufferFlagLLcNoAlloc;
-#endif
 
               Value *bufferDescs[2] = {nullptr};
               unsigned descSets[2] = {descSet, 0};
@@ -1745,14 +1762,16 @@ void LowerGlobals::lowerBufferBlock() {
                 globals[1] = cast<GlobalVariable>(select->getFalseValue());
                 unsigned nextGlobalIdx = (&global == select->getTrueValue()) ? 1 : 0;
 
-                MDNode *const resMetaNode1 = globals[nextGlobalIdx]->getMetadata(gSPIRVMD::Resource);
-                assert(resMetaNode);
-                descSets[1] = mdconst::extract<ConstantInt>(resMetaNode1->getOperand(0))->getZExtValue();
-                bindings[1] = mdconst::extract<ConstantInt>(resMetaNode1->getOperand(1))->getZExtValue();
-
-                if (!nextGlobalIdx) {
-                  std::swap(descSets[0], descSets[1]);
-                  std::swap(bindings[0], bindings[1]);
+                const MDNode *resMetaNode1 = nullptr;
+                {
+                  resMetaNode1 = globals[nextGlobalIdx]->getMetadata(gSPIRVMD::Resource);
+                  assert(resMetaNode1);
+                  descSets[1] = mdconst::extract<ConstantInt>(resMetaNode1->getOperand(0))->getZExtValue();
+                  bindings[1] = mdconst::extract<ConstantInt>(resMetaNode1->getOperand(1))->getZExtValue();
+                  if (!nextGlobalIdx) {
+                    std::swap(descSets[0], descSets[1]);
+                    std::swap(bindings[0], bindings[1]);
+                  }
                 }
                 skipGlobals.insert(globals[nextGlobalIdx]);
               }
@@ -1766,8 +1785,10 @@ void LowerGlobals::lowerBufferBlock() {
                   auto index = m_builder->CreateMul(blockIndex, stride);
                   bufferDescs[idx] = m_builder->CreateGEP(m_builder->getInt8Ty(), descPtr, index);
                 } else {
-                  bufferDescs[idx] =
-                      m_builder->create<lgc::LoadBufferDescOp>(descSets[idx], bindings[idx], blockIndex, bufferFlags);
+                  {
+                    bufferDescs[idx] =
+                        m_builder->create<lgc::LoadBufferDescOp>(descSets[idx], bindings[idx], blockIndex, bufferFlags);
+                  }
                 }
                 // If the global variable is a constant, the data it points to is invariant.
                 if (isConstant)
@@ -1812,16 +1833,17 @@ void LowerGlobals::lowerBufferBlock() {
         m_builder->SetInsertPointPastAllocas(func);
         unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
 
-#if LLPC_BUILD_GFX12
         if (isNoAllocResource)
           bufferFlags |= lgc::Builder::BufferFlagLLcNoAlloc;
-#endif
 
-        auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
-        Value *const bufferDesc =
-            isAccelerationStructure
-                ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
-                : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
+        Value *bufferDesc = nullptr;
+        {
+          auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
+          bufferDesc =
+              isAccelerationStructure
+                  ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
+                  : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
+        }
 
         SmallVector<Instruction *, 8> usesToReplace;
         for (User *const user : global.users()) {
@@ -2319,18 +2341,22 @@ void LowerGlobals::handleVolatileInput(GlobalVariable *input, Value *proxy) {
     struct Payload {
       lgc::Builder *builder;
       Value *proxy;
+      Type *allocaPtrType;
     };
-    Payload payload = {m_builder, proxy};
+    Type *allocaPtrTy = m_module->getDataLayout().getAllocaPtrType(m_builder->getContext());
+    Payload payload = {m_builder, proxy, allocaPtrTy};
 
     // RayTcurrent may change after OpReportIntersectionKHR, get and store it to proxy again after each Op is called.
-    static auto reportHitVisitor = llvm_dialects::VisitorBuilder<Payload>()
-                                       .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                                       .add<ReportHitOp>([](auto &payload, auto &op) {
-                                         payload.builder->SetInsertPoint(op.getNextNonDebugInstruction());
-                                         auto newRayTCurrent = payload.builder->template create<RayTcurrentOp>();
-                                         payload.builder->CreateStore(newRayTCurrent, payload.proxy);
-                                       })
-                                       .build();
+    static auto reportHitVisitor =
+        llvm_dialects::VisitorBuilder<Payload>()
+            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+            .add<ReportHitOp>([](auto &payload, auto &op) {
+              payload.builder->SetInsertPoint(op.getNextNonDebugInstruction());
+              auto newRayTCurrent = payload.builder->template create<RayTcurrentOp>(
+                  payload.builder->template create<GlobalHitObjectOp>(payload.allocaPtrType));
+              payload.builder->CreateStore(newRayTCurrent, payload.proxy);
+            })
+            .build();
 
     reportHitVisitor.visit(payload, *m_module);
     break;

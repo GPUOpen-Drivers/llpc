@@ -39,7 +39,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of setting up the value for workgroup global variables.
-class InitializeWorkgroupMemory final : public Patch, public llvm::PassInfoMixin<InitializeWorkgroupMemory> {
+class InitializeWorkgroupMemory final : public LgcLowering, public llvm::PassInfoMixin<InitializeWorkgroupMemory> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

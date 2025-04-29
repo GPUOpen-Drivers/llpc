@@ -36,7 +36,7 @@
 namespace Llpc {
 
 // Represents the pass of FE lowering ray query post inline.
-class LowerPostInline : public SpirvLower, public llvm::PassInfoMixin<LowerPostInline> {
+class LowerPostInline : public Lowering, public llvm::PassInfoMixin<LowerPostInline> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

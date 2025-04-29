@@ -46,7 +46,7 @@ class AdjustIjOp;
 
 // =====================================================================================================================
 // Represents the pass of LGC lowering operations for input import and output export.
-class LowerInOut : public Patch, public llvm::PassInfoMixin<LowerInOut> {
+class LowerInOut : public LgcLowering, public llvm::PassInfoMixin<LowerInOut> {
 public:
   LowerInOut();
 
@@ -69,12 +69,12 @@ private:
   void visitCallInsts(llvm::ArrayRef<llvm::Function *> calleeFuncs);
   void visitReturnInsts();
 
-  llvm::Value *patchTcsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                          llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
-  llvm::Value *patchTesGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                          llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
-  llvm::Value *patchGsGenericInputImport(llvm::Type *inputTy, unsigned location, unsigned compIdx,
-                                         llvm::Value *vertexIdx, BuilderBase &builder);
+  llvm::Value *readTcsGenericInput(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
+                                   llvm::Value *vertexIdx, BuilderBase &builder);
+  llvm::Value *readTesGenericInput(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
+                                   llvm::Value *vertexIdx, BuilderBase &builder);
+  llvm::Value *readGsGenericInput(llvm::Type *inputTy, unsigned location, unsigned compIdx, llvm::Value *vertexIdx,
+                                  BuilderBase &builder);
 
   llvm::Value *performFsFloatInterpolation(BuilderBase &builder, llvm::Value *attr, llvm::Value *channel,
                                            llvm::Value *coordI, llvm::Value *coordJ, llvm::Value *primMask);
@@ -85,51 +85,49 @@ private:
   llvm::Value *performFsParameterLoad(BuilderBase &builder, llvm::Value *attr, llvm::Value *channel,
                                       InterpParam interpParam, llvm::Value *primMask, unsigned bitWidth, bool highHalf);
 
-  llvm::Value *patchFsGenericInputImport(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
-                                         llvm::Value *compIdx, bool isPerPrimitive, unsigned interpMode,
-                                         llvm::Value *interpValue, bool highHalf, BuilderBase &builder);
-
-  llvm::Value *patchTcsGenericOutputImport(llvm::Type *outputTy, unsigned location, llvm::Value *locOffset,
-                                           llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
-
-  void patchVsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
-  void patchTcsGenericOutputExport(llvm::Value *output, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
-                                   llvm::Value *vertexIdx, BuilderBase &builder);
-  void patchTesGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
-  void patchGsGenericOutputExport(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
+  llvm::Value *readFsGenericInput(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
+                                  bool isPerPrimitive, unsigned interpMode, llvm::Value *interpValue, bool highHalf,
                                   BuilderBase &builder);
-  void patchMeshGenericOutputExport(llvm::Value *output, unsigned location, llvm::Value *locOffset,
-                                    llvm::Value *compIdx, llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
-                                    BuilderBase &builder);
 
-  llvm::Value *patchTcsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                          llvm::Value *vertexIdx, BuilderBase &builder);
-  llvm::Value *patchTesBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                          llvm::Value *vertexIdx, BuilderBase &builder);
-  llvm::Value *patchGsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *vertexIdx,
-                                         BuilderBase &builder);
-  llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, BuilderBase &builder);
-  llvm::Value *patchFsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *sampleId,
-                                         BuilderBase &builder);
+  llvm::Value *readTcsGenericOutput(llvm::Type *outputTy, unsigned location, llvm::Value *locOffset,
+                                    llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
+
+  void writeVsGenericOutput(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
+  void writeTcsGenericOutput(llvm::Value *output, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
+                             llvm::Value *vertexIdx, BuilderBase &builder);
+  void writeTesGenericOutput(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
+  void writeGsGenericOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
+                            BuilderBase &builder);
+  void writeMeshGenericOutput(llvm::Value *output, unsigned location, llvm::Value *locOffset, llvm::Value *compIdx,
+                              llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive, BuilderBase &builder);
+
+  llvm::Value *readTcsBuiltInInput(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
+                                   llvm::Value *vertexIdx, BuilderBase &builder);
+  llvm::Value *readTesBuiltInInput(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
+                                   llvm::Value *vertexIdx, BuilderBase &builder);
+  llvm::Value *readGsBuiltInInput(llvm::Type *inputTy, unsigned builtInId, llvm::Value *vertexIdx,
+                                  BuilderBase &builder);
+  llvm::Value *readMeshBuiltInInput(llvm::Type *inputTy, unsigned builtInId, BuilderBase &builder);
+  llvm::Value *readFsBuiltInInput(llvm::Type *inputTy, unsigned builtInId, llvm::Value *sampleId, BuilderBase &builder);
   llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, BuilderBase &builder);
   llvm::Value *getSamplePosition(llvm::Type *inputTy, BuilderBase &builder);
 
-  llvm::Value *patchTcsBuiltInOutputImport(llvm::Type *outputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                           llvm::Value *vertexIdx, BuilderBase &builder);
+  llvm::Value *readTcsBuiltInOutput(llvm::Type *outputTy, unsigned builtInId, llvm::Value *elemIdx,
+                                    llvm::Value *vertexIdx, BuilderBase &builder);
 
-  void patchVsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
-  void patchTcsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
-                                   llvm::Value *vertexIdx, BuilderBase &builder);
-  void patchTesBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
-  void patchGsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, unsigned streamId, BuilderBase &builder);
-  void patchMeshBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
-                                    llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive, BuilderBase &builder);
-  void patchFsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &insertPos);
+  void writeVsBuiltInOutput(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
+  void writeTcsBuiltInOutput(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx, llvm::Value *vertexIdx,
+                             BuilderBase &builder);
+  void writeTesBuiltInOutput(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
+  void writeGsBuiltInOutput(llvm::Value *output, unsigned builtInId, unsigned streamId, BuilderBase &builder);
+  void writeMeshBuiltInOutput(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
+                              llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive, BuilderBase &builder);
+  void writeFsBuiltInOutput(llvm::Value *output, unsigned builtInId, BuilderBase &insertPos);
 
-  void patchCopyShaderBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &insertPos);
+  void writeCopyShaderBuiltInOutput(llvm::Value *output, unsigned builtInId, BuilderBase &insertPos);
 
-  void patchXfbOutputExport(llvm::Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned streamId,
-                            BuilderBase &builder);
+  void writeXfbOutput(llvm::Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned streamId,
+                      BuilderBase &builder);
 
   void storeValueToStreamOutBuffer(llvm::Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset, unsigned xfbStride,
                                    unsigned streamId, BuilderBase &builder);

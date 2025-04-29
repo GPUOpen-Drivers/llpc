@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; This test checks that the PS_INPUT_CNTL entries are continuous.  Tests fail
 ; when they do not start at 0 or there is a gap.
@@ -128,7 +128,6 @@ colorBuffer[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
 colorBuffer[1].channelWriteMask = 15
 colorBuffer[1].blendEnable = 0
 colorBuffer[1].blendSrcAlphaToColor = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

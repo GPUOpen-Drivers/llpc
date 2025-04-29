@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,8 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL:  LLPC location input/output mapping results (TES)
@@ -35,7 +34,7 @@
 ; SHADERTEST: (TES) Input (per-patch):  location = 4  =>  Mapped = 1
 ; SHADERTEST: (TES) Input (per-patch):  location = 5  =>  Mapped = 2
 
-; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching)
 
 ; SHADERTEST: (TES) Input:  locations = 1
 ; SHADERTEST: (TES) Output: locations = 0
@@ -50,7 +49,7 @@
 ; SHADERTEST: (TCS) Output (per-patch): location = 4  =>  Mapped = 1
 ; SHADERTEST: (TCS) Output (per-patch): location = 5  =>  Mapped = 2
 
-; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching)
 
 ; SHADERTEST: (TCS) Input:  locations = 0
 ; SHADERTEST: (TCS) Output: locations = 2
@@ -62,7 +61,6 @@
 #version 450 core
 
 layout(vertices = 3) out;
-
 
 layout(location = 0) out vec4 unused[];
 layout(location = 1) out vec4 importOut[];
@@ -78,7 +76,7 @@ void main (void)
 
     gl_TessLevelInner[1] = 1.0;
     gl_TessLevelOuter[1] = 2.0;
-    
+
     for (int i = 0; i < 3; ++i)
       patchDynIdx[i] = vec4(float(i));
 }

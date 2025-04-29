@@ -48,7 +48,7 @@ class SubgroupBuilder;
 
 // =====================================================================================================================
 // The lower subgroup ops pass
-class LowerSubgroupOps : public Patch, public llvm::PassInfoMixin<LowerSubgroupOps> {
+class LowerSubgroupOps : public LgcLowering, public llvm::PassInfoMixin<LowerSubgroupOps> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

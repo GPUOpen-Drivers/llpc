@@ -32,17 +32,6 @@ add_library(vkgc_headers INTERFACE)
 target_link_libraries(vkgc_headers INTERFACE llpc_version)
 
 ### Options that affect the headers ####################################################################################
-#if LLPC_BUILD_GFX11
-if(LLPC_BUILD_GFX11)
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_BUILD_GFX11)
-endif()
-#endif
-
-#if LLPC_BUILD_GFX12
-if(LLPC_BUILD_GFX12)
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_BUILD_GFX12)
-endif()
-#endif
 
 #if LLPC_RAY_TRACING
 if(LLPC_RAY_TRACING)

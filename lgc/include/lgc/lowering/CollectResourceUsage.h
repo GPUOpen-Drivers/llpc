@@ -47,7 +47,7 @@ typedef std::map<InOutLocationInfo, InOutLocationInfo> InOutLocationInfoMap;
 
 // =====================================================================================================================
 // Represents the pass of LGC lowering operations for resource collecting
-class CollectResourceUsage : public Patch,
+class CollectResourceUsage : public LgcLowering,
                              public llvm::InstVisitor<CollectResourceUsage>,
                              public llvm::PassInfoMixin<CollectResourceUsage> {
 public:

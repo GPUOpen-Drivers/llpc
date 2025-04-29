@@ -44,10 +44,7 @@ using namespace lgc::rt;
 
 constexpr const char CpsMetadata[] = "lgc.cps";
 constexpr const char CpsMaxArgumentVgprsMetadata[] = "lgc.cps.maxArgumentVgprs";
-
-#if LLPC_BUILD_GFX12
 constexpr const char CpsMaxOutgoingVgprCountMetadata[] = "lgc.cps.maxOutgoingVgprCount";
-#endif
 
 // =====================================================================================================================
 // Helper to determine how many dwords we require to store a variable of a given
@@ -254,7 +251,6 @@ Value *lgc::cps::lowerAsContinuationReference(IRBuilder<> &Builder, lgc::cps::As
   return Reference;
 }
 
-#if LLPC_BUILD_GFX12
 // ====================================================================================================================
 // Sets max outgoing VGPR count metadata.
 void lgc::cps::setMaxOutgoingVgprCount(Function &fn, unsigned maxOutgoingVgpr) {
@@ -279,4 +275,3 @@ std::optional<unsigned> lgc::cps::tryGetMaxOutgoingVgprCount(const Function &fn)
   const ConstantAsMetadata *c = cast<ConstantAsMetadata>(node->getOperand(0));
   return cast<ConstantInt>(c->getValue())->getZExtValue();
 }
-#endif

@@ -35,9 +35,7 @@
 #include "lgc/state/ResourceUsage.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/BuilderBase.h"
-#if LLPC_BUILD_GFX12
 #include "llvm/IR/IntrinsicsAMDGPU.h"
-#endif
 
 using namespace lgc;
 using namespace llvm;
@@ -81,6 +79,8 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
   case UserDataMapping::CompositeData:
     return "CompositeData";
   default:
+    if (kind >= UserDataMapping::PipelineLinkStart && kind <= UserDataMapping::PipelineLinkEnd)
+      return "pipelineLink";
     return "";
   }
 }
@@ -109,14 +109,22 @@ CallInst *ShaderInputs::getSpecialUserData(UserDataMapping kind, BuilderBase &bu
 // @param builder : Builder to insert the call with
 Value *ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping kind, BuilderBase &builder) {
   Type *pointerTy = builder.getPtrTy(ADDR_SPACE_CONST);
-  std::string callName = lgcName::SpecialUserData;
-  callName += getSpecialUserDataName(kind);
-  callName += ".";
-  callName += getTypeName(pointerTy);
   Value *userDataValue = builder.CreateNamedCall(
       (Twine(lgcName::SpecialUserData) + getSpecialUserDataName(kind)).str(), pointerTy,
       {builder.getInt32(static_cast<unsigned>(kind)), builder.getInt32(HighAddrPc)}, Attribute::ReadNone);
   return builder.CreateIntToPtr(userDataValue, pointerTy);
+}
+
+// =====================================================================================================================
+// Get a pipeline link user data value.
+//
+// @param kind : The kind of pipeline link user data, a PipelineLinkKind enum value
+// @param builder : Builder to insert the call with
+CallInst *ShaderInputs::getPipelineLinkUserData(PipelineLinkKind kind, BuilderBase &builder) {
+  CallInst *call =
+      getSpecialUserData(UserDataMapping(unsigned(UserDataMapping::PipelineLinkStart) + unsigned(kind)), builder);
+  call->setName(Twine("pipelineLink") + Twine(unsigned(kind)));
+  return call;
 }
 
 // =====================================================================================================================
@@ -304,10 +312,8 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
     return "FixedXY";
   case ShaderInput::LocalInvocationId:
     return "LocalInvocationId";
-#if LLPC_BUILD_GFX12
   case ShaderInput::CsWaveId:
     return "CsWaveId";
-#endif
   default:
     llvm_unreachable("Unknown shader input kind");
   }
@@ -366,7 +372,6 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
         continue;
 
       Value *value = nullptr;
-#if LLPC_BUILD_GFX12
       GfxIpVersion gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
       if (gfxIp.major >= 12 && kind == static_cast<unsigned>(ShaderInput::WorkgroupId)) {
         auto &entryBlock = func.getEntryBlock();
@@ -374,15 +379,22 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
         value = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
         unsigned intrinsics[3] = {Intrinsic::amdgcn_workgroup_id_x, Intrinsic::amdgcn_workgroup_id_y,
                                   Intrinsic::amdgcn_workgroup_id_z};
-        for (auto [i, id] : enumerate(intrinsics))
+        for (auto [i, id] : enumerate(intrinsics)) {
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+          value = builder.CreateInsertElement(value, builder.CreateIntrinsic(id, {}), i);
+#else
           value = builder.CreateInsertElement(value, builder.CreateIntrinsic(id, {}, {}), i);
+#endif
+        }
       } else if (gfxIp.major >= 12 && kind == static_cast<unsigned>(ShaderInput::CsWaveId)) {
         auto &entryBlock = func.getEntryBlock();
         BuilderBase builder(&entryBlock.front());
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+        value = builder.CreateIntrinsic(Intrinsic::amdgcn_wave_id, {});
+#else
         value = builder.CreateIntrinsic(Intrinsic::amdgcn_wave_id, {}, {});
-      } else
 #endif
-      {
+      } else {
         if (inputUsage->entryArgIdx != 0)
           value = getFunctionArgument(&func, inputUsage->entryArgIdx);
         else
@@ -729,11 +741,10 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       ShaderInputsUsage *inputsUsage = getShaderInputsUsage(shaderStage);
       assert(inputDesc.inputKind < ShaderInput::Count);
       ShaderInputUsage *inputUsage = inputsUsage->inputs[static_cast<unsigned>(inputDesc.inputKind)].get();
-#if LLPC_BUILD_GFX12
       if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 12 &&
           (inputDesc.inputKind == ShaderInput::WorkgroupId || inputDesc.inputKind == ShaderInput::MultiDispatchInfo))
         continue;
-#endif
+
       // We don't want this input if it is not marked "always" and it is not used.
       if (!inputDesc.always && (!inputUsage || inputUsage->users.empty()))
         continue;

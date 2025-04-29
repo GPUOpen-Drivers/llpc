@@ -418,10 +418,10 @@ class SPIRVBaseVariable : public SPIRVInstruction {
 public:
   // Complete constructor for integer constant
   SPIRVBaseVariable(Op OC, SPIRVWord FixedWordCount, SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer,
-                    const std::string &TheName, SPIRVStorageClassKind TheStorageClass, SPIRVId TheMemObjId,
-                    SPIRVBasicBlock *TheBB, SPIRVModule *TheM)
+                    const std::string &TheName, SPIRVStorageClassKind TheStorageClass, SPIRVBasicBlock *TheBB,
+                    SPIRVModule *TheM)
       : SPIRVInstruction(TheInitializer ? (FixedWordCount + 1) : FixedWordCount, OC, TheType, TheId, TheBB, TheM),
-        StorageClass(TheStorageClass), MemObjId(TheMemObjId) {
+        StorageClass(TheStorageClass) {
     if (TheInitializer)
       Initializer.push_back(TheInitializer->getId());
     Name = TheName;
@@ -430,6 +430,7 @@ public:
   SPIRVBaseVariable(Op OC) : SPIRVInstruction(OC), StorageClass(StorageClassFunction) {}
 
   SPIRVStorageClassKind getStorageClass() const { return StorageClass; }
+  void setStorageClass(SPIRVStorageClassKind TheStorageClass) { StorageClass = TheStorageClass; }
   SPIRVValue *getInitializer() const {
     if (Initializer.empty())
       return nullptr;
@@ -456,19 +457,12 @@ public:
     return std::vector<SPIRVEntry *>();
   }
 
-  virtual void validate() const override{};
-  SPIRVType *getMemObjType() const {
-    SPIRVType *spvMemType = nullptr;
-    if (getOpCode() == OpVariable) {
-      spvMemType = getType()->getPointerElementType();
-    }
-    return spvMemType;
-  }
+  virtual void validate() const override {}
+  virtual SPIRVType *getMemObjType() const { return nullptr; }
 
 protected:
   SPIRVStorageClassKind StorageClass;
   std::vector<SPIRVId> Initializer;
-  SPIRVId MemObjId;
 };
 
 class SPIRVVariable : public SPIRVBaseVariable {
@@ -479,8 +473,7 @@ public:
   // Complete constructor for integer constant
   SPIRVVariable(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer, const std::string &TheName,
                 SPIRVStorageClassKind TheStorageClass, SPIRVBasicBlock *TheBB, SPIRVModule *TheM)
-      : SPIRVBaseVariable(OC, FixedWords, TheType, TheId, TheInitializer, TheName, TheStorageClass, SPIRVID_INVALID,
-                          TheBB, TheM) {
+      : SPIRVBaseVariable(OC, FixedWords, TheType, TheId, TheInitializer, TheName, TheStorageClass, TheBB, TheM) {
     validate();
   };
 
@@ -498,6 +491,9 @@ protected:
     SPIRVEntry::setWordCount(TheWordCount);
     Initializer.resize(WordCount - 4);
   }
+
+  virtual SPIRVType *getMemObjType() const override { return getType()->getPointerElementType(); }
+
   _SPIRV_DEF_DECODE4(Type, Id, StorageClass, Initializer)
 };
 
@@ -1020,11 +1016,23 @@ protected:
       Op1Ty = getValueType(Op1);
       Op2Ty = getValueType(Op2);
       ResTy = Type;
-      if (Op1Ty->isTypePointer() || Op2Ty->isTypePointer()) {
-        assert(Op1Ty == Op2Ty && "Invalid type for ptr cmp inst");
+
+      [[maybe_unused]] SPIRVStorageClassKind storageClass1 = SPIRVStorageClassKind::StorageClassMax;
+      [[maybe_unused]] SPIRVStorageClassKind storageClass2 = SPIRVStorageClassKind::StorageClassMax;
+      bool isOp1Pointer = Op1Ty->isTypePointer();
+      bool isOp2Pointer = Op2Ty->isTypePointer();
+      if (isOp1Pointer) {
+        storageClass1 = static_cast<SPIRVTypePointer *>(Op1Ty)->getPointerStorageClass();
         Op1Ty = Op1Ty->getPointerElementType();
+      }
+
+      if (isOp2Pointer) {
+        storageClass2 = static_cast<SPIRVTypePointer *>(Op2Ty)->getPointerStorageClass();
         Op2Ty = Op2Ty->getPointerElementType();
       }
+
+      assert(isOp1Pointer == isOp2Pointer && "Inconsistent pointer types");
+      assert(storageClass1 == storageClass2 && "Inconsistent storage class");
     }
     assert(isCmpOpCode(OpCode) && "Invalid op code for cmp inst");
     assert((ResTy->isTypeBool() || ResTy->isTypeInt()) && "Invalid type for compare instruction");
@@ -1409,7 +1417,7 @@ _SPIRV_OP(QuantizeToF16)
 
 class SPIRVAccessChainBase : public SPIRVInstTemplateBase {
 public:
-  SPIRVValue *getBase() { return this->getValue(this->Ops[0]); }
+  virtual SPIRVValue *getBase() { return this->getValue(this->Ops[0]); }
   std::vector<SPIRVValue *> getIndices() const {
     std::vector<SPIRVWord> IndexWords(this->Ops.begin() + 1, this->Ops.end());
     return this->getValues(IndexWords);
@@ -1644,6 +1652,24 @@ protected:
     NonSemanticShaderDebugInfo100Instructions ExtOpDebug;
   };
   SPIRVExtInstSetKind ExtSetKind;
+};
+
+class SPIRVExtInstWithForwardRefsKHR : public SPIRVExtInst {
+public:
+  SPIRVExtInstWithForwardRefsKHR(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet, SPIRVWord TheEntryPoint,
+                                 const std::vector<SPIRVWord> &TheArgs, SPIRVBasicBlock *BB)
+      : SPIRVExtInst(TheType, TheId, TheBuiltinSet, TheEntryPoint, TheArgs, BB) {
+    OpCode = OpExtInstWithForwardRefsKHR;
+  }
+  SPIRVExtInstWithForwardRefsKHR(SPIRVType *TheType, SPIRVId TheId, SPIRVId TheBuiltinSet, SPIRVWord TheEntryPoint,
+                                 const std::vector<SPIRVValue *> &TheArgs, SPIRVBasicBlock *BB)
+      : SPIRVExtInst(TheType, TheId, TheBuiltinSet, TheEntryPoint, TheArgs, BB) {
+    OpCode = OpExtInstWithForwardRefsKHR;
+  }
+  SPIRVExtInstWithForwardRefsKHR(SPIRVExtInstSetKind SetKind = SPIRVEIS_Count, unsigned ExtOC = SPIRVWORD_MAX)
+      : SPIRVExtInst(SetKind, ExtOC) {
+    OpCode = OpExtInstWithForwardRefsKHR;
+  }
 };
 
 class SPIRVCompositeConstruct : public SPIRVInstruction {
@@ -2387,6 +2413,7 @@ _SPIRV_OP(ReadClockKHR, true, 4)
 _SPIRV_OP(IsHelperInvocationEXT, true, 3)
 _SPIRV_OP(EmitMeshTasksEXT, false, 5, false)
 _SPIRV_OP(SetMeshOutputsEXT, false, 3, false)
+_SPIRV_OP(ArithmeticFenceEXT, true, 4)
 #undef _SPIRV_OP
 class SPIRVSubgroupShuffleINTELInstBase : public SPIRVInstTemplateBase {
 protected:
@@ -2801,9 +2828,6 @@ protected:
 _SPIRV_OP(AssumeTrueKHR, false, 2, false)
 _SPIRV_OP(ExpectKHR, true, 5, false)
 #undef _SPIRV_OP
-
-#if LLPC_BUILD_GFX12
-#endif
 
 } // namespace SPIRV
 

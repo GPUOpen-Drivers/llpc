@@ -102,8 +102,9 @@ void main()
 
 ; SHADERTEST-LABEL: {{^// LLPC}} LGC lowering results
 ; SHADERTEST: load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}
-; SHADERTEST: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}
 ; SHADERTEST: call <8 x i32> @llvm.amdgcn.readfirstlane.v8i32
+; SHADERTEST: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.readfirstlane.v4i32
 ; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.sample.d.cl.1d.v4f32.f32.f32{{(\.v8i32)?}}{{(\.v4i32)?}}({{.*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, {{.*}})
 ; SHADERTEST: load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}
 ; SHADERTEST: load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}

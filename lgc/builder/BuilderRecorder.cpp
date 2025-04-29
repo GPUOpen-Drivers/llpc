@@ -1115,16 +1115,16 @@ Value *Builder::CreateSamplerFeedbackDesc(Value *feedbackDesc, Value *resourceDe
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : The pointer to the image descriptor
+// @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
 // @param coord : Coordinates: scalar or vector i32
 // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
+Value *Builder::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescPointer, Value *coord,
                                 Value *mipLevel, const Twine &instName) {
   SmallVector<Value *, 5> args;
   args.push_back(getInt32(dim));
   args.push_back(getInt32(flags));
-  args.push_back(imageDesc);
+  args.push_back(imageDescPointer);
   args.push_back(coord);
   if (mipLevel)
     args.push_back(mipLevel);
@@ -1154,17 +1154,17 @@ Value *Builder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsigned 
 // @param texel : Texel value to store; v4f16 or v4f32
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : The pointer to the image descriptor
+// @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
 // @param coord : Coordinates: scalar or vector i32
 // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
+Value *Builder::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDescPointer, Value *coord,
                                  Value *mipLevel, const Twine &instName) {
   SmallVector<Value *, 6> args;
   args.push_back(texel);
   args.push_back(getInt32(dim));
   args.push_back(getInt32(flags));
-  args.push_back(imageDesc);
+  args.push_back(imageDescPointer);
   args.push_back(coord);
   if (mipLevel)
     args.push_back(mipLevel);
@@ -1177,12 +1177,12 @@ Value *Builder::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Val
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : The pointer to the image descriptor
-// @param samplerDesc : The pointer to the sampler descriptor
+// @param imageDescPointer : The pointer to the image descriptor
+// @param samplerDescPointer : The pointer to the sampler descriptor
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateImageSample(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc,
-                                  ArrayRef<Value *> address, const Twine &instName) {
+Value *Builder::CreateImageSample(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescPointer,
+                                  Value *samplerDescPointer, ArrayRef<Value *> address, const Twine &instName) {
   // Gather a mask of address elements that are not nullptr.
   unsigned addressMask = 0;
   for (unsigned i = 0; i != address.size(); ++i) {
@@ -1193,8 +1193,8 @@ Value *Builder::CreateImageSample(Type *resultTy, unsigned dim, unsigned flags, 
   SmallVector<Value *, 8> args;
   args.push_back(getInt32(dim));
   args.push_back(getInt32(flags));
-  args.push_back(imageDesc);
-  args.push_back(samplerDesc);
+  args.push_back(imageDescPointer);
+  args.push_back(samplerDescPointer);
   args.push_back(getInt32(addressMask));
   for (unsigned i = 0; i != address.size(); ++i) {
     if (address[i])
@@ -1243,12 +1243,12 @@ Value *Builder::CreateImageSampleConvert(Type *resultTy, unsigned dim, unsigned 
 // @param resultTy : Result type
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : The pointer to the image descriptor
-// @param samplerDesc : The pointer to the sampler descriptor
+// @param imageDescPointer : The pointer to the image descriptor
+// @param samplerDescPointer : The pointer to the sampler descriptor
 // @param address : Address and other arguments
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc,
-                                  ArrayRef<Value *> address, const Twine &instName) {
+Value *Builder::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, Value *imageDescPointer,
+                                  Value *samplerDescPointer, ArrayRef<Value *> address, const Twine &instName) {
   // Gather a mask of address elements that are not nullptr.
   unsigned addressMask = 0;
   for (unsigned i = 0; i != address.size(); ++i) {
@@ -1259,8 +1259,8 @@ Value *Builder::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, 
   SmallVector<Value *, 8> args;
   args.push_back(getInt32(dim));
   args.push_back(getInt32(flags));
-  args.push_back(imageDesc);
-  args.push_back(samplerDesc);
+  args.push_back(imageDescPointer);
+  args.push_back(samplerDescPointer);
   args.push_back(getInt32(addressMask));
   for (unsigned i = 0; i != address.size(); ++i) {
     if (address[i])
@@ -1276,15 +1276,15 @@ Value *Builder::CreateImageGather(Type *resultTy, unsigned dim, unsigned flags, 
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
 // @param ordering : Atomic ordering
-// @param imageDesc : The pointer to the image descriptor
+// @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
 // @param coord : Coordinates: scalar or vector i32
 // @param inputValue : Input value: i32
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, AtomicOrdering ordering,
-                                  Value *imageDesc, Value *coord, Value *inputValue, const Twine &instName) {
+                                  Value *imageDescPointer, Value *coord, Value *inputValue, const Twine &instName) {
   return record(BuilderOpcode::ImageAtomic, inputValue->getType(),
                 {getInt32(atomicOp), getInt32(dim), getInt32(flags), getInt32(static_cast<unsigned>(ordering)),
-                 imageDesc, coord, inputValue},
+                 imageDescPointer, coord, inputValue},
                 instName);
 }
 
@@ -1294,16 +1294,16 @@ Value *Builder::CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flag
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
 // @param ordering : Atomic ordering
-// @param imageDesc : The pointer to the image descriptor
+// @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
 // @param coord : Coordinates: scalar or vector i32
 // @param inputValue : Input value: i32
 // @param comparatorValue : Value to compare against: i32
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, AtomicOrdering ordering, Value *imageDesc,
-                                             Value *coord, Value *inputValue, Value *comparatorValue,
-                                             const Twine &instName) {
+Value *Builder::CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, AtomicOrdering ordering,
+                                             Value *imageDescPointer, Value *coord, Value *inputValue,
+                                             Value *comparatorValue, const Twine &instName) {
   return record(BuilderOpcode::ImageAtomicCompareSwap, inputValue->getType(),
-                {getInt32(dim), getInt32(flags), getInt32(static_cast<unsigned>(ordering)), imageDesc, coord,
+                {getInt32(dim), getInt32(flags), getInt32(static_cast<unsigned>(ordering)), imageDescPointer, coord,
                  inputValue, comparatorValue},
                 instName);
 }
@@ -1355,14 +1355,14 @@ Value *Builder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *imageD
 //
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
-// @param imageDesc : The pointer to the image descriptor
-// @param samplerDesc : The pointer to the sampler descriptor
+// @param imageDescPointer : The pointer to the image descriptor
+// @param samplerDesc : The pointer to the sampler descriptor or the full descriptor
 // @param coord : Coordinates
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDesc, Value *samplerDesc, Value *coord,
-                                  const Twine &instName) {
+Value *Builder::CreateImageGetLod(unsigned dim, unsigned flags, Value *imageDescPointer, Value *samplerDesc,
+                                  Value *coord, const Twine &instName) {
   return record(BuilderOpcode::ImageGetLod, FixedVectorType::get(getFloatTy(), 2),
-                {getInt32(dim), getInt32(flags), imageDesc, samplerDesc, coord}, instName);
+                {getInt32(dim), getInt32(flags), imageDescPointer, samplerDesc, coord}, instName);
 }
 
 // =====================================================================================================================

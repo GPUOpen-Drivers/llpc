@@ -55,7 +55,7 @@
 // SHADERTEST: ds_ordered_count {{v[0-9]*}}, {{v[0-9]*}} offset:772 gds
 // SHADERTEST:  s_waitcnt expcnt(0) lgkmcnt(0)
 // SHADERTEST: ds_add_gs_reg_rtn v[{{[0-9]*}}:{{[0-9]*}}], {{v[0-9]*}} offset:32 gds
-// SHADERTEST: s_waitcnt lgkmcnt(0)
+// SHADERTEST: s_waitcnt {{(expcnt\(0\) )?}}lgkmcnt(0)
 // SHADERTEST: ds_add_gs_reg_rtn v[{{[0-9]*}}:{{[0-9]*}}], {{v[0-9]*}} offset:36 gds
 // SHADERTEST: s_waitcnt lgkmcnt(0)
 

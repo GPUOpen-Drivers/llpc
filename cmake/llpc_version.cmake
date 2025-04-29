@@ -28,6 +28,7 @@ set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 # Function to set variable named ${varName} to the first of:
 #
 # - the value it already has (which might be set by driver or developer);
+# - ON if PAL_BUILD_FORCE_ON and the variable name matches PAL_BUILD_* (after prefix replacement to PAL);
 # - the value of the variable whose name has PAL_ instead of LLPC_ (which might be set by driver or developer);
 # - the given default.
 #
@@ -41,8 +42,14 @@ set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 function(llpc_set_property target scope varName default propertyName)
     if (NOT DEFINED ${varName})
         string(REGEX REPLACE "^[A-Z][A-Z]*_(.*)$" "PAL_\\1" palVarName "${varName}")
+        string(REGEX MATCH "^(PAL_BUILD).*" _match ${palVarName})
+
         if (DEFINED ${palVarName})
             set(${varName} ${${palVarName}})
+        elseif ((PAL_BUILD_FORCE_ON) AND (_match))
+            # If the user has requested that we force BUILD settings on, then
+            # force the setting on (if it matches a PAL_BUILD* variable and isn't explicitly overridden).
+            set(${varName} ON)
         else()
             set(${varName} ${default})
         endif()

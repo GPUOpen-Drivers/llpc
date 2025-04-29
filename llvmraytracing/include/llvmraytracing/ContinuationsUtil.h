@@ -320,9 +320,6 @@ public:
   // Handle the number of outgoing payload registers.
   NUMERIC_METADATA_HELPER(Instruction, OutgoingRegisterCount, MDRegisterCountName)
 
-  // Handle the number of incoming payload registers.
-  NUMERIC_METADATA_HELPER(Function, IncomingRegisterCount, MDRegisterCountName)
-
   // Handle the number of payload registers returned by a TraceRay or CallShader. See MDReturnedRegisterCountName for
   // details.
   NUMERIC_METADATA_HELPER(Instruction, ReturnedRegisterCount, MDReturnedRegisterCountName)
@@ -334,10 +331,6 @@ public:
   NUMERIC_METADATA_HELPER(Function, StackSize, MDStackSizeName)
 
 #undef NUMERIC_METADATA_HELPER
-
-  static std::optional<uint32_t> tryGetIncomingRegisterCount(const Function *F) {
-    return IncomingRegisterCount::tryGetValue(F);
-  }
 
   static std::optional<uint32_t> tryGetStackSize(const Function *F) { return StackSize::tryGetValue(F); }
 
@@ -538,7 +531,10 @@ DRIVER_FUNC_NAME(Traversal)
 DRIVER_FUNC_NAME(KernelEntry)
 DRIVER_FUNC_NAME(GpurtVersionFlags)
 DRIVER_FUNC_NAME(ShaderStart)
+DRIVER_FUNC_NAME(ShaderExit)
 DRIVER_FUNC_NAME(Scheduler)
+DRIVER_FUNC_NAME(RayTCurrent)
+DRIVER_FUNC_NAME(GlobalHitObject)
 
 #undef DRIVER_FUNC_NAME
 } // namespace ContDriverFunc

@@ -57,10 +57,8 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   Value *pipeBankXorNone = m_builder->getInt32(0);
 
   switch (m_gfxIp->major) {
-#if LLPC_BUILD_GFX12
-  case 12:
-#endif
-  case 11: {
+  case 11:
+  case 12: {
     pipeBankXor1 = pipeBankXorNone;
     pipeBankXor2 = pipeBankXorNone;
     break;
@@ -139,11 +137,9 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
   m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
-#if LLPC_BUILD_GFX12
-  case 12:
-#endif
+  case 10:
   case 11:
-  case 10: {
+  case 12: {
     const unsigned elementBytes = bpp >> 3;
     const unsigned pitchAlign = (256 / elementBytes);
 

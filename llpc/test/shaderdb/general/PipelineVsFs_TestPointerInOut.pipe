@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,8 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
 ; SHADERTEST_PP0-LABEL: {{^// LLPC}} FE lowering results
@@ -47,7 +46,6 @@
 ; SHADERTEST_PP1: call void (...) @lgc.create.write.generic.output(i64 %{{[0-9]*}}, i32 1, i32 0, i32 0, i32 0, i32 0, i32 poison)
 ; SHADERTEST_PP1: AMDLLPC SUCCESS
 ; END_SHADERTEST
-
 
 [Version]
 version = 3

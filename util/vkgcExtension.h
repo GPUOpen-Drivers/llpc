@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -61,6 +61,7 @@ enum Extension : unsigned {
   EXT_DEMOTE_TO_HELPER_INVOCATION,
   EXT_SHADER_IMAGE_ATOMIC_INT64,
   EXT_MESH_SHADER,
+  EXT_OPTNONE,
   AMD_SHADER_BALLOT,
   AMD_SHADER_TRINARY_MINMAX,
   AMD_SHADER_EXPLICIT_VERTEX_PARAMETER,
@@ -87,6 +88,8 @@ enum Extension : unsigned {
   KHR_SUBGROUP_ROTATE,
   KHR_COMPUTE_SHADER_DERIVATIVES,
   EXT_REPLICATED_COMPOSITES,
+  EXT_ARITHMETIC_FENCE,
+  KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION,
   ExtensionCount,
 };
 

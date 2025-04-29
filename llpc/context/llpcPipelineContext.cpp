@@ -185,16 +185,7 @@ StringRef PipelineContext::getRayTracingFunctionName(unsigned funcType) {
 void PipelineContext::setRayTracingState(const Vkgc::RtState &rtState, const Vkgc::BinaryData *shaderLibrary) {
   m_rtState = rtState;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 62
   assert(!shaderLibrary);
-#else
-  assert(shaderLibrary);
-  if (!m_rtState.gpurtOverride && shaderLibrary->pCode) {
-    m_rtState.gpurtOverride = true;
-    m_rtState.rtIpOverride = true;
-    m_rtState.gpurtShaderLibrary = *shaderLibrary;
-  }
-#endif
 
 #if HAVE_GPURT_SHIM
   if (!m_rtState.rtIpOverride)
@@ -225,8 +216,9 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
                                  VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
     assert(m_apiName);
     pipeline->setClient(m_apiName);
-    if (getPreRasterHasGs())
-      pipeline->setPreRasterHasGs(true);
+    lgc::PreRasterFlags preRasterFlags{};
+    preRasterFlags.hasGs = getPreRasterFlags().hasGs;
+    pipeline->setPreRasterFlags(preRasterFlags);
   }
   // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
   // to lgc::ShaderStageEnum bit numbers. We only process native shader stages, ignoring the CopyShader stage.
@@ -265,11 +257,9 @@ Options PipelineContext::computePipelineOptions() const {
   options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
-#if LLPC_BUILD_GFX12
   options.cacheScopePolicyControl = getPipelineOptions()->cacheScopePolicyControl;
   options.temporalHintControl = getPipelineOptions()->temporalHintControl;
   options.disableDynamicVgpr = true;
-#endif
 
   options.threadGroupSwizzleMode =
       static_cast<lgc::ThreadGroupSwizzleMode>(getPipelineOptions()->threadGroupSwizzleMode);
@@ -307,6 +297,7 @@ Options PipelineContext::computePipelineOptions() const {
   }
 
   options.robustBufferAccess = getPipelineOptions()->robustBufferAccess;
+  options.enableRobustUnboundVertex = getPipelineOptions()->enableRobustUnboundVertex;
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.enableExtendedRobustBufferAccess = getPipelineOptions()->extendedRobustness.robustBufferAccess;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
@@ -314,9 +305,7 @@ Options PipelineContext::computePipelineOptions() const {
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
-#if LLPC_BUILD_GFX12
   options.expertSchedulingMode = getPipelineOptions()->expertSchedulingMode;
-#endif
   options.optimizePointSizeWrite = getPipelineOptions()->optimizePointSizeWrite;
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
@@ -572,14 +561,10 @@ void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappi
       dst.concreteType = ResourceNodeType::DescriptorBufferCompact;
     else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
       dst.concreteType = ResourceNodeType::DescriptorBuffer;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
     else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorAtomicCounter)
       dst.concreteType = ResourceNodeType::DescriptorBuffer;
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorMutable)
       dst.concreteType = ResourceNodeType::DescriptorMutable;
-#endif
     else
       dst.concreteType = static_cast<ResourceNodeType>(src.type);
 
@@ -594,14 +579,12 @@ void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappi
     dst.immutableValue = nullptr;
     dst.immutableSize = 0;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     // Normally we know the stride of items in a descriptor array. However in specific circumstances
     // the type is not known by llpc. This is the case with mutable descriptors where we need the
     // stride to be explicitly specified.
     if (src.srdRange.strideInDwords > 0) {
       dst.stride = src.srdRange.strideInDwords;
     } else {
-#endif
       switch (src.type) {
       case ResourceMappingNodeType::DescriptorImage:
       case ResourceMappingNodeType::DescriptorResource:
@@ -633,9 +616,7 @@ void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappi
         dst.stride = DescriptorSizeBuffer / sizeof(uint32_t);
         break;
       }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     }
-#endif
 
     // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
     // YCbCrSampler; that was handled in the SPIR-V reader.
@@ -719,9 +700,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
 
   shaderOptions.waveSize = shaderInfo.options.waveSize;
   shaderOptions.wgpMode = shaderInfo.options.wgpMode;
-#if LLPC_BUILD_GFX12
   shaderOptions.temporalHintShaderControl = shaderInfo.options.temporalHintShaderControl;
-#endif
   // If subgroupSize is specified, we should use the specified value.
   if (shaderInfo.options.subgroupSize != 0)
     shaderOptions.subgroupSize = shaderInfo.options.subgroupSize;
@@ -815,9 +794,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
                 "Mismatch");
   shaderOptions.aggressiveInvariantLoads =
       static_cast<InvariantLoadsOption>(shaderInfo.options.aggressiveInvariantLoads);
-#if LLPC_BUILD_GFX12
   shaderOptions.workgroupRoundRobin = shaderInfo.options.workgroupRoundRobin;
-#endif
   shaderOptions.viewIndexFromDeviceIndex = shaderInfo.options.viewIndexFromDeviceIndex;
 
   shaderOptions.forceUnderflowPrevention = shaderInfo.options.forceUnderflowPrevention;
@@ -829,6 +806,9 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
                     lgc::LlvmScheduleStrategy::MaxMemoryClause,
                 "Mismatch");
   shaderOptions.scheduleStrategy = static_cast<lgc::LlvmScheduleStrategy>(shaderInfo.options.scheduleStrategy);
+
+  shaderOptions.promoteAllocaRegLimit = shaderInfo.options.promoteAllocaRegLimit;
+  shaderOptions.promoteAllocaRegRatio = shaderInfo.options.promoteAllocaRegRatio;
 
   return shaderOptions;
 }
@@ -1180,11 +1160,9 @@ uint32_t PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNode
   case ResourceMappingNodeType::DescriptorBuffer:
     resourceSet = GlResourceMappingSet::DescriptorBuffer;
     break;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
   case ResourceMappingNodeType::DescriptorAtomicCounter:
     resourceSet = GlResourceMappingSet::DescriptorAtomicCounter;
     break;
-#endif
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorTexelBuffer:
     resourceSet = GlResourceMappingSet::DescriptorImage;

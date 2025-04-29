@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Check that the payload register count for intersection shader is reasonable
 
@@ -51,7 +51,7 @@ void main() {
   origin.y = gl_LaunchIDEXT.y;
   origin.z = 0;
 
-  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff, 
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff,
               /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
               origin.xyz, /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
               /* tmax */ 48.0, /* payload location */ 0);
@@ -93,7 +93,6 @@ options.dontUnrollHintThreshold = 0
 void main()
 {
 }
-
 
 [missInfo]
 entryPoint = main

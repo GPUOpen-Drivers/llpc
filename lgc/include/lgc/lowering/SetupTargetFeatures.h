@@ -39,7 +39,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to set up target features on shader entry-points
-class SetUpTargetFeatures : public Patch, public llvm::PassInfoMixin<SetUpTargetFeatures> {
+class SetUpTargetFeatures : public LgcLowering, public llvm::PassInfoMixin<SetUpTargetFeatures> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

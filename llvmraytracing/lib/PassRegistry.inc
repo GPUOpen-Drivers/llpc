@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -48,7 +48,6 @@ CONT_MODULE_ANALYSIS("dialect-context-analysis", DialectContextAnalysis(NeedDial
 
 CONT_MODULE_PASS("cleanup-continuations", CleanupContinuationsPass())
 CONT_MODULE_PASS("continuations-lint", ContinuationsLintPass())
-CONT_MODULE_PASS("continuations-stats-report", ContinuationsStatsReportPass())
 CONT_MODULE_PASS("dxil-cont-lgc-rt-op-converter", DXILContLgcRtOpConverterPass())
 CONT_MODULE_PASS("dxil-cont-post-hook", DXILContPostHookPass())
 CONT_MODULE_PASS("dxil-cont-post-process", DXILContPostProcessPass())

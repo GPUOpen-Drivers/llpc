@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 // Test uber shader
 
 ; BEGIN_SHADERTEST
@@ -34,7 +34,7 @@
 ; SHADERTEST: [[PTR0:%[.a-z0-9]+]] = insertelement <2 x i32> poison, i32 %userdata2, i64 0
 ; SHADERTEST: [[PTR1:%[.a-z0-9]+]] = insertelement <2 x i32> [[PTR0]], i32 %userdata3, i64 1
 ; SHADERTEST: [[PTR2:%[.a-z0-9]+]] = bitcast <2 x i32> [[PTR1]] to i64
-; SHADERTEST: [[INTDESCPTR:%[0-9]+]] = inttoptr i64 [[PTR2]] to ptr addrspace(4)
+; SHADERTEST: [[INTDESCPTR:%[^ ]+]] = inttoptr i64 [[PTR2]] to ptr addrspace(4)
 ; SHADERTEST: [[CURDESCPTR:%[0-9]+]] = getelementptr {{i8|i64}}, ptr addrspace(4) [[INTDESCPTR]], i64 {{8|1}}
 ; SHADERTEST: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[CURDESCPTR]], align 16
 
@@ -104,7 +104,6 @@ void main (void)
 
 [FsInfo]
 entryPoint = main
-
 
 [ResourceMapping]
 userDataNode[0].visibility = 4

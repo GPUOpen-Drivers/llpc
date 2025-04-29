@@ -60,7 +60,7 @@ LowerGlCompatibility::LowerGlCompatibility()
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses LowerGlCompatibility::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Gl-Compatibility\n");
 
   collectEmulationResource();
@@ -548,7 +548,7 @@ void LowerGlCompatibility::createBackSecondaryColor() {
 void LowerGlCompatibility::createFrontFacing() {
   assert(m_frontFacing == nullptr);
   auto frontFacing =
-      new GlobalVariable(*m_module, m_builder->getInt1Ty(), false, GlobalValue::ExternalLinkage, nullptr,
+      new GlobalVariable(*m_module, m_builder->getInt32Ty(), false, GlobalValue::ExternalLinkage, nullptr,
                          "gl_FrontFacing", nullptr, GlobalVariable::GeneralDynamicTLSModel, SPIRV::SPIRAS_Input);
   frontFacing->addMetadata(gSPIRVMD::InOut, *createBuiltInInOutMd(lgc::BuiltInKind::BuiltInFrontFacing));
   m_frontFacing = frontFacing;
@@ -709,22 +709,23 @@ void LowerGlCompatibility::emulateTwoSideLighting() {
       if (m_frontFacing == nullptr) {
         createFrontFacing();
       }
+
+      auto frontFacing = m_builder->CreateLoad(m_builder->getInt32Ty(), m_frontFacing);
+      auto isFrontFace = m_builder->CreateTrunc(frontFacing, m_builder->getInt1Ty());
       if (m_color != nullptr) {
         assert(m_backColor == nullptr);
         createBackColor();
-        auto frontColorLoad = m_builder->CreateLoad(vec4Type, m_color);
-        auto backColorLoad = m_builder->CreateLoad(vec4Type, m_backColor);
-        auto frontFacingLoad = m_builder->CreateLoad(m_builder->getInt1Ty(), m_frontFacing);
-        auto color = m_builder->CreateSelect(frontFacingLoad, frontColorLoad, backColorLoad);
+        auto frontColor = m_builder->CreateLoad(vec4Type, m_color);
+        auto backColor = m_builder->CreateLoad(vec4Type, m_backColor);
+        auto color = m_builder->CreateSelect(isFrontFace, frontColor, backColor);
         m_builder->CreateStore(color, m_color);
       }
       if (m_secondaryColor != nullptr) {
         assert(m_backSecondaryColor == nullptr);
         createBackSecondaryColor();
-        auto frontSecondaryColorLoad = m_builder->CreateLoad(vec4Type, m_secondaryColor);
-        auto backSecondaryColorLoad = m_builder->CreateLoad(vec4Type, m_backSecondaryColor);
-        auto frontFacingLoad = m_builder->CreateLoad(m_builder->getInt1Ty(), m_frontFacing);
-        auto secondaryColor = m_builder->CreateSelect(frontFacingLoad, frontSecondaryColorLoad, backSecondaryColorLoad);
+        auto frontSecondaryColor = m_builder->CreateLoad(vec4Type, m_secondaryColor);
+        auto backSecondaryColor = m_builder->CreateLoad(vec4Type, m_backSecondaryColor);
+        auto secondaryColor = m_builder->CreateSelect(isFrontFace, frontSecondaryColor, backSecondaryColor);
         m_builder->CreateStore(secondaryColor, m_secondaryColor);
       }
     }

@@ -38,12 +38,10 @@
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the LLVM pass for patching loop metadata.
+// Represents the LLVM pass for lowering loop metadata.
 class AddLoopMetadata : public llvm::PassInfoMixin<AddLoopMetadata> {
 public:
-  AddLoopMetadata();
-  llvm::PreservedAnalyses run(llvm::Loop &loop, llvm::LoopAnalysisManager &analysisManager,
-                              llvm::LoopStandardAnalysisResults &loopAnalysisResults, llvm::LPMUpdater &);
+  llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Set or amend metadata to control loop unrolling"; }
 
@@ -51,13 +49,7 @@ public:
                                llvm::Metadata *addMetadata, bool conditional);
 
 private:
-  llvm::LLVMContext *m_context;       // Associated LLVM context of the LLVM module that passes run on
-  unsigned m_forceLoopUnrollCount;    // Force loop unroll count
-  bool m_disableLoopUnroll;           // Forcibly disable loop unroll
-  unsigned m_disableLicmThreshold;    // Disable LLVM LICM pass loop block count threshold
-  unsigned m_unrollHintThreshold;     // Unroll hint threshold
-  unsigned m_dontUnrollHintThreshold; // DontUnroll hint threshold
-  GfxIpVersion m_gfxIp;
+  llvm::LLVMContext *m_context; // Associated LLVM context of the LLVM module that passes run on
 };
 
 } // namespace lgc

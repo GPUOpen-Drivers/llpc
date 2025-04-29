@@ -75,6 +75,30 @@ define <8 x float> @relayout_zero() {
   ret <8 x float> %r
 }
 
+define <8 x float> @fill_undef() {
+; CHECK-LABEL: @fill_undef(
+; CHECK-NEXT:    ret <8 x float> undef
+;
+  %r = call <8 x float> (...) @lgc.xdl.cooperative.matrix.fill__v8f32(half undef, i32 1, i32 0)
+  ret <8 x float> %r
+}
+
+define <8 x float> @fill_poison() {
+; CHECK-LABEL: @fill_poison(
+; CHECK-NEXT:    ret <8 x float> poison
+;
+  %r = call <8 x float> (...) @lgc.xdl.cooperative.matrix.fill__v8f32(half poison, i32 1, i32 0)
+  ret <8 x float> %r
+}
+
+define <8 x float> @fill_zero() {
+; CHECK-LABEL: @fill_zero(
+; CHECK-NEXT:    ret <8 x float> zeroinitializer
+;
+  %r = call <8 x float> (...) @lgc.xdl.cooperative.matrix.fill__v8f32(half zeroinitializer, i32 1, i32 0)
+  ret <8 x float> %r
+}
+
 define <8 x float> @fptrunc_undef() {
 ; CHECK-LABEL: @fptrunc_undef(
 ; CHECK-NEXT:    [[R:%.*]] = call <8 x float> (...) @lgc.xdl.cooperative.matrix.convert__v8f32(i32 45, <8 x float> undef, i32 2, i32 1, i32 0, i32 0)
@@ -178,3 +202,4 @@ define <8 x i32> @zext_zero() {
 declare <8 x float> @lgc.xdl.cooperative.matrix.transpose__v8f32(...)
 declare <8 x float> @lgc.xdl.cooperative.matrix.convert__v8f32(...)
 declare <8 x i32> @lgc.xdl.cooperative.matrix.convert__v8i32(...)
+declare <8 x float> @lgc.xdl.cooperative.matrix.fill__v8f32(...)

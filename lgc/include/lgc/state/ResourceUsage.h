@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -240,12 +240,13 @@ struct ResourceUsage {
         unsigned viewportIndexIn : 1; // Whether DX SV_ViewportArrayIndex is used
         unsigned layerIn : 1;         // Whether DX SV_RenderTargetArrayIndex is used
         // Output
-        unsigned pointSize : 1;     // Whether gl_PointSize is used
-        unsigned position : 1;      // Whether gl_Position is used
-        unsigned clipDistance : 4;  // Array size gl_ClipDistance[] (0 means unused)
-        unsigned cullDistance : 4;  // Array size gl_CullDistance[] (0 means unused)
-        unsigned viewportIndex : 1; // Whether gl_ViewportIndex is used
-        unsigned layer : 1;         // Whether gl_Layer is used
+        unsigned pointSize : 1;            // Whether gl_PointSize is used
+        unsigned position : 1;             // Whether gl_Position is used
+        unsigned clipDistance : 4;         // Array size gl_ClipDistance[] (0 means unused)
+        unsigned cullDistance : 4;         // Array size gl_CullDistance[] (0 means unused)
+        unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
+        unsigned layer : 1;                // Whether gl_Layer is used
+        unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
       } tes;
 
       // Geometry shader
@@ -317,6 +318,7 @@ struct ResourceUsage {
         unsigned primitiveId : 1;              // Whether gl_PrimitiveID is used
         unsigned sampleId : 1;                 // Whether gl_SampleID is used
         unsigned samplePosition : 1;           // Whether gl_SamplePosition is used
+        unsigned samplePosOffset : 1;          // Whether internal SamplePosOffset is used
         unsigned sampleMaskIn : 1;             // Whether gl_SampleMaskIn[] is used
         unsigned layer : 1;                    // Whether gl_Layer is used
         unsigned viewportIndex : 1;            // Whether gl_ViewportIndex is used

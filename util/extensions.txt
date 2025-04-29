@@ -22,6 +22,7 @@ SPV_EXT_shader_viewport_index_layer
 SPV_EXT_demote_to_helper_invocation
 SPV_EXT_shader_image_atomic_int64
 SPV_EXT_mesh_shader
+SPV_EXT_optnone
 SPV_AMD_shader_ballot
 SPV_AMD_shader_trinary_minmax
 SPV_AMD_shader_explicit_vertex_parameter
@@ -50,3 +51,5 @@ SPV_KHR_expect_assume
 SPV_KHR_shader_quad_control
 SPV_KHR_subgroup_rotate
 SPV_EXT_replicated_composites
+SPV_EXT_arithmetic_fence
+SPV_KHR_shader_relaxed_extended_instruction

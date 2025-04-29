@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 // Test gl_ViewIndex when multi-view is disabled
 
@@ -93,7 +93,6 @@ void main (void)
 [GsInfo]
 entryPoint = main
 
-
 [FsGlsl]
 #version 450
 #extension GL_EXT_multiview : require
@@ -137,8 +136,6 @@ colorBuffer[0].channelWriteMask = 15
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 0
 nggState.enableNgg = 0
-
-
 
 [VertexInputState]
 binding[0].binding = 0

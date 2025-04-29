@@ -187,7 +187,11 @@ std::unique_ptr<Module> Context::loadLibrary(const BinaryData *lib) {
 // @param [in/out] module : Module to modify
 void Context::setModuleTargetMachine(Module *module) {
   TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 529559
   module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+#else
+  module->setTargetTriple(targetMachine->getTargetTriple());
+#endif
   std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
   // continuation stack address space.
   dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
@@ -214,15 +218,17 @@ GpurtKey Context::buildGpurtKey() {
     const auto &rtPipelineBuildInfo = *rtContext.getRayTracingPipelineBuildInfo();
     key.rtPipeline.valid = true;
     key.rtPipeline.cpsFlags = rtPipelineBuildInfo.cpsFlags;
-    key.rtPipeline.options.resize(rtPipelineBuildInfo.gpurtOptionCount);
-    std::copy(rtPipelineBuildInfo.pGpurtOptions,
-              rtPipelineBuildInfo.pGpurtOptions + rtPipelineBuildInfo.gpurtOptionCount, key.rtPipeline.options.begin());
-
-    // Use a stable sort so that if an option is supplied multiple times, the last occurrence is guaranteed to win.
-    llvm::stable_sort(key.rtPipeline.options, [](const Vkgc::GpurtOption &lhs, const Vkgc::GpurtOption &rhs) {
-      return lhs.nameHash < rhs.nameHash;
-    });
   }
+
+  assert((rtState->gpurtOptionCount == 0) || (rtState->pGpurtOptions != nullptr));
+
+  key.rtPipeline.options.resize(rtState->gpurtOptionCount);
+  std::copy(rtState->pGpurtOptions, rtState->pGpurtOptions + rtState->gpurtOptionCount, key.rtPipeline.options.begin());
+
+  // Use a stable sort so that if an option is supplied multiple times, the last occurrence is guaranteed to win.
+  llvm::stable_sort(key.rtPipeline.options, [](const Vkgc::GpurtOption &lhs, const Vkgc::GpurtOption &rhs) {
+    return lhs.nameHash < rhs.nameHash;
+  });
 
   return key;
 }
@@ -270,7 +276,7 @@ void Context::ensureGpurtLibrary() {
 
   TimerProfiler timerProfiler(getPipelineHashCode(), "LLPC GPURT", TimerProfiler::PipelineTimerEnableMask);
   std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(getLgcContext()));
-  SpirvLower::registerTranslationPasses(*lowerPassMgr);
+  Lowering::registerTranslationPasses(*lowerPassMgr);
 
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
@@ -332,7 +338,7 @@ void Context::ensureGfxRuntimeLibrary() {
 
   TimerProfiler timerProfiler(getPipelineHashCode(), "LLPC GfxRuntime", TimerProfiler::PipelineTimerEnableMask);
   std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(getLgcContext()));
-  SpirvLower::registerTranslationPasses(*lowerPassMgr);
+  Lowering::registerTranslationPasses(*lowerPassMgr);
 
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 

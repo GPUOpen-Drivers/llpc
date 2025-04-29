@@ -38,7 +38,7 @@ def TaskPayloadPointer : TgConstant<(PointerType 7)>, Type;
 
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 
-def NoDivergenceSource : LlvmEnumAttributeTrait<"NoDivergenceSource">;
+def NoDivergenceSource : LlvmEnumAttributeTrait<"NoDivergenceSource", [FnTrait]>;
 
 class DivergentLgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
@@ -89,7 +89,7 @@ def ConvertToStridedBufferPointerOp : LgcOp<"convert.to.strided.buffer.pointer",
 }
 
 def StridedBufferDescToPtrOp : LgcOp<"strided.buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins V4I32:$desc, AttrI1:$globallyCoherent);
+  let arguments = (ins V4I32:$desc, AttrI32:$stride, AttrI1:$globallyCoherent);
   let results = (outs BufferStridedPointer:$result);
 
   let summary = "convert a buffer descriptor into a strided buffer pointer";
@@ -137,6 +137,10 @@ def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
   let arguments = (ins BufferPointer:$pointer, I64:$offset);
   let results = (outs I64:$result);
 
+  let value_traits = [
+    (NoCapture $pointer)
+  ];
+
   let summary = "return the size of a buffer";
   let description = [{
     Return the number of bytes available in the buffer pointed to by `pointer`, starting at a byte `offset` from the
@@ -152,6 +156,11 @@ def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
 def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
   let arguments = (ins BufferPointer:$lhs, BufferPointer:$rhs);
   let results = (outs I64:$result);
+
+  let value_traits = [
+    (NoCapture $lhs),
+    (NoCapture $rhs)
+  ];
 
   let summary = "return the difference between buffer pointers in bytes";
   let description = [{
@@ -745,10 +754,24 @@ def LoadTfeOp : LgcOp<"load.tfe", [Memory<[]>, WillReturn]> {
   let arguments = (ins (or BufferPointer, BufferStridedPointer):$pointer);
   let results = (outs value:$result);
 
+  let value_traits = [
+    (NoCapture $pointer)
+  ];
+
   let defaultBuilderHasExplicitResultType = true;
 
   let summary = "load data and tfe value from the given buffer pointer";
   let description = [{
     Return the data stored in the structure or raw buffer and the tfe value in term of {T, i32}.
+  }];
+}
+
+def EmitShaderHashTokenOp : LgcOp<"emit.shader.hash.token", [Memory<[]>]> {
+  let arguments = (ins);
+  let results = (outs);
+
+  let summary = "emit SQTT token with API shader hash";
+  let description = [{
+    Emits s_ttracedata with shader hash generated at runtime to export the data to SQTT.
   }];
 }

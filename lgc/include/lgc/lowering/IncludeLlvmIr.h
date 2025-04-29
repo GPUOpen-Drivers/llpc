@@ -36,8 +36,8 @@
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the pass of LLVM patch operations of including LLVM IR as a separate section in the ELF binary.
-class IncludeLlvmIr : public Patch, public llvm::PassInfoMixin<IncludeLlvmIr> {
+// Represents the pass of including LLVM IR as a separate section in the ELF binary.
+class IncludeLlvmIr : public LgcLowering, public llvm::PassInfoMixin<IncludeLlvmIr> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

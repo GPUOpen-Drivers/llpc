@@ -81,7 +81,7 @@ static unsigned findAddressSpaceAccess(const Instruction *inst) {
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
 //
-// @param [in/out] function : Function that we will patch.
+// @param [in/out] function : Function that we will handle.
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses LowerInvariantLoads::run(Function &function, FunctionAnalysisManager &analysisManager) {

@@ -54,7 +54,7 @@ PrepareContinuations::PrepareContinuations() {
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass PrepareContinuations\n");
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
   ComputeShaderMode mode = {};
   // NOTE: For continuations, we only support flatten threadgroup (more precisely, numthreads(32, 1, 1)) so far.

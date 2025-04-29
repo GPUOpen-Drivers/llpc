@@ -41,7 +41,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to prepare the pipeline ABI
-class PreparePipelineAbi final : public Patch, public llvm::PassInfoMixin<PreparePipelineAbi> {
+class PreparePipelineAbi final : public LgcLowering, public llvm::PassInfoMixin<PreparePipelineAbi> {
 public:
   // A collection of handler functions to get the analysis info of the given function
   struct FunctionAnalysisHandlers {

@@ -69,6 +69,58 @@ constexpr unsigned OnChipGsMaxEsVertsPerSubgroup = 255;
 constexpr unsigned DefaultLdsSizePerSubgroup = 8192;
 
 // =====================================================================================================================
+// Check the elements of vector are used
+// @param inst : the checked instruction
+// @param isUnKnown : unable to determine if the channels are used
+// @param elementUsed : elementUsed[i] = true if the channel i is used
+// @param insts: Record users of special inst, the user of the user of an instruction may be itself.
+static void checkElementUse(Value *inst, bool *isUnknown, bool elementUsed[], SmallVector<User *> *insts) {
+  assert(inst->getType()->isVectorTy());
+  unsigned scalarizeBy = cast<FixedVectorType>(inst->getType())->getNumElements();
+  for (User *user : inst->users()) {
+    if (auto extract = dyn_cast<ExtractElementInst>(user)) {
+      // NOTE: The extracted index is allowed to be constant or not. For non-constant, we just break the loop and mark
+      // as unknownElementsUsed.
+      if (auto extractIndex = dyn_cast<ConstantInt>(extract->getIndexOperand())) {
+        unsigned idx = extractIndex->getZExtValue();
+        assert(idx < scalarizeBy);
+        elementUsed[idx] = true;
+        continue;
+      }
+    } else if (auto shuffle = dyn_cast<ShuffleVectorInst>(user)) {
+      SmallVector<int, 4> mask;
+      shuffle->getShuffleMask(mask);
+      for (int maskElement : mask) {
+        if (maskElement >= 0) {
+          if (maskElement < scalarizeBy) {
+            if (shuffle->getOperand(0) == inst)
+              elementUsed[maskElement] = true;
+          } else {
+            assert(maskElement < 2 * scalarizeBy);
+            if (shuffle->getOperand(1) == inst)
+              elementUsed[maskElement - scalarizeBy] = true;
+          }
+        }
+      }
+      continue;
+    } else {
+      if (llvm::find_if(*insts, [&](const User *use) { return use == user; }) != insts->end())
+        continue;
+      auto *const binaryOperator = dyn_cast<BinaryOperator>(user);
+      auto *const selectInst = dyn_cast<SelectInst>(user);
+      auto *const phiNode = dyn_cast<PHINode>(user);
+      if (binaryOperator || selectInst || phiNode) {
+        insts->push_back(user);
+        checkElementUse(user, isUnknown, elementUsed, insts);
+        continue;
+      }
+    }
+    *isUnknown = true;
+    break;
+  }
+}
+
+// =====================================================================================================================
 CollectResourceUsage::CollectResourceUsage() : m_resUsage(nullptr) {
 }
 
@@ -84,7 +136,7 @@ PreservedAnalyses CollectResourceUsage::run(Module &module, ModuleAnalysisManage
 
   LLVM_DEBUG(dbgs() << "Run the pass Collect-Resource-Usage\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
   m_pipelineShaders = &pipelineShaders;
   m_pipelineState = pipelineState;
 
@@ -605,35 +657,41 @@ bool CollectResourceUsage::checkGsOnChipValidity() {
     bool enableMaxVertOut = false;
 
     if (hasGs) {
-      unsigned maxVertOut = std::max(geometryMode.outputVertices, primAmpFactor);
-      assert(gsInstanceCount >= 1);
+      if (nggControl->subgroupSizing != NggSubgroupSizing::Explicit) {
+        if (nggControl->primsPerSubgroup != 0) {
+          gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, nggControl->primsPerSubgroup);
+        }
 
-      // Each input GS primitive can generate at most maxVertOut vertices. Each output vertex will be emitted
-      // from a different thread. Note that maxVertOut does not account for additional amplification due
-      // to GS instancing.
-      gsPrimsPerSubgroup =
-          std::max(1u, std::min(gsPrimsPerSubgroup, NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
+        unsigned maxVertOut = std::max(geometryMode.outputVertices, primAmpFactor);
+        assert(gsInstanceCount >= 1);
 
-      // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
-      // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
-      // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
-      // primitive per subgroup and create 1 subgroup per GS instance.
-      if ((maxVertOut * gsInstanceCount) > NggMaxThreadsPerSubgroup) {
-        enableMaxVertOut = true;
-        gsInstanceCount = 1;
-        gsPrimsPerSubgroup = 1;
+        // Each input GS primitive can generate at most maxVertOut vertices. Each output vertex will be emitted
+        // from a different thread. Note that maxVertOut does not account for additional amplification due
+        // to GS instancing.
+        gsPrimsPerSubgroup =
+            std::max(1u, std::min(gsPrimsPerSubgroup, NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
+
+        // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
+        // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
+        // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
+        // primitive per subgroup and create 1 subgroup per GS instance.
+        if ((maxVertOut * gsInstanceCount) > NggMaxThreadsPerSubgroup) {
+          enableMaxVertOut = true;
+          gsInstanceCount = 1;
+          gsPrimsPerSubgroup = 1;
+        }
+
+        esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, NggMaxThreadsPerSubgroup);
+
+        if (hasTs)
+          esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
+
+        // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
+        if (gfxIp.isGfx(10, 3))
+          esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
+        else if (gfxIp.isGfx(10, 1))
+          esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
       }
-
-      esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, NggMaxThreadsPerSubgroup);
-
-      if (hasTs)
-        esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
-
-      // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-      if (gfxIp.isGfx(10, 3))
-        esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-      else if (gfxIp.isGfx(10, 1))
-        esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
     } else {
       // If GS is not present, instance count must be 1
       assert(gsInstanceCount == 1);
@@ -1634,6 +1692,9 @@ void CollectResourceUsage::clearInactiveBuiltInOutput() {
         builtInUsage.viewportIndex = false;
         builtInOutLocMap.erase(BuiltInViewportIndex);
       }
+
+      if (builtInUsage.primitiveShadingRate && m_activeOutputBuiltIns.count(BuiltInPrimitiveShadingRate) == 0)
+        builtInUsage.primitiveShadingRate = false;
     } else {
       assert(m_shaderStage == ShaderStage::Vertex);
       auto &builtInUsage = m_resUsage->builtInUsage.vs;
@@ -1684,6 +1745,16 @@ void CollectResourceUsage::matchGenericInOut() {
     // Disable to pack VS-TCS
     m_pipelineState->setPackInput(m_shaderStage.value(), false);
     m_pipelineState->setPackOutput(ShaderStage::Vertex, false);
+  }
+
+  // Note: If any stage prior to the pixel shader uses software-emulated transform feedback,
+  // then in/out location packing should be disabled to prevent location mismatches.
+  // SW-emulated stream-out is enabled on GFX11+.
+  bool partPipelineHasXfb = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterFlags().hasXfb;
+  unsigned gfxIpVersionMajor = m_pipelineState->getTargetInfo().getGfxIpVersion().major;
+  if (m_shaderStage == ShaderStage::Fragment && partPipelineHasXfb && gfxIpVersionMajor >= 11) {
+    packInput = false;
+    m_pipelineState->setPackInput(m_shaderStage.value(), false);
   }
   if (packInput)
     updateInputLocInfoMapWithPack();
@@ -2317,6 +2388,8 @@ void CollectResourceUsage::mapBuiltInToGenericInOut() {
       } else {
         builtInUsage.tes.viewportIndex = 0;
       }
+
+      builtInUsage.tes.primitiveShadingRate = false;
     } else if (!nextStage) {
       // TES only
       if (builtInUsage.tes.clipDistance > 0 || builtInUsage.tes.cullDistance > 0) {
@@ -3287,7 +3360,7 @@ void CollectResourceUsage::updateInputLocInfoMapWithPack() {
   // NOTE: Dynamic indexing in FS is processed to be constant in the lower pass.
 
   // LDS load/store copes with dword. For 8-bit/16-bit data type, we will extend them to 32-bit
-  bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterHasGs();
+  bool partPipelineHasGs = m_pipelineState->isPartPipeline() && m_pipelineState->getPreRasterFlags().hasGs;
   bool isFsAndHasGs = (isFs && (m_pipelineState->hasShaderStage(ShaderStage::Geometry) || partPipelineHasGs));
   bool requireDword = isTcs || isGs || isFsAndHasGs;
   // Create locationMap
@@ -3707,36 +3780,9 @@ void CollectResourceUsage::scalarizeGenericInput(GenericLocationOp *input) {
   assert(scalarizeBy <= MaxScalarizeBy);
   bool elementUsed[MaxScalarizeBy] = {};
   bool unknownElementsUsed = false;
-  for (User *user : input->users()) {
-    if (auto extract = dyn_cast<ExtractElementInst>(user)) {
-      // NOTE: The extracted index is allowed to be constant or not. For non-constant, we just break the loop and mark
-      // as unknownElementsUsed.
-      if (auto extractIndex = dyn_cast<ConstantInt>(extract->getIndexOperand())) {
-        unsigned idx = extractIndex->getZExtValue();
-        assert(idx < scalarizeBy);
-        elementUsed[idx] = true;
-        continue;
-      }
-    } else if (auto shuffle = dyn_cast<ShuffleVectorInst>(user)) {
-      SmallVector<int, 4> mask;
-      shuffle->getShuffleMask(mask);
-      for (int maskElement : mask) {
-        if (maskElement >= 0) {
-          if (maskElement < scalarizeBy) {
-            if (shuffle->getOperand(0) == input)
-              elementUsed[maskElement] = true;
-          } else {
-            assert(maskElement < 2 * scalarizeBy);
-            if (shuffle->getOperand(1) == input)
-              elementUsed[maskElement - scalarizeBy] = true;
-          }
-        }
-      }
-      continue;
-    }
-    unknownElementsUsed = true;
-    break;
-  }
+
+  llvm::SmallVector<User *> uses;
+  checkElementUse(input, &unknownElementsUsed, elementUsed, &uses);
 
   // Load the individual elements and insert into a vector.
   Value *result = PoisonValue::get(resultTy);

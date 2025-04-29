@@ -38,7 +38,6 @@
 using namespace Vkgc;
 
 RtIpVersion gpurt::getRtIpVersion(GfxIpVersion gfxIpVersion) {
-#if LLPC_BUILD_GFX12
   if (gfxIpVersion.major >= 12) {
 #if GPURT_BUILD_RTIP3_1
     return {3, 1};
@@ -48,7 +47,6 @@ RtIpVersion gpurt::getRtIpVersion(GfxIpVersion gfxIpVersion) {
     return {0, 0};
 #endif
   }
-#endif
   if (gfxIpVersion.major >= 11)
     return {2, 0};
   if (gfxIpVersion >= GfxIpVersion{10, 3})
@@ -63,10 +61,8 @@ static Pal::RayTracingIpLevel getRtIpLevel(RtIpVersion rtIpVersion) {
       {{1, 0}, Pal::RayTracingIpLevel::RtIp1_0},
       {{1, 1}, Pal::RayTracingIpLevel::RtIp1_0},
       {{2, 0}, Pal::RayTracingIpLevel::RtIp2_0},
-#if LLPC_BUILD_GFX12
-    {{3, 0}, Pal::RayTracingIpLevel::RtIp3_0},
-    {{3, 1}, Pal::RayTracingIpLevel::RtIp3_1},
-#endif
+      {{3, 0}, Pal::RayTracingIpLevel::RtIp3_0},
+      {{3, 1}, Pal::RayTracingIpLevel::RtIp3_1},
   };
   // clang-format on
 
@@ -79,11 +75,7 @@ static Pal::RayTracingIpLevel getRtIpLevel(RtIpVersion rtIpVersion) {
 }
 
 void gpurt::getShaderLibrarySpirv(RtIpVersion rtIpVersion, unsigned featureFlags, const void *&code, size_t &size) {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 48
-  auto libCode = GpuRt::GetShaderLibraryCode(featureFlags);
-#else
   auto libCode = GpuRt::GetShaderLibraryCode(getRtIpLevel(rtIpVersion), featureFlags);
-#endif
   code = libCode.pSpvCode;
   size = libCode.spvSize;
 }
@@ -110,12 +102,8 @@ void gpurt::getFuncTable(RtIpVersion rtIpVersion, GpurtFuncTable &table) {
 
   Pal::RayTracingIpLevel rtIpLevel = getRtIpLevel(rtIpVersion);
   GpuRt::EntryFunctionTable gpurtTable;
-#if LLPC_BUILD_GFX12
 #if GPURT_BUILD_RTIP3
   GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, true, &gpurtTable);
-#else
-  GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, &gpurtTable);
-#endif
 #else
   GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, &gpurtTable);
 #endif

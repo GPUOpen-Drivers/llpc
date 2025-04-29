@@ -139,11 +139,11 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   passMgr->registerFunctionAnalysis([&] { return lgcContext->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
   passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(static_cast<PipelineState *>(&pipeline)); });
-  Patch::registerPasses(*passMgr);
+  LgcLowering::registerPasses(*passMgr);
 
   PassBuilder passBuilder(lgcContext->getTargetMachine(), PipelineTuningOptions(), {},
                           &passMgr->getInstrumentationCallbacks());
-  Patch::registerPasses(passBuilder);
+  LgcLowering::registerPasses(passBuilder);
 
   if (auto err = passBuilder.parsePassPipeline(*passMgr, Passes)) {
     errs() << "Failed to parse -passes: " << toString(std::move(err)) << '\n';
@@ -349,7 +349,11 @@ int main(int argc, char **argv) {
 
       // Set the triple and data layout, so you can write tests without bothering to specify them.
       TargetMachine *targetMachine = lgcContext->getTargetMachine();
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 529559
       module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+#else
+      module->setTargetTriple(targetMachine->getTargetTriple());
+#endif
       std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
       // continuation stack address space.
       dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";

@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -34,4 +34,8 @@ if (NOT LLPC_LLVM_SRC_PATH)
         endif()
     endif()
     set(LLPC_LLVM_SRC_PATH ${DEFAULT_LLPC_LLVM_SRC_PATH} CACHE PATH "Specify the path to LLVM." FORCE)
+endif()
+
+if (NOT EXISTS ${LLPC_LLVM_SRC_PATH}/include/llvm/IR/LLVMContext.h)
+    message(FATAL_ERROR "LLVM source not found at ${LLPC_LLVM_SRC_PATH}")
 endif()

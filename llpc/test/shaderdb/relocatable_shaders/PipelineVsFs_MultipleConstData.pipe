@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 // This test case checks that the elf linker places symbols for constant data at the correct offset with the correct size.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx1010 -t %t.elf | FileCheck -check-prefix=SHADERTEST %s
@@ -34,7 +34,6 @@
 ; SHADERTEST: 0000000000000020 l O .rodata.cst32 0000000000000020 __unnamed_1.vertex
 ; SHADERTEST: 0000000000000000 l O .rodata.cst32 0000000000000020 __unnamed_2.vertex
 ; END_SHADERTEST
-
 
 [Version]
 version = 41
@@ -143,7 +142,6 @@ userDataNode[0].indirectUserDataCount = 0
 
 [FsInfo]
 entryPoint = PS_Blend
-
 
 [GraphicsPipelineState]
 colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM

@@ -73,7 +73,7 @@ PreservedAnalyses ScalarReplacementOfBuiltins::run(Module &module, ModuleAnalysi
       dbgs() << "Run the pass refactor and replace global variables that are structures containing built-in values\n");
 
   bool changed = false;
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   SmallVector<GlobalVariable *> originalGlobals(make_pointer_range(m_module->globals()));
   for (auto &global : originalGlobals) {
     if (!needsSplit(global))

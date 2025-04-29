@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -39,11 +39,7 @@ using namespace llvm;
 // clang-format off
 namespace llvm {
 namespace cl {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
-extern opt<std::string> ShaderCacheFileDir;
-extern opt<unsigned> ShaderCacheMode;
-extern opt<std::string> ExecutableName;
-#else
+
 // -shader-cache-mode: shader cache mode:
 // 0 - Disable
 // 1 - Runtime cache
@@ -62,7 +58,7 @@ opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root director
 // -executable-name: executable file name
 opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
                                 init("amdllpc"));
-#endif
+
 } // namespace cl
 } // namespace llvm
 // clang-format on

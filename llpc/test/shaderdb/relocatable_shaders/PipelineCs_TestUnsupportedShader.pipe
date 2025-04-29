@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; Check that a warning is printed when relocatable compilation is requested but not possible.
 ; Force this compute shader to use whole-pipeline compilation by using the
 ; `--relocatable-shader-elf-limit` dev flag.
@@ -36,7 +36,6 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: {{^=====}} AMDLLPC SUCCESS
 ; END_SHADERTEST
-
 
 [CsGlsl]
 #version 450
@@ -55,7 +54,6 @@ layout(local_size_x = 2, local_size_y = 3) in;
 void main() {
     o = ubo.i;
 }
-
 
 [CsInfo]
 entryPoint = main

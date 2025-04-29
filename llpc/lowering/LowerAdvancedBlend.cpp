@@ -60,7 +60,7 @@ LowerAdvancedBlend::LowerAdvancedBlend(unsigned binding, bool enableRov) : m_bin
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses LowerAdvancedBlend::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-advanced-blend\n");
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   if (m_shaderStage == ShaderStageFragment) {
     processFsOutputs(module);

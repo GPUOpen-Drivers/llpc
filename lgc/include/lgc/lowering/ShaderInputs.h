@@ -56,6 +56,7 @@ class Value;
 namespace lgc {
 
 class BuilderBase;
+enum class PipelineLinkKind : unsigned;
 class PipelineState;
 
 // =====================================================================================================================
@@ -139,9 +140,7 @@ enum class ShaderInput : unsigned {
 
   // Task/CS VGPRs
   LocalInvocationId, // LocalInvocationId (v3i32)
-#if LLPC_BUILD_GFX12
-  CsWaveId, // CS wave Id
-#endif
+  CsWaveId,          // CS wave Id
   Count
 };
 
@@ -183,6 +182,9 @@ public:
 
   // Get a special user data value as a pointer by inserting a call to lgc.special.user.data then extending it
   static llvm::Value *getSpecialUserDataAsPointer(UserDataMapping kind, BuilderBase &builder);
+
+  // Get a pipeline link user data value.
+  static llvm::CallInst *getPipelineLinkUserData(PipelineLinkKind kind, BuilderBase &builder);
 
   // Get VertexIndex
   static llvm::Value *getVertexIndex(BuilderBase &builder, const LgcContext &lgcContext);

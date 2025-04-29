@@ -113,6 +113,13 @@ enum class RayTracingIndirectMode : unsigned {
   Continuations = 3,          // Continuations flow that based on LowerRaytracingPipeline pass
 };
 
+// Settings for enableUberFetchShader option
+enum class UberFetchMode : uint8_t {
+  Disabled,    // Disabled (use Pipeline::setVertexInputDescriptions at compile time)
+  EnabledDesc, // Enabled (use table from reserved descriptor)
+  EnabledGpp,  // Enabled (use table from GPP pipeline link user data SGPR)
+};
+
 // Enumerate feature flags for CPS.
 enum CpsFlag : unsigned {
   CpsNoFlag = 0,
@@ -126,7 +133,6 @@ enum class LlvmScheduleStrategy : unsigned {
   MaxIlp = 2           // Maximize ILP
 };
 
-#if LLPC_BUILD_GFX12
 // Enumerate the cache policy type
 enum CacheScopePolicyType {
   AtmWriteUseSystemScope = 0x1, // Attributes through memory stores will use system scope and avoid occupying any
@@ -159,7 +165,14 @@ enum TH {
 
   TH_RESERVED = 7, // unused value for load insts
 };
-#endif
+
+// Handle temporal hint, a store/load occupies 4 bits.
+enum StridedBufferOverrideFlag {
+  OverrideNone = 0,
+  DirectStride = 1,             // use stride w/o override
+  OverrideStride = 2,           // override stride
+  OverrideStrideNumRecords = 3, // override stride and num-records
+};
 
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
@@ -171,7 +184,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[52];
+  unsigned u32All[58];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -213,22 +226,15 @@ union Options {
                                                    // optimization
     unsigned reverseThreadGroupBufferBinding; // Binding ID of the internal buffer for reverse thread group optimization
     bool internalRtShaders;                   // Enable internal RT shader intrinsics
-    bool enableUberFetchShader;               // Enable UberShader
-#if LLPC_BUILD_GFX12
-    bool expertSchedulingMode; // Enable gfx12 expert scheduling mode 2.
-#else
-    bool reserved16;
-#endif
-    bool disableTruncCoordForGather; // If set, trunc_coord of sampler srd is disabled for gather4
+    UberFetchMode enableUberFetchShader;      // Enable UberShader
+    bool expertSchedulingMode;                // Enable gfx12 expert scheduling mode 2.
+    bool disableTruncCoordForGather;          // If set, trunc_coord of sampler srd is disabled for gather4
     bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
-#if LLPC_BUILD_GFX12
+    bool enableRobustUnboundVertex;
     unsigned cacheScopePolicyControl; // Control cache scope policy. attributes-through-memory read/write is available
-#else
-    unsigned reserved20;
-#endif
     RayTracingIndirectMode rtIndirectMode;   // Ray tracing indirect mode
     bool enablePrimGeneratedQuery;           // Whether to enable primitive generated counter
     bool enableFragColor;                    // If enabled, do frag color broadcast
@@ -238,52 +244,42 @@ union Options {
     unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
     unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
     bool useGpurt;                           // Whether GPURT is used
-#if LLPC_BUILD_GFX12
-    bool disableDynamicVgpr; // Whether to disable dynamic VGPR mode for continuations. If not set, dVGPR mode is
-                             // enabled by default.
-#else
-    bool reserved21;
-#endif
-    bool disablePerCompFetch;                      // Disable per component fetch in uber fetch shader.
+    bool disableDynamicVgpr;  // Whether to disable dynamic VGPR mode for continuations. If not set, dVGPR mode is
+                              // enabled by default.
+    bool disablePerCompFetch; // Disable per component fetch in uber fetch shader.
     bool maskOffNullDescriptorTypeField;           // If true, mask off the type field of word3 from a null descriptor.
     bool vbAddressLowBitsKnown;                    // Use vertex buffer offset low bits from driver.
     bool enableExtendedRobustBufferAccess;         // Enable the extended robust buffer access
     bool sampleMaskExportOverridesAlphaToCoverage; // Whether to use sample mask export overriding alpha to coverage
     bool disableSampleCoverageAdjust;              // Disable the adjustment of sample coverage
-    bool forceNullFsDummyExport;                   // Force dummy export to be added for null fragment shader
-#if LLPC_BUILD_GFX12
-    unsigned dynamicVgprBlockSize; // The VGPR allocation granule for dynamic VGPR mode.
-#else
-    unsigned reserved22;
-#endif
-    bool dynamicTopology;    // Whether primitive topology is dynamic.
-    bool robustBufferAccess; // Enable the core robust buffer access
+    bool enableInitUndefZero;                      // Initialize undefined variables to zero
+    unsigned dynamicVgprBlockSize;                 // The VGPR allocation granule for dynamic VGPR mode.
+    bool dynamicTopology;                          // Whether primitive topology is dynamic.
+    bool robustBufferAccess;                       // Enable the core robust buffer access
     bool reserved23;
     bool forceUserDataSpill;     // Whether to force all user data to be spilled (Currently only for RT).
     bool optimizePointSizeWrite; // Optimize the write of PointSize in the last vertex processing stage by
                                  // eliminating it if the write value is 1.0.
     bool enableMapClipDistMask;  // For OGL only, whether to remap the clip distances.
+    bool disablePointCoord;      // For OGL only, whether point coordinate is disabled or not set
     unsigned clipPlaneMask;      // For OGL only, defines the bitmask for enabling/disabling clip planes.
-#if LLPC_BUILD_GFX12
+    unsigned numTexPointSprite;  // For OGL only, indicate the number of texture coords replace by point sprite
+    uint8_t
+        texPointSpriteLocs[8]; // For OGL only, indicate which texture coordinate will be replaced by point coordinate
     unsigned temporalHintControl; // Override value for temporal hint.  A load/store occupies 4 bits. The highest bit
                                   // of 4 bits marks whether to override temporal hint.
                                   // Arrange from the low bit to high bit in the following order:
                                   // TemporalHintAtmWrite,TemporalHintImageRead, TemporalHintImageWrite,
                                   // TemporalHintTessFactorWrite, TemporalHintTessRead, TemporalHintTessWrite
                                   // TemporalHintBufferRead, TemporalHintBufferWrite
-#else
-    unsigned reserved24;
-#endif
     bool checkRawBufferAccessDescStride; // Check descriptor stride to workaround an issue that a strided buffer desc is
                                          // used for a raw buffer access instruction.
     bool padBufferSizeToNextDword;       // Vulkan only, set if the driver rounds the buffer size up the next dword
-#if LLPC_BUILD_GFX12
-    unsigned xInterleave; // Log2 X interleave size.
-    unsigned yInterleave; // Log2 Y interleave size.
-#else
-    unsigned reserved26[2];
-#endif
+    unsigned xInterleave;                // Log2 X interleave size.
+    unsigned yInterleave;                // Log2 Y interleave size.
     bool reserved27;
+    unsigned stridedBufferOverrideMode; // Strided buffer override mode
+    unsigned unifiedRgsNameHash;        // 32-bit hash of unified RGS name, 0 otherwise
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -304,7 +300,7 @@ struct ColorExportInfo {
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 // The front-end should zero-initialize this with "= {}" in case future changes add new fields.
 union ShaderOptions {
-  unsigned u32All[36];
+  unsigned u32All[38];
   struct {
     uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
     unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
@@ -399,12 +395,9 @@ union ShaderOptions {
     /// Aggressively mark shader loads as invariant (where it is safe to do so).
     InvariantLoadsOption aggressiveInvariantLoads;
 
-#if LLPC_BUILD_GFX12
-    // Enable shader round-robin mode for waves within workgroup.
+    /// Enable shader round-robin mode for waves within workgroup.
     bool workgroupRoundRobin;
-#else
-    bool reserved;
-#endif
+
     /// Let dmask bits be fully enabled when call 'image.sample.c', for depth compare mode swizzling workaround.
     bool imageSampleDrefReturnsRgba;
 
@@ -415,13 +408,17 @@ union ShaderOptions {
     /// Force underflow prevention for log and pow
     bool forceUnderflowPrevention;
 
-#if LLPC_BUILD_GFX12
     /// Override value for temporal hint for image and buffer
     unsigned temporalHintShaderControl;
-#endif
 
     /// Choose llvm's instruction scheduling strategy.
     LlvmScheduleStrategy scheduleStrategy;
+
+    /// Maximum alloca size (in VGPRs) that can be promoted to registers (0 = backend decides).
+    unsigned promoteAllocaRegLimit;
+
+    /// Ratio of VGPR budget to use for promoting alloca to registers (0 = backend decides).
+    unsigned promoteAllocaRegRatio;
   };
 };
 static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));
@@ -842,6 +839,16 @@ struct FragmentOutputs {
   unsigned fsOutInfoCount; // The number of color exports.
 };
 
+// Pre-rasterization flags when compiling the fragment shader part-pipeline in graphics separate compilation mode.
+union PreRasterFlags {
+  struct {
+    unsigned hasGs : 1;  // Whether pre-rasterization part has a geometry shader
+    unsigned hasXfb : 1; // Whether pre-rasterization part has transform feedback (streamout)
+  };
+  unsigned allFlags;
+  PreRasterFlags() : allFlags(0) {}
+};
+
 // =====================================================================================================================
 // The public API of the middle-end pipeline state exposed to the front-end for setting state and linking and
 // generating the pipeline
@@ -910,9 +917,9 @@ public:
   // -----------------------------------------------------------------------------------------------------------------
   // State setting methods
 
-  // Set whether pre-rasterization part has a geometry shader
-  // NOTE: Only applicable in the part pipeline compilation mode.
-  virtual void setPreRasterHasGs(bool preRasterHasGs) = 0;
+  // Set pre-rasterization flags (hasGs, hasXfb) when compiling the fragment shader part-pipeline
+  // in graphics separate compilation mode.
+  virtual void setPreRasterFlags(PreRasterFlags flags) = 0;
 
   // Set client name
   virtual void setClient(llvm::StringRef client) = 0;

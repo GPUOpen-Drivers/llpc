@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -51,9 +51,6 @@ ComputeContext::ComputeContext(GfxIpVersion gfxIp, const char *apiName, const Co
     : PipelineContext(gfxIp, apiName, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo),
       m_vertexShaderStream(vertexShaderStream) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
-#endif
   setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   setUnlinked(pipelineInfo->unlinked);

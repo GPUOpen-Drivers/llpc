@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; This test checks that LGC lowering is done for each shader separately.
 ; It shows that the shaders were compiled individually and then linked.
 
@@ -39,7 +39,6 @@
 ; SHADERTEST-NEXT: source_filename = "llpc_fragment
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
-
 
 [Version]
 version = 38
@@ -93,7 +92,6 @@ version = 38
 
 [VsInfo]
 entryPoint = main
-
 
 [FsSpirv]
                OpCapability Shader

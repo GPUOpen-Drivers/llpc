@@ -1,7 +1,8 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
- ;  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;  Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved.
  ;
  ;  Permission is hereby granted, free of charge, to any person obtaining a copy
  ;  of this software and associated documentation files (the "Software"), to
@@ -23,54 +24,51 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; This test checks if SPIR-V new function control mask OptNoneEXT can be handled correctly. Currently, we inline
+; everything for graphics shaders so this mask is cancelled when we translate it to LLVM IR.
+
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: define internal spir_func i32 @"vertexIndex("() #0 {
+; SHADERTEST: attributes #0 = { alwaysinline nounwind }
+
+; SHADERTEST-LABEL: {{^}}===== AMDLLPC SUCCESS =====
 
 ; SPIR-V
-; Version: 1.6
+; Version: 1.0
 ; Generator: Khronos Glslang Reference Front End; 11
-; Bound: 19
+; Bound: 18
 ; Schema: 0
                OpCapability Shader
+			   OpCapability OptNoneEXT
+			   OpExtension "SPV_EXT_optnone"
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
-               OpEntryPoint Fragment %main "main" %_
-               OpExecutionMode %main OriginUpperLeft
+               OpEntryPoint Vertex %main "main" %gl_VertexIndex %data
                OpSource GLSL 450
                OpName %main "main"
-               OpName %UniformData "UniformData"
-               OpMemberName %UniformData 0 "valueNonZero"
-               OpName %_ ""
-               OpMemberDecorate %UniformData 0 Offset 0
-               OpDecorate %UniformData Block
-               OpDecorate %_ DescriptorSet 0
-               OpDecorate %_ Binding 0
+               OpName %vertexIndex_ "vertexIndex("
+               OpName %gl_VertexIndex "gl_VertexIndex"
+               OpName %data "data"
+               OpDecorate %gl_VertexIndex BuiltIn VertexIndex
+               OpDecorate %data Location 0
        %void = OpTypeVoid
           %3 = OpTypeFunction %void
         %int = OpTypeInt 32 1
-%UniformData = OpTypeStruct %int
-%_ptr_Uniform_UniformData = OpTypePointer Uniform %UniformData
-          %_ = OpVariable %_ptr_Uniform_UniformData Uniform
-      %int_0 = OpConstant %int 0
-%_ptr_Uniform_int = OpTypePointer Uniform %int
-       %bool = OpTypeBool
+          %7 = OpTypeFunction %int
+%_ptr_Input_int = OpTypePointer Input %int
+%gl_VertexIndex = OpVariable %_ptr_Input_int Input
+%_ptr_Output_int = OpTypePointer Output %int
+       %data = OpVariable %_ptr_Output_int Output
        %main = OpFunction %void None %3
           %5 = OpLabel
-         %12 = OpAccessChain %_ptr_Uniform_int %_ %int_0
-         %13 = OpLoad %int %12
-         %15 = OpINotEqual %bool %13 %int_0
-               OpSelectionMerge %17 None
-               OpBranchConditional %15 %16 %17
-         %16 = OpLabel
-               OpTerminateInvocation
-         %17 = OpLabel
+         %17 = OpFunctionCall %int %vertexIndex_
+               OpStore %data %17
                OpReturn
                OpFunctionEnd
-
-; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck --check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST: .cb_shader_mask:
-; SHADERTEST-NEXT:     .output0_enable: 0x0000000000000001
-; SHADERTEST: .spi_shader_col_format:
-; SHADERTEST-NEXT:     .col_0_export_format: 0x0000000000000001
-; SHADERTEST: AMDLLPC SUCCESS
-; END_SHADERTEST
+%vertexIndex_ = OpFunction %int OptNoneEXT %7
+          %9 = OpLabel
+         %12 = OpLoad %int %gl_VertexIndex
+               OpReturnValue %12
+               OpFunctionEnd

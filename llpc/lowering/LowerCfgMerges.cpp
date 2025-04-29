@@ -308,7 +308,7 @@ PreservedAnalyses LowerCfgMerges::run(Module &module, ModuleAnalysisManager &ana
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Cfg-Merges\n");
   LLVM_DEBUG(dbgs() << "Processing module: " << module);
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   // Check for loops
   Function *loopMergeFunc = module.getFunction("spirv.loop.merge");
@@ -636,7 +636,7 @@ PreservedAnalyses LowerCfgMerges::run(Module &module, ModuleAnalysisManager &ana
         loop->returnPhi->addIncoming(waveReturnPhi, waveHeader);
 
       // Move PHIs in merge block to sigma block
-      Instruction *firstSigmaInst = &*loop->sigmaBlock->getFirstInsertionPt();
+      auto firstSigmaInst = loop->sigmaBlock->getFirstInsertionPt();
       for (PHINode &mergePhi : make_early_inc_range(loop->mergeBlock->phis())) {
         LLVM_DEBUG(dbgs() << "move phi: " << mergePhi << "\n");
         mergePhi.moveBefore(firstSigmaInst);

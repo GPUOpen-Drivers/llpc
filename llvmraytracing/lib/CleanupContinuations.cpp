@@ -54,6 +54,7 @@
 // 3. Edit function signatures, like removing coroutine frame pointer argument,
 //    adding needed ones (state, rcr, returned_values) for resume function.
 // 4. Allocating/freeing cps stack space as needed.
+// 5. Report statistics
 //===----------------------------------------------------------------------===//
 
 #include "compilerutils/CompilerUtils.h"
@@ -61,6 +62,8 @@
 #include "llvmraytracing/ContinuationsUtil.h"
 #include "llvmraytracing/CpsStackLowering.h"
 #include "llvmraytracing/GpurtContext.h"
+#include "llvmraytracing/StatisticsReporter.h"
+#include "lgc/GpurtDialect.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcIlCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
@@ -106,6 +109,7 @@ private:
   Value *getContinuationFramePtr(Function *F, bool IsStart, const ContinuationData &ContinuationInfo,
                                  SmallVector<Instruction *> *InstsToRemove = nullptr);
   void freeCpsStack(Function *F, ContinuationData &CpsInfo);
+  AllocaInst *lowerGlobalHitOp(Function *F, Value *SystemData, ContinuationData &Data);
   void updateCpsStack(Function *F, Function *NewFunc, bool IsStart, ContinuationData &CpsInfo);
   void analyzeContinuation(Function &F, MDNode *MD);
   void processContinuations();
@@ -117,6 +121,7 @@ private:
   void handleGetShaderKind(Function &F);
   void lowerGetResumePoint(Module &Mod);
   bool lowerCompleteOp(Module &Mod);
+  void lowerSpecialGpurtDialect(Module &Mod);
 
   llvm::Module &Mod;
   llvm::ModuleAnalysisManager &AnalysisManager;
@@ -127,6 +132,7 @@ private:
   llvm::Module *GpurtLibrary = nullptr;
   std::optional<CpsStackLowering> StackLowering;
   Function *GetGlobalMemBase = nullptr;
+  StatisticsReporter StatsReporter;
 };
 
 /// Find the original call that created the continuation token and the matching
@@ -369,6 +375,29 @@ void CleanupContinuationsPassImpl::freeCpsStack(Function *F, ContinuationData &C
   Visitor.visit(State, *F);
 }
 
+/// Handle lgc.rt.global.hit.object calls for intersection shaders.
+AllocaInst *CleanupContinuationsPassImpl::lowerGlobalHitOp(Function *F, Value *SystemData, ContinuationData &Data) {
+  SmallVector<Instruction *> GlobalHitObjectCalls;
+  static const auto Visitor =
+      llvm_dialects::VisitorBuilder<SmallVector<Instruction *>>()
+          .addSet<lgc::rt::GlobalHitObjectOp>(
+              [](auto &GlobalHitObjectCalls, auto &Instruction) { GlobalHitObjectCalls.push_back(&Instruction); })
+          .build();
+  Visitor.visit(GlobalHitObjectCalls, *F);
+
+  AllocaInst *HitObjectAlloca = nullptr;
+  if (GlobalHitObjectCalls.size() > 0) {
+    HitObjectAlloca = createAllocaForGlobalHitObject(Builder, *F, GpurtLibrary, SystemData);
+
+    for (auto *Call : GlobalHitObjectCalls) {
+      Call->replaceAllUsesWith(HitObjectAlloca);
+      Call->eraseFromParent();
+    }
+  }
+
+  return HitObjectAlloca;
+}
+
 /// Handle lgc.cps.complete calls.
 bool CleanupContinuationsPassImpl::lowerCompleteOp(Module &Mod) {
   struct VisitState {
@@ -392,39 +421,25 @@ bool CleanupContinuationsPassImpl::lowerCompleteOp(Module &Mod) {
   return State.CompleteLowered;
 }
 
-// For a resume function, find the continue call to it (by looking at its uses)
-// and obtain the incoming payload register count into the resume function
-// as the outgoing register count of the continue call, indicated by metadata.
-uint32_t getIncomingRegisterCount(Function *ResumeFunc) {
-  // For non-start functions, set (incoming) continuation registercount
-  // metadata by looking at the continue calls that reference this
-  // function. These continue calls both specify the number of their
-  // outgoing registers, and the number of incoming payload registers
-  // coming back into the resume function (i.e. us).
-  SmallVector<User *> Worklist(ResumeFunc->users());
-  std::optional<uint32_t> RegCount;
-  while (!Worklist.empty()) {
-    auto *U = Worklist.pop_back_val();
-    if (isa<Constant>(U) || isa<lgc::cps::AsContinuationReferenceOp>(U)) {
-      Worklist.append(U->user_begin(), U->user_end());
-      continue;
-    }
-    assert(isa<CallInst>(U) && "User of a resume function should be a call to continue");
-    auto *Inst = cast<CallInst>(U);
-    if (auto Count = ContHelper::ReturnedRegisterCount::tryGetValue(Inst)) {
-      assert((!RegCount || *RegCount == *Count) && "Got different returned registercounts in continues to "
-                                                   "the same resume function");
-      RegCount = *Count;
-#ifdef NDEBUG
-      break;
-#endif
-    } else {
-      LLVM_DEBUG(Inst->dump());
-      report_fatal_error("Found a jump call without "
-                         "continuation returned registercount metadata");
-    }
-  }
-  return RegCount.value();
+/// Handle GPURT dialect which requires special CPS-related handling.
+void CleanupContinuationsPassImpl::lowerSpecialGpurtDialect(Module &Mod) {
+  struct VisitState {
+    llvm_dialects::Builder &Builder;
+  };
+
+  VisitState State = {Builder};
+  static auto Visitor = llvm_dialects::VisitorBuilder<VisitState>()
+                            .add<GpurtGetRayQueryDispatchIdOp>([](VisitState &State, auto &inst) {
+                              // This will be translated to GlobalInvocationId, which indirectly uses LocalInvocationId,
+                              // and we don't have it in CPS mode. Instead, translate it to DispatchRaysIndex for CPS.
+                              State.Builder.SetInsertPoint(&inst);
+                              auto dispatchId = State.Builder.create<rt::DispatchRaysIndexOp>();
+                              inst.replaceAllUsesWith(dispatchId);
+                              inst.eraseFromParent();
+                            })
+                            .build();
+
+  Visitor.visit(State, Mod);
 }
 
 void CleanupContinuationsPassImpl::processContinuations() {
@@ -504,7 +519,6 @@ void CleanupContinuationsPassImpl::processContinuations() {
       // Add function metadata that stores how big the continuation state is in bytes.
       // Technically, continuation state includes the spilled payload here.
       // However, we want to exclude it here for statistics.
-      // TODO: Remove this once we can properly report payload size statistics in LowerRaytracingPipeline.
       if (IsStart) {
         const uint32_t PayloadSpillSize = ContHelper::StackSize::tryGetValue(NewFunc).value_or(0);
         assert(CpsInfo.ContStateBytes >= PayloadSpillSize);
@@ -541,6 +555,10 @@ void CleanupContinuationsPassImpl::processContinuations() {
         if (!lgc::rt::LgcRtDialect::isDialectOp(IntrinsicFunc))
           continue;
 
+        // GlobalHit Objects will be lowered in this pass for Intersection Shaders
+        if (IntrinsicFunc.getName().starts_with("lgc.rt.global.hit.object"))
+          continue;
+
         llvm::forEachCall(IntrinsicFunc, [&](CallInst &CInst) {
           auto *Caller = CInst.getFunction();
           if (Caller != NewFunc)
@@ -556,13 +574,6 @@ void CleanupContinuationsPassImpl::processContinuations() {
 
       // Lower lgc.rt intrinsics
       lowerIntrinsicCall(NewFunc, CpsInfo);
-    }
-
-    for (Function *F : FuncData.second.NewFunctions) {
-      if (FuncData.first != F) {
-        uint32_t IncomingRegisterCount = getIncomingRegisterCount(F);
-        ContHelper::IncomingRegisterCount::setValue(F, IncomingRegisterCount);
-      }
     }
   }
 
@@ -668,6 +679,9 @@ void CleanupContinuationsPassImpl::lowerIntrinsicCall(Function *F, ContinuationD
 
   Builder.CreateStore(SystemDataArg, SystemData);
 
+  // Replace lgc.rt.global.hit.object
+  auto *HitObjectAlloca = lowerGlobalHitOp(F, SystemData, Data);
+
   // All intrinsics that we need to inline are rematerializable/constant, the others have been inlined
   // by LowerRaytracingPipeline.
   // Therefore it is enough to inline every used intrinsic once at the start of the function. This
@@ -679,14 +693,13 @@ void CleanupContinuationsPassImpl::lowerIntrinsicCall(Function *F, ContinuationD
   while (!Data.CpsIntrinsicCalls.empty()) {
     // Ensure the list gets freed, since otherwise we will process the same calls twice by accident.
     auto *Call = Data.CpsIntrinsicCalls.pop_back_val();
-    assert(Call->arg_empty() && "Expect only calls without arguments");
     Value *&Cached = CachedIntrinsics[Call->getCalledFunction()];
     if (Cached != nullptr) {
       Call->replaceAllUsesWith(Cached);
       Call->eraseFromParent();
     } else {
-      Cached = replaceIntrinsicCall(Builder, SystemDataTy, SystemData, *Stage, Call, GpurtLibrary ? GpurtLibrary : &Mod,
-                                    CrossInliner, true);
+      Cached = replaceIntrinsicCall(Builder, SystemDataTy, SystemData, HitObjectAlloca, *Stage, Call,
+                                    GpurtLibrary ? GpurtLibrary : &Mod, CrossInliner, true);
     }
   }
 }
@@ -852,7 +865,7 @@ void CleanupContinuationsPassImpl::lowerGetResumePoint(Module &Mod) {
       Value *ResumeFn = Jump->getRcr();
       assert(ResumeFn && isa<cps::AsContinuationReferenceOp>(ResumeFn));
       // We can always move this as.continuation.reference call.
-      cast<Instruction>(ResumeFn)->moveBefore(GetResumeCall);
+      cast<Instruction>(ResumeFn)->moveBefore(GetResumeCall->getIterator());
       Builder.SetInsertPoint(GetResumeCall);
       GetResumeCall->replaceAllUsesWith(ResumeFn);
       GetResumeCall->eraseFromParent();
@@ -951,6 +964,8 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
 
     StackLowering.emplace(Mod.getContext(), static_cast<unsigned>(StackAddrspace));
 
+    lowerSpecialGpurtDialect(Mod);
+
     processContinuations();
 
     lowerGetResumePoint(Mod);
@@ -959,11 +974,12 @@ llvm::PreservedAnalyses CleanupContinuationsPassImpl::run() {
 
   Changed |= handleIntrinsics(AnalysisManager);
 
-  // Run stack lowering
+  // Run stack lowering and statistics reporting.
   for (auto &FuncData : ToProcess) {
     for (Function *F : FuncData.second.NewFunctions) {
       bool RequiresIncomingCsp = lgc::rt::getLgcRtShaderStage(F) != lgc::rt::RayTracingShaderStage::KernelEntry;
-      StackLowering->lowerCpsStackOps(F, GetGlobalMemBase, RequiresIncomingCsp);
+      Function *NewFunc = StackLowering->lowerCpsStackOps(F, GetGlobalMemBase, RequiresIncomingCsp);
+      StatsReporter.report(*NewFunc);
     }
   }
 

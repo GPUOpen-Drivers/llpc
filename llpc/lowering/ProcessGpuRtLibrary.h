@@ -72,7 +72,7 @@ struct GpurtKey {
   }
 };
 
-class ProcessGpuRtLibrary : public SpirvLower, public llvm::PassInfoMixin<ProcessGpuRtLibrary> {
+class ProcessGpuRtLibrary : public Lowering, public llvm::PassInfoMixin<ProcessGpuRtLibrary> {
 public:
   ProcessGpuRtLibrary(const GpurtKey &key);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
@@ -146,7 +146,6 @@ private:
   void createGetShaderRecordIndex(llvm::Function *func);
   void createShaderMarker(llvm::Function *func);
   void createWaveScan(llvm::Function *func);
-#if LLPC_BUILD_GFX12
   void createDualIntersectRay(llvm::Function *func);
   void createIntersectRayBvh8(llvm::Function *func);
   void createDsStackPush8Pop1(llvm::Function *func);
@@ -154,7 +153,6 @@ private:
   void createIntersectRay(llvm::Function *func, bool isDualNode);
   void createDsStackPush8Pop1PrimRangeEnabled(llvm::Function *func);
   void createDsStackPush8PopN(llvm::Function *func, unsigned returnNodeCount, bool primRangeEnable);
-#endif
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

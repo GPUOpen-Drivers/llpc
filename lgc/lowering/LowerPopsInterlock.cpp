@@ -326,6 +326,12 @@ void LowerPopsInterlock::lowerBeginInterlock(PopsBeginInterlockOp &popsBeginInte
   //
   const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   if (gfxIp.major >= 11) {
+    // NOTE: LLVM backend will move up s_wait_event when scheduling instructions. This is unexpected. The critical
+    // section gated by begin_interlock and end_interlock is decided by API shader. We'd better not enlarge it for
+    // performance reason. Here, we insert a sched_barrier to achieve this.
+    //
+    //   Mask = 0x0, no instructions may be scheduled across sched_barrier
+    m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_sched_barrier, m_builder->getInt32(0));
     m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_s_wait_event_export_ready, {});
     return;
   }

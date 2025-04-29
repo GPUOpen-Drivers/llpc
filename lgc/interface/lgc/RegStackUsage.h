@@ -75,10 +75,8 @@ public:
   //
   void finalizeAndUpdate(llvm::SmallVectorImpl<char> &elfBuffer, size_t startOffset, unsigned frontendGlobalAlignment);
 
-#if LLPC_BUILD_GFX12
   // Get the max outgoing VGPR count.
   unsigned getMaxOutgoingVgprCount() const;
-#endif
 
 private:
   std::unique_ptr<RegStackUsageImpl> m_impl;

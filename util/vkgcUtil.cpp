@@ -31,6 +31,7 @@
 #include "vkgcUtil.h"
 #include "spirv.hpp"
 #include "vkgcElfReader.h"
+#include "lgc/Disassembler.h"
 #include <filesystem>
 #if defined(_WIN32)
 #include <direct.h>
@@ -58,6 +59,65 @@ const char *VKAPI_CALL IUtil::GetEntryPointNameFromSpirvBinary(const BinaryData 
 // @param type : Resource map node type
 const char *VKAPI_CALL IUtil::GetResourceMappingNodeTypeName(ResourceMappingNodeType type) {
   return getResourceMappingNodeTypeName(type);
+}
+
+// =====================================================================================================================
+// Disassembles a symbol from an ELF object
+// If pOutDisassembly is null, only the size of the disassembly is written to pDisassemblySize
+// Returns Result::Success if the operation completed successfully, all other results mean the operation was
+// semantically a no-op.
+//
+// @param [in] pElfObj : ELF object data
+// @param [in] objSize : size of ELF object data
+// @param [in] pSymbolName : symbol to disassemble
+// @param [out] pDisassemblySize : size of disassembled code
+// @param [out] pOutDisassembly : disassembled code
+// @returns : Success code, possible values:
+//   * Success: operation completed successfully
+//   * ErrorInvalidPointer: pElfObj is nullptr
+//   * ErrorInvalidShader: pElfObj could not be decoded
+//   * NotFound: pSymbolName not found in pElfObj
+//   * ErrorUnknown: other error occurred during disassembly
+Result VKAPI_CALL IUtil::GetSymbolDisassemblyFromElf(const void *pElfObj, const size_t objSize, const char *pSymbolName,
+                                                     size_t *pDisassemblySize, void *pOutDisassembly) {
+  if (pElfObj != nullptr) {
+    llvm::MemoryBufferRef memBufRef =
+        llvm::MemoryBufferRef(llvm::StringRef(static_cast<const char *>(pElfObj), objSize), "ElfObj");
+    std::string disassembly;
+    llvm::raw_string_ostream ostream(disassembly);
+
+    llvm::Error err = lgc::disassembleSingleSymbol(memBufRef, ostream, pSymbolName);
+
+    if (!err) {
+      if (pDisassemblySize != nullptr) {
+        *pDisassemblySize = disassembly.length() + 1;
+      }
+
+      if (pOutDisassembly != nullptr) {
+        memcpy(pOutDisassembly, disassembly.c_str(), disassembly.length() + 1);
+      }
+
+      return Result::Success;
+    } else {
+      std::string errMsg;
+      llvm::raw_string_ostream errStream(errMsg);
+      llvm::logAllUnhandledErrors(std::move(err), errStream);
+
+      if (errMsg.find("ELF object file") != std::string::npos) {
+        // Could not decode pElfObj
+        return Result::ErrorInvalidShader;
+      }
+
+      if (errMsg.find("Symbol not found") != std::string::npos) {
+        // pSymbolName not found in pElfObj
+        return Result::NotFound;
+      }
+
+      return Result::ErrorUnknown;
+    }
+  }
+
+  return Result::ErrorInvalidPointer;
 }
 
 // =====================================================================================================================
@@ -173,12 +233,8 @@ const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, InlineBuffer)
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorAtomicCounter)
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorMutable)
-#endif
     break;
   default:
     llvm_unreachable("Should never be called!");

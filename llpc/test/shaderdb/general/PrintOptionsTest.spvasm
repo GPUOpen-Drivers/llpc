@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; Check that we can print LLVM CLI options overridden by LLPC.
 
 ; 1. Check that only the overridden options gets printed with `--print-options`.
@@ -39,7 +39,6 @@
 ;
 ; ALL-LABEL: --robust-buffer-access = 1 (default: 0)
 ; ALL-LABEL: --scalar-block-layout = {{.*}}
-
 
                OpCapability Shader
                OpMemoryModel Logical GLSL450

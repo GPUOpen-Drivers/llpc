@@ -576,8 +576,12 @@ void BuilderImpl::markInterpolationInfo(InOutInfo &interpInfo) {
     resUsage->builtInUsage.fs.centroid = true;
     break;
   case InOutInfo::InterpLocSample:
-    resUsage->builtInUsage.fs.sample = true;
-    resUsage->builtInUsage.fs.runAtSampleRate = true;
+    // The auxiliary value is the explicit sample ID and the location is converted to an offset from the center, so no
+    // need to mark sample usage or sample rate.
+    if (!interpInfo.hasInterpAux()) {
+      resUsage->builtInUsage.fs.sample = true;
+      resUsage->builtInUsage.fs.runAtSampleRate = true;
+    }
     break;
   default:
     break;
@@ -1167,11 +1171,6 @@ Value *BuilderImpl::normalizeBaryCoord(InOutInfo inputInfo, Value *iJCoord) {
     barycoord1 = CreateInsertElement(barycoord1, hwCoord[1], 1);
     barycoord1 = CreateInsertElement(barycoord1, hwCoord[2], 2);
 
-    if (inputInfo.isProvokingVertexModeDisabled()) {
-      // return the original i,j,k w/o any adjustment
-      return barycoord1;
-    }
-
     Value *barycoord0 = CreateShuffleVector(barycoord1, ArrayRef<int>({2, 0, 1}));
     Value *barycoord2 = CreateShuffleVector(barycoord1, ArrayRef<int>({1, 2, 0}));
     return CreateSelect(isOne, barycoord1, CreateSelect(isTwo, barycoord2, barycoord0));
@@ -1396,14 +1395,11 @@ Value *BuilderImpl::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInSubgroupId: {
     GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
     // From Navi21, it should load the subgroupid from sgpr initialized at wave launch.
-#if LLPC_BUILD_GFX12
     if (gfxIp.major >= 12) {
       Value *waveIdInSubgroup =
           ShaderInputs::getInput(ShaderInput::CsWaveId, BuilderBase::get(*this), *getLgcContext());
       return waveIdInSubgroup;
-    } else
-#endif
-    {
+    } else {
       if (gfxIp >= GfxIpVersion({10, 3})) {
         Value *multiDispatchInfo =
             ShaderInputs::getInput(ShaderInput::MultiDispatchInfo, BuilderBase::get(*this), *getLgcContext());
@@ -1756,7 +1752,7 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
     switch (static_cast<unsigned>(builtIn)) {
     case BuiltInFragCoord:
       usage.fs.fragCoord = true;
-      if (inOutInfo.getInterpMode() == InOutInfo::InterpLocSample)
+      if (inOutInfo.getInterpLoc() == InOutInfo::InterpLocSample)
         usage.fs.fragCoordIsSample = true;
       break;
     case BuiltInFrontFacing:
@@ -1855,7 +1851,7 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
       usage.fs.pullMode = true;
       break;
     case BuiltInSamplePosOffset:
-      usage.fs.runAtSampleRate = true;
+      usage.fs.samplePosOffset = true;
       break;
     case BuiltInPrimType:
       usage.fs.primType = true;
@@ -1978,6 +1974,9 @@ void BuilderImpl::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize
       break;
     case BuiltInLayer:
       usage.tes.layer = true;
+      break;
+    case BuiltInPrimitiveShadingRate:
+      usage.tes.primitiveShadingRate = true;
       break;
     default:
       break;

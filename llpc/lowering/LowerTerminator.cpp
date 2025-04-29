@@ -58,7 +58,7 @@ namespace Llpc {
 PreservedAnalyses LowerTerminator::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Terminator\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   // Kills are only valid in fragment shader model.
   if (m_shaderStage != ShaderStageFragment)

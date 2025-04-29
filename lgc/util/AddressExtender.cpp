@@ -97,7 +97,11 @@ Instruction *AddressExtender::getPc() {
     // is doing.
     IRBuilder<> builder(m_func->getContext());
     builder.SetInsertPoint(m_insertInto->getFirstNonPHIOrDbgOrAlloca());
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+    Value *pc = builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {});
+#else
     Value *pc = builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {}, {});
+#endif
     pc = cast<Instruction>(builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2)));
     m_pc = cast<Instruction>(pc);
   }

@@ -211,8 +211,6 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityMeshShadingEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityFragmentBarycentricKHR, {CapabilityShader});
   ADD_VEC_INIT(CapabilityCooperativeMatrixKHR, {CapabilityShader});
-#if LLPC_BUILD_GFX12
-#endif
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearNV, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupQuadsNV, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearKHR, {CapabilityShader});

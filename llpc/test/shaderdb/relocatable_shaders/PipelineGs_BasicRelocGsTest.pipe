@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 // This test case checks that a pipeline with geometry shader can be compiled using relocatable shaders.
 
@@ -175,7 +175,6 @@ entryPoint = main
 
 [FsInfo]
 entryPoint = main
-
 
 [GraphicsPipelineState]
 topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP

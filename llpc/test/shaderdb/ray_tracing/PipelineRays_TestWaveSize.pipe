@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; Check that the ray tracing pipeline is compiled in Wave32 mode (which is the only one we support so far).
 
 ; BEGIN_SHADERTEST
@@ -48,7 +48,7 @@ void main() {
   origin.y = gl_LaunchIDEXT.y;
   origin.z = 0;
 
-  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff, 
+  traceRayEXT(g_bvh, /* ray flags */ 0, /* cull mask */ 0xff,
               /* sbt offset */ 0, /* sbt stride */ 1, /* miss index */ 0,
               origin.xyz, /* tmin */ 0.0, /* direction */ vec3(1, 0, 0),
               /* tmax */ 48.0, /* payload location */ 0);
@@ -90,7 +90,6 @@ options.dontUnrollHintThreshold = 0
 void main()
 {
 }
-
 
 [missInfo]
 entryPoint = main

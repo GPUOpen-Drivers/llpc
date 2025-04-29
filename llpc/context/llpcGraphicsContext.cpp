@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -58,11 +58,8 @@ static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl:
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const char *apiName, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
     : PipelineContext(gfxIp, apiName, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
-      m_preRasterHasGs(false), m_activeStageCount(0) {
+      m_activeStageCount(0) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
-#endif
   setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   setUnlinked(pipelineInfo->unlinked);
@@ -248,13 +245,19 @@ Options GraphicsContext::computePipelineOptions() const {
   }
 
   auto pipelineInfo = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
-  options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
+  options.enableUberFetchShader =
+      pipelineInfo->enableUberFetchShader ? UberFetchMode::EnabledDesc : UberFetchMode::Disabled;
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
   options.vbAddressLowBitsKnown = pipelineInfo->getGlState().vbAddressLowBitsKnown;
   options.dynamicTopology = pipelineInfo->dynamicTopology;
   options.enableMapClipDistMask = pipelineInfo->getGlState().enableMapClipDistMask;
+  options.disablePointCoord = pipelineInfo->getGlState().disablePointCoord;
   options.clipPlaneMask = pipelineInfo->rsState.usrClipPlaneMask;
+  options.enableInitUndefZero = pipelineInfo->enableInitUndefZero;
+  options.numTexPointSprite = pipelineInfo->getGlState().numTexPointSprite;
+  memcpy(options.texPointSpriteLocs, pipelineInfo->getGlState().texPointSpriteLocs,
+         sizeof(uint8_t) * pipelineInfo->getGlState().numTexPointSprite);
 
   // Only set NGG options for a GFX10+ graphics pipeline.
   const auto &nggState = pipelineInfo->nggState;

@@ -67,10 +67,8 @@ const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
 const static char TcsPassthroughEntryPoint[] = "lgc.shader.TCS.passthrough.main";
 
-#if LLPC_BUILD_GFX12
 const static char SparsityIndexLoad[] = "lgc.xdl.sparsityindex.load";
 const static char SparseCooperativeMatrixMulAdd[] = "lgc.xdl.sparseCooperativeMatrix.muladd";
-#endif
 } // namespace lgcName
 
 // Value for high half of address that means "use PC".
@@ -78,11 +76,9 @@ const static unsigned HighAddrPc = ~0U;
 
 // Well-known metadata names
 const static char MetaNameUniform[] = "amdgpu.uniform";
-
-#if LLPC_BUILD_GFX12
 const static char MetaNameBufferOpStage[] = "lgc.bufferOp.stage";
 const static char MetaNameBufferOpLlc[] = "lgc.bufferOp.llc";
-#endif
+
 // Maximum count of input/output locations that a shader stage (except fragment shader outputs) is allowed to specify
 static const unsigned MaxInOutLocCount = 32;
 
@@ -95,6 +91,9 @@ static const unsigned MaxTransformFeedbackBuffers = 4;
 // Maximum GS output vertex streams
 static const unsigned MaxGsStreams = 4;
 static_assert(MaxGsStreams == MaxTransformFeedbackBuffers, "Unexpected value!");
+
+// Attribute granularity in bytes, used in attribute-through-memory write
+const unsigned AttributeGranularity = 32 * 4 * sizeof(unsigned);
 
 static const char RayQueryLdsStackName[] = "LdsStack";
 // NOTE: Currently, we restrict the max thread count of ray query to be 64 and make sure the wave size is 64. This is

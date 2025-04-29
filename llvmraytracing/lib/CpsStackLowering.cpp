@@ -86,8 +86,6 @@ Function *CpsStackLowering::lowerCpsStackOps(Function *Func, Function *GetGlobal
                                   .add(&CpsStackLowering::visitBitCastInst)
                                   .add(&CpsStackLowering::visitLoad)
                                   .add(&CpsStackLowering::visitStore)
-                                  .add(&CpsStackLowering::visitContinue)
-                                  .add(&CpsStackLowering::visitWaitContinue)
                                   .build();
   Visitor.visit(*this, *Func);
   TypeLower.finishPhis();
@@ -196,24 +194,6 @@ void CpsStackLowering::visitJump(lgc::cps::JumpOp &JumpOp) {
 
   auto *NewJumpOp = JumpOp.replaceTail(TailArgs);
   NewJumpOp->setCsp(CSP);
-}
-
-// =====================================================================================================================
-// Add stack pointer to a lgc.ilcps.continue call
-//
-// @param Continue: the instruction
-void CpsStackLowering::visitContinue(lgc::ilcps::ContinueOp &Continue) {
-  Builder.SetInsertPoint(&Continue);
-  Continue.setCsp(loadCsp());
-}
-
-// =====================================================================================================================
-// Add stack pointer to a lgc.ilcps.waitContinue call
-//
-// @param WaitContinue: the instruction
-void CpsStackLowering::visitWaitContinue(lgc::ilcps::WaitContinueOp &WaitContinue) {
-  Builder.SetInsertPoint(&WaitContinue);
-  WaitContinue.setCsp(loadCsp());
 }
 
 // =====================================================================================================================

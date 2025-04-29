@@ -54,7 +54,7 @@ LowerInstMetaRemove::LowerInstMetaRemove() {
 PreservedAnalyses LowerInstMetaRemove::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Inst-Meta-Remove\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   bool changed = false;
 
   // Remove calls to functions whose names start with "spirv.NonUniform".

@@ -222,9 +222,6 @@ uint32_t SPIRVType::getCooperativeMatrixKHRUse() const {
   return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getUse()->getZExtIntValue();
 }
 
-#if LLPC_BUILD_GFX12
-#endif
-
 bool SPIRVType::isTypeVoid() const {
   return OpCode == OpTypeVoid;
 }
@@ -300,9 +297,6 @@ bool SPIRVType::isTypeRayQueryKHR() const {
 bool SPIRVType::isTypeCooperativeMatrixKHR() const {
   return OpCode == OpTypeCooperativeMatrixKHR;
 }
-
-#if LLPC_BUILD_GFX12
-#endif
 
 void SPIRVTypeFloat::decode(std::istream &I) {
   getDecoder(I) >> (Id) >> (BitWidth);

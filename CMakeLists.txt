@@ -37,13 +37,19 @@
 
 cmake_minimum_required(VERSION 3.21)
 
-project(LLPCrepo LANGUAGES C CXX)
-
 set(LLPC_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### Standalone LLPC build handling
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     include(cmake/CompilerStandalone.cmake)
+    llpc_standalone_pre_project_setup()
+endif()
+
+project(LLPCrepo LANGUAGES C CXX)
+
+### Standalone LLPC build handling
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    llpc_standalone_post_project_setup()
     set(LLPC_IS_STANDALONE ON)
 endif()
 
@@ -123,7 +129,12 @@ if(ICD_BUILD_LLPC)
     target_link_libraries(vkgc INTERFACE llpc)
 endif()
 
-# Set sub library properties
+### Post-processing for standalone compiler build #################################
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    include(cmake/PostCompilerStandalone.cmake)
+endif()
+
+### Set sub library properties ####################################################
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 
     if (TARGET dumper)

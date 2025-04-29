@@ -32,12 +32,43 @@
 #include "xdl/util/ElementType.h"
 #include "lgc/LgcXdlTypes.h"
 #include "llvm-dialects/Dialect/Builder.h"
+#include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 
 using namespace lgc::xdl;
+
+namespace {
+struct CastOpMapKeyT {
+  CooperativeMatrixElementType srcElemType;
+  bool srcIsSigned;
+  CooperativeMatrixElementType dstElemType;
+  bool dstIsSigned;
+};
+} // anonymous namespace
+
+template <> struct llvm::DenseMapInfo<CastOpMapKeyT> {
+  using T = CastOpMapKeyT;
+
+  static T getEmptyKey() {
+    return T{CooperativeMatrixElementType::Unknown, false, CooperativeMatrixElementType::Unknown, false};
+  }
+  static T getTombstoneKey() {
+    return T{static_cast<CooperativeMatrixElementType>(DenseMapInfo<unsigned>::getTombstoneKey()), false,
+             static_cast<CooperativeMatrixElementType>(DenseMapInfo<unsigned>::getTombstoneKey()), false};
+  }
+  static unsigned getHashValue(const T &val) {
+    return llvm::hash_combine(
+        DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(val.srcElemType)), val.srcIsSigned,
+        DenseMapInfo<unsigned>::getHashValue(static_cast<unsigned>(val.dstElemType)), val.dstIsSigned);
+  }
+  static bool isEqual(const T &lhs, const T &rhs) {
+    return lhs.srcElemType == rhs.srcElemType && lhs.srcIsSigned == rhs.srcIsSigned &&
+           lhs.dstElemType == rhs.dstElemType && lhs.dstIsSigned == rhs.dstIsSigned;
+  }
+};
 
 // =====================================================================================================================
 // Get the bit width of the cooperativeMatrix element type
@@ -65,6 +96,154 @@ static unsigned getBitWidthOfCooperativeMatrixElement(CooperativeMatrixElementTy
 }
 
 // =====================================================================================================================
+// Get the cast opcode for cooperative matrix.
+//
+// @param srcElemType : the element type of source matrix
+// @param dstElemType : the element type of target matrix
+// @return the cast op
+llvm::Instruction::CastOps lgc::xdl::getCooperativeMatrixCastOp(CooperativeMatrixElementType srcElemType,
+                                                                bool srcIsSigned,
+                                                                CooperativeMatrixElementType dstElemType,
+                                                                bool dstIsSigned) {
+  using ElemTy = CooperativeMatrixElementType;
+  // NOTE: For floating points, we have some rules:
+  //  + float8 / bfloat8 will be changed to float32 first, and then cast to target type.
+  //  + to cast between float16 and bfloat16, we need to use `FPTrunc`, since we will cast it to float32 first.
+  //  + to cast between same 16-bit floating type, we use `0` instead of `BitCast`, that means reshape only.
+  static const llvm::DenseMap<CastOpMapKeyT, llvm::Instruction::CastOps> castOpMaps{
+      {{ElemTy::Int4, true, ElemTy::Int4, true}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int4, true, ElemTy::Int4, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int4, true, ElemTy::Int8, true}, llvm::Instruction::CastOps::SExt},
+      {{ElemTy::Int4, true, ElemTy::Int8, false}, llvm::Instruction::CastOps::SExt},
+      {{ElemTy::Int4, true, ElemTy::Float16, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int4, true, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int4, true, ElemTy::Float32, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int4, true, ElemTy::Int32, true}, llvm::Instruction::CastOps::SExt},
+      {{ElemTy::Int4, true, ElemTy::Int32, false}, llvm::Instruction::CastOps::SExt},
+      {{ElemTy::Int4, true, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int4, true, ElemTy::Float8, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int4, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int4, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int4, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::ZExt},
+      {{ElemTy::Int4, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::ZExt},
+      {{ElemTy::Int4, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int4, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int4, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int4, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::ZExt},
+      {{ElemTy::Int4, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::ZExt},
+      {{ElemTy::Int4, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int4, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int8, true, ElemTy::Int4, true}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int8, true, ElemTy::Int4, false}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int8, true, ElemTy::Int8, true}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int8, true, ElemTy::Int8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int8, true, ElemTy::Float16, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int8, true, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int8, true, ElemTy::Float32, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int8, true, ElemTy::Int32, true}, llvm::Instruction::CastOps::SExt},
+      {{ElemTy::Int8, true, ElemTy::Int32, false}, llvm::Instruction::CastOps::SExt},
+      {{ElemTy::Int8, true, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int8, true, ElemTy::Float8, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int8, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int8, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int8, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int8, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int8, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int8, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int8, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int8, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::ZExt},
+      {{ElemTy::Int8, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::ZExt},
+      {{ElemTy::Int8, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int8, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Float16, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float16, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float16, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float16, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float16, false, ElemTy::Float16, false}, static_cast<llvm::Instruction::CastOps>(0)},
+      {{ElemTy::Float16, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::Float16, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::FPExt},
+      {{ElemTy::Float16, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float16, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float16, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::FPExt},
+      {{ElemTy::Float16, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::FPExt},
+      {{ElemTy::BFloat16, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::BFloat16, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::BFloat16, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::BFloat16, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::BFloat16, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::BFloat16, false, ElemTy::BFloat16, false}, static_cast<llvm::Instruction::CastOps>(0)},
+      {{ElemTy::BFloat16, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::FPExt},
+      {{ElemTy::BFloat16, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::BFloat16, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::BFloat16, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::FPExt},
+      {{ElemTy::BFloat16, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::FPExt},
+      {{ElemTy::Float32, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float32, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float32, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float32, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float32, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::Float32, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::Float32, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Float32, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float32, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float32, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Float32, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int32, true, ElemTy::Int4, true}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, true, ElemTy::Int4, false}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, true, ElemTy::Int8, true}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, true, ElemTy::Int8, false}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, true, ElemTy::Float16, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int32, true, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int32, true, ElemTy::Float32, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int32, true, ElemTy::Int32, true}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int32, true, ElemTy::Int32, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int32, true, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int32, true, ElemTy::Float8, false}, llvm::Instruction::CastOps::SIToFP},
+      {{ElemTy::Int32, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::Trunc},
+      {{ElemTy::Int32, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int32, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int32, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int32, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int32, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Int32, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::Int32, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::UIToFP},
+      {{ElemTy::BFloat8, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::BFloat8, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::BFloat8, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::BFloat8, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::BFloat8, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::BFloat8, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::BFloat8, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::BFloat8, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::BFloat8, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::BFloat8, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::BFloat8, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Float8, false, ElemTy::Int4, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float8, false, ElemTy::Int4, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float8, false, ElemTy::Int8, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float8, false, ElemTy::Int8, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float8, false, ElemTy::Float16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::Float8, false, ElemTy::BFloat16, false}, llvm::Instruction::CastOps::FPTrunc},
+      {{ElemTy::Float8, false, ElemTy::Float32, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Float8, false, ElemTy::Int32, true}, llvm::Instruction::CastOps::FPToSI},
+      {{ElemTy::Float8, false, ElemTy::Int32, false}, llvm::Instruction::CastOps::FPToUI},
+      {{ElemTy::Float8, false, ElemTy::BFloat8, false}, llvm::Instruction::CastOps::BitCast},
+      {{ElemTy::Float8, false, ElemTy::Float8, false}, llvm::Instruction::CastOps::BitCast},
+  };
+  auto key = CastOpMapKeyT{
+      .srcElemType = srcElemType,
+      .srcIsSigned = srcIsSigned,
+      .dstElemType = dstElemType,
+      .dstIsSigned = dstIsSigned,
+  };
+  assert(castOpMaps.contains(key) && "Not found the related cast op.");
+  return castOpMaps.at(key);
+}
+
+// =====================================================================================================================
 // Get the LGC type of a cooperative matrix with the given element type and layout.
 //
 // @param builder : The IR builder
@@ -89,7 +268,6 @@ llvm::Type *lgc::xdl::getCooperativeMatrixTy(llvm_dialects::Builder &builder, Co
     if (elemType == CooperativeMatrixElementType::Int8)
       return llvm::FixedVectorType::get(wordTy, 4);
     return llvm::FixedVectorType::get(wordTy, 8);
-#if LLPC_BUILD_GFX12
   case CooperativeMatrixLayout::Gfx12BaseLayout:
     assert(kSize == 16);
     // Total elementNumber * element_bit_width/ (waveSize * vgpr_size_perlane);
@@ -104,13 +282,11 @@ llvm::Type *lgc::xdl::getCooperativeMatrixTy(llvm_dialects::Builder &builder, Co
     if (cntDwords > 1)
       return llvm::FixedVectorType::get(wordTy, cntDwords);
     return builder.getInt32Ty();
-#endif
   default:
     llvm_unreachable("Type is not supported!");
   }
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Get the LLVM type of a sparse index for the sparseCooperativeMatrix.
 //
@@ -125,7 +301,6 @@ llvm::Type *lgc::xdl::getSparseIndexTy(llvm_dialects::Builder &builder, SparseCo
     llvm_unreachable("The sparsity index type is not supported now.");
   }
 }
-#endif
 
 // =====================================================================================================================
 // Whether the underlying type of a cooperative matrix is integer.

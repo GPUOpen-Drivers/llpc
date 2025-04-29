@@ -200,7 +200,6 @@ typedef std::unordered_map<PrimShaderLdsRegion, std::pair<unsigned, unsigned>> P
 // NOTE: The layout structure is defined by @ref Util::Abi::StreamOutControlCb.
 struct StreamOutControlCbOffsets {
   unsigned bufOffsets[MaxTransformFeedbackBuffers];
-#if LLPC_BUILD_GFX12
   // Following offsets are only available on GFX12+ (caused by GDS removal)
   unsigned primsNeeded[MaxGsStreams];
   unsigned primsWritten[MaxGsStreams];
@@ -208,7 +207,6 @@ struct StreamOutControlCbOffsets {
     unsigned orderedWaveId;
     unsigned dwordsWritten;
   } orderedIdPair[MaxTransformFeedbackBuffers];
-#endif
 };
 
 // =====================================================================================================================
@@ -358,12 +356,10 @@ private:
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, bool useDs128 = false);
   void atomicOp(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *value, llvm::Value *ldsOffset);
   llvm::Value *readValueFromCb(llvm::Type *readyTy, llvm::Value *bufPtr, llvm::Value *offset, bool isVolatile = false);
-#if LLPC_BUILD_GFX12
   llvm::Value *globalAtomicOp(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *value, llvm::Value *basePtr,
                               llvm::Value *offset);
   std::pair<llvm::Value *, llvm::Value *> globalAtomicOrderedAdd(std::pair<llvm::Value *, llvm::Value *> orderedIdPair,
                                                                  llvm::Value *basePtr, llvm::Value *offset);
-#endif
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 

@@ -47,6 +47,10 @@ def CooperativeMatrixLoadOp : DivergentLgcCoopMatOp<"load", [Memory<[(read)]>, C
                    CooperativeMatrixLayout:$layout, AttrI32:$memory_access, AttrI32:$alignment, AttrI32:$k_size);
   let results = (outs value:$result);
 
+  let value_traits = [
+    (NoCapture $pointer)
+  ];
+
   let defaultBuilderHasExplicitResultType = true;
 
   let summary = "load the cooperative matrix elements per lane";

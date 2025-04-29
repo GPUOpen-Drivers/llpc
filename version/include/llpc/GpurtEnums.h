@@ -63,12 +63,8 @@ enum class RayTracingIpLevel : uint32_t {
   _None = 0,
   RtIp1_1 = 11,
   RtIp2_0 = 20,
-#if LLPC_BUILD_GFX12
   RtIp3_0 = 30,
-#endif
-#if LLPC_BUILD_GFX12
   RtIp3_1 = 31,
-#endif
 };
 
 // CPS Scheduling levels.

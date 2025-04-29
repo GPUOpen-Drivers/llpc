@@ -54,6 +54,11 @@ target_link_libraries(dumper_base PUBLIC
     khronos_spirv_interface
 )
 
+if(ICD_BUILD_LLPC)
+    target_compile_definitions(dumper_base PRIVATE ICD_BUILD_LLPC)
+    target_link_libraries(dumper_base PRIVATE LLVMlgcdis)
+endif()
+
 target_include_directories(dumper_base
     PUBLIC
         .

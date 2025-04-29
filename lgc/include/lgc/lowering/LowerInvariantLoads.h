@@ -37,7 +37,7 @@
 namespace lgc {
 
 // =====================================================================================================================
-// Represents the LLVM pass for patching operations to lower invariant loads
+// Represents the LLVM pass for lowering invariant loads
 class LowerInvariantLoads : public llvm::PassInfoMixin<LowerInvariantLoads> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);

@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -58,11 +58,12 @@ public:
   // Sets the mask of active shader stages bound to this pipeline
   virtual void setShaderStageMask(unsigned mask) override { m_stageMask = mask; }
 
-  // Sets whether pre-rasterization part has a geometry shader
-  virtual void setPreRasterHasGs(bool preRasterHasGs) override { m_preRasterHasGs = preRasterHasGs; }
+  // Set pre-rasterization flags (hasGs, hasXfb) when compiling the fragment shader part-pipeline
+  // in graphics separate compilation mode
+  virtual void setPreRasterFlags(lgc::PreRasterFlags flags) override { m_preRasterFlags = flags; }
 
-  // Gets whether pre-rasterization part has a geometry shader
-  virtual bool getPreRasterHasGs() const override { return m_preRasterHasGs; };
+  // Gets pre-rasterization flags
+  virtual lgc::PreRasterFlags getPreRasterFlags() const override { return m_preRasterFlags; }
 
   // Gets the count of active shader stages
   virtual unsigned getActiveShaderStageCount() const override { return m_activeStageCount; }
@@ -100,8 +101,8 @@ private:
 
   const GraphicsPipelineBuildInfo *m_pipelineInfo; // Info to build a graphics pipeline
 
-  unsigned m_stageMask;        // Mask of active shader stages bound to this graphics pipeline
-  bool m_preRasterHasGs;       // Whether pre-rasterization part has a geometry shader
+  unsigned m_stageMask; // Mask of active shader stages bound to this graphics pipeline
+  lgc::PreRasterFlags m_preRasterFlags;
   unsigned m_activeStageCount; // Count of active shader stages
 };
 

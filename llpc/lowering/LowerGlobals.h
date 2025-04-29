@@ -45,7 +45,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering operations for globals (global variables, inputs, and outputs).
-class LowerGlobals : public SpirvLower, public llvm::PassInfoMixin<LowerGlobals> {
+class LowerGlobals : public Lowering, public llvm::PassInfoMixin<LowerGlobals> {
 public:
   LowerGlobals();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
@@ -82,6 +82,8 @@ private:
                                          llvm::Value *startLoc, unsigned maxLocOffset, llvm::Value *compIdx,
                                          llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
                                          bool isPerVertexDimension);
+
+  template <typename OpT> Value *processOpWithGlobalHitObject();
 
   llvm::Value *createRaytracingBuiltIn(BuiltIn builtIn);
   void addCallInstForOutputExport(llvm::Value *outputValue, llvm::Constant *outputMeta, llvm::Value *locOffset,

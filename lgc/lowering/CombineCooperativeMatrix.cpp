@@ -40,6 +40,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/DerivedTypes.h"
 #include <optional>
 
 #define DEBUG_TYPE "lgc-combine-cooperative-matrix"
@@ -109,18 +110,19 @@ bool CooperativeMatrixCombiner::run() {
   bool changed = false;
 
   // Step 1: Collect transposes, converts and muladds
-  static const auto visitor = llvm_dialects::VisitorBuilder<CooperativeMatrixCombiner>()
-                                  .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                                  .addSet<CooperativeMatrixConvertOp, CooperativeMatrixTransposeOp>(
-                                      [](auto &self, auto &op) { self.m_ops.push_back(&op); })
-                                  .add<CooperativeMatrixMulAddOp>([](auto &self, auto &op) {
-                                    auto accumElemType = op.getMatrixCElemType();
-                                    bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
-                                    if ((self.m_gfxIpVersion.major == 11) && isPackable) {
-                                      self.m_muladds[op.getParent()].push_back(&op);
-                                    }
-                                  })
-                                  .build();
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<CooperativeMatrixCombiner>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .addSet<CooperativeMatrixConvertOp, CooperativeMatrixTransposeOp, CooperativeMatrixFillOp>(
+              [](auto &self, auto &op) { self.m_ops.push_back(&op); })
+          .add<CooperativeMatrixMulAddOp>([](auto &self, auto &op) {
+            auto accumElemType = op.getMatrixCElemType();
+            bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
+            if ((self.m_gfxIpVersion.major == 11) && isPackable) {
+              self.m_muladds[op.getParent()].push_back(&op);
+            }
+          })
+          .build();
   visitor.visit(*this, m_function);
 
   // Step 2: Attempt folds.
@@ -195,11 +197,15 @@ void CooperativeMatrixCombiner::foldTo(Value *from, Value *to) {
 bool CooperativeMatrixCombiner::tryFold(CallInst *op) {
   Value *src;
   bool isConvert = false;
+  bool isFill = false;
   if (auto *convertOp = dyn_cast<CooperativeMatrixConvertOp>(op)) {
     src = convertOp->getSource();
     isConvert = true;
   } else if (auto *transposeOp = dyn_cast<CooperativeMatrixTransposeOp>(op)) {
     src = transposeOp->getMatrix();
+  } else if (auto *fillOp = dyn_cast<CooperativeMatrixFillOp>(op)) {
+    src = fillOp->getScalar();
+    isFill = true;
   } else {
     llvm_unreachable("the operation is not supported here.");
   }
@@ -229,12 +235,13 @@ bool CooperativeMatrixCombiner::tryFold(CallInst *op) {
       }
     }
     if (constant->isNullValue()) {
-      // transpose/convert(zeroinitializer) -> zeroinitializer
+      // fill/transpose/convert(zeroinitializer) -> zeroinitializer
       foldTo(op, Constant::getNullValue(op->getType()));
       return true;
     }
   } else if (auto *inst = dyn_cast<Instruction>(src)) {
-    if (tryFoldComponentContaining(inst))
+    // We will try to fold the coopmat instructions, but skip the fillOp since it comes scalar instead of a coopmat.
+    if (!isFill && tryFoldComponentContaining(inst))
       return true;
   }
 
@@ -361,7 +368,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       continue;
     }
 
-    if (isa<CooperativeMatrixLoadOp>(input))
+    if (isa<CooperativeMatrixLoadOp, CooperativeMatrixFillOp>(input))
       continue; // loads can be adjusted at zero cost
     if (auto *transposeOp = dyn_cast<CooperativeMatrixTransposeOp>(input)) {
       foundComponentShape(getShapeOfTranspose(*transposeOp));
@@ -443,6 +450,8 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
         loadOp->setColMajor(!colMajor);
         continue;
       }
+      if (isa<CooperativeMatrixFillOp>(input))
+        continue;
 
       // Handle generic inputs that need to be transposed explicitly.
       if (auto *inst = dyn_cast<Instruction>(input)) {
@@ -559,6 +568,10 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       }
       if (auto *loadOp = dyn_cast<CooperativeMatrixLoadOp>(input)) {
         loadOp->setLayout(*otherLayout);
+        continue;
+      }
+      if (auto *fillOp = dyn_cast<CooperativeMatrixFillOp>(input)) {
+        fillOp->setLayout(*otherLayout);
         continue;
       }
 

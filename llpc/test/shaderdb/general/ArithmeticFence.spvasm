@@ -1,0 +1,78 @@
+
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;  Permission is hereby granted, free of charge, to any person obtaining a copy
+ ;  of this software and associated documentation files (the "Software"), to
+ ;  deal in the Software without restriction, including without limitation the
+ ;  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ ;  sell copies of the Software, and to permit persons to whom the Software is
+ ;  furnished to do so, subject to the following conditions:
+ ;
+ ;  The above copyright notice and this permission notice shall be included in all
+ ;  copies or substantial portions of the Software.
+ ;
+ ;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ ;  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ ;  IN THE SOFTWARE.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; This test checks if SPIR-V new opcode OpArithmeticFenceEXT can be handled correctly. This SPIR-V opcode will be
+; translated to LLVM intrinsic llvm.arithmetic.fence according to the SPIR-V spec suggestion.
+
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: %[[MUL:[^ ,]*]] = fmul reassoc nnan nsz arcp contract afn float %vertex0.0.i, 3.000000e+00
+; SHADERTEST-NEXT: %[[ARITH_FENCE:[^ ,]*]] = call reassoc nnan nsz arcp contract afn float @llvm.arithmetic.fence.f32(float %[[MUL]])
+; SHADERTEST-NEXT: fadd reassoc nnan nsz arcp contract afn float %[[ARITH_FENCE]], 1.000000e+00
+
+; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
+; SHADERTEST: v_mul_f32_e32 v1, 0x40400000, v1
+; SHADERTEST: v_add_f32_e32 v1, 1.0, v1
+
+; SHADERTEST-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos Glslang Reference Front End; 11
+; Bound: 20
+; Schema: 0
+               OpCapability Shader
+			   OpCapability ArithmeticFenceEXT
+			   OpExtension "SPV_EXT_arithmetic_fence"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %inColor %outColor
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %inColor "inColor"
+               OpName %outColor "outColor"
+               OpDecorate %inColor Location 0
+               OpDecorate %outColor Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Input_float = OpTypePointer Input %float
+    %inColor = OpVariable %_ptr_Input_float Input
+    %float_3 = OpConstant %float 3
+    %float_1 = OpConstant %float 1
+%_ptr_Output_float = OpTypePointer Output %float
+   %outColor = OpVariable %_ptr_Output_float Output
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %11 = OpLoad %float %inColor
+         %13 = OpFMul %float %11 %float_3
+         %15 = OpArithmeticFenceEXT %float %13
+         %16 = OpFAdd %float %15 %float_1
+               OpStore %outColor %16
+               OpReturn
+               OpFunctionEnd

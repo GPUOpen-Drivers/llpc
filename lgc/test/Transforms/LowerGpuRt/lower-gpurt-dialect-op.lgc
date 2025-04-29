@@ -33,8 +33,8 @@ declare <2 x i32> @lgc.gpurt.make.pc__v2i32(i32)
 declare void @dummy.use__i64(i64 %val)
 declare void @dummy.use__v2i32(<2 x i32> %val)
 
-define spir_func void @test(i32 %debug_in) {
-; CHECK-LABEL: define spir_func void @test(
+define spir_func void @test_make.pc(i32 %debug_in) {
+; CHECK-LABEL: define spir_func void @test_make.pc(
 ; CHECK-SAME: i32 [[DEBUG_IN:%.*]]) {
 ; CHECK-NEXT:    [[TMP6:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 ; CHECK-NEXT:    [[TMP11:%.*]] = lshr i64 [[TMP6]], 32

@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; This test is to verify that dot(f16vec2, f16vec2) is not translated to the HW instruction v_dot2_f16_f16
 ; in signed zero mode on GFX12. The test checks this result: dot2(<-0.0, -0.0>, <1.0, 1.0>) ?= -0.0.
 ; v_dot2_f16_f16 is not IEEE compliant and doesn't respect signed zeros.
@@ -35,7 +35,7 @@
 ; SHADERTEST-NEXT: [[ELEM0:%.*]] = extractelement <2 x half> [[MUL]], i64 0
 ; SHADERTEST-NEXT: [[ELEM1:%.*]] = extractelement <2 x half> [[MUL]], i64 0
 ; SHADERTEST-NEXT: fadd nnan ninf arcp contract half [[ELEM0]], [[ELEM1]]
-  
+
 ; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
 ; SHADERTEST: s_mul_f16 [[TMP:s.*]], s{{[0-9]*}}, s{{[0-9]*}}
 ; SHADERTEST: s_add_f16 s{{[0-9]*}}, [[TMP]], [[TMP]]

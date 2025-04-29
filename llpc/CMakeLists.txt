@@ -182,6 +182,8 @@ if(ICD_BUILD_LLPC)
         lowering/LoweringUtil.h
         lowering/LowerInternalLibraryIntrinsic.cpp
         lowering/LowerInternalLibraryIntrinsic.h
+        lowering/MemCpyRecognize.cpp
+        lowering/MemCpyRecognize.h
         lowering/ProcessGpuRtLibrary.cpp
         lowering/ProcessGpuRtLibrary.h
         lowering/PrepareContinuations.cpp

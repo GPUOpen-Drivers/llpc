@@ -48,9 +48,7 @@ static constexpr char MaxRayPayloadSize[] = "max_ray_payload_size";
 static constexpr char MaxHitAttributeSize[] = "max_hit_attribute_size";
 static constexpr char HasKernelEntry[] = "has_kernel_entry";
 static constexpr char HasTraceRayModule[] = "has_trace_ray_module";
-#if LLPC_BUILD_GFX12
 static constexpr char MaxOutgoingVgprCount[] = "max_outgoing_vgpr_count";
-#endif
 static constexpr char LlvmRaytracingState[] = "llvm_raytracing_state";
 
 } // namespace RtLibSummary
@@ -86,9 +84,7 @@ Expected<RayTracingLibrarySummary> RayTracingLibrarySummary::decodeMsgpack(Strin
   getUInt(root[RtLibSummary::MaxHitAttributeSize], rls.maxHitAttributeSize);
   getBool(root[RtLibSummary::HasKernelEntry], rls.hasKernelEntry);
   getBool(root[RtLibSummary::HasTraceRayModule], rls.hasTraceRayModule);
-#if LLPC_BUILD_GFX12
   getUInt(root[RtLibSummary::MaxOutgoingVgprCount], rls.maxOutgoingVgprCount);
-#endif
   auto errorOrState = llvmraytracing::PipelineState::decodeMsgpack(root[RtLibSummary::LlvmRaytracingState]);
   if (auto error = errorOrState.takeError())
     return error;
@@ -111,9 +107,7 @@ std::string RayTracingLibrarySummary::encodeMsgpack() const {
   root[RtLibSummary::MaxHitAttributeSize] = maxHitAttributeSize;
   root[RtLibSummary::HasKernelEntry] = hasKernelEntry;
   root[RtLibSummary::HasTraceRayModule] = hasTraceRayModule;
-#if LLPC_BUILD_GFX12
   root[RtLibSummary::MaxOutgoingVgprCount] = maxOutgoingVgprCount;
-#endif
   llvmRaytracingState.encodeMsgpack(root[RtLibSummary::LlvmRaytracingState]);
 
   std::string out;
@@ -129,9 +123,7 @@ void RayTracingLibrarySummary::merge(const RayTracingLibrarySummary &other) {
   }
   maxRayPayloadSize = std::max(maxRayPayloadSize, other.maxRayPayloadSize);
   maxHitAttributeSize = std::max(maxHitAttributeSize, other.maxHitAttributeSize);
-#if LLPC_BUILD_GFX12
   maxOutgoingVgprCount = std::max(maxOutgoingVgprCount, other.maxOutgoingVgprCount);
-#endif
 
   // TODO: Inherit kernel entry and trace ray module if possible and avoid recompile?
   hasKernelEntry = false;

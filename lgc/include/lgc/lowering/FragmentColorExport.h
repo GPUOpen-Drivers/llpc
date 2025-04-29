@@ -66,7 +66,6 @@ public:
     unsigned expFmt[MaxColorTargets];           // Export format used for "export" instruction.
     unsigned waveSize;                          // The wave size for fragment.
     bool enableFragColor;                       // Whether to broadcast frag color. Only for OGLP
-    ExportFormat dummyExpFmt;                   // Export format used for dummy "export" instruction.
   };
 
   FragmentColorExport(LgcContext *context);

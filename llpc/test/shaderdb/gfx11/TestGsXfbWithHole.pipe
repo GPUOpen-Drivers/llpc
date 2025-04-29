@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Test to check GS output handling with XFB on GFX11. The XFB has a hole by specifying the component
 ; qualifier. In a location, only part of its components are exported to XFB buffer and they are not
@@ -95,7 +95,6 @@ options.overrideShaderThreadGroupSizeZ = 0
 options.nsaThreshold = 0
 options.aggressiveInvariantLoads = Auto
 options.workaroundStorageImageFormats = 0
-options.workaroundInitializeOutputsToZero = 0
 options.disableFMA = 0
 options.backwardPropagateNoContract = 0
 options.forwardPropagateNoContract = 1
@@ -164,7 +163,6 @@ options.overrideShaderThreadGroupSizeZ = 0
 options.nsaThreshold = 0
 options.aggressiveInvariantLoads = Auto
 options.workaroundStorageImageFormats = 0
-options.workaroundInitializeOutputsToZero = 0
 options.disableFMA = 0
 options.backwardPropagateNoContract = 0
 options.forwardPropagateNoContract = 1
@@ -223,7 +221,6 @@ options.overrideShaderThreadGroupSizeZ = 0
 options.nsaThreshold = 0
 options.aggressiveInvariantLoads = Auto
 options.workaroundStorageImageFormats = 0
-options.workaroundInitializeOutputsToZero = 0
 options.disableFMA = 0
 options.backwardPropagateNoContract = 0
 options.forwardPropagateNoContract = 1
@@ -372,7 +369,6 @@ rtState.gpurtFuncTable.pFunc[11] =
 rtState.rtIpVersion = 0.0
 rtState.gpurtOverride = 0
 rtState.rtIpOverride = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

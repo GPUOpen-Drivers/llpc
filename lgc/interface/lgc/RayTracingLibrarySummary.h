@@ -60,10 +60,8 @@ struct RayTracingLibrarySummary {
   // attributes (no AHS/IS/CHS).
   unsigned maxHitAttributeSize = 0;
 
-#if LLPC_BUILD_GFX12
   // The maximum outgoing VGPR count for dynamic VGPRs.
   unsigned maxOutgoingVgprCount = 0;
-#endif
 
   // Whether a kernel entry function was built for this library.
   bool hasKernelEntry = false;

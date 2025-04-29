@@ -47,7 +47,7 @@ public:
 
   // Create a VertexFetch
   static VertexFetch *create(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors,
-                             bool vbAddressLowBitsKnown);
+                             bool vbAddressLowBitsKnown, bool enableRobustUnboundVertex);
 
   // Generate code to fetch a vertex value
   virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,

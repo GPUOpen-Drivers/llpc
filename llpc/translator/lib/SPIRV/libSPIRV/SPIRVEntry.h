@@ -5,7 +5,7 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -66,6 +66,7 @@ class SPIRVMemberDecorate;
 class SPIRVLine;
 class SPIRVString;
 class SPIRVExtInst;
+class SPIRVExtInstWithForwardRefsKHR;
 
 // Add declaration of decode functions to a class.
 // Used inside class definition.
@@ -220,9 +221,9 @@ public:
   bool hasLinkageType() const;
   bool isAtomic() const { return isAtomicOpCode(OpCode); }
   bool isBasicBlock() const { return isLabel(); }
-  bool isExtInst() const { return OpCode == OpExtInst; }
+  bool isExtInst() const { return OpCode == OpExtInst || OpCode == OpExtInstWithForwardRefsKHR; }
   bool isExtInst(const SPIRVExtInstSetKind InstSet, const SPIRVWord ExtOp) const;
-  bool isBuiltinCall() const { return OpCode == OpExtInst; }
+  bool isBuiltinCall() const { return OpCode == OpExtInst || OpCode == OpExtInstWithForwardRefsKHR; }
   bool isDecorate() const { return OpCode == OpDecorate; }
   bool isMemberDecorate() const { return OpCode == OpMemberDecorate; }
   bool isForward() const { return OpCode == OpForward; }

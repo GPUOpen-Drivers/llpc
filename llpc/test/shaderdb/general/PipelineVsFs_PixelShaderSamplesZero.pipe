@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -140,7 +140,6 @@ version = 40
                OpReturn
                OpFunctionEnd
 
-
 [VsInfo]
 entryPoint = main
 options.trapPresent = 0
@@ -180,7 +179,6 @@ options.overrideShaderThreadGroupSizeZ = 0
 options.nsaThreshold = 0
 options.aggressiveInvariantLoads = Auto
 options.workaroundStorageImageFormats = 0
-options.workaroundInitializeOutputsToZero = 0
 options.disableFMA = 0
 options.backwardPropagateNoContract = 0
 options.forwardPropagateNoContract = 1
@@ -317,7 +315,6 @@ options.forwardPropagateNoContract = 1
                OpReturn
                OpFunctionEnd
 
-
 [FsInfo]
 entryPoint = main
 options.trapPresent = 0
@@ -357,7 +354,6 @@ options.overrideShaderThreadGroupSizeZ = 0
 options.nsaThreshold = 0
 options.aggressiveInvariantLoads = Auto
 options.workaroundStorageImageFormats = 0
-options.workaroundInitializeOutputsToZero = 0
 options.disableFMA = 0
 options.backwardPropagateNoContract = 0
 options.forwardPropagateNoContract = 1
@@ -516,5 +512,4 @@ attribute[1].offset = 16
 [ApiXfbOutInfo]
 forceDisableStreamOut = 0
 forceEnablePrimStats = 0
-
 

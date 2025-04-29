@@ -129,6 +129,7 @@ static constexpr char Name[] = ".name";
 static constexpr char Type[] = ".type";
 static constexpr char InternalPipelineHash[] = ".internal_pipeline_hash";
 static constexpr char ResourceHash[] = ".resource_hash";
+static constexpr char UnifiedRgsNameHash[] = ".unified_rgs_name_hash";
 static constexpr char XglCacheInfo[] = ".xgl_cache_info";
 static constexpr char CacheHash128Bits[] = ".128_bit_cache_hash";
 static constexpr char LlpcVersion[] = ".llpc_version";
@@ -190,10 +191,8 @@ static constexpr char UserDataRegMap[] = ".user_data_reg_map";
 static constexpr char ImageOp[] = ".image_op";
 static constexpr char FrontendStackSize[] = ".frontend_stack_size";
 static constexpr char ShaderSpillThreshold[] = ".shader_spill_threshold";
-#if LLPC_BUILD_GFX12
 static constexpr char WorkgroupRoundRobin[] = ".wg_round_robin";
 static constexpr char OutgoingVgprCount[] = ".outgoing_vgpr_count";
-#endif
 }; // namespace HardwareStageMetadataKey
 
 namespace ShaderMetadataKey {
@@ -208,10 +207,8 @@ static constexpr char TgidYEn[] = ".tgid_y_en";
 static constexpr char TgidZEn[] = ".tgid_z_en";
 static constexpr char TgSizeEn[] = ".tg_size_en";
 static constexpr char TidigCompCnt[] = ".tidig_comp_cnt";
-#if LLPC_BUILD_GFX12
 static constexpr char XInterleave[] = ".x_interleave";
 static constexpr char YInterleave[] = ".y_interleave";
-#endif
 }; // namespace ComputeRegisterMetadataKey
 
 namespace GraphicsRegisterMetadataKey {
@@ -610,6 +607,16 @@ enum class UserDataMapping : unsigned {
   CompositeData = 0x10000023, // sample info + DynamicDualSrcBlendInfo + topology, this will replace the two
                               // userdata above.
 
+  // Range of values for a user data PAL metadata register to be resolved at pipeline create time in PAL.
+  // PipelineLinkStart+N is initialized by PAL to the (low 32 bits of the) address of symbol _amdgpu_pipelineLinkN
+  // in any ELF piece of the pipeline. For odd N, the symbol is optional; if it is not present, the register is
+  // initialized to 0. For even N, the symbol is not optional; if it is not present, PAL pipeline creation fails
+  // with an error.
+  // The semantics of the various values of N are internal to the compiler implementation, as it generates both
+  // the ELF defining the symbol and the ELF using the user data SGPR.
+  PipelineLinkStart = 0x10001000,
+  PipelineLinkEnd = 0x100010FF,
+
   // Values used in a user data PAL metadata register to be resolved at link time.
   // This is part of the "unlinked" ABI, so should arguably be in AbiUnlinked.h.
   DescriptorSet0 = 0x80000000,   // 32-bit pointer to the descriptor table for descriptor set 0: add N to this value
@@ -713,9 +720,7 @@ constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE = 0xA29B;
 constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE_GFX11 = 0xC266;
 
 constexpr unsigned mmSPI_SHADER_PGM_LO_GS = 0x2C88;
-#if LLPC_BUILD_GFX12
 constexpr unsigned mmSPI_SHADER_PGM_LO_GS_GFX12 = 0x2C84;
-#endif
 
 // Register bitfield layout.
 

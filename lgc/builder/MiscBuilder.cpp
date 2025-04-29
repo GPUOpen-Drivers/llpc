@@ -75,15 +75,17 @@ Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
 // =====================================================================================================================
 // Create a workgroup control barrier.
 Instruction *BuilderImpl::CreateBarrier() {
-#if LLPC_BUILD_GFX12
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
     CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, getInt32(WorkgroupNormalBarrierId));
     return CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
                            getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
   }
-#endif
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+  return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {});
+#else
   return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+#endif
 }
 
 // =====================================================================================================================
@@ -106,6 +108,36 @@ Instruction *BuilderImpl::CreateKill(const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Instruction *BuilderCommon::CreateDebugBreak(const Twine &instName) {
   return CreateIntrinsic(Intrinsic::amdgcn_s_sethalt, {}, getInt32(1), nullptr, instName);
+}
+
+// =====================================================================================================================
+// Create an "s_setreg" to set specified bits of a hardware register.
+//
+// @param waveRegIdx : The wave state register idx
+// @param offset: The starting offset
+// @param size: The size of bits
+// @param value : The value to set to the register
+// @param instName : Name to give instruction(s)
+Instruction *BuilderCommon::CreateSetReg(unsigned waveRegIdx, unsigned offset, unsigned size, llvm::Value *value,
+                                         const llvm::Twine &instName) {
+  assert(size > 0 && size <= 32);
+  assert(offset + size <= 32);
+  unsigned scalarInput = waveRegIdx | offset << 6 | (size - 1) << 11;
+  return CreateIntrinsic(getVoidTy(), Intrinsic::amdgcn_s_setreg, {getInt32(scalarInput), value});
+}
+
+// =====================================================================================================================
+// Create an "s_getreg" to get specified bits of a hardware register.
+//
+// @param waveRegIdx : The wave state register idx
+// @param offset: The starting offset
+// @param size: The size of bits
+// @param instName : Name to give instruction(s)
+Value *BuilderCommon::CreateGetReg(unsigned waveRegIdx, unsigned offset, unsigned size, const llvm::Twine &instName) {
+  assert(size > 0 && size <= 32);
+  assert(offset + size <= 32);
+  unsigned scalarInput = waveRegIdx | offset << 6 | (size - 1) << 11;
+  return CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_s_getreg, {getInt32(scalarInput)});
 }
 
 // =====================================================================================================================

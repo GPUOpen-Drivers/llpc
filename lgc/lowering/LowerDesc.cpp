@@ -123,4 +123,5 @@ void LowerDesc::visitLoadStridedBufferDesc(LoadStridedBufferDescOp &op) {
 
   op.replaceAllUsesWith(desc);
 }
+
 } // namespace lgc

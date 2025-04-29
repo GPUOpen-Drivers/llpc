@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CodeGen.h"
@@ -37,6 +38,7 @@
 
 namespace llvm {
 
+class GlobalVariable;
 class LLVMContext;
 class ModulePass;
 class raw_pwrite_stream;
@@ -59,6 +61,7 @@ class PassManager;
 class PassManagerCache;
 class Pipeline;
 class TargetInfo;
+union VertexInputDescription;
 
 // Size in bytes of resource (image) descriptor
 static constexpr unsigned DescriptorSizeResource = 8 * sizeof(uint32_t);
@@ -154,6 +157,12 @@ public:
 
   // Get pass manager cache
   PassManagerCache *getPassManagerCache();
+
+  // Make uber fetch table.
+  //
+  // @param inputs : Array of VertexInputDescription structs
+  // @returns New GlobalVariable. Ownership passes to caller; typically caller inserts into a module
+  llvm::GlobalVariable *makeUberFetchTable(llvm::ArrayRef<VertexInputDescription> inputs);
 
 private:
   LgcContext() = delete;

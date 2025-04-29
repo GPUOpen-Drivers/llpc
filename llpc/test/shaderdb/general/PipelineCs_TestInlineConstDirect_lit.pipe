@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -83,7 +83,6 @@ void main()
     O1.o1 = uvec4(b1.i1, 0, 0, 0) + uvec4(b1.i2, 0, 0) + uvec4(b1.i3, 0) + b1.i4;
     O2.o2 = dvec4(b1.d1, 0, 0, 0) + dvec4(b1.d2, 0, 0) + dvec4(b1.d3, 0) + b1.d4;
 }
-
 
 [CsInfo]
 entryPoint = main

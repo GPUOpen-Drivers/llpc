@@ -60,8 +60,6 @@ private:
   void setIaMultVgtParam();
   void setVgtTfParam();
 
-  unsigned calcLdsSize(unsigned ldsSizeInDwords);
-
   bool m_isNggMode = false;
 };
 

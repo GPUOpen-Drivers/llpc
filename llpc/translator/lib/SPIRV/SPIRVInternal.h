@@ -207,6 +207,7 @@ template <> inline void SPIRVMap<Attribute::AttrKind, SPIRVFunctionControlMaskKi
   add(Attribute::ReadOnly, FunctionControlConstMask);
   add(Attribute::AlwaysInline, FunctionControlInlineMask);
   add(Attribute::NoInline, FunctionControlDontInlineMask);
+  add(Attribute::OptimizeNone, FunctionControlOptNoneEXTMask);
 }
 typedef SPIRVMap<Attribute::AttrKind, SPIRVFunctionControlMaskKind> SPIRSPIRVFuncCtlMaskMap;
 
@@ -220,9 +221,7 @@ const static char InOut[] = "spirv.InOut";
 const static char Block[] = "spirv.Block";
 const static char PushConst[] = "spirv.PushConst";
 const static char Resource[] = "spirv.Resource";
-#if LLPC_BUILD_GFX12
 const static char ResourceNoAlloc[] = "spirv.Resource.NoAlloc";
-#endif
 const static char TaskPayload[] = "spirv.TaskPayload";
 const static char UniformConstant[] = "spirv.UniformConstant";
 const static char ExecutionModel[] = "spirv.ExecutionModel";

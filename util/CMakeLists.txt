@@ -32,15 +32,7 @@ add_library(vkgc_util
 
 ### util Auto-generated String Files ####################################################################################
 find_package(Python3 3.6 COMPONENTS Interpreter)
-#if _WIN32
-if(NOT Python3_Interpreter_FOUND AND WIN32)
-    set(Python3_EXECUTABLE "${GLOBAL_ROOT_DK_DIR}/python/3.6/python.exe")
-    if(FILE ${Python3_EXECUTABLE})
-        set(Python3_Interpreter_FOUND ON)
-        message(STATUS "Using the Python found at ${Python3_EXECUTABLE} instead.")
-    endif()
-endif()
-#endif
+
 if(NOT Python3_Interpreter_FOUND)
     message(FATAL_ERROR "Python 3.6 is needed to generate some source files.")
 endif()

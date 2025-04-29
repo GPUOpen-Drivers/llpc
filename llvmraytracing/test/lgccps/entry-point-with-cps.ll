@@ -128,7 +128,7 @@ declare void @lgc.cps.jump(...)
 ;
 ;
 ; CHECK-LABEL: define dso_local void @raygen.resume.0(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], [2 x i32] [[TMP1:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2]] !continuation [[META3]] !continuation.registercount [[META2]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]], [2 x i32] [[TMP1:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META2]] !continuation [[META3]] {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
@@ -165,7 +165,7 @@ declare void @lgc.cps.jump(...)
 ;
 ;
 ; CHECK-LABEL: define dso_local void @chs.resume.0(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4]] !continuation [[META5]] !continuation.registercount [[META2]] {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i32 [[TMP0:%.*]]) !lgc.shaderstage [[META1]] !lgc.cps [[META4]] !continuation [[META5]] {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4

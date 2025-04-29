@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
@@ -132,7 +132,6 @@ layout(location = 3) out float out4[3];
 layout(location = 6) out int index;
 layout(location = 7) out dvec3 out5[2];
 
-
 void main(void)
 {
     gl_Position = inV0;
@@ -147,7 +146,6 @@ void main(void)
 
 [VsInfo]
 entryPoint = main
-
 
 [TcsGlsl]
 #version 450 core
@@ -203,7 +201,6 @@ void main(void)
 
 [TesInfo]
 entryPoint = main
-
 
 [FsGlsl]
 #version 450 core
@@ -272,7 +269,6 @@ options.shadowDescriptorTablePtrHigh = 2
 options.extendedRobustness.robustBufferAccess = 0
 options.extendedRobustness.robustImageAccess = 0
 options.extendedRobustness.nullDescriptor = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

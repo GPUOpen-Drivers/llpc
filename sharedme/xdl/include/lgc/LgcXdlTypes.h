@@ -60,10 +60,8 @@ enum class CooperativeMatrixLayout : unsigned {
   AccumulatorMatrixLayout,           // C/D layout on gfx11
   Gfx10AccumulatorMatrixLayout,      // 32bit@C/D layout on gfx10
   Gfx10Accumulator16bitMatrixLayout, // 16bit@C/D layout on gfx10
-#if LLPC_BUILD_GFX12
-  Gfx12BaseLayout,         // Base layout on gfx12
-  Gfx12SwizzledKX16Layout, // KX16 layout for denseB on gfx12.
-#endif
+  Gfx12BaseLayout,                   // Base layout on gfx12
+  Gfx12SwizzledKX16Layout,           // KX16 layout for denseB on gfx12.
   InvalidLayout
 };
 
@@ -86,11 +84,9 @@ enum class CooperativeMatrixArithOp : unsigned {
   FMod
 };
 
-#if LLPC_BUILD_GFX12
 enum class SparseCooperativeMatrixSparsityFormat : unsigned {
   Sparsity2to4AMD = 0, // Format of the sparse index
   InvalidSparsityFormat
 };
-#endif
 
 } // namespace lgc::xdl

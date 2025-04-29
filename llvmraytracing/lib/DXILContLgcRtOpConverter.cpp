@@ -85,34 +85,59 @@ static void analyzeShaderKinds(Module &M, MapVector<Function *, DXILShaderKind> 
   }
 }
 
-} // namespace
+class DXILContLgcRtOpConverterPassImpl final {
+public:
+  DXILContLgcRtOpConverterPassImpl(Module &Module);
+  llvm::PreservedAnalyses run();
 
-namespace llvm {
+private:
+  llvm_dialects::Builder Builder;
+  Module &M;
+  const llvm::DataLayout &DL;
+
+  bool convertDxOp(llvm::Function &Func);
+  using OpCallbackType = std::function<llvm::Value *(llvm::CallInst &, DXILContLgcRtOpConverterPassImpl *)>;
+  std::optional<OpCallbackType> getCallbackByOpName(StringRef OpName);
+
+  template <typename T> Value *handleSimpleCall(CallInst &CI);
+  template <typename T> Value *handleSimpleCallHitObj(CallInst &CI);
+  Value *handleTraceRayOp(CallInst &CI);
+  Value *handleReportHitOp(CallInst &CI);
+  Value *handleCallShaderOp(CallInst &CI);
+  Value *getArgIndexOfArrayOperand(CallInst &CI, unsigned MaxElements);
+  template <typename T, unsigned MaxElements = 3> Value *handleVecResult(CallInst &CI);
+  template <typename T, unsigned MaxElements = 3> Value *handleVecResultHitObj(CallInst &CI);
+  template <typename Op, unsigned MaxRows = 3, unsigned MaxColumns = 4> Value *handleMatrixResult(CallInst &CI);
+  Value *createVec3(Value *X, Value *Y, Value *Z);
+  void addDXILPayloadTypeToCall(Function &DXILFunc, CallInst &CI);
+  bool prepareEntryPointShaders();
+  void setupLocalRootIndex(Function *F);
+};
 
 // Get the corresponding callback index in the callback table.
-std::optional<DXILContLgcRtOpConverterPass::OpCallbackType>
-DXILContLgcRtOpConverterPass::getCallbackByOpName(StringRef OpName) {
+std::optional<DXILContLgcRtOpConverterPassImpl::OpCallbackType>
+DXILContLgcRtOpConverterPassImpl::getCallbackByOpName(StringRef OpName) {
   using namespace lgc::rt;
 #define LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK(Op, Callback)                                                           \
   if (OpName.starts_with(Op))                                                                                          \
-    return std::bind(&DXILContLgcRtOpConverterPass::Callback, this, std::placeholders::_1);
+    return std::bind(&DXILContLgcRtOpConverterPassImpl::Callback, this, std::placeholders::_1);
 
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("acceptHitAndEndSearch", handleSimpleCall<AcceptHitAndEndSearchOp>)
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("ignoreHit", handleSimpleCall<IgnoreHitOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("instanceID", handleSimpleCall<InstanceIdOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("instanceIndex", handleSimpleCall<InstanceIndexOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("geometryIndex", handleSimpleCall<GeometryIndexOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("hitKind", handleSimpleCall<HitKindOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("primitiveIndex", handleSimpleCall<PrimitiveIndexOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("rayFlags", handleSimpleCall<RayFlagsOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("rayTMin", handleSimpleCall<RayTminOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("rayTCurrent", handleSimpleCall<RayTcurrentOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("objectRayDirection", handleVecResult<ObjectRayDirectionOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("objectRayOrigin", handleVecResult<ObjectRayOriginOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("instanceID", handleSimpleCallHitObj<InstanceIdOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("instanceIndex", handleSimpleCallHitObj<InstanceIndexOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("geometryIndex", handleSimpleCallHitObj<GeometryIndexOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("hitKind", handleSimpleCallHitObj<HitKindOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("primitiveIndex", handleSimpleCallHitObj<PrimitiveIndexOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("rayFlags", handleSimpleCallHitObj<RayFlagsOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("rayTMin", handleSimpleCallHitObj<RayTminOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("rayTCurrent", handleSimpleCallHitObj<RayTcurrentOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("objectRayDirection", handleVecResultHitObj<ObjectRayDirectionOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("objectRayOrigin", handleVecResultHitObj<ObjectRayOriginOp>)
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("dispatchRaysDimensions", handleVecResult<DispatchRaysDimensionsOp>)
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("dispatchRaysIndex", handleVecResult<DispatchRaysIndexOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("worldRayDirection", handleVecResult<WorldRayDirectionOp>)
-  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("worldRayOrigin", handleVecResult<WorldRayOriginOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("worldRayDirection", handleVecResultHitObj<WorldRayDirectionOp>)
+  LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("worldRayOrigin", handleVecResultHitObj<WorldRayOriginOp>)
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("objectToWorld", handleMatrixResult<ObjectToWorldOp>)
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("worldToObject", handleMatrixResult<WorldToObjectOp>)
   LGC_RT_CALLBACK_TABLE_TRY_GET_CALLBACK("traceRay", handleTraceRayOp)
@@ -126,18 +151,30 @@ DXILContLgcRtOpConverterPass::getCallbackByOpName(StringRef OpName) {
 
 /// Handle a simple call without any arguments, replace the uses with the new
 /// op.
-template <typename Op> Value *DXILContLgcRtOpConverterPass::handleSimpleCall(CallInst &CI) {
+template <typename Op> Value *DXILContLgcRtOpConverterPassImpl::handleSimpleCall(CallInst &CI) {
   static_assert(std::is_base_of<llvm::CallInst, Op>());
 
-  Builder->SetInsertPoint(&CI);
-  return Builder->create<Op>();
+  Builder.SetInsertPoint(&CI);
+  return Builder.create<Op>();
+}
+
+/// Handle a simple call without any arguments, replace the uses with the new
+/// op.
+template <typename Op> Value *DXILContLgcRtOpConverterPassImpl::handleSimpleCallHitObj(CallInst &CI) {
+  static_assert(std::is_base_of<llvm::CallInst, Op>());
+
+  Builder.SetInsertPoint(&CI);
+
+  Type *allocaPtrTy = CI.getDataLayout().getAllocaPtrType(Builder.getContext());
+  auto *globalHitObjectOp = Builder.create<lgc::rt::GlobalHitObjectOp>(allocaPtrTy);
+  return Builder.create<Op>(globalHitObjectOp);
 }
 
 /// Create a lgc.rt.trace.ray op from a dx.op.traceRay call.
-Value *DXILContLgcRtOpConverterPass::handleTraceRayOp(CallInst &CI) {
+Value *DXILContLgcRtOpConverterPassImpl::handleTraceRayOp(CallInst &CI) {
   assert(CI.arg_size() == static_cast<unsigned>(TraceRayArgIndex::Count) && "Invalid argument size!");
 
-  Builder->SetInsertPoint(&CI);
+  Builder.SetInsertPoint(&CI);
 
   Value *AccelStructHandle = CI.getArgOperand(TraceRayArgIndex::AccelStruct);
   Value *RayFlags = CI.getArgOperand(TraceRayArgIndex::RayFlags);
@@ -154,20 +191,20 @@ Value *DXILContLgcRtOpConverterPass::handleTraceRayOp(CallInst &CI) {
   Value *Payload = CI.getArgOperand(TraceRayArgIndex::Payload);
 
   Function *AccelStructGetter = getAccelStructAddr(*CI.getModule(), AccelStructHandle->getType());
-  Value *AccelStructAddr = Builder->CreateCall(AccelStructGetter, AccelStructHandle);
+  Value *AccelStructAddr = Builder.CreateCall(AccelStructGetter, AccelStructHandle);
 
   // TODO: This only creates a Paq array with the size of the payload data for
   // now.
   Type *PaqTy = getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(TraceRayArgIndex::Payload));
   SmallVector<Constant *, 1> PaqArgs;
   if (PaqTy)
-    PaqArgs.push_back(ConstantInt::get(Builder->getInt32Ty(), DL->getTypeAllocSize(PaqTy).getKnownMinValue()));
+    PaqArgs.push_back(ConstantInt::get(Builder.getInt32Ty(), DL.getTypeAllocSize(PaqTy).getKnownMinValue()));
 
-  Constant *PaqArr = ConstantArray::get(ArrayType::get(Builder->getInt32Ty(), 1), PaqArgs);
+  Constant *PaqArr = ConstantArray::get(ArrayType::get(Builder.getInt32Ty(), 1), PaqArgs);
 
-  auto *Op = Builder->create<lgc::rt::TraceRayOp>(AccelStructAddr, RayFlags, InstanceInclusionMask,
-                                                  RayContributionToHitGroupIndex, MultiplierForGeometryContribution,
-                                                  MissShaderIndex, Origin, TMin, Dir, TMax, Payload, PaqArr);
+  auto *Op = Builder.create<lgc::rt::TraceRayOp>(AccelStructAddr, RayFlags, InstanceInclusionMask,
+                                                 RayContributionToHitGroupIndex, MultiplierForGeometryContribution,
+                                                 MissShaderIndex, Origin, TMin, Dir, TMax, Payload, PaqArr);
 
   addDXILPayloadTypeToCall(*CI.getCalledFunction(), *Op);
 
@@ -175,17 +212,17 @@ Value *DXILContLgcRtOpConverterPass::handleTraceRayOp(CallInst &CI) {
 }
 
 /// Create a lgc.rt.report.hit op from a dx.op.reportHit call.
-Value *DXILContLgcRtOpConverterPass::handleReportHitOp(CallInst &CI) {
+Value *DXILContLgcRtOpConverterPassImpl::handleReportHitOp(CallInst &CI) {
   assert(CI.arg_size() == static_cast<unsigned>(ReportHitArgIndex::Count) && "Invalid argument size!");
 
-  Builder->SetInsertPoint(&CI);
+  Builder.SetInsertPoint(&CI);
   Value *THit = CI.getArgOperand(ReportHitArgIndex::THit);
   Value *HitKind = CI.getArgOperand(ReportHitArgIndex::HitKind);
   Value *Attributes = CI.getArgOperand(ReportHitArgIndex::Attributes);
-  auto AttributeSizeBytes = DL->getTypeAllocSize(
+  auto AttributeSizeBytes = DL.getTypeAllocSize(
       getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(ReportHitArgIndex::Attributes)));
 
-  auto *Op = Builder->create<lgc::rt::ReportHitOp>(THit, HitKind, Attributes, AttributeSizeBytes);
+  auto *Op = Builder.create<lgc::rt::ReportHitOp>(THit, HitKind, Attributes, AttributeSizeBytes);
 
   addDXILPayloadTypeToCall(*CI.getCalledFunction(), *Op);
 
@@ -193,21 +230,44 @@ Value *DXILContLgcRtOpConverterPass::handleReportHitOp(CallInst &CI) {
 }
 
 /// Create a lgc.rt.call.callable.shader op from a dx.op.callShader call.
-Value *DXILContLgcRtOpConverterPass::handleCallShaderOp(CallInst &CI) {
+Value *DXILContLgcRtOpConverterPassImpl::handleCallShaderOp(CallInst &CI) {
   assert(CI.arg_size() == static_cast<unsigned>(CallShaderArgIndex::Count) && "Invalid argument size!");
 
-  Builder->SetInsertPoint(&CI);
+  Builder.SetInsertPoint(&CI);
   Value *ShaderIndex = CI.getArgOperand(CallShaderArgIndex::ShaderIndex);
   Value *Param = CI.getArgOperand(CallShaderArgIndex::Param);
 
-  auto ParamSizeBytes = DL->getTypeAllocSize(
+  auto ParamSizeBytes = DL.getTypeAllocSize(
       getFuncArgPtrElementType(CI.getCalledFunction(), static_cast<int>(CallShaderArgIndex::Param)));
 
-  auto *Op = Builder->create<lgc::rt::CallCallableShaderOp>(ShaderIndex, Param, ParamSizeBytes.getKnownMinValue());
+  auto *Op = Builder.create<lgc::rt::CallCallableShaderOp>(ShaderIndex, Param, ParamSizeBytes.getKnownMinValue());
 
   addDXILPayloadTypeToCall(*CI.getCalledFunction(), *Op);
 
   return Op;
+}
+
+/// Return Index of the array operand of the call instruction.
+Value *DXILContLgcRtOpConverterPassImpl::getArgIndexOfArrayOperand(CallInst &CI, unsigned MaxElements) {
+  constexpr int ArrayIndexArgPosition = 1;
+  assert(CI.getNumOperands() > ArrayIndexArgPosition && "Invalid number of operands!");
+
+  Value *Index = CI.getOperand(ArrayIndexArgPosition);
+  if (!Index) {
+    report_fatal_error("DXILContLgcRtOpConverterPassImpl::getArgIndexOfArrayOperand: Invalid operand index "
+                       "at position " +
+                       Twine(ArrayIndexArgPosition));
+  }
+
+  if (auto *Constant = dyn_cast<ConstantInt>(Index)) {
+    unsigned ElementIndex = Constant->getZExtValue();
+    if (ElementIndex >= MaxElements) {
+      report_fatal_error("DXILContLgcRtOpConverterPassImpl::getArgIndexOfArrayOperand: "
+                         "Operand at position " +
+                         Twine(ArrayIndexArgPosition) + " is out of bounds (max: " + Twine(MaxElements) + ")!");
+    }
+  }
+  return Index;
 }
 
 /// Helper to convert single-value operations from DXIL to vector return type
@@ -217,31 +277,32 @@ Value *DXILContLgcRtOpConverterPass::handleCallShaderOp(CallInst &CI) {
 /// sequence:
 /// %val = call lgc.rt.op(...)
 /// %extract.index = extractelement %val, arrayIndex
-template <typename Op, unsigned MaxElements> Value *DXILContLgcRtOpConverterPass::handleVecResult(CallInst &CI) {
+template <typename Op, unsigned MaxElements> Value *DXILContLgcRtOpConverterPassImpl::handleVecResult(CallInst &CI) {
   static_assert(std::is_base_of<llvm::CallInst, Op>());
 
-  constexpr int ArrayIndexArgPosition = 1;
-  assert(CI.getNumOperands() > ArrayIndexArgPosition && "Invalid number of operands!");
+  Value *Index = getArgIndexOfArrayOperand(CI, MaxElements);
+  Builder.SetInsertPoint(&CI);
+  Value *DialectOp = Builder.create<Op>();
+  return Builder.CreateExtractElement(DialectOp, Index, DialectOp->getName() + "extract");
+}
 
-  Value *Index = CI.getOperand(ArrayIndexArgPosition);
-  if (!Index) {
-    report_fatal_error("DXILContLgcRtOpConverterPass::handleVecResult: Invalid operand index "
-                       "at position " +
-                       Twine(ArrayIndexArgPosition));
-  }
+/// Helper to convert single-value operations from DXIL to vector return type
+/// operations from the lgc.rt dialect:
+/// %val = call dx.op(..., arrayIndex)
+/// will be converted to the following
+/// sequence:
+/// %val = call lgc.rt.op(HitObject)
+/// %extract.index = extractelement %val, arrayIndex
+template <typename Op, unsigned MaxElements>
+Value *DXILContLgcRtOpConverterPassImpl::handleVecResultHitObj(CallInst &CI) {
+  static_assert(std::is_base_of<llvm::CallInst, Op>());
 
-  if (auto *Constant = dyn_cast<ConstantInt>(Index)) {
-    unsigned ElementIndex = Constant->getZExtValue();
-    if (ElementIndex >= MaxElements) {
-      report_fatal_error("DXILContLgcRtOpConverterPass::handleVecResult: "
-                         "Operand at position " +
-                         Twine(ArrayIndexArgPosition) + " is out of bounds (max: " + Twine(MaxElements) + ")!");
-    }
-  }
-
-  Builder->SetInsertPoint(&CI);
-  Value *DialectOp = Builder->create<Op>();
-  return Builder->CreateExtractElement(DialectOp, Index, DialectOp->getName() + "extract");
+  Value *Index = getArgIndexOfArrayOperand(CI, MaxElements);
+  Builder.SetInsertPoint(&CI);
+  Type *allocaPtrTy = CI.getDataLayout().getAllocaPtrType(Builder.getContext());
+  auto *globalHitObjectOp = Builder.create<lgc::rt::GlobalHitObjectOp>(allocaPtrTy);
+  Value *DialectOp = Builder.create<Op>(globalHitObjectOp);
+  return Builder.CreateExtractElement(DialectOp, Index, DialectOp->getName() + "extract");
 }
 
 /// Helper to convert single-value matrix operations from DXIL to matrix return
@@ -257,7 +318,7 @@ template <typename Op, unsigned MaxElements> Value *DXILContLgcRtOpConverterPass
 /// %col.gep.load = load <3 x type>, %col.gep
 /// %row.index = extractelement type %row.gep.load, col
 template <typename Op, unsigned MaxRows, unsigned MaxColumns>
-Value *DXILContLgcRtOpConverterPass::handleMatrixResult(CallInst &CI) {
+Value *DXILContLgcRtOpConverterPassImpl::handleMatrixResult(CallInst &CI) {
   static_assert(std::is_base_of<llvm::CallInst, Op>());
 
   constexpr unsigned RowArgumentIndex = 1;
@@ -268,7 +329,7 @@ Value *DXILContLgcRtOpConverterPass::handleMatrixResult(CallInst &CI) {
   auto TryExtractIndexOperand = [&](unsigned ArgumentIndex, unsigned UpperBound) -> Value * {
     Value *Index = CI.getOperand(ArgumentIndex);
     if (!Index) {
-      report_fatal_error("DXILContLgcRtOpConverterPass::handleMatrixResult: "
+      report_fatal_error("DXILContLgcRtOpConverterPassImpl::handleMatrixResult: "
                          "Invalid operand index "
                          "at position " +
                          Twine(ArgumentIndex));
@@ -277,7 +338,7 @@ Value *DXILContLgcRtOpConverterPass::handleMatrixResult(CallInst &CI) {
     if (auto *Constant = dyn_cast<ConstantInt>(Index)) {
       unsigned ConstantIndex = Constant->getZExtValue();
       if (ConstantIndex >= UpperBound) {
-        report_fatal_error("DXILContLgcRtOpConverterPass::handleMatrixResult: "
+        report_fatal_error("DXILContLgcRtOpConverterPassImpl::handleMatrixResult: "
                            "Operand with value " +
                            Twine(ConstantIndex) + " is out of bounds (upper bound: " + Twine(UpperBound) +
                            ", xMax, yMax = (" + Twine(MaxColumns) + ", " + Twine(MaxRows) + "))!");
@@ -290,36 +351,38 @@ Value *DXILContLgcRtOpConverterPass::handleMatrixResult(CallInst &CI) {
   auto *Row = TryExtractIndexOperand(RowArgumentIndex, MaxRows);
   auto *Column = TryExtractIndexOperand(ColumnArgumentIndex, MaxColumns);
 
-  Builder->SetInsertPoint(&CI);
-  auto *DialectOp = Builder->create<Op>();
+  Builder.SetInsertPoint(&CI);
+  Type *allocaPtrTy = CI.getDataLayout().getAllocaPtrType(Builder.getContext());
+  auto *globalHitObjectOp = Builder.create<lgc::rt::GlobalHitObjectOp>(allocaPtrTy);
+  auto *DialectOp = Builder.create<Op>(globalHitObjectOp);
   AllocaInst *Alloca = nullptr;
 
   {
-    IRBuilder<>::InsertPointGuard Guard(*Builder);
-    Builder->SetInsertPoint(&*CI.getFunction()->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
-    Alloca = Builder->CreateAlloca(DialectOp->getType());
+    IRBuilder<>::InsertPointGuard Guard(Builder);
+    Builder.SetInsertPoint(&*CI.getFunction()->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+    Alloca = Builder.CreateAlloca(DialectOp->getType());
   }
 
-  Builder->CreateStore(DialectOp, Alloca);
+  Builder.CreateStore(DialectOp, Alloca);
 
-  Value *InnerVecGEP = Builder->CreateGEP(DialectOp->getType(), Alloca, {Builder->getInt32(0), Column}, "col.gep");
-  Value *InnerVecLoad = Builder->CreateLoad(DialectOp->getType()->getArrayElementType(), InnerVecGEP, "col.gep.load");
-  return Builder->CreateExtractElement(InnerVecLoad, Row, InnerVecLoad->getName() + ".row");
+  Value *InnerVecGEP = Builder.CreateGEP(DialectOp->getType(), Alloca, {Builder.getInt32(0), Column}, "col.gep");
+  Value *InnerVecLoad = Builder.CreateLoad(DialectOp->getType()->getArrayElementType(), InnerVecGEP, "col.gep.load");
+  return Builder.CreateExtractElement(InnerVecLoad, Row, InnerVecLoad->getName() + ".row");
 }
 
 /// Helper to create a vec3 from three elements.
-Value *DXILContLgcRtOpConverterPass::createVec3(Value *X, Value *Y, Value *Z) {
-  assert(X->getType() == Y->getType() && "DXILContLgcRtOpConverterPass::createVec3: Invalid types for X and Y!");
-  assert(X->getType() == Z->getType() && "DXILContLgcRtOpConverterPass::createVec3: Invalid types for X and Z!");
+Value *DXILContLgcRtOpConverterPassImpl::createVec3(Value *X, Value *Y, Value *Z) {
+  assert(X->getType() == Y->getType() && "DXILContLgcRtOpConverterPassImpl::createVec3: Invalid types for X and Y!");
+  assert(X->getType() == Z->getType() && "DXILContLgcRtOpConverterPassImpl::createVec3: Invalid types for X and Z!");
 
-  auto *Vec = Builder->CreateInsertElement(FixedVectorType::get(X->getType(), 3), X, static_cast<uint64_t>(0));
-  Vec = Builder->CreateInsertElement(Vec, Y, 1);
-  return Builder->CreateInsertElement(Vec, Z, 2);
+  auto *Vec = Builder.CreateInsertElement(FixedVectorType::get(X->getType(), 3), X, static_cast<uint64_t>(0));
+  Vec = Builder.CreateInsertElement(Vec, Y, 1);
+  return Builder.CreateInsertElement(Vec, Z, 2);
 }
 
 /// Helper to add the type of the DXIL payload to the lgc.rt callsite if it does
 /// not exist.
-void DXILContLgcRtOpConverterPass::addDXILPayloadTypeToCall(Function &DXILFunc, CallInst &CI) {
+void DXILContLgcRtOpConverterPassImpl::addDXILPayloadTypeToCall(Function &DXILFunc, CallInst &CI) {
   // This should not happen theoretically.
   if (DXILFunc.arg_empty()) {
     report_fatal_error("DXILContLgcRtOpConverter::addDXILPayloadTypeToCall: DXIL "
@@ -334,7 +397,7 @@ void DXILContLgcRtOpConverterPass::addDXILPayloadTypeToCall(Function &DXILFunc, 
   ContHelper::setPayloadTypeMetadata(&CI, PayloadPtrTy);
 }
 
-bool DXILContLgcRtOpConverterPass::convertDxOp(Function &Func) {
+bool DXILContLgcRtOpConverterPassImpl::convertDxOp(Function &Func) {
   auto FuncName = Func.getName();
   constexpr const char CalleePrefix[] = "dx.op.";
   if (!FuncName.starts_with(CalleePrefix))
@@ -358,7 +421,7 @@ bool DXILContLgcRtOpConverterPass::convertDxOp(Function &Func) {
         Value *NewOp = (*Callback)(*CI, this);
 
         if (!NewOp)
-          report_fatal_error("DXILContLgcRtOpConverterPass::visitFunction: unexpected "
+          report_fatal_error("DXILContLgcRtOpConverterPassImpl::visitFunction: unexpected "
                              "nullptr when trying to replace instruction!");
 
         if (CI->hasName())
@@ -375,17 +438,17 @@ bool DXILContLgcRtOpConverterPass::convertDxOp(Function &Func) {
   return Changed;
 }
 
-void DXILContLgcRtOpConverterPass::setupLocalRootIndex(Function *F) {
-  Builder->SetInsertPointPastAllocas(F);
-  auto *LocalIndex = Builder->create<lgc::rt::ShaderIndexOp>();
-  Builder->create<lgc::ilcps::SetLocalRootIndexOp>(LocalIndex);
+void DXILContLgcRtOpConverterPassImpl::setupLocalRootIndex(Function *F) {
+  Builder.SetInsertPointPastAllocas(F);
+  auto *LocalIndex = Builder.create<lgc::rt::ShaderIndexOp>();
+  Builder.create<lgc::ilcps::SetLocalRootIndexOp>(LocalIndex);
 }
 
 // Do preparation transformations to entry-point shaders.
-bool DXILContLgcRtOpConverterPass::prepareEntryPointShaders() {
+bool DXILContLgcRtOpConverterPassImpl::prepareEntryPointShaders() {
   bool Changed = false;
   MapVector<Function *, DXILShaderKind> ShaderKinds;
-  analyzeShaderKinds(*M, ShaderKinds);
+  analyzeShaderKinds(M, ShaderKinds);
 
   for (auto &[Func, Kind] : ShaderKinds) {
     auto Stage = ShaderStageHelper::dxilShaderKindToRtShaderStage(Kind);
@@ -418,18 +481,16 @@ bool DXILContLgcRtOpConverterPass::prepareEntryPointShaders() {
   return Changed;
 }
 
-PreservedAnalyses DXILContLgcRtOpConverterPass::run(Module &Module, ModuleAnalysisManager &AnalysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass dxil-cont-lgc-rt-op-converter\n");
-  AnalysisManager.getResult<DialectContextAnalysis>(Module);
+DXILContLgcRtOpConverterPassImpl::DXILContLgcRtOpConverterPassImpl(Module &Module)
+    : Builder{Module.getContext()}, M{Module}, DL{M.getDataLayout()} {
+}
 
+PreservedAnalyses DXILContLgcRtOpConverterPassImpl::run() {
   bool Changed = false;
-  Builder = std::make_unique<llvm_dialects::Builder>(Module.getContext());
-  M = &Module;
-  DL = &M->getDataLayout();
 
   Changed |= prepareEntryPointShaders();
 
-  for (Function &F : Module.functions()) {
+  for (Function &F : M.functions()) {
     if (!F.isDeclaration())
       continue;
 
@@ -438,4 +499,17 @@ PreservedAnalyses DXILContLgcRtOpConverterPass::run(Module &Module, ModuleAnalys
 
   return Changed ? PreservedAnalyses::all() : PreservedAnalyses::none();
 }
+
+} // namespace
+
+namespace llvm {
+
+PreservedAnalyses DXILContLgcRtOpConverterPass::run(Module &Module, ModuleAnalysisManager &AnalysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the pass dxil-cont-lgc-rt-op-converter\n");
+  AnalysisManager.getResult<DialectContextAnalysis>(Module);
+
+  DXILContLgcRtOpConverterPassImpl Impl(Module);
+  return Impl.run();
+}
+
 } // namespace llvm

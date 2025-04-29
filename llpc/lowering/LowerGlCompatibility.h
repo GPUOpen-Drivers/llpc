@@ -41,7 +41,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering ray query post inline.
-class LowerGlCompatibility : public SpirvLower, public llvm::PassInfoMixin<LowerGlCompatibility> {
+class LowerGlCompatibility : public Lowering, public llvm::PassInfoMixin<LowerGlCompatibility> {
 public:
   LowerGlCompatibility();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);

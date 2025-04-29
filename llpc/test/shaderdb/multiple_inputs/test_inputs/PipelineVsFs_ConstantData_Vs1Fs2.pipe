@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Test that constant data in the vertex shader is handled correctly.
 ; BEGIN_SHADERTEST
@@ -49,7 +49,6 @@
 ; SHADERTEST-NEXT: 00000000002C: 3F800000
 ; END_SHADERTEST
 
-
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -o %t_01.elf %gfxip %s
 ; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx1010 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP0 %s
@@ -72,7 +71,6 @@
 ; SHADERTEST2_PP0-NEXT: 000000000028: 3F800000
 ; SHADERTEST2_PP0-NEXT: 00000000002C: 3F800000
 ; END_SHADERTEST
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -o %t_01.elf %gfxip %s

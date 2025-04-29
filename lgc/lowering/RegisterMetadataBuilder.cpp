@@ -210,12 +210,8 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
     else
       lsVgprCompCnt = 1; // Must enable relative vertex ID (LS VGPR2 and VGPR3)
   } else {
-#if LLPC_BUILD_GFX12
     if (m_hasVs && vsBuiltInUsage.instanceIndex)
-      lsVgprCompCnt = 1; // Enable instance ID (LS VGPR3）
-#else
-    llvm_unreachable("Not implemented!");
-#endif
+      lsVgprCompCnt = 1; // Enable instance ID (LS VGPR3)
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::LsVgprCompCnt] = lsVgprCompCnt;
 
@@ -223,8 +219,7 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   unsigned ldsSizeInDwords = hwConfig.tessOnChipLdsSize;
   ldsSizeInDwords += hwConfig.rayQueryLdsStackSize;
 
-  auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Hs);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
+  setLdsSizeByteSize(Util::Abi::HardwareStage::Hs, ldsSizeInDwords * 4);
 
   if (m_gfxIp.major == 10 && !m_hasGs && !m_isNggMode) {
     auto vgtGsOnChipCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOnchipCntl].getMap(true);
@@ -376,9 +371,7 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = hwConfig.gsOnChipLdsSize;
   ldsSizeInDwords += hwConfig.rayQueryLdsStackSize;
-
-  auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
+  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
 }
 
 // =====================================================================================================================
@@ -419,7 +412,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
         gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
     }
   } else {
-#if LLPC_BUILD_GFX12
     if (m_hasGs) {
       if (hwConfig.inputVertices > 3 && geometryMode.inputPrimitive != InputPrimitives::Patch)
         gsVgprCompCnt = 2; // Enable primitive connectivity data for adjacency (GS VGPR2)
@@ -431,9 +423,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       if (!hasTs && vsBuiltInUsage.primitiveId)
         gsVgprCompCnt = 1; // Enable primitive ID (GS VGPR1)
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::GsVgprCompCnt] = gsVgprCompCnt;
 
@@ -450,7 +439,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
         esVgprCompCnt = 3; // Enable instance ID (ES VGPR8)
     }
   } else {
-#if LLPC_BUILD_GFX12
     if (hasTs) {
       if (tesBuiltInUsage.primitiveId)
         esVgprCompCnt = 3; // Enable patch ID (ES VGPR6)
@@ -460,9 +448,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       if (vsBuiltInUsage.instanceIndex)
         esVgprCompCnt = 1; // Enable instance ID (ES VGPR4)
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::EsVgprCompCnt] = esVgprCompCnt;
 
@@ -650,12 +635,8 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     if (!nggControl->passthroughMode) {
       // If the NGG culling data buffer is not already specified by a hardware stage's user_data_reg_map, then this
       // field specified the register offset that is expected to point to the low 32-bits of address to the buffer.
-#if LLPC_BUILD_GFX12
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::NggCullingDataReg] =
           m_gfxIp.major >= 12 ? mmSPI_SHADER_PGM_LO_GS_GFX12 : mmSPI_SHADER_PGM_LO_GS;
-#else
-      getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::NggCullingDataReg] = mmSPI_SHADER_PGM_LO_GS;
-#endif
     }
   }
 
@@ -691,9 +672,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = hwConfig.gsOnChipLdsSize;
   ldsSizeInDwords += hwConfig.rayQueryLdsStackSize;
-
-  auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
+  setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
 }
 
 // =====================================================================================================================
@@ -814,13 +793,12 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
   // PA_SC_MODE_CNTL_1
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsIterSample] =
-      m_pipelineState->getShaderResourceUsage(shaderStage)->builtInUsage.fs.runAtSampleRate > 0;
+      builtInUsage.fragCoordIsSample > 0 || builtInUsage.runAtSampleRate > 0;
 
   bool allowRez = shaderOptions.allowReZ;
-#if LLPC_BUILD_GFX12
   if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx12.waNoReZSupport)
     allowRez = false;
-#endif
+
   // DB_SHADER_CONTROL
   ZOrder zOrder = LATE_Z;
   bool execOnHeirFail = false;
@@ -893,6 +871,24 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   const auto &fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
   const auto *interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
+  bool replaceTexCoordEnabled = false;
+  std::map<unsigned, unsigned> locationMap;
+
+  // Define a loction map to store original location and new location
+  for (auto iter : resUsage->inOutUsage.inputLocInfoMap)
+    locationMap[iter.first.getLocation()] = iter.second.getLocation();
+
+  // Define a lambda to check if the texture coordinate should be replaced
+  auto replaceTexCoordByPointCoord = [&](unsigned location) -> bool {
+    for (unsigned k = 0; k < m_pipelineState->getOptions().numTexPointSprite; k++) {
+      unsigned texCoordLocation = static_cast<unsigned>(m_pipelineState->getOptions().texPointSpriteLocs[k]);
+      auto iter = locationMap.find(texCoordLocation);
+      if (iter != locationMap.end() && iter->second == location)
+        return true;
+    }
+    return false;
+  };
+
   unsigned numPrimInterp = 0;
   for (unsigned i = 0; i < interpInfo->size(); ++i) {
     auto spiPsInputCntElem = spiPsInputCnt[i].getMap(true);
@@ -930,8 +926,12 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       spiPsInputCntlInfo.attr1Valid = interpInfoElem.attr1Valid;
     }
 
+    bool replaceTexCoord = replaceTexCoordByPointCoord(interpInfoElem.loc);
+    replaceTexCoordEnabled |= replaceTexCoord;
+
     if (pointCoordLoc == i) {
-      spiPsInputCntlInfo.ptSpriteTex = true;
+      if (!m_pipelineState->getOptions().disablePointCoord)
+        spiPsInputCntlInfo.ptSpriteTex = true;
 
       // NOTE: Set the offset value to force hardware to select input defaults (no VS match).
       spiPsInputCntlInfo.offset = UseDefaultVal;
@@ -940,6 +940,11 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     if (primCoordLoc == i) {
       spiPsInputCntlInfo.offset = UseDefaultVal;
     }
+
+    if (replaceTexCoord) {
+      spiPsInputCntlInfo.ptSpriteTex = true;
+    }
+
     // NOTE: Set SPI_PS_INPUT_CNTL_* here, but the register can still be changed later,
     // when it becomes known that gl_ViewportIndex is not used and fields OFFSET and FLAT_SHADE
     // can be amended.
@@ -976,7 +981,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   }
 
   // SPI_INTERP_CONTROL_0
-  if (pointCoordLoc != InvalidValue) {
+  if (pointCoordLoc != InvalidValue && !m_pipelineState->getOptions().disablePointCoord || replaceTexCoordEnabled) {
     auto spiInterpControl0 =
         getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiInterpControl].getMap(true);
     spiInterpControl0[Util::Abi::SpiInterpControlMetadataKey::PointSpriteEna] = true;
@@ -1152,10 +1157,8 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     const auto &shaderOptions = m_pipelineState->getShaderOptions(apiStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::DebugMode] = shaderOptions.debugMode;
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::TrapPresent] = shaderOptions.trapPresent;
-#if LLPC_BUILD_GFX12
     if (m_gfxIp.major >= 12)
       hwShaderNode[Util::Abi::HardwareStageMetadataKey::WorkgroupRoundRobin] = shaderOptions.workgroupRoundRobin;
-#endif
   }
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::UserSgprs] = userDataCount;
 
@@ -1269,6 +1272,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       usePointSize = builtInUsage.pointSize;
       useLayer = builtInUsage.layer;
       useViewportIndex = builtInUsage.viewportIndex;
+      useShadingRate = builtInUsage.primitiveShadingRate;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
 
@@ -1638,14 +1642,6 @@ void RegisterMetadataBuilder::setVgtTfParam() {
   vgtTfParam[Util::Abi::VgtTfParamMetadataKey::Partitioning] = partition;
   vgtTfParam[Util::Abi::VgtTfParamMetadataKey::Topology] = topology;
   vgtTfParam[Util::Abi::VgtTfParamMetadataKey::DistributionMode] = TRAPEZOIDS;
-}
-
-// =====================================================================================================================
-// Calculate the LDS size in bytes.
-//
-// @param onChipLdsSize : The value of onChip LDS size
-unsigned RegisterMetadataBuilder::calcLdsSize(unsigned ldsSizeInDwords) {
-  return (ldsSizeInDwords * 4);
 }
 
 } // namespace lgc

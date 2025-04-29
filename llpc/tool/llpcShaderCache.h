@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -114,7 +114,6 @@ struct ShaderCacheSerializedHeader {
 
 typedef void *CacheEntryHandle;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 66
 /// Defines callback function used to lookup shader cache info in an external cache
 typedef Result (*ShaderCacheGetValue)(const void *pClientData, uint64_t hash, void *pValue, size_t *pValueLen);
 
@@ -175,7 +174,6 @@ protected:
   /// @internal Destructor. Prevent use of delete operator on this interface.
   virtual ~IShaderCache() = default;
 };
-#endif
 
 // =====================================================================================================================
 // This class implements a cache for compiled shaders. The shader cache persists in memory at runtime and can be

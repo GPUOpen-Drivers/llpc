@@ -65,6 +65,12 @@ struct RtIpVersion {
   bool operator!=(const RtIpVersion &rhs) const { return !(*this == rhs); }
   bool operator>=(const RtIpVersion &rhs) const { return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor); }
   bool operator<(const RtIpVersion &rhs) const { return std::tie(major, minor) < std::tie(rhs.major, rhs.minor); }
+
+  // Compare only Major version, minor is assumed to be zero
+  bool operator==(unsigned rhsMajor) const { return std::tie(major, minor) == std::tuple(rhsMajor, 0); }
+  bool operator>=(unsigned rhsMajor) const { return std::tie(major, minor) >= std::tuple(rhsMajor, 0); }
+  bool operator<(unsigned rhsMajor) const { return std::tie(major, minor) < std::tuple(rhsMajor, 0); }
+
   bool isRtIp(unsigned rhsMajor, unsigned rhsMinor) const {
     return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
   }

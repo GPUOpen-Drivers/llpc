@@ -260,18 +260,14 @@ public:
 
   SectionShaderOption() : Section(getAddrTable(), SectionTypeUnset, "options"), m_clientHash{} {
     memset(&m_state, 0, sizeof(m_state));
-#if LLPC_BUILD_GFX12
     m_cachePolicyLlc = &m_memory;
-#endif
   }
 
   void getSubState(SubState &state) {
     m_state.clientHash.lower = m_clientHash.i64Vec2[0];
     m_state.clientHash.upper = m_clientHash.i64Vec2[1];
-#if LLPC_BUILD_GFX12
     m_state.cachePolicyLlc.resourceCount = m_cachePolicyLlc->size();
     m_state.cachePolicyLlc.noAllocs = m_cachePolicyLlc->data();
-#endif
     state = m_state;
   };
   SubState &getSubStateRef() { return m_state; }
@@ -321,25 +317,22 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, nsaThreshold, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, aggressiveInvariantLoads, MemberTypeEnum, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundStorageImageFormats, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundInitializeOutputsToZero, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFMA, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableReadFirstLaneWorkaround, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, backwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, constantBufferBindingOffset, MemberTypeInt, false);
-#if LLPC_BUILD_GFX12
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workgroupRoundRobin, MemberTypeBool, false);
-#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, imageSampleDrefReturnsRgba, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableGlPositionOpt, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, viewIndexFromDeviceIndex, MemberTypeBool, false);
-#if LLPC_BUILD_GFX12
       INIT_MEMBER_NAME_TO_ADDR(SectionShaderOption, m_cachePolicyLlc, MemberTypeUArray, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, temporalHintShaderControl, MemberTypeInt, false);
-#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceUnderflowPrevention, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forceMemoryBarrierScope, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, scheduleStrategy, MemberTypeEnum, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, promoteAllocaRegLimit, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, promoteAllocaRegRatio, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -347,10 +340,8 @@ private:
 
   SubState m_state;
   IUFValue m_clientHash;
-#if LLPC_BUILD_GFX12
   std::vector<uint32_t> *m_cachePolicyLlc;
   std::vector<uint32_t> m_memory;
-#endif
 };
 
 // =====================================================================================================================
@@ -546,6 +537,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enablePointSmooth, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableRemapLocation, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableDepthCompareParam, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGlState, enableDepthCompareFailValue, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -585,6 +577,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, scalarBlockLayout, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, includeIr, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, robustBufferAccess, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableRobustUnboundVertex, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableRelocatableShaderElf, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableImageResourceCheck, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableScratchAccessBoundsChecks, MemberTypeBool, false);
@@ -609,17 +602,12 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableInterpModePatch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, pageMigrationEnabled, MemberTypeBool, false);
-#if LLPC_BUILD_GFX12
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, expertSchedulingMode, MemberTypeBool, false);
-#endif
-
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_glState, MemberTypeGlState, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
-#if LLPC_BUILD_GFX12
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, cacheScopePolicyControl, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, temporalHintControl, MemberTypeInt, false);
-#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizePointSizeWrite, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, padBufferSizeToNextDword, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_compileTimeConstants, MemberTypeCompileConstInfo, true);
@@ -757,6 +745,8 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, enableDynamicLaunch, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderDataToken, MemberTypeBool,
                                      false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, emitRaytracingShaderHashToken, MemberTypeBool,
+                                     false);
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingShaderExportConfig, m_indirectCalleeSavedRegs,
                                MemberTypeIndirectCalleeSavedRegs, true);
       return addrTableInitializer;
@@ -849,6 +839,15 @@ public:
         state.gpurtShaderLibrary.pCode = &m_gpurtShaderLibraryBinary[0];
       }
     }
+
+    m_state.gpurtOptionCount = static_cast<unsigned>(m_gpurtOptions.size());
+    m_vkgcGpurtOptions.resize(m_state.gpurtOptionCount);
+    for (unsigned i = 0; i < m_state.gpurtOptionCount; ++i)
+      m_gpurtOptions[i].getSubState(m_vkgcGpurtOptions[i]);
+    m_state.pGpurtOptions = (m_state.gpurtOptionCount) > 0 ? m_vkgcGpurtOptions.data() : nullptr;
+
+    state.gpurtOptionCount = m_state.gpurtOptionCount;
+    state.pGpurtOptions = m_state.pGpurtOptions;
   }
 
   SubState &getSubStateRef() { return m_state; }
@@ -893,6 +892,7 @@ private:
       INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_rtIpVersion, MemberTypeString, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, gpurtOverride, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, rtIpOverride, MemberTypeBool, false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRtState, m_gpurtOptions, MemberTypeGpurtOption, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -906,6 +906,9 @@ private:
   std::string m_rtIpVersion;
   unsigned m_bvhResDescSize = 0;
   std::vector<unsigned> m_bvhResDesc;
+
+  std::vector<SectionGpurtOption> m_gpurtOptions;
+  std::vector<Vkgc::GpurtOption> m_vkgcGpurtOptions;
 };
 
 // =====================================================================================================================
@@ -1025,7 +1028,10 @@ public:
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableColorClampFs, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableFlatShade, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, enableMapClipDistMask, MemberTypeBool, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, disablePointCoord, MemberTypeBool, false);
       INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, alphaTestFunc, MemberTypeInt, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, numTexPointSprite, MemberTypeInt, false);
+      INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(SectionGraphicsState, glState, texPointSpriteLocs, MemberTypeInt, false);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, m_colorBuffer, MemberTypeColorBufferItem,
                                      Vkgc::MaxColorTargets, true);
 
@@ -1113,16 +1119,6 @@ public:
 
     state = m_state;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-    std::string dummySource;
-    if (!m_shaderLibrary.empty()) {
-      bool ret = readFile(docFilename, m_shaderLibrary, true, &m_shaderLibraryBytes, &dummySource, errorMsg);
-      if (ret) {
-        state.shaderLibrary.codeSize = m_shaderLibraryBytes.size();
-        state.shaderLibrary.pCode = &m_shaderLibraryBytes[0];
-      }
-    }
-#endif
     m_rtState.getSubState(docFilename, state.rtState, errorMsg);
   };
   SubState &getSubStateRef() { return m_state; };
@@ -1182,16 +1178,6 @@ public:
     m_options.getSubState(m_state.options);
     state = m_state;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-    std::string dummySource;
-    if (!m_shaderLibrary.empty()) {
-      bool ret = readFile(docFilename, m_shaderLibrary, true, &m_shaderLibraryBytes, &dummySource, errorMsg);
-      if (ret) {
-        state.shaderLibrary.codeSize = m_shaderLibraryBytes.size();
-        state.shaderLibrary.pCode = &m_shaderLibraryBytes[0];
-      }
-    }
-#endif
     m_rtState.getSubState(docFilename, state.rtState, errorMsg);
 
     m_uniformConstantMap.getSubState(m_uniformMap);
@@ -1237,9 +1223,6 @@ public:
 
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_groups, MemberTypeShaderGroup, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, libraryMode, MemberTypeInt, false);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-      INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_shaderTraceRay, MemberTypeString, false);
-#endif
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_options, MemberTypePipelineOption, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, maxRecursionDepth, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, indirectStageMask, MemberTypeInt, false);
@@ -1254,11 +1237,8 @@ public:
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_clientMetadata, MemberTypeU8Array, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, cpsFlags, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, rtIgnoreDeclaredPayloadSize, MemberTypeBool, false);
-#if LLPC_BUILD_GFX12
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, disableDynamicVgpr, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, dynamicVgprBlockSize, MemberTypeInt, false);
-#endif
-      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_gpurtOptions, MemberTypeGpurtOption, true);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -1272,27 +1252,11 @@ public:
       m_groups[i].getSubState(m_vkShaderGroups[i]);
 
     m_state.pShaderGroups = (m_state.shaderGroupCount) > 0 ? &m_vkShaderGroups[0] : nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-    std::string dummySource;
-    if (!m_shaderTraceRay.empty()) {
-      bool ret = readFile(docFilename, m_shaderTraceRay, true, &m_traceRayBinary, &dummySource, errorMsg);
-      if (ret) {
-        m_state.shaderTraceRay.codeSize = m_traceRayBinary.size();
-        m_state.shaderTraceRay.pCode = &m_traceRayBinary[0];
-      }
-    }
-#endif
     m_rtState.getSubState(docFilename, m_state.rtState, errorMsg);
     if (m_clientMetadataBufMem.size() > 0) {
       m_state.clientMetadataSize = m_clientMetadataBufMem.size();
       m_state.pClientMetadata = m_clientMetadataBufMem.data();
     }
-
-    m_state.gpurtOptionCount = static_cast<unsigned>(m_gpurtOptions.size());
-    m_vkgcGpurtOptions.resize(m_state.gpurtOptionCount);
-    for (unsigned i = 0; i < m_state.gpurtOptionCount; ++i)
-      m_gpurtOptions[i].getSubState(m_vkgcGpurtOptions[i]);
-    m_state.pGpurtOptions = (m_state.gpurtOptionCount) > 0 ? m_vkgcGpurtOptions.data() : nullptr;
 
     state = m_state;
   };
@@ -1302,16 +1266,11 @@ private:
   SubState m_state;
   SectionPipelineOption m_options;
   SectionRtState m_rtState;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  std::string m_shaderTraceRay;
-#endif
   std::vector<SectionShaderGroup> m_groups;
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_vkShaderGroups;
   std::vector<uint8_t> m_traceRayBinary;
   std::vector<uint8_t> *m_clientMetadata;
   std::vector<uint8_t> m_clientMetadataBufMem;
-  std::vector<SectionGpurtOption> m_gpurtOptions;
-  std::vector<Vkgc::GpurtOption> m_vkgcGpurtOptions;
 };
 
 } // namespace Vfx

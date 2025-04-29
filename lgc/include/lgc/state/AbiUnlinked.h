@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -37,6 +37,19 @@
 #include "lgc/state/PipelineState.h"
 
 namespace lgc {
+
+// Range of values for a user data PAL metadata register to be resolved at pipeline create time in PAL.
+// Values of N in the pipeline link scheme in Graphics Partial Pipeline scheme. The user data SGPR that specifies
+// UserDataMapping::PipelineLinkStart+N is initialized by PAL to the (low 32 bits of the) address of symbol
+// _amdgpu_pipelineLinkN in any ELF piece of the pipeline. For odd N, the symbol is optional; if it is not present,
+// the register is initialized to 0. For even N, the symbol is not optional; if it is not present, PAL pipeline
+// creation fails with an error.
+//
+// This enum defines the small non-negative integers used in this scheme. The values and semantics are private
+// to LGC, as LGC generates both the defining piece and the using piece.
+enum class PipelineLinkKind : unsigned {
+  VertexFetchTable, // The uber fetch vertex table, defined in the vertex layout piece and used in the pre-rast piece.
+};
 
 // =====================================================================================================================
 // Fetchless entry-point names. If the linker finds one of these names, it glues a fetch shader on to the front

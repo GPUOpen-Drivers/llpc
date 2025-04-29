@@ -49,7 +49,6 @@ set(LLVMRaytracingLibFiles
   lib/DXILContPostProcess.cpp
   lib/GpurtContext.cpp
   lib/GpurtDialect.cpp
-  lib/ContinuationsStatsReport.cpp
   lib/LgcCpsDialect.cpp
   lib/LgcCpsJumpInliner.cpp
   lib/LgcIlCpsDialect.cpp
@@ -63,7 +62,8 @@ set(LLVMRaytracingLibFiles
   lib/PayloadAccessQualifiers.cpp
   lib/RematSupport.cpp
   lib/RemoveTypesMetadata.cpp
-  lib/SpecializeDriverShaders.cpp)
+  lib/SpecializeDriverShaders.cpp
+  lib/StatisticsReporter.cpp)
 
 add_llvm_library(LLVMRaytracing
   ${LLVMRaytracingLibFiles}

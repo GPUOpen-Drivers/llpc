@@ -150,7 +150,11 @@ Module *ColorExportShader::generate() {
   }
   for (ReturnInst *inst : llvm::reverse(retInsts)) {
     builder.SetInsertPoint(inst);
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+    builder.CreateIntrinsic(Intrinsic::amdgcn_endpgm, {});
+#else
     builder.CreateIntrinsic(Intrinsic::amdgcn_endpgm, {}, {});
+#endif
     builder.CreateUnreachable();
     inst->eraseFromParent();
   }
@@ -175,7 +179,12 @@ Function *ColorExportShader::createColorExportFunc() {
   // Create the module
   Module *module = new Module("colorExportShader", getContext());
   TargetMachine *targetMachine = m_lgcContext->getTargetMachine();
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 529559
   module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
+#else
+  module->setTargetTriple(targetMachine->getTargetTriple());
+#endif
   module->setDataLayout(targetMachine->createDataLayout());
 
   // Get the function type. Its inputs are the outputs from the unlinked pixel shader or similar.

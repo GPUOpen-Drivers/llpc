@@ -40,7 +40,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to generate copy shader if required
-class GenerateCopyShader : public Patch, public llvm::PassInfoMixin<GenerateCopyShader> {
+class GenerateCopyShader : public LgcLowering, public llvm::PassInfoMixin<GenerateCopyShader> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

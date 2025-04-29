@@ -57,7 +57,7 @@ PreservedAnalyses GenerateNullFragmentShader::run(Module &module, ModuleAnalysis
 
   LLVM_DEBUG(dbgs() << "Run the pass Generate-Null-Fragment-Shader\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   // Do not add a null fragment shader if not generating a whole pipeline.
   if (!pipelineState->isWholePipeline())

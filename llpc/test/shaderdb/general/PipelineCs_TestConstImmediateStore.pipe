@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,8 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -1352,8 +1351,6 @@ OpFunctionEnd
 OpReturnValue %34
 OpFunctionEnd
 
-
-
 [CsInfo]
 entryPoint = main
 userDataNode[0].type = DescriptorTableVaPtr
@@ -1429,7 +1426,6 @@ userDataNode[0].next[13].offsetInDwords = 72
 userDataNode[0].next[13].sizeInDwords = 4
 userDataNode[0].next[13].set = 0
 userDataNode[0].next[13].binding = 8
-
 
 [ComputePipelineState]
 deviceIndex = 0

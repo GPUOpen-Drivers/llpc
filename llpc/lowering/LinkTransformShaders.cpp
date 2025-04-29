@@ -54,7 +54,7 @@ static const char GetTransformVertexAttribute[] = "GetTransformVertexAttributeAm
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses LinkTransformShaders::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   LLVM_DEBUG(dbgs() << "Run the pass Lower-transform-shader\n");
   processTransformCsFunctions(module);
   return PreservedAnalyses::none();

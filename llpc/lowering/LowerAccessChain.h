@@ -38,7 +38,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering operations for access chain.
-class LowerAccessChain : public SpirvLower,
+class LowerAccessChain : public Lowering,
                          public llvm::InstVisitor<LowerAccessChain>,
                          public llvm::PassInfoMixin<LowerAccessChain> {
 public:

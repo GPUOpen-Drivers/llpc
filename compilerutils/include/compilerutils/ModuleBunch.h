@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -60,6 +60,9 @@ public:
   }
   size_t size() const { return end() - begin(); }
   bool empty() const { return size() == 0; }
+
+  // Clear the list of modules. This does not need renormalize() after it.
+  void clear() { Modules.clear(); }
 
   // Access the array of Modules in the ModuleBunch, directly accessing the unique_ptrs
   // for erasing/removing/replacing them.

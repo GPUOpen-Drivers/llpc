@@ -510,8 +510,6 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR, "WorkgroupMemoryExplicitLayout8BitAccessKHR");
   add(CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR, "WorkgroupMemoryExplicitLayout16BitAccessKHR");
   add(CapabilityCooperativeMatrixKHR, "CooperativeMatrixKHR");
-#if LLPC_BUILD_GFX12
-#endif
   add(CapabilityComputeDerivativeGroupLinearNV, "ComputeDerivativeGroupLinearNV");
   add(CapabilityComputeDerivativeGroupQuadsNV, "ComputeDerivativeGroupQuadsNV");
   add(CapabilityComputeDerivativeGroupLinearKHR, "ComputeDerivativeGroupLinearKHR");
@@ -524,6 +522,8 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityFragmentShaderShadingRateInterlockEXT, "FragmentShaderShadingRateInterlockEXT");
   add(CapabilityFragmentShaderPixelInterlockEXT, "FragmentShaderPixelInterlockEXT");
   add(CapabilityReplicatedCompositesEXT, "ReplicatedCompositesEXT");
+  add(CapabilityOptNoneEXT, "OptNoneEXT");
+  add(CapabilityArithmeticFenceEXT, "ArithmeticFenceEXT");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 

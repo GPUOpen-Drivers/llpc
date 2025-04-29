@@ -91,7 +91,7 @@ DIFile *SPIRVToLLVMDbgTran::getDIFile(const string &FileName) {
 
 SPIRVExtInst *SPIRVToLLVMDbgTran::getDbgInst(const SPIRVId Id) {
   SPIRVEntry *E = BM->getEntry(Id);
-  if (isa<OpExtInst>(E)) {
+  if (isa<OpExtInst>(E) || isa<OpExtInstWithForwardRefsKHR>(E)) {
     SPIRVExtInst *EI = static_cast<SPIRVExtInst *>(E);
     if (EI->getExtSetKind() == SPIRV::SPIRVEIS_Debug ||
         EI->getExtSetKind() == SPIRV::SPIRVEIS_NonSemanticShaderDebugInfo100)

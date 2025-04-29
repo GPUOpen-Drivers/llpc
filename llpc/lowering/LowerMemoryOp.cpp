@@ -52,7 +52,7 @@ namespace Llpc {
 PreservedAnalyses LowerMemoryOp::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Memory-Op\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   visit(m_module);
 

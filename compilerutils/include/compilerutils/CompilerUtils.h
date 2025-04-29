@@ -86,6 +86,49 @@ void setIsLastUseLoad(llvm::LoadInst &Load);
 // Handle early returns, ensure the function has only one return instruction
 llvm::ReturnInst *unifyReturns(llvm::Function &function, llvm::IRBuilder<> &builder, const llvm::Twine &blockName = "");
 
+// Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
+//
+// Get a metadata node containing an array of i32 values, which can be read from any type.
+// The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
+// returns nullptr.
+//
+// @param context : LLVM context
+// @param value : Value to write as array of i32
+// @param atLeastOneValue : True to generate node with one value even if all values are zero
+template <typename T>
+static llvm::MDNode *getArrayOfInt32MetaNode(llvm::LLVMContext &context, const T &value, bool atLeastOneValue) {
+  llvm::IRBuilder<> builder(context);
+  static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
+  llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned *>(&value), sizeof(value) / sizeof(unsigned));
+
+  while (!values.empty() && values.back() == 0) {
+    if (values.size() == 1 && atLeastOneValue)
+      break;
+    values = values.slice(0, values.size() - 1);
+  }
+  if (values.empty())
+    return nullptr;
+
+  llvm::SmallVector<llvm::Metadata *, 8> operands;
+  for (unsigned value : values)
+    operands.push_back(llvm::ConstantAsMetadata::get(builder.getInt32(value)));
+  return llvm::MDNode::get(context, operands);
+}
+
+// Read an array of i32 values out of a metadata node, writing into any type.
+// Returns the number of i32s read.
+//
+// @param metaNode : Metadata node to read from
+// @param [out] value : Value to write into (caller must zero initialize)
+template <typename T> static unsigned readArrayOfInt32MetaNode(const llvm::MDNode *metaNode, T &value) {
+  static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
+  llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned *>(&value), sizeof(value) / sizeof(unsigned));
+  unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
+  for (unsigned index = 0; index < count; ++index)
+    values[index] = llvm::mdconst::extract<llvm::ConstantInt>(metaNode->getOperand(index))->getZExtValue();
+  return count;
+}
+
 struct CrossModuleInlinerResult {
   llvm::Value *returnValue;
   llvm::iterator_range<llvm::Function::iterator> newBBs;
@@ -135,6 +178,10 @@ public:
   // target module.
   llvm::GlobalValue *findCopiedGlobal(llvm::GlobalValue &sourceGv, llvm::Module &targetModule);
 
+  // Register the type remapping for values when we want to inline other module functions.
+  // Return true if register successfully, otherwise return false.
+  bool registerTypeRemapping(llvm::Type *sourceType, llvm::Type *targetType);
+
   // Default implementation that finds global values using getCrossModuleName.
   static llvm::GlobalValue &defaultGetGlobalInModuleFunc(CrossModuleInliner &inliner, llvm::GlobalValue &sourceGv,
                                                          llvm::Module &targetModule);
@@ -166,6 +213,16 @@ llvm::Value *simplifyingCreateConstGEP1_32(llvm::IRBuilder<> &builder, llvm::Typ
 // Create an inbounds GEP if idx is non-null, otherwise return the pointer.
 llvm::Value *simplifyingCreateConstInBoundsGEP1_32(llvm::IRBuilder<> &builder, llvm::Type *ty, llvm::Value *ptr,
                                                    uint32_t idx);
+
+// =====================================================================================================================
+// Split the input into pieces of i32.
+//
+// @param layout : Data layout
+// @param builder : IR builder
+// @param input : A collection of inputs (structures, arrays, vectors, pointers, or basic primitive types)
+// @param [out] output : A collection of outputs by flattening the inputs to scalar values
+void splitIntoI32(const llvm::DataLayout &layout, llvm::IRBuilder<> &builder, llvm::ArrayRef<llvm::Value *> input,
+                  llvm::SmallVector<llvm::Value *> &output);
 
 namespace bb {
 std::string getLabel(const llvm::Function *func);

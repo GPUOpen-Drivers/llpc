@@ -221,6 +221,10 @@ cl::opt<unsigned>
 cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
                                  cl::init(false));
 
+cl::opt<bool> EnableRobustUnboundVertex("enable-robust-unbound-vertex",
+                                        cl::desc("Replace reads of unbound vertex attribute with (0,0,0,0)"),
+                                        cl::init(false));
+
 cl::opt<bool> ScalarBlockLayout("scalar-block-layout", cl::desc("Allow scalar block layout of types"),
                                 cl::init(false));
 
@@ -339,11 +343,7 @@ LlpcRaytracingModeSetting("llpc-raytracing-mode", cl::init(LlpcRaytracingMode::L
                           cl::desc("Override the LLPC raytracing mode"),
                           cl::values(
                             clEnumValN(LlpcRaytracingMode::Legacy, "legacy", "Legacy mode"),
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
-                            clEnumValN(LlpcRaytracingMode::Gpurt2, "continufy", "Legacy RT pipeline with continufy"),
-#else
                             clEnumValN(LlpcRaytracingMode::Continufy, "continufy", "Legacy RT pipeline with continufy"),
-#endif
                             clEnumValN(LlpcRaytracingMode::Continuations, "continuations", "Continuations mode")));
 
 // -enable-color-export-shader
@@ -556,6 +556,8 @@ static void initCompileInfo(CompileInfo *compileInfo) {
     compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
   if (RobustBufferAccess.getNumOccurrences())
     compileInfo->robustBufferAccess = RobustBufferAccess;
+  if (EnableRobustUnboundVertex.getNumOccurrences())
+    compileInfo->enableRobustUnboundVertex = EnableRobustUnboundVertex;
   if (ScalarBlockLayout.getNumOccurrences())
     compileInfo->scalarBlockLayout = ScalarBlockLayout;
   if (EnableScratchAccessBoundsChecks.getNumOccurrences())

@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,8 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
-
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
@@ -43,7 +42,6 @@ void main()
 {
     gl_Position = i_position;
 }
-
 
 [VsInfo]
 entryPoint = main
@@ -75,7 +73,6 @@ userDataNode[1].offsetInDwords = 1
 userDataNode[1].sizeInDwords = 1
 userDataNode[1].indirectUserDataCount = 4
 
-
 [FsGlsl]
 #version 450
 
@@ -90,8 +87,6 @@ void main()
 {
     o_color = texture(sampler2D(t0, s1), vec2(0.0));
 }
-
-
 
 [FsInfo]
 entryPoint = main
@@ -119,7 +114,6 @@ userDataNode[0].next[3].sizeInDwords = 8
 userDataNode[0].next[3].set = 0
 userDataNode[0].next[3].binding = 1
 
-
 [GraphicsPipelineState]
 topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
 patchControlPoints = 0
@@ -138,7 +132,6 @@ dualSourceBlendEnable = 0
 colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

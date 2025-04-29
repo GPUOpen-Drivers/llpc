@@ -63,7 +63,6 @@ private:
   Value *ensure64BitAddr(Value *Packed32BitAddr);
   void lowerJumpOp(lgc::cps::JumpOp &JumpOp);
   void lowerAsContinuationReferenceOp(lgc::cps::AsContinuationReferenceOp &AsCrOp, Function *GetContinuationAddrAndMD);
-  bool cleanupIncomingPayloadMetadata(Function &F);
 
   Module *Mod;
   llvm_dialects::Builder Builder;
@@ -90,7 +89,6 @@ Value *DXILContPostProcessPassImpl::ensure64BitAddr(Value *Src) {
   Value *Addr64 = Builder.CreateZExt(Src, I64);
   Addr64 = Builder.CreateAnd(Addr64, 0xFFFFFFC0);
 
-#if LLPC_BUILD_GFX12
   // Extract the dVGPR requirements and priority, encode it in the target VPC
   // vgprCount = (((vpc32 >> 3) & 0x7) + 1) * 16
   // vpc64 |= vgprCount << 32
@@ -104,7 +102,6 @@ Value *DXILContPostProcessPassImpl::ensure64BitAddr(Value *Src) {
   VgprCount = Builder.CreateZExt(VgprCount, I64);
   VgprCount = Builder.CreateShl(VgprCount, 32);
   Addr64 = Builder.CreateOr(Addr64, VgprCount);
-#endif
 
   Value *Priority = Builder.CreateAnd(Src, Builder.getInt32(0x7));
   // firstMetadataBit = 32
@@ -121,20 +118,17 @@ void DXILContPostProcessPassImpl::lowerJumpOp(lgc::cps::JumpOp &JumpOp) {
 
   CallInst *ContinueOp = nullptr;
 
-  SmallVector<Value *> TailArgs{JumpOp.getTail()};
-
   Value *JumpTarget = JumpOp.getTarget();
   if (!ContHelper::tryGetDeferVpcUnpacking(*Mod))
     JumpTarget = ensure64BitAddr(JumpTarget);
 
-  Value *ShaderIndex = JumpOp.getShaderIndex();
-  Value *RetAddr = JumpOp.getRcr();
+  // Omit jump target and levels.
+  SmallVector<Value *> TailArgs{llvm::drop_begin(JumpOp.args(), 2)};
   if (ContHelper::isWaitAwaitCall(JumpOp)) {
-    ContinueOp = Builder.create<lgc::ilcps::WaitContinueOp>(JumpTarget, Builder.getInt64(-1), JumpOp.getCsp(),
-                                                            ShaderIndex, RetAddr, TailArgs);
+    ContinueOp = Builder.create<lgc::ilcps::WaitContinueOp>(JumpTarget, Builder.getInt64(-1), TailArgs);
     ContHelper::removeWaitMask(JumpOp);
   } else {
-    ContinueOp = Builder.create<lgc::ilcps::ContinueOp>(JumpTarget, JumpOp.getCsp(), ShaderIndex, RetAddr, TailArgs);
+    ContinueOp = Builder.create<lgc::ilcps::ContinueOp>(JumpTarget, TailArgs);
   }
 
   ContinueOp->copyMetadata(JumpOp);
@@ -203,7 +197,6 @@ PreservedAnalyses DXILContPostProcessPassImpl::run(ModuleAnalysisManager &Analys
     if (Stage == lgc::rt::RayTracingShaderStage::Traversal)
       continue;
 
-    ContHelper::IncomingRegisterCount::reset(&F);
     ContHelper::ContinuationStateByteCount::reset(&F);
   }
 

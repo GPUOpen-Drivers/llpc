@@ -37,7 +37,7 @@
 namespace Llpc {
 // =====================================================================================================================
 // Represents the pass of FE lowering advanced blend shader
-class LowerAdvancedBlend : public SpirvLower, public llvm::PassInfoMixin<LowerAdvancedBlend> {
+class LowerAdvancedBlend : public Lowering, public llvm::PassInfoMixin<LowerAdvancedBlend> {
 
 public:
   LowerAdvancedBlend(unsigned binding, bool enableRov);

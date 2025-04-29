@@ -454,6 +454,13 @@ GlobalValue *compilerutils::CrossModuleInliner::findCopiedGlobal(GlobalValue &so
   return nullptr;
 }
 
+bool CrossModuleInliner::registerTypeRemapping(llvm::Type *sourceType, llvm::Type *targetType) {
+  if (sourceType == targetType)
+    return false;
+  auto [iter, success] = impl->typeRemapper.mappedTypes.try_emplace(sourceType, targetType);
+  return success;
+}
+
 llvm::GlobalValue &CrossModuleInliner::defaultGetGlobalInModuleFunc(CrossModuleInliner &inliner,
                                                                     llvm::GlobalValue &sourceGv,
                                                                     llvm::Module &targetModule) {
@@ -695,6 +702,53 @@ Value *compilerutils::simplifyingCreateConstInBoundsGEP1_32(IRBuilder<> &builder
   if (idx == 0)
     return ptr;
   return builder.CreateConstInBoundsGEP1_32(ty, ptr, idx);
+}
+
+void compilerutils::splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
+                                 SmallVector<Value *> &output) {
+  for (auto *x : input) {
+    Type *xType = x->getType();
+    if (isa<StructType>(xType)) {
+      StructType *structTy = cast<StructType>(xType);
+      for (unsigned idx = 0; idx < structTy->getNumElements(); idx++)
+        splitIntoI32(layout, builder, builder.CreateExtractValue(x, idx), output);
+    } else if (auto *arrayTy = dyn_cast<ArrayType>(xType)) {
+      auto *elemTy = arrayTy->getElementType();
+      assert(layout.getTypeSizeInBits(elemTy) == 32 && "array of non-32bit type not supported");
+      for (unsigned idx = 0; idx < arrayTy->getNumElements(); idx++) {
+        auto *elem = builder.CreateExtractValue(x, idx);
+        if (!elemTy->isIntegerTy())
+          elem = builder.CreateBitCast(elem, builder.getInt32Ty());
+        output.push_back(elem);
+      }
+    } else if (auto *vecTy = dyn_cast<FixedVectorType>(xType)) {
+      Type *scalarTy = vecTy->getElementType();
+      assert((scalarTy->getPrimitiveSizeInBits() & 0x3) == 0);
+      unsigned scalarBytes = scalarTy->getPrimitiveSizeInBits() / 8;
+      if (scalarBytes < 4) {
+        // Use shufflevector for types like <i8 x 6>?
+        llvm_unreachable("vector of type smaller than dword not supported yet.");
+      } else {
+        for (unsigned idx = 0; idx < (unsigned)vecTy->getNumElements(); idx++)
+          splitIntoI32(layout, builder, builder.CreateExtractElement(x, idx), output);
+      }
+    } else {
+      // pointer or primitive types
+      assert(xType->isPointerTy() || xType->isIntegerTy() || xType->isFloatTy());
+      unsigned size = layout.getTypeSizeInBits(xType).getFixedValue();
+      if (xType->isPointerTy())
+        x = builder.CreatePtrToInt(x, builder.getIntNTy(size));
+
+      if (size > 32) {
+        assert(size % 32 == 0);
+        Value *vecDword = builder.CreateBitCast(x, FixedVectorType::get(builder.getInt32Ty(), size / 32));
+        splitIntoI32(layout, builder, vecDword, output);
+      } else {
+        x = builder.CreateZExtOrBitCast(x, builder.getInt32Ty());
+        output.push_back(x);
+      }
+    }
+  }
 }
 
 std::string compilerutils::bb::getLabel(const Function *func) {

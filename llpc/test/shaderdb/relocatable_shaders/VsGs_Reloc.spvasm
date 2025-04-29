@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Check that we can compile Vertex and Geometry stages together, without having to provide a .pipe file.
 
@@ -56,7 +56,6 @@
 ; SHADERTEST_MT-LABEL: <_amdgpu_gs_main>:
 ; SHADERTEST_MT-LABEL: <_amdgpu_vs_main>:
 ; END_SHADERTEST_MT
-
 
 ; SPIR-V
 ; Version: 1.5

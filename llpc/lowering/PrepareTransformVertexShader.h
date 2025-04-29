@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -39,25 +39,35 @@ class ReturnInst;
 } // namespace llvm
 
 namespace Llpc {
-class PrepareTransformVertexShader : public SpirvLower, public llvm::PassInfoMixin<PrepareTransformVertexShader> {
+class PrepareTransformVertexShader : public Lowering, public llvm::PassInfoMixin<PrepareTransformVertexShader> {
 public:
   PrepareTransformVertexShader() {}
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
 private:
-  enum TransformVertexVariable : unsigned {
+  enum VertexOutputBuiltIn : unsigned {
     Position = 0,
     ClipDistance0 = 1,
     ClipDistance1 = 2,
     FrontColor = 3,
     TexCoord = 4,
-    Count = 5,
+    OutputCount = 5
   };
 
-  void collectVsOutputSymbols(llvm::Module &module);
+  enum VertexInputBuiltIn : unsigned {
+    VertexIndex = 0,
+    InstanceIndex = 1,
+    DrawID = 2,
+    BaseVertex = 3,
+    BaseInstance = 4,
+    InputCount = 5,
+  };
+
+  void collectVtxBuiltInSymbols(llvm::Module &module);
   void genFunTransformVertex(llvm::Function &function);
   llvm::Value *loadClipDistanceComponent(unsigned index, unsigned component);
-  llvm::User *m_outputBuiltIns[Count] = {nullptr};
+  llvm::User *m_outputBuiltIns[OutputCount] = {nullptr};
+  llvm::User *m_inputBuiltIns[InputCount] = {nullptr};
   llvm::ReturnInst *m_unifiedReturn = nullptr;
 };
 } // namespace Llpc

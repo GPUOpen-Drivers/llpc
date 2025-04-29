@@ -92,7 +92,7 @@ static void setFpMathAttribute(Function &func, bool fp32, FpDenormMode denormMod
 //
 // @param [in/out] module : LLVM module to be run on
 void LowerMath::init(Module &module) {
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   m_changed = false;
 
   if (m_shaderStage == ShaderStageInvalid)
@@ -267,7 +267,7 @@ Function *LowerMathConstFolding::getEntryPoint() {
 bool LowerMathPrecision::adjustExports(Module &module, bool disablePositionOpt) {
   bool changed = false;
   for (auto &func : module.functions()) {
-    // Disable fast math for gl_Position.
+    // Disable fast math for gl_Position and gl_FragDepth.
     // TODO: This requires knowledge of the Builder implementation, which is not ideal.
     // We need to find a neater way to do it.
     auto funcName = func.getName();
@@ -291,7 +291,7 @@ bool LowerMathPrecision::adjustExports(Module &module, bool disablePositionOpt) 
         valueWritten = callInst->getOperand(0);
       }
 
-      if (valueWritten && builtIn == lgc::BuiltInPosition) {
+      if (valueWritten && (builtIn == lgc::BuiltInPosition || builtIn == lgc::BuiltInFragDepth)) {
         disableFastMath(valueWritten, disablePositionOpt);
         changed = true;
       }
@@ -386,7 +386,7 @@ bool LowerMathPrecision::propagateNoContract(Module &module, bool forward, bool 
 PreservedAnalyses LowerMathPrecision::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Math-Precision\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   if (m_shaderStage == ShaderStageInvalid)
     return PreservedAnalyses::all();
 

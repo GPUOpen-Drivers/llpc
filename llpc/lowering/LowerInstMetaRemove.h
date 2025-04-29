@@ -37,7 +37,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering operations for removing the instruction metadata.
-class LowerInstMetaRemove : public SpirvLower, public llvm::PassInfoMixin<LowerInstMetaRemove> {
+class LowerInstMetaRemove : public Lowering, public llvm::PassInfoMixin<LowerInstMetaRemove> {
 public:
   LowerInstMetaRemove();
 

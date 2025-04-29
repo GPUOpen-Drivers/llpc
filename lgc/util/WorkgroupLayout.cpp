@@ -87,11 +87,8 @@ SwizzleWorkgroupLayout lgc::calculateWorkgroupLayout(PipelineState *pipelineStat
     resultLayout.microLayout = WorkgroupLayout::Linear;
   }
 
-  if (pipelineState->getOptions().forceCsThreadIdSwizzling
-#if LLPC_BUILD_GFX12
-      || (pipelineState->getOptions().xInterleave == 3 && pipelineState->getOptions().yInterleave == 3)
-#endif
-  ) {
+  if (pipelineState->getOptions().forceCsThreadIdSwizzling ||
+      (pipelineState->getOptions().xInterleave == 3 && pipelineState->getOptions().yInterleave == 3)) {
     if ((workgroupSizeX >= 16) && (workgroupSizeX % 8 == 0) && (workgroupSizeY % 4 == 0)) {
       resultLayout.macroLayout = WorkgroupLayout::SexagintiQuads;
     }

@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Test that GS outputs get extended from 16-bit to 32-bit during in/out packing.
 ; Test that unused GS outputs are removed without corresponding item in the mapping table
@@ -117,7 +117,6 @@ void main()
 [GsInfo]
 entryPoint = main
 
-
 [FsGlsl]
 #version 450
 #extension GL_AMD_gpu_shader_int16 : require
@@ -127,7 +126,6 @@ layout(location = 2) flat in u16vec4 inp2;
 layout(location = 4) in vec2 inp4;
 layout(location = 0) out vec4 outp0;
 layout(location = 1) out u16vec4 outp1;
-
 
 vec4 _91(vec4 _101)
 {
@@ -143,7 +141,6 @@ void main()
 [FsInfo]
 entryPoint = main
 
-
 [ResourceMapping]
 userDataNode[0].visibility = 8
 userDataNode[0].type = StreamOutTableVaPtr
@@ -154,7 +151,6 @@ userDataNode[1].type = IndirectUserDataVaPtr
 userDataNode[1].offsetInDwords = 1
 userDataNode[1].sizeInDwords = 1
 userDataNode[1].indirectUserDataCount = 8
-
 
 [GraphicsPipelineState]
 topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
@@ -167,7 +163,6 @@ colorBuffer[1].format = VK_FORMAT_R16G16B16A16_UINT
 colorBuffer[1].channelWriteMask = 15
 colorBuffer[1].blendEnable = 0
 colorBuffer[1].blendSrcAlphaToColor = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

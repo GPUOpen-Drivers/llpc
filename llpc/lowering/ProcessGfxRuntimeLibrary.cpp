@@ -53,7 +53,7 @@ ProcessGfxRuntimeLibrary::ProcessGfxRuntimeLibrary() {
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses ProcessGfxRuntimeLibrary::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-gfxruntime-library\n");
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     processLibraryFunction(func);

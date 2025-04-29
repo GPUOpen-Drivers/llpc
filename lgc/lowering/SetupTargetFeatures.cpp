@@ -51,7 +51,7 @@ PreservedAnalyses SetUpTargetFeatures::run(Module &module, ModuleAnalysisManager
 
   LLVM_DEBUG(dbgs() << "Run the pass Set-up-Target-Features\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   m_pipelineState = pipelineState;
   setupTargetFeatures(&module);
@@ -155,8 +155,6 @@ void SetUpTargetFeatures::setupTargetFeatures(Module *module) {
     }
 
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-
-#if LLPC_BUILD_GFX12
     if (gfxIp.major >= 12) {
       if (m_pipelineState->getOptions().expertSchedulingMode)
         builder.addAttribute("amdgpu-expert-scheduling", "true");
@@ -174,7 +172,6 @@ void SetUpTargetFeatures::setupTargetFeatures(Module *module) {
           targetFeatures += ",+dynamic-vgpr-block-size-" + std::to_string(blockSize);
       }
     }
-#endif
 
     // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
     // pass know we are in which wavesize mode. Here, we read back it and append it to finalized target

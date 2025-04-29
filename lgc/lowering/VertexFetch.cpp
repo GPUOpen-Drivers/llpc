@@ -34,10 +34,12 @@
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/lowering/LgcLowering.h"
 #include "lgc/lowering/ShaderInputs.h"
+#include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
 #include "lgc/util/Internal.h"
 #include "llvm-dialects/Dialect/Visitor.h"
@@ -76,6 +78,7 @@ struct VertexCompFormatInfo {
   unsigned vertexByteSize; // Byte size of the vertex
   unsigned compByteSize;   // Byte size of each individual component
   unsigned compCount;      // Component count
+  bool isBgra;             // Whether components reversed
   BufDataFmt fetchDfmt;    // Equivalent data format of each fetch intrinsic
 };
 
@@ -93,7 +96,11 @@ struct VertexNumFormatInfo {
 // Vertex fetch manager
 class VertexFetchImpl : public VertexFetch {
 public:
-  VertexFetchImpl(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors, bool vbAddressLowBitsKnown);
+  // Make uber fetch table.
+  static GlobalVariable *makeUberFetchTable(LgcContext &lgcContext, ArrayRef<VertexInputDescription> inputs);
+
+  VertexFetchImpl(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors, bool vbAddressLowBitsKnown,
+                  bool enableRobustUnboundVertex);
   VertexFetchImpl(const VertexFetchImpl &) = delete;
   VertexFetchImpl &operator=(const VertexFetchImpl &) = delete;
 
@@ -120,7 +127,7 @@ private:
 
   static const VertexNumFormatInfo *getVertexNumericFormatInfo(unsigned nfmt);
 
-  unsigned mapVertexFormat(unsigned dfmt, unsigned nfmt) const;
+  static unsigned mapVertexFormat(const GfxIpVersion &gfxIp, unsigned dfmt, unsigned nfmt);
 
   Value *loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl);
 
@@ -154,15 +161,12 @@ private:
 
   bool m_useSoftwareVertexBufferDescriptors = false; // Use software vertex buffer descriptors to structure SRD.
   bool m_vbAddressLowBitsKnown = false;              // Use vertex buffer offset low bits from driver.
+  bool m_enableRobustUnboundVertex = false;          // Use robust unbound vertex from driver.
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const VertexNumFormatInfo m_vertexNumFormatInfo[];   // Info table of vertex num format
   static const unsigned char m_vertexFormatMapGfx10[][9];     // Info table of vertex format mapping for GFX10
-#if LLPC_BUILD_GFX12
-  static const unsigned char m_vertexFormatMapGfx11[][9]; // Info table of vertex format mapping for GFX11~12
-#else
-  static const unsigned char m_vertexFormatMapGfx11[][9]; // Info table of vertex format mapping for GFX11
-#endif
+  static const unsigned char m_vertexFormatMapGfx11[][9];     // Info table of vertex format mapping for GFX11~12
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
@@ -198,42 +202,43 @@ const VertexNumFormatInfo VertexFetchImpl::m_vertexNumFormatInfo[] = {
   { _format, BUF_NUM_FORMAT_FLOAT, BUF_DATA_FORMAT_INVALID, 0, }
 
 // Initializes info table of vertex component format map
+// vertexByteSize, compByteSize, compCount, isBgra, fetchDfmt
 const VertexCompFormatInfo VertexFetchImpl::m_vertexCompFormatInfo[] = {
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BUF_DATA_FORMAT_INVALID
-    {1, 1, 1, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8
-    {2, 2, 1, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16
-    {2, 1, 2, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8_8
-    {4, 4, 1, BUF_DATA_FORMAT_32},         // BUF_DATA_FORMAT_32
-    {4, 2, 2, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16_16
-    {4, 0, 3, BUF_DATA_FORMAT_10_11_11},   // BUF_DATA_FORMAT_10_11_11 (Packed)
-    {4, 0, 3, BUF_DATA_FORMAT_11_11_10},   // BUF_DATA_FORMAT_11_11_10 (Packed)
-    {4, 0, 4, BUF_DATA_FORMAT_10_10_10_2}, // BUF_DATA_FORMAT_10_10_10_2 (Packed)
-    {4, 0, 4, BUF_DATA_FORMAT_2_10_10_10}, // BUF_DATA_FORMAT_2_10_10_10 (Packed)
-    {4, 1, 4, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8_8_8_8
-    {8, 4, 2, BUF_DATA_FORMAT_32},         // BUF_DATA_FORMAT_32_32
-    {8, 2, 4, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16_16_16_16
-    {12, 4, 3, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32
-    {16, 4, 4, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32_32
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormatReserved
-    {4, 1, 4, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8_8_Bgra
-    {3, 1, 3, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8
-    {3, 0, 3, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8_Bgr,
-    {4, 0, 4, BUF_DATA_FORMAT_2_10_10_10}, // BufDataFormat2_10_10_10_Bgra,
-    {8, 8, 1, BUF_DATA_FORMAT_32},         // BufDataFormat64,
-    {16, 8, 2, BUF_DATA_FORMAT_32},        // BufDataFormat64_64,
-    {24, 8, 3, BUF_DATA_FORMAT_32},        // BufDataFormat64_64_64,
-    {32, 8, 4, BUF_DATA_FORMAT_32},        // BufDataFormat64_64_64_64,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4_Bgra,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_Bgr,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1_Bgra,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat1_5_6_5,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_9_9_9,
-    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_A,
-    {6, 2, 3, BUF_DATA_FORMAT_16},         // BufDataFormat16_16_16
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BUF_DATA_FORMAT_INVALID
+    {1, 1, 1, 0, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8
+    {2, 2, 1, 0, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16
+    {2, 1, 2, 0, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8_8
+    {4, 4, 1, 0, BUF_DATA_FORMAT_32},         // BUF_DATA_FORMAT_32
+    {4, 2, 2, 0, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16_16
+    {4, 0, 3, 0, BUF_DATA_FORMAT_10_11_11},   // BUF_DATA_FORMAT_10_11_11 (Packed)
+    {4, 0, 3, 0, BUF_DATA_FORMAT_11_11_10},   // BUF_DATA_FORMAT_11_11_10 (Packed)
+    {4, 0, 4, 0, BUF_DATA_FORMAT_10_10_10_2}, // BUF_DATA_FORMAT_10_10_10_2 (Packed)
+    {4, 0, 4, 0, BUF_DATA_FORMAT_2_10_10_10}, // BUF_DATA_FORMAT_2_10_10_10 (Packed)
+    {4, 1, 4, 0, BUF_DATA_FORMAT_8},          // BUF_DATA_FORMAT_8_8_8_8
+    {8, 4, 2, 0, BUF_DATA_FORMAT_32},         // BUF_DATA_FORMAT_32_32
+    {8, 2, 4, 0, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16_16_16_16
+    {12, 4, 3, 0, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32
+    {16, 4, 4, 0, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32_32
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormatReserved
+    {4, 1, 4, 1, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8_8_Bgra
+    {3, 1, 3, 0, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8
+    {3, 0, 3, 1, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8_Bgr,
+    {4, 0, 4, 1, BUF_DATA_FORMAT_2_10_10_10}, // BufDataFormat2_10_10_10_Bgra,
+    {8, 8, 1, 0, BUF_DATA_FORMAT_32},         // BufDataFormat64,
+    {16, 8, 2, 0, BUF_DATA_FORMAT_32},        // BufDataFormat64_64,
+    {24, 8, 3, 0, BUF_DATA_FORMAT_32},        // BufDataFormat64_64_64,
+    {32, 8, 4, 0, BUF_DATA_FORMAT_32},        // BufDataFormat64_64_64_64,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4_Bgra,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_Bgr,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1_Bgra,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat1_5_6_5,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_9_9_9,
+    {0, 0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_A,
+    {6, 2, 3, 0, BUF_DATA_FORMAT_16},         // BufDataFormat16_16_16
 };
 
 // clang-format off
@@ -645,26 +650,51 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
 
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(
       pipelineState->getLgcContext(), pipelineState->getOptions().useSoftwareVertexBufferDescriptors,
-      pipelineState->getOptions().vbAddressLowBitsKnown));
+      pipelineState->getOptions().vbAddressLowBitsKnown, pipelineState->getOptions().enableRobustUnboundVertex));
   BuilderImpl builder(pipelineState);
 
-  if (pipelineState->getOptions().enableUberFetchShader) {
+  // Uber fetch shader mode is enabled for either of:
+  // 1. the enableUberFetchShader option is set, meaning that the front-end wants uber fetch shader support with
+  //    the table being loaded from a reserved descriptor (FetchShaderInternalBufferBinding); or
+  // 2. the enableUberFetchShader option is not set, but there are no vertex input descriptions from the
+  //    front-end, meaning that the table's address is in a pipeline link user data SGPR.
+  Value *uberFetchTable = nullptr;
+  switch (pipelineState->getOptions().enableUberFetchShader) {
+  default:
+    break;
+  case UberFetchMode::EnabledDesc: {
+    // Uber fetch mode; table is in reserved descriptor.
     // NOTE: The 10_10_10_2 formats are not supported by the uber fetch shader on gfx9 and older.
     // We rely on the driver to fallback to not using the uber fetch shader when those formats are used.
     builder.setShaderStage(ShaderStage::Vertex);
     builder.SetInsertPointPastAllocas(vertexFetches[0]->getFunction());
     auto desc = builder.CreateBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding, builder.getInt32(0),
                                          Builder::BufferFlagAddress, false);
+    uberFetchTable = builder.CreateIntToPtr(desc, builder.getPtrTy(ADDR_SPACE_CONST));
+    break;
+  }
+  case UberFetchMode::EnabledGpp: {
+    // Uber fetch mode; table is in pipeline link user data.
+    builder.setShaderStage(ShaderStage::Vertex);
+    Function *func = vertexFetches[0]->getFunction();
+    builder.SetInsertPointPastAllocas(func);
+    uberFetchTable =
+        ShaderInputs::getPipelineLinkUserData(PipelineLinkKind::VertexFetchTable, BuilderBase::get(builder));
+    uberFetchTable = AddressExtender(func).extendWithPc(
+        uberFetchTable, PointerType::get(func->getContext(), ADDR_SPACE_CONST), builder);
+    break;
+  }
+  }
 
-    auto descPtr = builder.CreateIntToPtr(desc, builder.getPtrTy(ADDR_SPACE_CONST));
-
+  if (uberFetchTable) {
+    uberFetchTable->setName("uberFetchTable");
     // 64 bit location masks.
-    Value *locationMasks = builder.CreateLoad(builder.getInt64Ty(), descPtr);
-    descPtr = builder.CreateGEP(builder.getInt64Ty(), descPtr, {builder.getInt32(1)});
+    Value *locationMasks = builder.CreateLoad(builder.getInt64Ty(), uberFetchTable);
+    uberFetchTable = builder.CreateGEP(builder.getInt64Ty(), uberFetchTable, {builder.getInt32(1)});
 
     for (LoadVertexInputOp *inst : vertexFetches) {
       builder.SetInsertPoint(inst);
-      Value *vertex = vertexFetch->fetchVertex(inst, descPtr, locationMasks, BuilderBase::get(builder),
+      Value *vertex = vertexFetch->fetchVertex(inst, uberFetchTable, locationMasks, BuilderBase::get(builder),
                                                pipelineState->getOptions().disablePerCompFetch);
       // Replace and erase this instruction.
       inst->replaceAllUsesWith(vertex);
@@ -696,8 +726,14 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
     const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
 
     if (!description) {
-      // If we could not find vertex input info matching this location, just return undefined value.
-      vertex = PoisonValue::get(fetch->getType());
+      // If we could not find vertex input info matching this location...
+      if (pipelineState->getOptions().enableRobustUnboundVertex) {
+        // ...return 0s when robustness is enabled.
+        vertex = Constant::getNullValue(fetch->getType());
+      } else {
+        // ...just return undefined value when robustness is disabled.
+        vertex = PoisonValue::get(fetch->getType());
+      }
     } else {
       // Fetch the vertex.
       builder.SetInsertPoint(fetch);
@@ -738,6 +774,131 @@ PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &a
   }
 
   return PreservedAnalyses::none();
+}
+
+// =====================================================================================================================
+// Make uber fetch table -- LgcContext method for use by front-end.
+//
+// @param inputs : Array of VertexInputDescription structs
+// @returns New GlobalVariable. Ownership passes to caller; typically caller inserts into a module
+GlobalVariable *LgcContext::makeUberFetchTable(ArrayRef<VertexInputDescription> inputs) {
+  return VertexFetchImpl::makeUberFetchTable(*this, inputs);
+}
+
+// =====================================================================================================================
+// Make uber fetch table.
+//
+// Format of uber fetch table:
+//
+// i64 locationMask (1 bit per location saying it is valid)
+// v4i32 entry per location, where each entry is UberFetchShaderAttribInfo
+//
+// @param lgcContext : LGC context (for getting GFXIP version)
+// @param inputs : Array of VertexInputDescription structs
+// @returns New GlobalVariable. Ownership passes to caller; typically caller inserts into a module
+GlobalVariable *VertexFetchImpl::makeUberFetchTable(LgcContext &lgcContext, ArrayRef<VertexInputDescription> inputs) {
+  uint64_t locationMask = 0;
+  SmallVector<UberFetchShaderAttribInfo> table;
+
+  for (const VertexInputDescription &desc : inputs) {
+    locationMask |= uint64_t(1) << desc.location;
+
+    const VertexCompFormatInfo *compFormatInfo = getVertexComponentFormatInfo(desc.dfmt);
+
+    UberFetchShaderAttribInfo info{};
+    info.binding = desc.binding;
+    if (desc.inputRate == VertexInputRateVertex || desc.inputRate == VertexInputRatePerDrawPerVertex ||
+        desc.inputRate == VertexInputRatePerDraw) {
+      info.perInstance = 0;
+    } else {
+      info.perInstance = 1;
+      info.instanceDivisor = desc.divisor;
+    }
+    info.componentSize = compFormatInfo->compByteSize;
+    info.componentMask = (1U << compFormatInfo->compCount) - 1;
+    info.isBgra = compFormatInfo->isBgra;
+    info.offset = desc.offset;
+
+    info.isPacked = 1;
+    if ((compFormatInfo->compByteSize == 2 && compFormatInfo->compCount == 3) || compFormatInfo->compByteSize == 8)
+      info.isPacked = 0;
+
+    // Disable packed fetch for any fewer-than-four-element input. The VS code might be setting up a four-element
+    // vector from it, and the uber fetch code does not handle that correctly as a packed load, in that the extra
+    // components are not set to their default values (0 for y and z; 1 for w).
+    if (compFormatInfo->compCount < 4)
+      info.isPacked = 0;
+
+    BufDataFormat dfmt = desc.dfmt;
+    if (!info.isPacked) {
+      // If unpacked, set dfmt to the component dfmt.
+      switch (compFormatInfo->compByteSize) {
+      case 1:
+        dfmt = BufDataFormat8;
+        break;
+      case 2:
+        dfmt = BufDataFormat16;
+        break;
+      case 4:
+        dfmt = BufDataFormat32;
+        break;
+      case 8:
+        dfmt = BufDataFormat64;
+        break;
+      default:
+        llvm_unreachable("");
+      }
+    }
+
+    GfxIpVersion gfxIp = lgcContext.getTargetInfo().getGfxIpVersion();
+    unsigned format = mapVertexFormat(gfxIp, dfmt, desc.nfmt);
+    SqBufRsrcWord3 rsrcWord3{};
+    // Populate dstSelX/Y/Z/W fields, four three bit fields at the bottom of rsrcWord3.
+    for (unsigned comp = 0; comp != compFormatInfo->compCount; ++comp) {
+      constexpr unsigned SQ_SEL_X = 4;
+      unsigned field = comp;
+      if (compFormatInfo->isBgra)
+        field = compFormatInfo->compCount - 1 - field;
+      field += SQ_SEL_X;
+      rsrcWord3.u32All |= field << comp * 3;
+    }
+
+    {
+      // info.bufferFormat is set to SqBufRsrcWord3, containing component selectors and format.
+      switch (gfxIp.major) {
+#if LLPC_BUILD_GFX12
+      case 12:
+        rsrcWord3.gfx12.format = format;
+        break;
+#endif
+      case 11:
+        rsrcWord3.gfx11.format = format;
+        break;
+      case 10:
+        rsrcWord3.gfx11.format = format;
+        break;
+      default:
+        llvm_unreachable("");
+      }
+      info.bufferFormat = rsrcWord3.u32All;
+    }
+
+    table.resize(std::max(table.size(), size_t(desc.location + 1)));
+    table[desc.location] = info;
+  }
+
+  // Construct the initializer for the global variable.
+  Constant *locMaskConst = ConstantInt::get(Type::getInt64Ty(lgcContext.getContext()), locationMask);
+  Constant *tableConst = ConstantDataArray::get(
+      lgcContext.getContext(), ArrayRef<uint32_t>(reinterpret_cast<const uint32_t *>(table.data()),
+                                                  table.size() * sizeof(UberFetchShaderAttribInfo) / sizeof(uint32_t)));
+  Constant *wholeConst = ConstantStruct::getAnon({locMaskConst, tableConst});
+
+  // Create the global variable with name "_amdgpu_pipelineLink0".
+  return new GlobalVariable(wholeConst->getType(), /*isConstant=*/true, GlobalValue::ExternalLinkage, wholeConst,
+                            Twine(Util::Abi::AmdGpuPipelineLinkPrefix) +
+                                Twine(unsigned(PipelineLinkKind::VertexFetchTable)),
+                            /*threadLocalMode=*/GlobalVariable::NotThreadLocal, ADDR_SPACE_CONST);
 }
 
 // =====================================================================================================================
@@ -1141,7 +1302,11 @@ Value *VertexFetchImpl::fetchVertex(LoadVertexInputOp *inst, Value *descPtr, Val
   {
     builder.SetInsertPoint(&*fetchEndBlock->getFirstInsertionPt());
     auto phiInst = builder.CreatePHI(inputTy, 2);
-    phiInst->addIncoming(PoisonValue::get(inputTy), fetchStartBlock);
+    if (m_enableRobustUnboundVertex) {
+      phiInst->addIncoming(Constant::getNullValue(inputTy), fetchStartBlock);
+    } else {
+      phiInst->addIncoming(PoisonValue::get(inputTy), fetchStartBlock);
+    }
     phiInst->addIncoming(vertex, fetchUberEndBlock);
     vertex = phiInst;
     vertex->setName("vertex");
@@ -1152,8 +1317,9 @@ Value *VertexFetchImpl::fetchVertex(LoadVertexInputOp *inst, Value *descPtr, Val
 // =====================================================================================================================
 // Create a VertexFetch
 VertexFetch *VertexFetch::create(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors,
-                                 bool vbAddressLowBitsKnown) {
-  return new VertexFetchImpl(lgcContext, useSoftwareVertexBufferDescriptors, vbAddressLowBitsKnown);
+                                 bool vbAddressLowBitsKnown, bool enableRobustUnboundVertex) {
+  return new VertexFetchImpl(lgcContext, useSoftwareVertexBufferDescriptors, vbAddressLowBitsKnown,
+                             enableRobustUnboundVertex);
 }
 
 // =====================================================================================================================
@@ -1161,10 +1327,10 @@ VertexFetch *VertexFetch::create(LgcContext *lgcContext, bool useSoftwareVertexB
 //
 // @param context : LLVM context
 VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors,
-                                 bool vbAddressLowBitsKnown)
+                                 bool vbAddressLowBitsKnown, bool enableRobustUnboundVertex)
     : m_lgcContext(lgcContext), m_context(&lgcContext->getContext()),
       m_useSoftwareVertexBufferDescriptors(useSoftwareVertexBufferDescriptors),
-      m_vbAddressLowBitsKnown(vbAddressLowBitsKnown) {
+      m_vbAddressLowBitsKnown(vbAddressLowBitsKnown), m_enableRobustUnboundVertex(enableRobustUnboundVertex) {
 
   // Initialize default fetch values
   auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
@@ -1524,14 +1690,14 @@ const VertexNumFormatInfo *VertexFetchImpl::getVertexNumericFormatInfo(unsigned 
 // =====================================================================================================================
 // Maps separate buffer data and numeric formats to the combined buffer format
 //
+// @param gfxIp : GFX version
 // @param dfmt : Data format
 // @param nfmt : Numeric format
-unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
+unsigned VertexFetchImpl::mapVertexFormat(const GfxIpVersion &gfxIp, unsigned dfmt, unsigned nfmt) {
   assert(dfmt < 16);
   assert(nfmt < 9);
   unsigned format = 0;
 
-  GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
   switch (gfxIp.major) {
   case 10:
     assert(dfmt < sizeof(m_vertexFormatMapGfx10) / sizeof(m_vertexFormatMapGfx10[0]));
@@ -1539,9 +1705,7 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
     format = m_vertexFormatMapGfx10[dfmt][nfmt];
     break;
   case 11:
-#if LLPC_BUILD_GFX12
   case 12:
-#endif
     assert(dfmt < sizeof(m_vertexFormatMapGfx11) / sizeof(m_vertexFormatMapGfx11[0]));
     assert(nfmt < sizeof(m_vertexFormatMapGfx11[0]) / sizeof(m_vertexFormatMapGfx11[0][0]));
     format = m_vertexFormatMapGfx11[dfmt][nfmt];
@@ -1839,10 +2003,11 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, Value *vbIndex, Value *s
   unsigned offsetIdx = args.size();
   args.push_back(instOffset);
   args.push_back(builderImpl.getInt32(0));
+  GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
   if (fetchInByte)
-    args.push_back(builderImpl.getInt32(mapVertexFormat(BUF_DATA_FORMAT_8, BufNumFormatUint)));
+    args.push_back(builderImpl.getInt32(mapVertexFormat(gfxIp, BUF_DATA_FORMAT_8, BufNumFormatUint)));
   else
-    args.push_back(builderImpl.getInt32(mapVertexFormat(dfmt, nfmt)));
+    args.push_back(builderImpl.getInt32(mapVertexFormat(gfxIp, dfmt, nfmt)));
   args.push_back(builderImpl.getInt32(0));
 
   Value *fetchVal = resultChannels > 1 ? PoisonValue::get(FixedVectorType::get(inputCompTy, resultChannels)) : nullptr;

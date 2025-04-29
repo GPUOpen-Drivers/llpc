@@ -33,6 +33,7 @@
 #include "lgc/Debug.h"
 #include "lgc/lowering/LgcLowering.h"
 #include "lgc/lowering/MutateEntryPoint.h"
+#include "lgc/util/BufferResource.h"
 #include "lgc/util/WorkgroupLayout.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
@@ -310,7 +311,7 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
     outputsLayout->primitiveStride = primitiveStride;
 
     bool hasDummyVertexAttrib = false;
-    if (!pipelineState->exportAttributeByExportInstruction()) {
+    if (!pipelineState->attributeThroughExport()) {
       if (outputsLayout->vertexExportCount == 0) {
         // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
         // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
@@ -1693,10 +1694,8 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
 
     CoherentFlag coherent = {};
-#if LLPC_BUILD_GFX12
-    if (m_gfxIp.major >= 12)
+    if (m_gfxIp.major == 12)
       coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_SYS;
-#endif
 
     m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_raw_buffer_store,
                               {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset,
@@ -1807,21 +1806,17 @@ void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &set
   //
   // HW requires the primitive connectivity data has the following bit layout:
   //
-#if LLPC_BUILD_GFX12
   // Pre-GFX12:
-#endif
   //   +----------------+---------------+---------------+---------------+
   //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
-#if LLPC_BUILD_GFX12
   //
   // GFX12:
   //   +----------------+------------+---------------+------------+---------------+------------+---------------+
   //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
   //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
   //   +----------------+------------+---------------+------------+---------------+------------+---------------+
-#endif
   //
   auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   Value *primitiveData = nullptr;
@@ -1838,12 +1833,8 @@ void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &set
       primitiveData = m_builder.CreateShl(vertex1, 10);
       primitiveData = m_builder.CreateOr(primitiveData, vertex0);
     } else {
-#if LLPC_BUILD_GFX12
       primitiveData = m_builder.CreateShl(vertex1, 9);
       primitiveData = m_builder.CreateOr(primitiveData, vertex0);
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
   } else {
     assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
@@ -1857,14 +1848,10 @@ void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &set
       primitiveData = m_builder.CreateShl(primitiveData, 10);
       primitiveData = m_builder.CreateOr(primitiveData, vertex0);
     } else {
-#if LLPC_BUILD_GFX12
       primitiveData = m_builder.CreateShl(vertex2, 9);
       primitiveData = m_builder.CreateOr(primitiveData, vertex1);
       primitiveData = m_builder.CreateShl(primitiveData, 9);
       primitiveData = m_builder.CreateOr(primitiveData, vertex0);
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
   }
 
@@ -2168,12 +2155,13 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
     // Task shader
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Task)->entryArgIdxs.task;
 
-#if LLPC_BUILD_GFX12
     if (m_gfxIp.major >= 12) {
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+      m_waveThreadInfo.waveIdInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_wave_id, {});
+#else
       m_waveThreadInfo.waveIdInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_wave_id, {}, {});
-    } else
 #endif
-    {
+    } else {
       // waveId = dispatchInfo[24:20]
       m_waveThreadInfo.waveIdInSubgroup =
           m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
@@ -2248,14 +2236,16 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
         workgroupIds[1] = m_builder.CreateExtractElement(workgroupId, 1);
         workgroupIds[2] = m_builder.CreateExtractElement(workgroupId, 2);
       } else {
-#if LLPC_BUILD_GFX12
         // NOTE: On GFX12+, we use the intrinsics to get workgroup ID X/Y/Z instead of getting them from entry-point
         // arguments. This is because the IDs are modeled by architected dispatch ID GPRs rather than normal SGPRs.
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+        workgroupIds[0] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_x, {});
+        workgroupIds[1] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_y, {});
+        workgroupIds[2] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_z, {});
+#else
         workgroupIds[0] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_x, {}, {});
         workgroupIds[1] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_y, {}, {});
         workgroupIds[2] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_workgroup_id_z, {}, {});
-#else
-        llvm_unreachable("Not implemented!");
 #endif
       }
       auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
@@ -3035,8 +3025,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
       exportDone = true; // Last export
 
     if (m_gfxIp.major >= 11) {
-      if (m_pipelineState->exportAttributeByExportInstruction() || kind == ExportKind::Position ||
-          kind == ExportKind::Primitive) {
+      if (m_pipelineState->attributeThroughExport() || kind == ExportKind::Position || kind == ExportKind::Primitive) {
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp_row, valueTy,
                                   {
                                       m_builder.getInt32(target + exports[i].slot), // tgt
@@ -3050,7 +3039,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
                                   });
       } else {
         assert(kind == ExportKind::VertexAttribute || kind == ExportKind::PrimitiveAttribute);
-        assert(!m_pipelineState->exportAttributeByExportInstruction());
+        assert(!m_pipelineState->attributeThroughExport());
 
         Value *valueToStore = PoisonValue::get(FixedVectorType::get(valueTy, 4));
         for (unsigned j = 0; j < 4; ++j) {
@@ -3065,12 +3054,9 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
         CoherentFlag coherent = {};
         if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
           coherent.bits.glc = true;
-        }
-#if LLPC_BUILD_GFX12
-        else {
+        } else {
           coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
         }
-#endif
 
         m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
                                   {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.primOrVertexIndex,
@@ -3113,23 +3099,18 @@ void MeshTaskShader::prepareAttribRingAccess() {
   Value *attribRingBase =
       getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
   attribRingBase = m_builder.CreateAnd(attribRingBase, 0x7FFF);
+
   m_attribRingBaseOffset =
-      m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity), "attribRingBaseOffset");
+      m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttributeGranularity), "attribRingBaseOffset");
 
   m_attribRingBufDesc = m_pipelineSysValues.get(entryPoint)->getAttribRingBufDesc();
 
   // Modify the field STRIDE of attribute ring buffer descriptor
   if (numAttributes >= 2) {
-    // STRIDE = WORD1[30:16], STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
-    // We override the value if there are more attributes.
-    auto descWord1 = m_builder.CreateExtractElement(m_attribRingBufDesc, 1);
+    // NOTE: STRIDE is initialized to 16 by the driver, which is the right value for one attribute.
+    // We have to override the value if there are more attributes.
     auto stride = m_builder.getInt32(numAttributes * SizeOfVec4);
-    if ((numAttributes & 1) == 0) {
-      // Clear the bit that was set in STRIDE by the driver.
-      descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);
-    }
-    descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
-    m_attribRingBufDesc = m_builder.CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
+    setBufferStride(m_gfxIp, m_builder, m_attribRingBufDesc, stride);
   }
 }
 
@@ -3680,12 +3661,8 @@ bool MeshTaskShader::checkNeedBarrierFlag(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
   auto module = entryPoint->getParent();
   for (auto &func : module->functions()) {
-#if LLPC_BUILD_GFX12
     if (func.isIntrinsic() && (func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier ||
                                func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier_signal)) {
-#else
-    if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier) {
-#endif
       for (auto user : func.users()) {
         CallInst *const call = cast<CallInst>(user);
         if (call->getParent()->getParent() == entryPoint)
@@ -3826,16 +3803,18 @@ void MeshTaskShader::createFenceAndBarrier() {
 // =====================================================================================================================
 // Create LDS barrier to guarantee the synchronization of LDS operations.
 void MeshTaskShader::createBarrier() {
-#if LLPC_BUILD_GFX12
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, m_builder.getInt32(WorkgroupNormalBarrierId));
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
                               m_builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
     return;
   }
-#endif
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {});
+#else
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+#endif
 }
 
 } // namespace lgc

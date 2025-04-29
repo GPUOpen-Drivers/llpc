@@ -77,7 +77,7 @@ PreservedAnalyses CheckShaderCache::run(Module &module, ModuleAnalysisManager &a
     return PreservedAnalyses::all();
   }
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   std::string inOutUsageStreams[ShaderStage::GfxCount];
   ArrayRef<uint8_t> inOutUsageValues[ShaderStage::GfxCount];

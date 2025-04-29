@@ -39,7 +39,10 @@ for d in "@LIT_DEFINITIONS@".split(";"):
     val = def_split[1] if len(def_split) > 1 else "ON"
     config.available_features.add(name)
 
-breaking_revisions = [511860]
+breaking_revisions = [
+    511860,
+    528172,
+    ]
 
 llvm_main_revision = "@LLVM_MAIN_REVISION@"
 try:

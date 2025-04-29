@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,8 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -68,7 +67,6 @@ userDataNode[1].offsetInDwords = 1
 userDataNode[1].sizeInDwords = 1
 userDataNode[1].indirectUserDataCount = 4
 
-
 [FsGlsl]
 #version 450
 #extension GL_EXT_multiview : enable
@@ -79,8 +77,6 @@ void main()
 {
     out_color = vec4(subpassLoad(in_color_attachment));
 }
-
-
 
 [FsInfo]
 entryPoint = main
@@ -97,7 +93,6 @@ userDataNode[0].next[1].offsetInDwords = 8
 userDataNode[0].next[1].sizeInDwords = 8
 userDataNode[0].next[1].set = 0
 userDataNode[0].next[1].binding = 0
-
 
 [GraphicsPipelineState]
 topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
@@ -117,7 +112,6 @@ dualSourceBlendEnable = 0
 colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 1
-
 
 [VertexInputState]
 binding[0].binding = 0

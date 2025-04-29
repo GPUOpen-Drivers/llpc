@@ -120,13 +120,11 @@ public:
   Vkgc::LlpcRaytracingMode getRaytracingMode() const { return m_pipelineInfo->mode; }
   bool isContinuationsMode() const;
   unsigned getCpsFlag() { return m_pipelineInfo->cpsFlags; }
-#if LLPC_BUILD_GFX12
   bool isDynamicVgprEnabled() {
     return (m_gfxIp.major >= 12) &&
            (isContinuationsMode() || getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continufy) &&
            !m_pipelineInfo->disableDynamicVgpr;
   }
-#endif
   void updateRayFlagsKnownBits(const llvm::KnownBits &knownBits) {
     if (m_rayFlagsKnownBits.has_value()) {
       m_rayFlagsKnownBits = m_rayFlagsKnownBits->intersectWith(knownBits);

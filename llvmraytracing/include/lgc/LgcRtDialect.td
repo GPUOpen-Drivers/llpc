@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -68,6 +68,7 @@ def V3F32 : TgConstant<(FixedVectorType F32, 3)>, Type;
 def V3I32 : TgConstant<(FixedVectorType I32, 3)>, Type;
 def A4V3F32 : TgConstant<(ArrayType V3F32, 4)>, Type;
 def A3V3F32 : TgConstant<(ArrayType V3F32, 3)>, Type;
+def I126 : TgConstant<(IntegerType 126)>, Type;
 
 def GlobalPointer : TgConstant<(PointerType 1)>, Type;
 def PrivatePointer : TgConstant<(PointerType 5)>, Type;
@@ -124,8 +125,8 @@ def DispatchRaysIndexOp : LgcRtOp<"dispatch.rays.index", [Memory<[]>, WillReturn
 }
 
 // =========================================================================================================
-def GeometryIndexOp : LgcRtOp<"geometry.index", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def GeometryIndexOp : LgcRtOp<"geometry.index", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the geometry index";
@@ -135,8 +136,8 @@ def GeometryIndexOp : LgcRtOp<"geometry.index", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def HitKindOp : LgcRtOp<"hit.kind", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def HitKindOp : LgcRtOp<"hit.kind", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the hit kind";
@@ -159,8 +160,8 @@ def IgnoreHitOp : LgcRtOp<"ignore.hit", [Memory<[(write InaccessibleMem)]>, NoRe
 }
 
 // =========================================================================================================
-def InstanceIdOp : LgcRtOp<"instance.id", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def InstanceIdOp : LgcRtOp<"instance.id", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the instance ID";
@@ -171,8 +172,8 @@ def InstanceIdOp : LgcRtOp<"instance.id", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def InstanceIndexOp : LgcRtOp<"instance.index", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def InstanceIndexOp : LgcRtOp<"instance.index", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the instance index";
@@ -182,8 +183,8 @@ def InstanceIndexOp : LgcRtOp<"instance.index", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def ObjectRayDirectionOp : LgcRtOp<"object.ray.direction", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def ObjectRayDirectionOp : LgcRtOp<"object.ray.direction", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs V3F32:$result);
 
   let summary = "Return the object-space direction";
@@ -193,8 +194,8 @@ def ObjectRayDirectionOp : LgcRtOp<"object.ray.direction", [Memory<[]>, WillRetu
 }
 
 // =========================================================================================================
-def ObjectRayOriginOp : LgcRtOp<"object.ray.origin", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def ObjectRayOriginOp : LgcRtOp<"object.ray.origin", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs V3F32:$result);
 
   let summary = "Return the object-space origin";
@@ -204,8 +205,8 @@ def ObjectRayOriginOp : LgcRtOp<"object.ray.origin", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def ObjectToWorldOp : LgcRtOp<"object.to.world", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def ObjectToWorldOp : LgcRtOp<"object.to.world", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs A4V3F32:$result);
 
   let summary = "Return the current object-to-world transformation matrix";
@@ -216,8 +217,8 @@ def ObjectToWorldOp : LgcRtOp<"object.to.world", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def PrimitiveIndexOp : LgcRtOp<"primitive.index", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def PrimitiveIndexOp : LgcRtOp<"primitive.index", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the primitive index";
@@ -227,8 +228,8 @@ def PrimitiveIndexOp : LgcRtOp<"primitive.index", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def RayFlagsOp : LgcRtOp<"ray.flags", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def RayFlagsOp : LgcRtOp<"ray.flags", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the current ray flags";
@@ -238,8 +239,8 @@ def RayFlagsOp : LgcRtOp<"ray.flags", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def RayTcurrentOp : LgcRtOp<"ray.tcurrent", [Memory<[(read)]>, WillReturn]> {
-  let arguments = (ins);
+def RayTcurrentOp : LgcRtOp<"ray.tcurrent", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs F32:$result);
 
   let summary = "Return the current parametric ending point for the ray";
@@ -249,8 +250,8 @@ def RayTcurrentOp : LgcRtOp<"ray.tcurrent", [Memory<[(read)]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def RayTminOp : LgcRtOp<"ray.tmin", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def RayTminOp : LgcRtOp<"ray.tmin", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs F32:$result);
 
   let summary = "Return the parametric starting point for the ray";
@@ -356,8 +357,8 @@ def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(readwrite InaccessibleMem), (rea
 }
 
 // =========================================================================================================
-def WorldRayDirectionOp : LgcRtOp<"world.ray.direction", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def WorldRayDirectionOp : LgcRtOp<"world.ray.direction", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs V3F32:$result);
 
   let summary = "Return the world-space direction for the current ray";
@@ -367,8 +368,8 @@ def WorldRayDirectionOp : LgcRtOp<"world.ray.direction", [Memory<[]>, WillReturn
 }
 
 // =========================================================================================================
-def WorldRayOriginOp : LgcRtOp<"world.ray.origin", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def WorldRayOriginOp : LgcRtOp<"world.ray.origin", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs V3F32:$result);
 
   let summary = "Return the world-space origin for the current ray";
@@ -378,8 +379,8 @@ def WorldRayOriginOp : LgcRtOp<"world.ray.origin", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def WorldToObjectOp : LgcRtOp<"world.to.object", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
+def WorldToObjectOp : LgcRtOp<"world.to.object", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
   let results = (outs A4V3F32:$result);
 
   let summary = "Return the current world-to-object transformation matrix";
@@ -390,8 +391,8 @@ def WorldToObjectOp : LgcRtOp<"world.to.object", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[]>, WillReturn]> {
-  let arguments =  (ins);
+def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments =  (ins PointerType:$hitObject);
   let results = (outs A3V3F32:$result);
 
   let summary = "Return the object-space vertices of the triangle";
@@ -401,8 +402,8 @@ def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[]>
 }
 
 // =========================================================================================================
-def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[]>, WillReturn]> {
-  let arguments =  (ins);
+def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments =  (ins PointerType:$hitObject);
   let results = (outs I32:$result);
 
   let summary = "Return the instance inclusion mask";
@@ -411,3 +412,162 @@ def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[]>, Wi
   }];
 }
 
+// =========================================================================================================
+def HitObjectMakeNopOp : LgcRtOp<"hit.object.make.nop", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I126:$hitObject);
+  let summary = "Returns Empty Hit Object";
+  let description = [{
+    Returns an Empty Hit Object.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectIsMissOp : LgcRtOp<"hit.object.is.miss", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
+  let results = (outs I1:$result);
+  let summary = "Returns if hit object is a miss";
+  let description = [{
+    Returns a boolean indicating whether the hit object has encoded a miss.
+
+    - hitObject: Pointer to HitObject.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectIsHitOp : LgcRtOp<"hit.object.is.hit", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
+  let results = (outs I1:$result);
+  let summary = "Returns if hit object is a hit";
+  let description = [{
+    Returns a boolean indicating whether the hit object has encoded a hit.
+
+    - hitObject: Pointer to HitObject.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectIsEmptyOp : LgcRtOp<"hit.object.is.empty", [Memory<[(read ArgMem)]>, WillReturn]> {
+   let arguments = (ins PointerType:$hitObject);
+  let results = (outs I1:$result);
+  let summary = "Returns if hit object is empty";
+  let description = [{
+    Returns a boolean indicating whether the hit object has encoded as empty.
+
+    - hitObject: Pointer to HitObject.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectGetPrimitiveIndexOp : LgcRtOp<"hit.object.get.primitive.index", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
+  let results = (outs I32:$result);
+  let summary = "Returns the primitive index as encoded in the hit object";
+  let description = [{
+    Returns the primitive index as encoded in the hit object.
+
+    - hitObject: Pointer to HitObject.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectGetKindOp : LgcRtOp<"hit.object.get.kind", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
+  let results = (outs I32:$result);
+  let summary = "Returns a encoded value in the hit object with front face or back face of a primitive";
+  let description = [{
+    0xFE if hit encoded in the hit object is with front facing primitive else is 0xFF if it is back facing
+    primitive.
+
+    - hitObject: Pointer to HitObject.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectGetShaderTableIndexOp : LgcRtOp<"hit.object.get.shader.table.index", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject);
+  let results = (outs I32:$result);
+  let summary = "Returns the index for the record in shader binding table as encoded in hit object";
+  let description = [{
+    Returns the index for the record in shader binding table as encoded in hit object.
+
+    - hitObject: Pointer to HitObject.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectSetShaderTableIndexOp : LgcRtOp<"hit.object.set.shader.table.index", [Memory<[(read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject, I32:$sbtindex);
+  let results = (outs I126:$result);
+  let summary = "Returns a hit object with the given index for the record in the shader binding table";
+  let description = [{
+    Sets the index for the record in the shader binding table and returns it as a new hit object.
+
+    - hitObject: Pointer to HitObject.
+
+    - sbtindex: The new SBT index value to encode in the hit object.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectExecuteShaderOp : LgcRtOp<"hit.object.execute.shader", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject, PointerType:$payload, value:$paq);
+  let results = (outs);
+  let summary = "Hit Object Execute Shader";
+  let description = [{
+    Executes the closest-hit or miss shader as encoded in the hit object.
+
+    If the hit object encodes an empty hit object or was created from a ray query with no shader index set no function
+    is called.
+
+    - hitObject: Pointer to HitObject.
+
+    - payload: User-defined payload, read and written by shaders called from TraceRayOp.
+
+    - paq: The payload access qualifier as a constant int array. In the simplest case, the array has a
+      single entry giving the payload size in bytes.
+  }];
+}
+
+// =========================================================================================================
+def ReorderThreadWithHitObjectOp : LgcRtOp<"reorder.thread.with.hit.object", [Memory<[(readwrite InaccessibleMem), (read ArgMem)]>, WillReturn]> {
+  let arguments = (ins PointerType:$hitObject, I32:$hint, I32:$bits);
+  let results = (outs);
+  let summary = "Reorder Thread With Hit Object";
+  let description = [{
+    Reorder threads based on hit object supplemented by 'Hint' and 'Bits' if they are optionally provided values.
+    Behavior is implementation-defined.
+
+    - hitObject: Pointer to HitObject.
+
+    - hint: Determines desired ordering of threads relative to others.
+
+    - bits: Indicates number of least significant bits an implementation
+            should take into account from <hint> in determining ordering.
+  }];
+}
+
+// =========================================================================================================
+def HitObjectTraceRayOp : LgcRtOp<"hit.object.trace.ray", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
+  let superclass = BaseTraceRayOp;
+  let arguments = (ins superclass);
+  let results = (outs I126:$result);
+  let summary = "Trace Ray and store results in a HitObject";
+  let description = [{
+    Traces a ray and triggers execution on any-hit or intersection shaders and populates resulting hit or miss information and returns a hit object.
+  }];
+}
+
+// =========================================================================================================
+def GlobalHitObjectOp : LgcRtOp<"global.hit.object", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs (PointerType $address_space):$hitObject);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "Get Global Hit Object";
+  let description = [{
+    Get the global hit object. The global hit object is used for all operations that do not explicitly specify a hit object.
+    This is all functions that query raytracing state in intersection, anyHit, closestHit and miss shaders.
+  }];
+}

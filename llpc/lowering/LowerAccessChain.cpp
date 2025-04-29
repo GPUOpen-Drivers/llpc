@@ -56,7 +56,7 @@ namespace Llpc {
 PreservedAnalyses LowerAccessChain::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Access-Chain\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   // Invoke handling of "getelementptr", "load" and "store" instructions
   visit(m_module);

@@ -215,6 +215,35 @@ that are useful to know of for this workflow:
 Read Git's documentation or search online to learn more about them. Similar
 functionality is available in some GUI tools.
 
+### Checking clang-format diff before committing a change
+
+Changes need to pass automated testing. An early check consists of checking
+whether clang-format was applied properly. To avoid wasting cycles, developers
+can install a git pre-commit hook that runs clang-format automatically and
+prevents committing if the latest changes have not been properly formatted.
+
+Note that `clang-format-diff-14` needs to be installed on your system. If not,
+the script falls back to `clang-format-diff`, but to prevent getting inaccurate
+results, aim at using the same version as the CI server.
+
+To get the pre-commit hook installed, check your `.git/hooks` folder for
+existing pre-commit hooks.  Make sure `core.hooksPath` is properly setup to
+point to this folder.  If you want to apply the pre-commit hook in a submodule
+only, then make sure `core.hooksPath` is pointing to the parent git folder, for
+instance, by running `git config --local core.hooksPath ../../.git/hooks`. The
+`.git` file in a submodule shows the gitdir for the submodule.
+
+If `.git/hooks/pre-commit` already exists, append the contents of
+`script/pre-commit-clang-format` to it where appropriate.  Otherwise, copy
+`script/pre-commit-clang-format` to `.git/hooks/pre-commit` and make it executable via
+`chmod +x .git/hooks/pre-commit`.
+
+Now, when trying to commit an unformatted change, the pre-commit hook will
+prevent you from doing so.
+
+Note: Using the pre-commit hook generates a temporary file inside `/tmp`.
+This can be used as git patch to apply the clang-format changes.
+
 ## Additional sources
 
 * [Patch submission guidelines of the Linux kernel](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/submitting-patches.rst)

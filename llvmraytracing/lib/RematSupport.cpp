@@ -225,7 +225,8 @@ bool rematsupport::isRematerializableLgcRtOp(CallInst &CInst, std::optional<lgc:
     static const llvm_dialects::OpSet RematerializableIntersectionDialectOps =
         llvm_dialects::OpSet::get<InstanceIdOp, InstanceIndexOp, GeometryIndexOp, ObjectRayDirectionOp,
                                   ObjectRayOriginOp, ObjectToWorldOp, PrimitiveIndexOp, RayFlagsOp, RayTminOp,
-                                  WorldRayDirectionOp, WorldRayOriginOp, WorldToObjectOp, InstanceInclusionMaskOp>();
+                                  WorldRayDirectionOp, WorldRayOriginOp, WorldToObjectOp, InstanceInclusionMaskOp,
+                                  GlobalHitObjectOp>();
     if (RematerializableIntersectionDialectOps.contains(*Callee))
       return true;
   }

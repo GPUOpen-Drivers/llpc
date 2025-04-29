@@ -54,7 +54,7 @@ LLPC_MODULE_PASS("lower-math-const-folding", LowerMathConstFolding)
 LLPC_MODULE_PASS("lower-math-precision", LowerMathPrecision)
 LLPC_MODULE_PASS("lower-math-float-op", LowerMathFloatOp)
 LLPC_MODULE_PASS("lower-memory-op", LowerMemoryOp)
-LLPC_MODULE_PASS("lower-ray-tracing", SpirvLowerRayTracing)
+LLPC_MODULE_PASS("lower-ray-tracing", LowerRayTracing)
 LLPC_MODULE_PASS("lower-post-inline", LowerPostInline)
 
 #undef LLPC_PASS

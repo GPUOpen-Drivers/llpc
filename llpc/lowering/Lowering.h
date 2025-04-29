@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  Lowering.h
- * @brief LLPC header file: contains declaration of class Llpc::SpirvLower.
+ * @brief LLPC header file: contains declaration of class Llpc::Lowering.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -67,9 +67,9 @@ union LowerFlag {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering operations, as the base class.
-class SpirvLower {
+class Lowering {
 public:
-  explicit SpirvLower() {}
+  explicit Lowering() {}
 
   // Add per-shader lowering passes to pass manager
   static void addPasses(Context *context, ShaderStage stage, llvm::ModulePassManager &passMgr, llvm::Timer *lowerTimer,
@@ -91,10 +91,10 @@ protected:
   lgc::Builder *m_builder = nullptr;              // LGC builder object
 };
 
-extern template void SpirvLower::registerTranslationPasses<lgc::PassManager>(lgc::PassManager &);
-extern template void SpirvLower::registerTranslationPasses<lgc::MbPassManager>(lgc::MbPassManager &);
+extern template void Lowering::registerTranslationPasses<lgc::PassManager>(lgc::PassManager &);
+extern template void Lowering::registerTranslationPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
-extern template void SpirvLower::registerLoweringPasses<lgc::PassManager>(lgc::PassManager &);
-extern template void SpirvLower::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPassManager &);
+extern template void Lowering::registerLoweringPasses<lgc::PassManager>(lgc::PassManager &);
+extern template void Lowering::registerLoweringPasses<lgc::MbPassManager>(lgc::MbPassManager &);
 
 } // namespace Llpc

@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerRayTracing.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerRayTracing.
+ * @brief LLPC source file: contains implementation of class Llpc::LowerRayTracing.
  ***********************************************************************************************************************
  */
 
@@ -111,9 +111,9 @@ static unsigned TraceParamsTySize[] = {
 
 namespace {
 
-class SpirvLowerRayTracingImpl : public SpirvLower {
+class LowerRayTracingImpl : public Lowering {
 public:
-  SpirvLowerRayTracingImpl();
+  LowerRayTracingImpl();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
 private:
@@ -148,6 +148,7 @@ private:
   void initShaderBuiltIns();
   void inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager);
   llvm::Instruction *createEntryFunc(llvm::Function *func);
+  void createRayGenEntryTerminator(llvm::Function *func);
   void createEntryTerminator(llvm::Function *func);
   llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage, llvm::SmallVectorImpl<llvm::StringRef> &argNames);
   llvm::FunctionType *getCallableShaderEntryFuncTy(llvm::SmallVectorImpl<llvm::StringRef> &argNames);
@@ -211,8 +212,11 @@ private:
   void visitInstanceInclusionMaskOp(lgc::rt::InstanceInclusionMaskOp &inst);
   void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
   void visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst);
+  void visitGlobalHitObjectOp(lgc::rt::GlobalHitObjectOp &inst);
 
   void createSqttCallCompactToken(ShaderStage stage);
+  void createSqttIndirectFunctionCallToken();
+  void createSqttShaderHashToken();
   void createSqttFunctionReturnToken();
 
   llvm::Value *createLoadInstNodeAddr();
@@ -239,14 +243,14 @@ private:
 } // anonymous namespace
 
 // =====================================================================================================================
-SpirvLowerRayTracingImpl::SpirvLowerRayTracingImpl() : m_nextTraceRayId(0) {
+LowerRayTracingImpl::LowerRayTracingImpl() : m_nextTraceRayId(0) {
 }
 
 // =====================================================================================================================
 // Process a trace ray call by creating (or get if created) an implementation function and replace the call to it.
 //
 // @param inst : The original call instruction
-void SpirvLowerRayTracingImpl::processTraceRayCall(BaseTraceRayOp *inst) {
+void LowerRayTracingImpl::processTraceRayCall(BaseTraceRayOp *inst) {
   m_builder->SetInsertPoint(inst);
 
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
@@ -279,10 +283,6 @@ void SpirvLowerRayTracingImpl::processTraceRayCall(BaseTraceRayOp *inst) {
     args.push_back(m_builder->getInt32(generateTraceRayStaticId()));
   }
 
-  // Call the trace ray implementation
-  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-    createSqttCallCompactToken(ShaderStageCompute);
-
   Value *result = nullptr;
   bool indirect = rayTracingContext->getIndirectStageMask() & ShaderStageComputeBit;
   auto funcTy = getTraceRayFuncTy();
@@ -290,6 +290,10 @@ void SpirvLowerRayTracingImpl::processTraceRayCall(BaseTraceRayOp *inst) {
     Value *traceRayGpuVa = loadShaderTableVariable(ShaderTable::TraceRayGpuVirtAddr, m_dispatchRaysInfoDesc);
     auto funcPtrTy = PointerType::get(funcTy, SPIRAS_Generic);
     auto funcPtr = m_builder->CreateIntToPtr(traceRayGpuVa, funcPtrTy);
+
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+      createSqttIndirectFunctionCallToken();
+
     // Create the indirect function call
     CallInst *call = m_builder->CreateCall(funcTy, funcPtr, args);
     call->setCallingConv(CallingConv::SPIR_FUNC);
@@ -302,9 +306,6 @@ void SpirvLowerRayTracingImpl::processTraceRayCall(BaseTraceRayOp *inst) {
   } else {
     result = m_builder->CreateNamedCall(RtName::TraceRayKHR, funcTy->getReturnType(), args, {Attribute::AlwaysInline});
   }
-
-  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-    createSqttFunctionReturnToken();
 
   // Handle the result
   unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
@@ -323,7 +324,7 @@ void SpirvLowerRayTracingImpl::processTraceRayCall(BaseTraceRayOp *inst) {
 // Visits "lgc.rt.call.callable.shader" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitCallCallableShaderOp(CallCallableShaderOp &inst) {
+void LowerRayTracingImpl::visitCallCallableShaderOp(CallCallableShaderOp &inst) {
   std::string mangledName = inst.getCalledFunction()->getName().str() + ".impl";
 
   auto shaderIndex = inst.getShaderIndex();
@@ -382,14 +383,10 @@ void SpirvLowerRayTracingImpl::visitCallCallableShaderOp(CallCallableShaderOp &i
       }
       auto funcPtr = m_builder->CreateIntToPtr(shaderIdentifier, funcPtrTy);
 
-      if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-        createSqttCallCompactToken(ShaderStageRayTracingCallable);
+      if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+        createSqttIndirectFunctionCallToken();
 
       CallInst *result = m_builder->CreateCall(funcTy, funcPtr, args);
-
-      if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-        createSqttFunctionReturnToken();
-
       result->setCallingConv(CallingConv::SPIR_FUNC);
 
       unsigned lgcRtStage = static_cast<unsigned>(mapStageToLgcRtShaderStage(ShaderStageRayTracingCallable));
@@ -416,7 +413,7 @@ void SpirvLowerRayTracingImpl::visitCallCallableShaderOp(CallCallableShaderOp &i
 // Visits "lgc.rt.report.hit" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitReportHitOp(ReportHitOp &inst) {
+void LowerRayTracingImpl::visitReportHitOp(ReportHitOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   assert(m_shaderStage == ShaderStageRayTracingIntersect);
@@ -547,10 +544,10 @@ void SpirvLowerRayTracingImpl::visitReportHitOp(ReportHitOp &inst) {
 //
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
-PreservedAnalyses SpirvLowerRayTracingImpl::run(Module &module, ModuleAnalysisManager &analysisManager) {
+PreservedAnalyses LowerRayTracingImpl::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Ray-Tracing\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   memset(m_traceParams, 0, sizeof(m_traceParams));
   initTraceParamsTy(rayTracingContext->getAttributeDataSize());
@@ -584,6 +581,14 @@ PreservedAnalyses SpirvLowerRayTracingImpl::run(Module &module, ModuleAnalysisMa
     createTraceParams(m_entryPoint);
     insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
     m_shaderRecordIndex = m_builder->getInt32(0);
+
+    // Emit SQTT tokens in raygen shader, if requested
+
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+      createSqttShaderHashToken();
+
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+      createSqttCallCompactToken(ShaderStageRayTracingRayGen);
   }
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
@@ -594,21 +599,21 @@ PreservedAnalyses SpirvLowerRayTracingImpl::run(Module &module, ModuleAnalysisMa
     m_entryPoint->setMetadata(RtName::ContinufyStageMeta,
                               MDNode::get(*m_context, ConstantAsMetadata::get(m_builder->getInt32(lgcRtStage))));
 
-    static auto visitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracingImpl>()
+    static auto visitor = llvm_dialects::VisitorBuilder<LowerRayTracingImpl>()
                               .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                              .add(&SpirvLowerRayTracingImpl::visitGetHitAttributes)
-                              .add(&SpirvLowerRayTracingImpl::visitSetHitAttributes)
-                              .add(&SpirvLowerRayTracingImpl::visitSetTraceParams)
-                              .add(&SpirvLowerRayTracingImpl::visitCallClosestHitShader)
-                              .add(&SpirvLowerRayTracingImpl::visitCallMissShader)
-                              .add(&SpirvLowerRayTracingImpl::visitCallTriangleAnyHitShader)
-                              .add(&SpirvLowerRayTracingImpl::visitCallIntersectionShader)
-                              .add(&SpirvLowerRayTracingImpl::visitSetTriangleIntersectionAttributes)
-                              .add(&SpirvLowerRayTracingImpl::visitSetHitTriangleNodePointer)
-                              .add(&SpirvLowerRayTracingImpl::visitGetParentId)
-                              .add(&SpirvLowerRayTracingImpl::visitSetParentId)
-                              .add(&SpirvLowerRayTracingImpl::visitGetRayStaticId)
-                              .add(&SpirvLowerRayTracingImpl::visitDispatchRayIndex)
+                              .add(&LowerRayTracingImpl::visitGetHitAttributes)
+                              .add(&LowerRayTracingImpl::visitSetHitAttributes)
+                              .add(&LowerRayTracingImpl::visitSetTraceParams)
+                              .add(&LowerRayTracingImpl::visitCallClosestHitShader)
+                              .add(&LowerRayTracingImpl::visitCallMissShader)
+                              .add(&LowerRayTracingImpl::visitCallTriangleAnyHitShader)
+                              .add(&LowerRayTracingImpl::visitCallIntersectionShader)
+                              .add(&LowerRayTracingImpl::visitSetTriangleIntersectionAttributes)
+                              .add(&LowerRayTracingImpl::visitSetHitTriangleNodePointer)
+                              .add(&LowerRayTracingImpl::visitGetParentId)
+                              .add(&LowerRayTracingImpl::visitSetParentId)
+                              .add(&LowerRayTracingImpl::visitGetRayStaticId)
+                              .add(&LowerRayTracingImpl::visitDispatchRayIndex)
                               .build();
 
     visitor.visit(*this, *m_entryPoint);
@@ -630,39 +635,43 @@ PreservedAnalyses SpirvLowerRayTracingImpl::run(Module &module, ModuleAnalysisMa
 
     m_insertPosPastInit = insertPos;
 
-    static auto visitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracingImpl>()
+    static auto visitor = llvm_dialects::VisitorBuilder<LowerRayTracingImpl>()
                               .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                              .add(&SpirvLowerRayTracingImpl::visitAcceptHitAndEndSearchOp)
-                              .add(&SpirvLowerRayTracingImpl::visitIgnoreHitOp)
-                              .add(&SpirvLowerRayTracingImpl::visitCallCallableShaderOp)
-                              .add(&SpirvLowerRayTracingImpl::visitReportHitOp)
-                              .add(&SpirvLowerRayTracingImpl::visitTraceRayOp)
-                              .add(&SpirvLowerRayTracingImpl::visitDispatchRayIndex)
-                              .add(&SpirvLowerRayTracingImpl::visitDispatchRaysDimensionsOp)
-                              .add(&SpirvLowerRayTracingImpl::visitWorldRayOriginOp)
-                              .add(&SpirvLowerRayTracingImpl::visitWorldRayDirectionOp)
-                              .add(&SpirvLowerRayTracingImpl::visitObjectRayOriginOp)
-                              .add(&SpirvLowerRayTracingImpl::visitObjectRayDirectionOp)
-                              .add(&SpirvLowerRayTracingImpl::visitRayTminOp)
-                              .add(&SpirvLowerRayTracingImpl::visitRayTcurrentOp)
-                              .add(&SpirvLowerRayTracingImpl::visitInstanceIndexOp)
-                              .add(&SpirvLowerRayTracingImpl::visitObjectToWorldOp)
-                              .add(&SpirvLowerRayTracingImpl::visitWorldToObjectOp)
-                              .add(&SpirvLowerRayTracingImpl::visitHitKindOp)
-                              .add(&SpirvLowerRayTracingImpl::visitTriangleVertexPositionsOp)
-                              .add(&SpirvLowerRayTracingImpl::visitRayFlagsOp)
-                              .add(&SpirvLowerRayTracingImpl::visitGeometryIndexOp)
-                              .add(&SpirvLowerRayTracingImpl::visitInstanceIdOp)
-                              .add(&SpirvLowerRayTracingImpl::visitPrimitiveIndexOp)
-                              .add(&SpirvLowerRayTracingImpl::visitInstanceInclusionMaskOp)
-                              .add(&SpirvLowerRayTracingImpl::visitShaderIndexOp)
-                              .add(&SpirvLowerRayTracingImpl::visitShaderRecordBufferOp)
-                              .add(&SpirvLowerRayTracingImpl::visitStackReadOp)
-                              .add(&SpirvLowerRayTracingImpl::visitStackWriteOp)
-                              .add(&SpirvLowerRayTracingImpl::visitLdsStackInitOp)
+                              .add(&LowerRayTracingImpl::visitAcceptHitAndEndSearchOp)
+                              .add(&LowerRayTracingImpl::visitIgnoreHitOp)
+                              .add(&LowerRayTracingImpl::visitCallCallableShaderOp)
+                              .add(&LowerRayTracingImpl::visitReportHitOp)
+                              .add(&LowerRayTracingImpl::visitTraceRayOp)
+                              .add(&LowerRayTracingImpl::visitDispatchRayIndex)
+                              .add(&LowerRayTracingImpl::visitDispatchRaysDimensionsOp)
+                              .add(&LowerRayTracingImpl::visitWorldRayOriginOp)
+                              .add(&LowerRayTracingImpl::visitWorldRayDirectionOp)
+                              .add(&LowerRayTracingImpl::visitObjectRayOriginOp)
+                              .add(&LowerRayTracingImpl::visitObjectRayDirectionOp)
+                              .add(&LowerRayTracingImpl::visitRayTminOp)
+                              .add(&LowerRayTracingImpl::visitRayTcurrentOp)
+                              .add(&LowerRayTracingImpl::visitInstanceIndexOp)
+                              .add(&LowerRayTracingImpl::visitObjectToWorldOp)
+                              .add(&LowerRayTracingImpl::visitWorldToObjectOp)
+                              .add(&LowerRayTracingImpl::visitHitKindOp)
+                              .add(&LowerRayTracingImpl::visitTriangleVertexPositionsOp)
+                              .add(&LowerRayTracingImpl::visitRayFlagsOp)
+                              .add(&LowerRayTracingImpl::visitGeometryIndexOp)
+                              .add(&LowerRayTracingImpl::visitInstanceIdOp)
+                              .add(&LowerRayTracingImpl::visitPrimitiveIndexOp)
+                              .add(&LowerRayTracingImpl::visitInstanceInclusionMaskOp)
+                              .add(&LowerRayTracingImpl::visitShaderIndexOp)
+                              .add(&LowerRayTracingImpl::visitShaderRecordBufferOp)
+                              .add(&LowerRayTracingImpl::visitStackReadOp)
+                              .add(&LowerRayTracingImpl::visitStackWriteOp)
+                              .add(&LowerRayTracingImpl::visitLdsStackInitOp)
+                              .add(&LowerRayTracingImpl::visitGlobalHitObjectOp)
                               .build();
 
     visitor.visit(*this, *m_module);
+  }
+  if (m_shaderStage == ShaderStageRayTracingRayGen) {
+    createRayGenEntryTerminator(m_entryPoint);
   }
   if (m_shaderStage == ShaderStageRayTracingClosestHit || m_shaderStage == ShaderStageRayTracingAnyHit ||
       m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingMiss) {
@@ -694,13 +703,13 @@ PreservedAnalyses SpirvLowerRayTracingImpl::run(Module &module, ModuleAnalysisMa
     }
   }
 
-  LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing " << module);
+  LLVM_DEBUG(dbgs() << "After the pass Lower-Ray-Tracing " << module);
   return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
 // Create alloc variable for the TraceParam
-void SpirvLowerRayTracingImpl::createTraceParams(Function *entryFunc) {
+void LowerRayTracingImpl::createTraceParams(Function *entryFunc) {
   m_builder->SetInsertPointPastAllocas(entryFunc);
   for (unsigned i = 0; i < TraceParam::Count; ++i) {
     m_traceParams[i] =
@@ -714,8 +723,7 @@ void SpirvLowerRayTracingImpl::createTraceParams(Function *entryFunc) {
 // @param func : Function to create
 // @param instArgsNum : Dialect instruction num
 // @param traceParamsOffset : TraceParams Offset
-void SpirvLowerRayTracingImpl::createSetHitAttributes(Function *func, unsigned instArgsNum,
-                                                      unsigned traceParamsOffset) {
+void LowerRayTracingImpl::createSetHitAttributes(Function *func, unsigned instArgsNum, unsigned traceParamsOffset) {
   eraseFunctionBlocks(func);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
@@ -744,27 +752,20 @@ void SpirvLowerRayTracingImpl::createSetHitAttributes(Function *func, unsigned i
 //
 // @param func : Function to create
 // @param instArgsNum : Dialect inst arguments count
-void SpirvLowerRayTracingImpl::createSetTraceParams(Function *func, unsigned instArgsNum) {
+void LowerRayTracingImpl::createSetTraceParams(Function *func, unsigned instArgsNum) {
   eraseFunctionBlocks(func);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 12
   assert(instArgsNum == 9);
-#else
-  assert(instArgsNum == 8);
-#endif
-
   auto argIt = func->arg_begin();
   auto traceParams = argIt + instArgsNum;
 
   Value *rayFlags = argIt++;
   m_builder->CreateStore(rayFlags, traceParams + TraceParam::RayFlags);
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 12
   Value *instanceInclusionMask = argIt++;
   m_builder->CreateStore(instanceInclusionMask, traceParams + TraceParam::InstanceInclusionMask);
-#endif
 
   Value *originX = argIt++;
   Value *originY = argIt++;
@@ -802,8 +803,8 @@ void SpirvLowerRayTracingImpl::createSetTraceParams(Function *func, unsigned ins
 // @param intersectId : Module ID of intersection shader
 // @param retVal : Function return value
 // @param traceParamsArgOffset : Non TraceParam arguments number
-void SpirvLowerRayTracingImpl::createCallShaderFunc(Function *func, ShaderStage stage, unsigned intersectId,
-                                                    Value *retVal, unsigned traceParamsArgOffset) {
+void LowerRayTracingImpl::createCallShaderFunc(Function *func, ShaderStage stage, unsigned intersectId, Value *retVal,
+                                               unsigned traceParamsArgOffset) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   auto shaderStageMask = rayTracingContext->getShaderStageMask();
 
@@ -845,10 +846,9 @@ void SpirvLowerRayTracingImpl::createCallShaderFunc(Function *func, ShaderStage 
 // @param entryBlock : Entry block
 // @param endBlock : End block
 // @param traceParamsArgOffset : The count of beginning function non traceParam function arguments
-void SpirvLowerRayTracingImpl::createCallShader(Function *func, ShaderStage stage, unsigned intersectId,
-                                                Value *shaderId, Value *shaderRecordIndex, Value *inputResult,
-                                                BasicBlock *entryBlock, BasicBlock *endBlock,
-                                                unsigned traceParamsArgOffset) {
+void LowerRayTracingImpl::createCallShader(Function *func, ShaderStage stage, unsigned intersectId, Value *shaderId,
+                                           Value *shaderRecordIndex, Value *inputResult, BasicBlock *entryBlock,
+                                           BasicBlock *endBlock, unsigned traceParamsArgOffset) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   auto indirectStageMask = rayTracingContext->getIndirectStageMask();
   bool indirectShader = indirectStageMask & shaderStageToMask(stage);
@@ -897,13 +897,10 @@ void SpirvLowerRayTracingImpl::createCallShader(Function *func, ShaderStage stag
 
     auto funcPtr = m_builder->CreateIntToPtr(shaderId, funcPtrTy);
 
-    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-      createSqttCallCompactToken(stage);
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+      createSqttIndirectFunctionCallToken();
 
     CallInst *result = m_builder->CreateCall(funcTy, funcPtr, args);
-
-    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-      createSqttFunctionReturnToken();
 
     unsigned lgcRtStage = static_cast<unsigned>(mapStageToLgcRtShaderStage(stage));
     result->setMetadata(RtName::ContinufyStageMeta,
@@ -928,7 +925,7 @@ void SpirvLowerRayTracingImpl::createCallShader(Function *func, ShaderStage stag
 // Patch library AmdTraceRaySetTriangleIntersectionAttributes function
 //
 // @param func : Function to create
-void SpirvLowerRayTracingImpl::createSetTriangleInsection(Function *func) {
+void LowerRayTracingImpl::createSetTriangleInsection(Function *func) {
   eraseFunctionBlocks(func);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
@@ -953,105 +950,69 @@ void SpirvLowerRayTracingImpl::createSetTriangleInsection(Function *func) {
 //
 // @param tableKind : Kind of shader table variable to create
 // @param bufferDesc : Dispatch ray buffer descriptor
-Value *SpirvLowerRayTracingImpl::loadShaderTableVariable(ShaderTable tableKind, Value *bufferDesc) {
+Value *LowerRayTracingImpl::loadShaderTableVariable(ShaderTable tableKind, Value *bufferDesc) {
   assert(tableKind < ShaderTable::Count);
   switch (tableKind) {
   case ShaderTable::RayGenTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayGenerationTable);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo);
     static_assert(
         offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressHi) ==
             offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo) + 4,
         "GpuRt::DispatchRaysConstantData: rayGenerationTableAddressLo and rayGenerationTableAddressHi mismatch!");
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::MissTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.baseAddress);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo);
     static_assert(offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressHi) ==
                       offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo) + 4,
                   "GpuRt::DispatchRaysConstantData: missTableBaseAddressLo and missTableBaseAddressHi mismatch!");
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::HitGroupTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.baseAddress);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo);
     static_assert(
         offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressHi) ==
             offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo) + 4,
         "GpuRt::DispatchRaysConstantData: hitGroupTableBaseAddressLo and hitGroupTableBaseAddressHi mismatch!");
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::CallableTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.baseAddress);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo);
     static_assert(
         offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressHi) ==
             offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo) + 4,
         "GpuRt::DispatchRaysConstantData: callableTableBaseAddressLo and callableTableBaseAddressHi mismatch!");
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::MissTableStride: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.strideInBytes);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableStrideInBytes);
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
   }
   case ShaderTable::HitGroupTableStride: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.strideInBytes);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableStrideInBytes);
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
   }
   case ShaderTable::CallableTableStride: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.strideInBytes);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableStrideInBytes);
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
   }
   case ShaderTable::TraceRayGpuVirtAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, traceRayGpuVa);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo);
     static_assert(offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaHi) ==
                       offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo) + 4,
                   "GpuRt::DispatchRaysConstantData: traceRayGpuVaLo and traceRayGpuVaHi mismatch!");
-#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::LaunchSize: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayDispatchWidth);
-#else
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayDispatchWidth);
-#endif
     Value *offsetOfRayDispatchWidth = m_builder->getInt32(offset);
     Value *rayDispatchWidthPtr =
         m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, offsetOfRayDispatchWidth, "");
@@ -1077,9 +1038,9 @@ Value *SpirvLowerRayTracingImpl::loadShaderTableVariable(ShaderTable tableKind, 
 // @param args : Argument list of function call
 // @param inResult : Allocated value to store function return value
 // @param inResultTy : Base type of inResult param
-void SpirvLowerRayTracingImpl::createShaderSelection(Function *func, BasicBlock *entryBlock, BasicBlock *endBlock,
-                                                     Value *shaderId, unsigned intersectId, ShaderStage stage,
-                                                     ArrayRef<Value *> args, Value *inResult, Type *inResultTy) {
+void LowerRayTracingImpl::createShaderSelection(Function *func, BasicBlock *entryBlock, BasicBlock *endBlock,
+                                                Value *shaderId, unsigned intersectId, ShaderStage stage,
+                                                ArrayRef<Value *> args, Value *inResult, Type *inResultTy) {
   // .entry:
   // switch i32 %shaderId, label % .end[
   //    i32 2, label % .shader2
@@ -1112,15 +1073,8 @@ void SpirvLowerRayTracingImpl::createShaderSelection(Function *func, BasicBlock 
     m_builder->SetInsertPoint(shaderBlock);
     auto funcName = std::string("_") + getShaderStageAbbreviation(stage) + "_" + moduleIdStr;
 
-    auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
-    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-      createSqttCallCompactToken(stage);
-
     Value *result =
         m_builder->CreateNamedCall(funcName, inResultTy, args, {Attribute::NoUnwind, Attribute::AlwaysInline});
-
-    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-      createSqttFunctionReturnToken();
 
     if (inResult)
       m_builder->CreateStore(result, inResult);
@@ -1135,7 +1089,7 @@ void SpirvLowerRayTracingImpl::createShaderSelection(Function *func, BasicBlock 
 // @param stage : Shader stage
 // @param shaderRecordIndex : Shader table record index
 // @param bufferDesc : DispatchRay descriptor
-Value *SpirvLowerRayTracingImpl::getShaderIdentifier(ShaderStage stage, Value *shaderRecordIndex, Value *bufferDesc) {
+Value *LowerRayTracingImpl::getShaderIdentifier(ShaderStage stage, Value *shaderRecordIndex, Value *bufferDesc) {
   ShaderTable tableAddr = ShaderTable::Count;
   ShaderTable tableStride = ShaderTable::Count;
   unsigned offset = 0;
@@ -1205,7 +1159,7 @@ Value *SpirvLowerRayTracingImpl::getShaderIdentifier(ShaderStage stage, Value *s
 //
 // @param shaderIdentifier : Input shader identifier for the function
 // @param shaderRecordIndex : Shader record index
-void SpirvLowerRayTracingImpl::createAnyHitFunc(Value *shaderIdentifier, Value *shaderRecordIndex) {
+void LowerRayTracingImpl::createAnyHitFunc(Value *shaderIdentifier, Value *shaderRecordIndex) {
   IRBuilderBase::InsertPointGuard ipg(*m_builder);
   Function *func = dyn_cast_or_null<Function>(m_module->getFunction(RtName::CallAnyHitShader));
   if (!func) {
@@ -1258,7 +1212,7 @@ void SpirvLowerRayTracingImpl::createAnyHitFunc(Value *shaderIdentifier, Value *
 
 // =====================================================================================================================
 // Process ray gen functions, threads of launchId should not exceed the launchSize
-void SpirvLowerRayTracingImpl::createRayGenEntryFunc() {
+void LowerRayTracingImpl::createRayGenEntryFunc() {
   // .entry
   //    %xgreat = icmp ge i32 %launchId.x, %launchSize.x
   //    %ygreat = icmp ge i32 %launchId.y, %launchSize.y
@@ -1305,7 +1259,7 @@ void SpirvLowerRayTracingImpl::createRayGenEntryFunc() {
   lgc::Pipeline::markShaderEntryPoint(func, lgc::ShaderStage::Compute);
   lgc::rt::setLgcRtShaderStage(func, lgc::rt::RayTracingShaderStage::KernelEntry);
 
-  // Construct entry block guard the launchId from launchSize
+  // Construct entry block to guard the launchId from launchSize
   m_builder->SetInsertPoint(entryBlock);
   createDispatchRaysInfoDesc();
   Value *launchSize = loadShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
@@ -1329,7 +1283,6 @@ void SpirvLowerRayTracingImpl::createRayGenEntryFunc() {
   auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), m_dispatchRaysInfoDesc);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 68
   if (rayTracingContext->getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continufy &&
       rayTracingContext->getIndirectStageMask() != 0) {
     // Setup continuation stack pointer
@@ -1339,7 +1292,6 @@ void SpirvLowerRayTracingImpl::createRayGenEntryFunc() {
     stackPtr = m_builder->CreateIntToPtr(stackPtr, PointerType::get(*m_context, lgc::cps::stackAddrSpace));
     m_builder->create<lgc::cps::SetVspOp>(stackPtr);
   }
-#endif
 
   bool indirect = rayTracingContext->getIndirectStageMask() & shaderStageToMask(m_shaderStage);
   if (!indirect) {
@@ -1356,14 +1308,14 @@ void SpirvLowerRayTracingImpl::createRayGenEntryFunc() {
     }
     auto funcPtr = m_builder->CreateIntToPtr(rayGenId, funcPtrTy);
 
-    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
-      createSqttCallCompactToken(ShaderStageRayTracingRayGen);
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+      createSqttIndirectFunctionCallToken();
 
     CallInst *call = m_builder->CreateCall(funcTy, funcPtr, {});
+    call->setCallingConv(CallingConv::SPIR_FUNC);
 
     if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
       createSqttFunctionReturnToken();
-    call->setCallingConv(CallingConv::SPIR_FUNC);
 
     unsigned lgcRtStage = static_cast<unsigned>(mapStageToLgcRtShaderStage(ShaderStageRayTracingRayGen));
     call->setMetadata(RtName::ContinufyStageMeta,
@@ -1381,7 +1333,7 @@ void SpirvLowerRayTracingImpl::createRayGenEntryFunc() {
 //
 // @param module : LLVM module to be used by the DIBuilder
 // @param func : Function to process
-void SpirvLowerRayTracingImpl::createDbgInfo(Module &module, Function *func) {
+void LowerRayTracingImpl::createDbgInfo(Module &module, Function *func) {
   DIBuilder builder(module);
   DIFile *file = builder.createFile(func->getName(), ".");
   builder.createCompileUnit(dwarf::DW_LANG_C99, file, "llvmIR", false, "", 0, "", DICompileUnit::LineTablesOnly);
@@ -1402,7 +1354,7 @@ void SpirvLowerRayTracingImpl::createDbgInfo(Module &module, Function *func) {
 //
 // @param func : Old Function to be deprecated
 // @param newFunc : New Function to be processed
-void SpirvLowerRayTracingImpl::cloneDbgInfoSubprogram(llvm::Function *func, llvm::Function *newFunc) {
+void LowerRayTracingImpl::cloneDbgInfoSubprogram(llvm::Function *func, llvm::Function *newFunc) {
   if (auto subprogram = func->getSubprogram()) {
     auto metadata = MDString::get(*m_context, newFunc->getName());
     // Replace DISubProgram name and linkname to the new function name
@@ -1420,7 +1372,7 @@ void SpirvLowerRayTracingImpl::cloneDbgInfoSubprogram(llvm::Function *func, llvm
 // @param func : Processed function
 // @param callInst : CallInst of terminal op
 // @param hitStatus : Ray hit Status
-void SpirvLowerRayTracingImpl::processTerminalFunc(Function *func, CallInst *callInst, RayHitStatus hitStatus) {
+void LowerRayTracingImpl::processTerminalFunc(Function *func, CallInst *callInst, RayHitStatus hitStatus) {
 
   // .entry:
   // ...
@@ -1451,7 +1403,7 @@ void SpirvLowerRayTracingImpl::processTerminalFunc(Function *func, CallInst *cal
 
 // =====================================================================================================================
 // Create traceray module entry function
-CallInst *SpirvLowerRayTracingImpl::createTraceRay() {
+CallInst *LowerRayTracingImpl::createTraceRay() {
   assert(m_shaderStage == ShaderStageCompute);
 
   // Create traceRay module entry function
@@ -1514,62 +1466,6 @@ CallInst *SpirvLowerRayTracingImpl::createTraceRay() {
 
   Value *sceneAddLow = m_builder->CreateExtractElement(arg, uint64_t(0));
   Value *sceneAddHigh = m_builder->CreateExtractElement(arg, 1);
-
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 34
-  {
-    // For GPURT major version < 34, GPURT expect base address of acceleration structure being passed, which is stored
-    // at offset 0 of the resource.
-    auto gpuLowAddr = m_builder->CreateZExt(sceneAddLow, m_builder->getInt64Ty());
-    auto gpuHighAddr = m_builder->CreateZExt(sceneAddHigh, m_builder->getInt64Ty());
-    gpuHighAddr = m_builder->CreateShl(gpuHighAddr, m_builder->getInt64(32));
-    auto gpuAddr = m_builder->CreateOr(gpuLowAddr, gpuHighAddr);
-
-    Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-    auto loadPtr = m_builder->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
-    auto loadTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-
-    Value *loadValue = nullptr;
-
-    if (m_context->getPipelineContext()->getPipelineOptions()->extendedRobustness.nullDescriptor) {
-      // We should not load from a null descriptor (if it is allowed).
-      // We do:
-      // .entry:
-      //   ...
-      //   %gpuAddr = ...
-      //   %loadPtr = inttoptr %gpuAddr
-      //   %isDescValid = icmp ne %gpuAddr, 0
-      //   br %isDescValid, label %.loadDescriptor, label %.continue
-      //
-      // .loadDescriptor:
-      //   %AS = load %loadPtr
-      //
-      // .continue:
-      //   %loadVal = phi [ %AS, %.loadDescriptor ], [ 0, %.entry ]
-
-      BasicBlock *loadDescriptorBlock = BasicBlock::Create(*m_context, ".loadDescriptor", func);
-      BasicBlock *continueBlock = BasicBlock::Create(*m_context, ".continue", func);
-
-      auto isDescValid = m_builder->CreateICmpNE(gpuAddr, m_builder->getInt64(0));
-      m_builder->CreateCondBr(isDescValid, loadDescriptorBlock, continueBlock);
-
-      m_builder->SetInsertPoint(loadDescriptorBlock);
-      auto accelerationStructureAddr = m_builder->CreateLoad(loadTy, loadPtr);
-      m_builder->CreateBr(continueBlock);
-
-      m_builder->SetInsertPoint(continueBlock);
-      auto phi = m_builder->CreatePHI(loadTy, 2);
-      phi->addIncoming(accelerationStructureAddr, loadDescriptorBlock);
-      auto zero = m_builder->getInt32(0);
-      phi->addIncoming(ConstantVector::get({zero, zero}), entryBlock);
-      loadValue = phi;
-    } else {
-      loadValue = m_builder->CreateLoad(loadTy, loadPtr);
-    }
-
-    sceneAddLow = m_builder->CreateExtractElement(loadValue, uint64_t(0));
-    sceneAddHigh = m_builder->CreateExtractElement(loadValue, 1);
-  }
-#endif
 
   m_builder->CreateStore(sceneAddLow, traceRaysArgs[TraceRayLibFuncParam::AcceleStructLo]);
   m_builder->CreateStore(sceneAddHigh, traceRaysArgs[TraceRayLibFuncParam::AcceleStructHi]);
@@ -1638,8 +1534,17 @@ CallInst *SpirvLowerRayTracingImpl::createTraceRay() {
     m_builder->CreateStore(arg, m_traceParams[TraceParam::RayStaticId]);
   }
 
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+    createSqttShaderHashToken();
+
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+    createSqttCallCompactToken(ShaderStageCompute);
+
   // Call TraceRay function from traceRays module
   auto call = m_builder->CreateCall(traceRayFunc, traceRaysArgs);
+
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+    createSqttFunctionReturnToken();
 
   const auto payloadType = rayTracingContext->getPayloadType(m_builder);
   (void(call)); // unused
@@ -1653,7 +1558,7 @@ CallInst *SpirvLowerRayTracingImpl::createTraceRay() {
 //
 // @param callInst : Where to inline function
 // @param analysisManager : : Analysis manager to use for this transformation
-void SpirvLowerRayTracingImpl::inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager) {
+void LowerRayTracingImpl::inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager) {
   FunctionAnalysisManager &fam = analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(*m_module).getManager();
   auto getAssumptionCache = [&](Function &F) -> AssumptionCache & { return fam.getResult<AssumptionAnalysis>(F); };
   auto getBFI = [&](Function &F) -> BlockFrequencyInfo & { return fam.getResult<BlockFrequencyAnalysis>(F); };
@@ -1683,7 +1588,7 @@ void SpirvLowerRayTracingImpl::inlineTraceRay(llvm::CallInst *callInst, ModuleAn
 // init TraceParam types
 //
 // @param traceParam : trace params
-void SpirvLowerRayTracingImpl::initTraceParamsTy(unsigned attributeSize) {
+void LowerRayTracingImpl::initTraceParamsTy(unsigned attributeSize) {
   auto floatx3Ty = FixedVectorType::get(Type::getFloatTy(*m_context), 3);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   const auto payloadType = rayTracingContext->getPayloadType(m_builder);
@@ -1735,7 +1640,7 @@ void SpirvLowerRayTracingImpl::initTraceParamsTy(unsigned attributeSize) {
 
 // =====================================================================================================================
 // Initialize builting for shader call
-void SpirvLowerRayTracingImpl::initShaderBuiltIns() {
+void LowerRayTracingImpl::initShaderBuiltIns() {
   assert(m_builtInParams.size() == 0);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   const auto *buildInfo = rayTracingContext->getRayTracingPipelineBuildInfo();
@@ -1841,7 +1746,7 @@ void SpirvLowerRayTracingImpl::initShaderBuiltIns() {
 //
 // @param func : The shader stage of entry function
 // @param argNames : Filled with the names of arguments
-FunctionType *SpirvLowerRayTracingImpl::getShaderEntryFuncTy(ShaderStage stage, SmallVectorImpl<StringRef> &argNames) {
+FunctionType *LowerRayTracingImpl::getShaderEntryFuncTy(ShaderStage stage, SmallVectorImpl<StringRef> &argNames) {
   SmallVector<Type *, 8> argTys;
 
   auto retTy = getShaderReturnTy(stage);
@@ -1866,7 +1771,7 @@ FunctionType *SpirvLowerRayTracingImpl::getShaderEntryFuncTy(ShaderStage stage, 
 // Mutate entry function for the shader stage, ClosestHit, Intersect, AnyHit, Miss
 //
 // @param func : Function to create
-Instruction *SpirvLowerRayTracingImpl::createEntryFunc(Function *func) {
+Instruction *LowerRayTracingImpl::createEntryFunc(Function *func) {
   // Set old entry function name deprecated
   func->setName("deprecated");
 
@@ -1905,6 +1810,14 @@ Instruction *SpirvLowerRayTracingImpl::createEntryFunc(Function *func) {
 
   Instruction *insertPos = &*(newFunc->begin()->getFirstNonPHIOrDbgOrAlloca());
   m_builder->SetInsertPoint(insertPos);
+
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+    createSqttShaderHashToken();
+
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+    createSqttCallCompactToken(m_shaderStage);
+
   auto argIt = newFunc->arg_begin();
 
   for (auto &builtIn : m_builtInParams) {
@@ -1934,8 +1847,8 @@ Instruction *SpirvLowerRayTracingImpl::createEntryFunc(Function *func) {
 // @param func : Function to create
 // @param stage : Ray tracing shader stage
 // @param traceParamsArgOffset : Non traceParam arguments number
-void SpirvLowerRayTracingImpl::updateGlobalFromCallShaderFunc(Function *func, ShaderStage stage,
-                                                              unsigned traceParamsArgOffset) {
+void LowerRayTracingImpl::updateGlobalFromCallShaderFunc(Function *func, ShaderStage stage,
+                                                         unsigned traceParamsArgOffset) {
   auto zero = m_builder->getInt32(0);
   auto one = m_builder->getInt32(1);
 
@@ -1957,7 +1870,7 @@ void SpirvLowerRayTracingImpl::updateGlobalFromCallShaderFunc(Function *func, Sh
 
 // =====================================================================================================================
 // Get callabe shader entry function type
-FunctionType *SpirvLowerRayTracingImpl::getCallableShaderEntryFuncTy(SmallVectorImpl<StringRef> &argNames) {
+FunctionType *LowerRayTracingImpl::getCallableShaderEntryFuncTy(SmallVectorImpl<StringRef> &argNames) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   SmallVector<Type *, 8> argTys;
   auto callableDataTy = rayTracingContext->getCallableDataType(m_builder);
@@ -1972,7 +1885,7 @@ FunctionType *SpirvLowerRayTracingImpl::getCallableShaderEntryFuncTy(SmallVector
 
 // =====================================================================================================================
 // Get traceray function type
-FunctionType *SpirvLowerRayTracingImpl::getTraceRayFuncTy() {
+FunctionType *LowerRayTracingImpl::getTraceRayFuncTy() {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   auto retTy = rayTracingContext->getPayloadType(m_builder);
   SmallVector<Type *, 11> argsTys = {
@@ -2003,7 +1916,7 @@ FunctionType *SpirvLowerRayTracingImpl::getTraceRayFuncTy() {
 // Mutate entry function for the shader stage callable shader
 //
 // @param func : Function to create
-Instruction *SpirvLowerRayTracingImpl::createCallableShaderEntryFunc(Function *func) {
+Instruction *LowerRayTracingImpl::createCallableShaderEntryFunc(Function *func) {
   // Set old entry function name deprecated
   func->setName("deprecatedCallableShader");
 
@@ -2038,6 +1951,13 @@ Instruction *SpirvLowerRayTracingImpl::createCallableShaderEntryFunc(Function *f
   Instruction *insertPos = &*(newFunc->begin()->getFirstNonPHIOrDbgOrAlloca());
   m_builder->SetInsertPoint(insertPos);
 
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderHashToken)
+    createSqttShaderHashToken();
+
+  if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+    createSqttCallCompactToken(m_shaderStage);
+
   auto argIt = newFunc->arg_begin();
 
   // Save the function input parameter value to the global callable
@@ -2055,7 +1975,7 @@ Instruction *SpirvLowerRayTracingImpl::createCallableShaderEntryFunc(Function *f
 // Get all the function ReturnInst
 //
 // @param func : Function to gather ReturnInst
-SmallVector<Instruction *> SpirvLowerRayTracingImpl::getFuncRets(Function *func) const {
+SmallVector<Instruction *> LowerRayTracingImpl::getFuncRets(Function *func) const {
   SmallVector<Instruction *> rets;
   for (auto &block : *func) {
     auto blockTerm = block.getTerminator();
@@ -2069,7 +1989,7 @@ SmallVector<Instruction *> SpirvLowerRayTracingImpl::getFuncRets(Function *func)
 // Get the extra parameters needed for calling indirect shader
 //
 // @param stage : The shader stage of shader to call
-SmallSet<unsigned, 4> SpirvLowerRayTracingImpl::getShaderExtraInputParams(ShaderStage stage) {
+SmallSet<unsigned, 4> LowerRayTracingImpl::getShaderExtraInputParams(ShaderStage stage) {
   SmallSet<unsigned, 4> params;
 
   switch (stage) {
@@ -2105,7 +2025,7 @@ SmallSet<unsigned, 4> SpirvLowerRayTracingImpl::getShaderExtraInputParams(Shader
 // Get the extra return values needed for indirect shader, in addition to payload
 //
 // @param stage : The shader stage
-SmallSet<unsigned, 4> SpirvLowerRayTracingImpl::getShaderExtraRets(ShaderStage stage) {
+SmallSet<unsigned, 4> LowerRayTracingImpl::getShaderExtraRets(ShaderStage stage) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   SmallSet<unsigned, 4> rets;
 
@@ -2134,7 +2054,7 @@ SmallSet<unsigned, 4> SpirvLowerRayTracingImpl::getShaderExtraRets(ShaderStage s
 // Get return type for specific shader stage
 //
 // @param stage : The shader stage
-Type *SpirvLowerRayTracingImpl::getShaderReturnTy(ShaderStage stage) {
+Type *LowerRayTracingImpl::getShaderReturnTy(ShaderStage stage) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
   // Return payload in default
@@ -2152,7 +2072,7 @@ Type *SpirvLowerRayTracingImpl::getShaderReturnTy(ShaderStage stage) {
 //
 // @param stage : The shader stage
 // @param result : The result to store
-void SpirvLowerRayTracingImpl::storeFunctionCallResult(ShaderStage stage, Value *result, Argument *traceParamsIt) {
+void LowerRayTracingImpl::storeFunctionCallResult(ShaderStage stage, Value *result, Argument *traceParamsIt) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
   unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
@@ -2200,8 +2120,8 @@ void SpirvLowerRayTracingImpl::storeFunctionCallResult(ShaderStage stage, Value 
 // @param traceParams : The value to initialize second part of inputResult
 // @param result : The result to initialize
 // @param traceParams : TraceParam argument
-void SpirvLowerRayTracingImpl::initInputResult(ShaderStage stage, Value *payload, Value *traceParams[], Value *result,
-                                               Argument *traceParamsIt) {
+void LowerRayTracingImpl::initInputResult(ShaderStage stage, Value *payload, Value *traceParams[], Value *result,
+                                          Argument *traceParamsIt) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
   unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
@@ -2246,7 +2166,7 @@ void SpirvLowerRayTracingImpl::initInputResult(ShaderStage stage, Value *payload
 // Load ObjectToWorld or WorldToObject matrix
 //
 // @param builtInId : ID of the built-in variable
-Value *SpirvLowerRayTracingImpl::createLoadRayTracingMatrix(unsigned builtInId) {
+Value *LowerRayTracingImpl::createLoadRayTracingMatrix(unsigned builtInId) {
   assert(builtInId == BuiltInWorldToObjectKHR || builtInId == BuiltInObjectToWorldKHR);
 
   IRBuilderBase::InsertPointGuard guard(*m_builder);
@@ -2263,7 +2183,7 @@ Value *SpirvLowerRayTracingImpl::createLoadRayTracingMatrix(unsigned builtInId) 
 // Process AmdTraceRaySetHitTriangleNodePointer function
 //
 // @param func : The function to create
-void SpirvLowerRayTracingImpl::createSetHitTriangleNodePointer(Function *func) {
+void LowerRayTracingImpl::createSetHitTriangleNodePointer(Function *func) {
   eraseFunctionBlocks(func);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
@@ -2292,10 +2212,24 @@ void SpirvLowerRayTracingImpl::createSetHitTriangleNodePointer(Function *func) {
 }
 
 // =====================================================================================================================
+// Process raygen entry function return instruction
+//
+// @param func : The function to process
+void LowerRayTracingImpl::createRayGenEntryTerminator(llvm::Function *func) {
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+  for (auto ret : getFuncRets(func)) {
+    m_builder->SetInsertPoint(ret);
+
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+      createSqttFunctionReturnToken();
+  }
+}
+
+// =====================================================================================================================
 // Process entry function return instruction, replace new return payload/etc info
 //
 // @param func : The function to process
-void SpirvLowerRayTracingImpl::createEntryTerminator(Function *func) {
+void LowerRayTracingImpl::createEntryTerminator(Function *func) {
   // Return incoming payload, and other values if needed
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   for (auto ret : getFuncRets(func)) {
@@ -2332,6 +2266,10 @@ void SpirvLowerRayTracingImpl::createEntryTerminator(Function *func) {
       retVal = newRetVal;
     }
 
+    auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+      createSqttFunctionReturnToken();
+
     Instruction *newfuncEnd = m_builder->CreateRet(retVal);
     ret->replaceAllUsesWith(newfuncEnd);
     ret->eraseFromParent();
@@ -2342,10 +2280,15 @@ void SpirvLowerRayTracingImpl::createEntryTerminator(Function *func) {
 // Add return callable data
 //
 // @param func : The function to process
-void SpirvLowerRayTracingImpl::createCallableShaderEntryTerminator(Function *func) {
+void LowerRayTracingImpl::createCallableShaderEntryTerminator(Function *func) {
   // return global callable data
   for (auto ret : getFuncRets(func)) {
     m_builder->SetInsertPoint(ret);
+
+    auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+    if (rayTracingContext->getRayTracingState()->exportConfig.emitRaytracingShaderDataToken)
+      createSqttFunctionReturnToken();
+
     Instruction *newfuncEnd =
         m_builder->CreateRet(m_builder->CreateLoad(m_callableData->getAllocatedType(), m_callableData));
     ret->replaceAllUsesWith(newfuncEnd);
@@ -2355,7 +2298,7 @@ void SpirvLowerRayTracingImpl::createCallableShaderEntryTerminator(Function *fun
 
 // =====================================================================================================================
 // Get RemapCapturedVaToReplayVa function for indirect pipeline capture replay, create it if it does not exist.
-Function *SpirvLowerRayTracingImpl::getOrCreateRemapCapturedVaToReplayVaFunc() {
+Function *LowerRayTracingImpl::getOrCreateRemapCapturedVaToReplayVaFunc() {
   Function *func = dyn_cast_or_null<Function>(m_module->getFunction(RtName::RemapCapturedVaToReplayVa));
   // uint64_t RemapCapturedVaToReplayVa(uint64_t shdaerId) {
   //   // InternalBuffer contains array of Vkgc::RayTracingCaptureReplayVaMappingEntry
@@ -2449,7 +2392,7 @@ Function *SpirvLowerRayTracingImpl::getOrCreateRemapCapturedVaToReplayVaFunc() {
 // =====================================================================================================================
 // Get DispatchRaysInfo Descriptor
 //
-void SpirvLowerRayTracingImpl::createDispatchRaysInfoDesc() {
+void LowerRayTracingImpl::createDispatchRaysInfoDesc() {
   if (!m_dispatchRaysInfoDesc) {
     m_dispatchRaysInfoDesc = m_builder->create<lgc::LoadBufferDescOp>(
         TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo, m_builder->getInt32(0), 0);
@@ -2461,7 +2404,7 @@ void SpirvLowerRayTracingImpl::createDispatchRaysInfoDesc() {
 // Visits "lgc.rt.accept.hit.and.end.search" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitAcceptHitAndEndSearchOp(AcceptHitAndEndSearchOp &inst) {
+void LowerRayTracingImpl::visitAcceptHitAndEndSearchOp(AcceptHitAndEndSearchOp &inst) {
   processTerminalFunc(m_entryPoint, &cast<CallInst>(inst), RayHitStatus::AcceptAndEndSearch);
 }
 
@@ -2469,7 +2412,7 @@ void SpirvLowerRayTracingImpl::visitAcceptHitAndEndSearchOp(AcceptHitAndEndSearc
 // Visits "lgc.rt.ignore.hit" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitIgnoreHitOp(IgnoreHitOp &inst) {
+void LowerRayTracingImpl::visitIgnoreHitOp(IgnoreHitOp &inst) {
   processTerminalFunc(m_entryPoint, &cast<CallInst>(inst), RayHitStatus::Ignore);
 }
 
@@ -2477,7 +2420,7 @@ void SpirvLowerRayTracingImpl::visitIgnoreHitOp(IgnoreHitOp &inst) {
 // Visits "lgc.rt.trace.ray" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitTraceRayOp(TraceRayOp &inst) {
+void LowerRayTracingImpl::visitTraceRayOp(TraceRayOp &inst) {
   processTraceRayCall(&inst);
 }
 
@@ -2485,7 +2428,7 @@ void SpirvLowerRayTracingImpl::visitTraceRayOp(TraceRayOp &inst) {
 // Visits "lgc.gpurt.get.hit.attributes" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitGetHitAttributes(lgc::GpurtGetHitAttributesOp &inst) {
+void LowerRayTracingImpl::visitGetHitAttributes(lgc::GpurtGetHitAttributesOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *tCurrent = m_builder->CreateLoad(m_traceParamsTys[TraceParam::TCurrent], m_traceParams[TraceParam::TCurrent]);
   Value *kind = m_builder->CreateLoad(m_traceParamsTys[TraceParam::Kind], m_traceParams[TraceParam::Kind]);
@@ -2503,7 +2446,7 @@ void SpirvLowerRayTracingImpl::visitGetHitAttributes(lgc::GpurtGetHitAttributesO
 // Visits "lgc.gpurt.set.hit.attributes" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitSetHitAttributes(lgc::GpurtSetHitAttributesOp &inst) {
+void LowerRayTracingImpl::visitSetHitAttributes(lgc::GpurtSetHitAttributesOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   ArrayRef<Value *> args(&m_traceParams[TraceParam::TMin], TraceParam::GeometryIndex - TraceParam::TMin + 1);
@@ -2520,7 +2463,7 @@ void SpirvLowerRayTracingImpl::visitSetHitAttributes(lgc::GpurtSetHitAttributesO
 // Visits "lgc.gpurt.set.trace.params" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitSetTraceParams(lgc::GpurtSetTraceParamsOp &inst) {
+void LowerRayTracingImpl::visitSetTraceParams(lgc::GpurtSetTraceParamsOp &inst) {
   m_builder->SetInsertPoint(&inst);
   ArrayRef<Value *> args(m_traceParams, TraceParam::TMax + 1);
   auto func = createImplFunc(inst, args);
@@ -2536,7 +2479,7 @@ void SpirvLowerRayTracingImpl::visitSetTraceParams(lgc::GpurtSetTraceParamsOp &i
 // Visits "lgc.gpurt.call.closest.hit.shader" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitCallClosestHitShader(lgc::GpurtCallClosestHitShaderOp &inst) {
+void LowerRayTracingImpl::visitCallClosestHitShader(lgc::GpurtCallClosestHitShaderOp &inst) {
   m_builder->SetInsertPoint(&inst);
   ArrayRef<Value *> args(m_traceParams, TraceParam::Count);
 
@@ -2554,7 +2497,7 @@ void SpirvLowerRayTracingImpl::visitCallClosestHitShader(lgc::GpurtCallClosestHi
 // Visits "lgc.gpurt.call.miss.shader" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitCallMissShader(lgc::GpurtCallMissShaderOp &inst) {
+void LowerRayTracingImpl::visitCallMissShader(lgc::GpurtCallMissShaderOp &inst) {
   m_builder->SetInsertPoint(&inst);
   ArrayRef<Value *> args(m_traceParams, TraceParam::Count);
   auto func = createImplFunc(inst, args);
@@ -2571,7 +2514,7 @@ void SpirvLowerRayTracingImpl::visitCallMissShader(lgc::GpurtCallMissShaderOp &i
 // Visits "lgc.gpurt.call.triangle.any.hit.shader" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitCallTriangleAnyHitShader(lgc::GpurtCallTriangleAnyHitShaderOp &inst) {
+void LowerRayTracingImpl::visitCallTriangleAnyHitShader(lgc::GpurtCallTriangleAnyHitShaderOp &inst) {
   m_builder->SetInsertPoint(&inst);
   ArrayRef<Value *> args(m_traceParams, TraceParam::Count);
   auto func = createImplFunc(inst, args);
@@ -2588,7 +2531,7 @@ void SpirvLowerRayTracingImpl::visitCallTriangleAnyHitShader(lgc::GpurtCallTrian
 // Visits "lgc.gpurt.call.intersection.shader" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitCallIntersectionShader(lgc::GpurtCallIntersectionShaderOp &inst) {
+void LowerRayTracingImpl::visitCallIntersectionShader(lgc::GpurtCallIntersectionShaderOp &inst) {
   m_builder->SetInsertPoint(&inst);
   ArrayRef<Value *> args(m_traceParams, TraceParam::Count);
   auto func = createImplFunc(inst, args);
@@ -2605,8 +2548,7 @@ void SpirvLowerRayTracingImpl::visitCallIntersectionShader(lgc::GpurtCallInterse
 // Visits "lgc.gpurt.set.triangle.intersection.attributes" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitSetTriangleIntersectionAttributes(
-    lgc::GpurtSetTriangleIntersectionAttributesOp &inst) {
+void LowerRayTracingImpl::visitSetTriangleIntersectionAttributes(lgc::GpurtSetTriangleIntersectionAttributesOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto func = createImplFunc(inst, {m_traceParams[TraceParam::HitAttributes]});
@@ -2622,7 +2564,7 @@ void SpirvLowerRayTracingImpl::visitSetTriangleIntersectionAttributes(
 // Visits "lgc.gpurt.set.hit.triangle.node.pointer" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitSetHitTriangleNodePointer(lgc::GpurtSetHitTriangleNodePointerOp &inst) {
+void LowerRayTracingImpl::visitSetHitTriangleNodePointer(lgc::GpurtSetHitTriangleNodePointerOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto func = createImplFunc(inst, {m_traceParams[TraceParam::HitTriangleVertexPositions]});
@@ -2638,7 +2580,7 @@ void SpirvLowerRayTracingImpl::visitSetHitTriangleNodePointer(lgc::GpurtSetHitTr
 // Visits "lgc.gpurt.get.ray.static.id" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst) {
+void LowerRayTracingImpl::visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto rayStaticId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceParams[TraceParam::RayStaticId]);
@@ -2652,7 +2594,7 @@ void SpirvLowerRayTracingImpl::visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &i
 // Visits "lgc.gpurt.stack.read" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitStackReadOp(lgc::GpurtStackReadOp &inst) {
+void LowerRayTracingImpl::visitStackReadOp(lgc::GpurtStackReadOp &inst) {
   // NOTE: If RayQuery is used inside intersection or any-hit shaders, where we already holding a traversal stack for
   // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
   if ((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit))
@@ -2663,7 +2605,7 @@ void SpirvLowerRayTracingImpl::visitStackReadOp(lgc::GpurtStackReadOp &inst) {
 // Visits "lgc.gpurt.stack.write" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitStackWriteOp(lgc::GpurtStackWriteOp &inst) {
+void LowerRayTracingImpl::visitStackWriteOp(lgc::GpurtStackWriteOp &inst) {
   // NOTE: If RayQuery is used inside intersection or any-hit shaders, where we already holding a traversal stack for
   // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
   if ((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit))
@@ -2674,7 +2616,7 @@ void SpirvLowerRayTracingImpl::visitStackWriteOp(lgc::GpurtStackWriteOp &inst) {
 // Visits "lgc.gpurt.stack.init" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitLdsStackInitOp(lgc::GpurtLdsStackInitOp &inst) {
+void LowerRayTracingImpl::visitLdsStackInitOp(lgc::GpurtLdsStackInitOp &inst) {
   // NOTE: If RayQuery is used inside any-hit shaders, where we already holding a traversal stack for
   // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
   if (m_shaderStage == ShaderStageRayTracingAnyHit)
@@ -2685,7 +2627,7 @@ void SpirvLowerRayTracingImpl::visitLdsStackInitOp(lgc::GpurtLdsStackInitOp &ins
 // Visits "lgc.gpurt.get.parent.id" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitGetParentId(lgc::GpurtGetParentIdOp &inst) {
+void LowerRayTracingImpl::visitGetParentId(lgc::GpurtGetParentIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto parentId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceParams[TraceParam::ParentRayId]);
@@ -2699,7 +2641,7 @@ void SpirvLowerRayTracingImpl::visitGetParentId(lgc::GpurtGetParentIdOp &inst) {
 // Visits "lgc.gpurt.set.parent.id" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitSetParentId(lgc::GpurtSetParentIdOp &inst) {
+void LowerRayTracingImpl::visitSetParentId(lgc::GpurtSetParentIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   m_builder->CreateStore(inst.getRayId(), m_traceParams[TraceParam::ParentRayId]);
@@ -2712,7 +2654,7 @@ void SpirvLowerRayTracingImpl::visitSetParentId(lgc::GpurtSetParentIdOp &inst) {
 // Visits "lgc.rt.dispatch.rays.index" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst) {
+void LowerRayTracingImpl::visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto dispatchRayIndex = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId);
@@ -2726,7 +2668,7 @@ void SpirvLowerRayTracingImpl::visitDispatchRayIndex(lgc::rt::DispatchRaysIndexO
 // Visits "lgc.rt.dispatch.rays.dimensions" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitDispatchRaysDimensionsOp(lgc::rt::DispatchRaysDimensionsOp &inst) {
+void LowerRayTracingImpl::visitDispatchRaysDimensionsOp(lgc::rt::DispatchRaysDimensionsOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto dispatchRaysDimensions = loadShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
@@ -2740,7 +2682,7 @@ void SpirvLowerRayTracingImpl::visitDispatchRaysDimensionsOp(lgc::rt::DispatchRa
 // Visits "lgc.rt.world.ray.origin" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitWorldRayOriginOp(lgc::rt::WorldRayOriginOp &inst) {
+void LowerRayTracingImpl::visitWorldRayOriginOp(lgc::rt::WorldRayOriginOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto worldRayOrigin = m_builder->CreateLoad(m_traceParamsTys[TraceParam::Origin], m_traceParams[TraceParam::Origin]);
@@ -2754,7 +2696,7 @@ void SpirvLowerRayTracingImpl::visitWorldRayOriginOp(lgc::rt::WorldRayOriginOp &
 // Visits "lgc.rt.world.ray.direction" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitWorldRayDirectionOp(lgc::rt::WorldRayDirectionOp &inst) {
+void LowerRayTracingImpl::visitWorldRayDirectionOp(lgc::rt::WorldRayDirectionOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto worldRayDir = m_builder->CreateLoad(m_traceParamsTys[TraceParam::Dir], m_traceParams[TraceParam::Dir]);
@@ -2768,7 +2710,7 @@ void SpirvLowerRayTracingImpl::visitWorldRayDirectionOp(lgc::rt::WorldRayDirecti
 // Visits "lgc.rt.object.ray.origin" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitObjectRayOriginOp(lgc::rt::ObjectRayOriginOp &inst) {
+void LowerRayTracingImpl::visitObjectRayOriginOp(lgc::rt::ObjectRayOriginOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   Value *origin = m_builder->CreateLoad(m_traceParamsTys[TraceParam::Origin], m_traceParams[TraceParam::Origin]);
@@ -2794,7 +2736,7 @@ void SpirvLowerRayTracingImpl::visitObjectRayOriginOp(lgc::rt::ObjectRayOriginOp
 // Visits "lgc.rt.object.ray.direction" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitObjectRayDirectionOp(lgc::rt::ObjectRayDirectionOp &inst) {
+void LowerRayTracingImpl::visitObjectRayDirectionOp(lgc::rt::ObjectRayDirectionOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   Value *dir = m_builder->CreateLoad(m_traceParamsTys[TraceParam::Dir], m_traceParams[TraceParam::Dir]);
@@ -2819,7 +2761,7 @@ void SpirvLowerRayTracingImpl::visitObjectRayDirectionOp(lgc::rt::ObjectRayDirec
 // Visits "lgc.rt.tmin" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitRayTminOp(lgc::rt::RayTminOp &inst) {
+void LowerRayTracingImpl::visitRayTminOp(lgc::rt::RayTminOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto tMin = m_builder->CreateLoad(m_traceParamsTys[TraceParam::TMin], m_traceParams[TraceParam::TMin]);
@@ -2833,7 +2775,7 @@ void SpirvLowerRayTracingImpl::visitRayTminOp(lgc::rt::RayTminOp &inst) {
 // Visits "lgc.rt.tcurrent" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitRayTcurrentOp(lgc::rt::RayTcurrentOp &inst) {
+void LowerRayTracingImpl::visitRayTcurrentOp(lgc::rt::RayTcurrentOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto tMax = m_builder->CreateLoad(m_traceParamsTys[TraceParam::TMax], m_traceParams[TraceParam::TMax]);
@@ -2847,7 +2789,7 @@ void SpirvLowerRayTracingImpl::visitRayTcurrentOp(lgc::rt::RayTcurrentOp &inst) 
 // Visits "lgc.rt.instance.index" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitInstanceIndexOp(lgc::rt::InstanceIndexOp &inst) {
+void LowerRayTracingImpl::visitInstanceIndexOp(lgc::rt::InstanceIndexOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto instNodeAddr = createLoadInstNodeAddr();
@@ -2862,7 +2804,7 @@ void SpirvLowerRayTracingImpl::visitInstanceIndexOp(lgc::rt::InstanceIndexOp &in
 // Visits "lgc.rt.object.to.world" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitObjectToWorldOp(lgc::rt::ObjectToWorldOp &inst) {
+void LowerRayTracingImpl::visitObjectToWorldOp(lgc::rt::ObjectToWorldOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto objectToWorld = createLoadRayTracingMatrix(BuiltInObjectToWorldKHR);
@@ -2876,7 +2818,7 @@ void SpirvLowerRayTracingImpl::visitObjectToWorldOp(lgc::rt::ObjectToWorldOp &in
 // Visits "lgc.rt.world.to.object" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitWorldToObjectOp(lgc::rt::WorldToObjectOp &inst) {
+void LowerRayTracingImpl::visitWorldToObjectOp(lgc::rt::WorldToObjectOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   m_worldToObjMatrix = !m_worldToObjMatrix ? createLoadRayTracingMatrix(BuiltInWorldToObjectKHR) : m_worldToObjMatrix;
@@ -2887,10 +2829,25 @@ void SpirvLowerRayTracingImpl::visitWorldToObjectOp(lgc::rt::WorldToObjectOp &in
 }
 
 // =====================================================================================================================
+// Visits "lgc.rt.global.hit.object" instructions
+//
+// @param inst : The instruction
+void LowerRayTracingImpl::visitGlobalHitObjectOp(lgc::rt::GlobalHitObjectOp &inst) {
+  // Note: The global hit object is only used in the continuations implementation, so it can be removed here.
+  m_builder->SetInsertPoint(&inst);
+
+  Value *newVal = PoisonValue::get(inst.getType());
+  inst.replaceAllUsesWith(newVal);
+
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
 // Visits "lgc.rt.hit.kind" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitHitKindOp(lgc::rt::HitKindOp &inst) {
+void LowerRayTracingImpl::visitHitKindOp(lgc::rt::HitKindOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto hitKind = m_builder->CreateLoad(m_traceParamsTys[TraceParam::Kind], m_traceParams[TraceParam::Kind]);
@@ -2904,7 +2861,7 @@ void SpirvLowerRayTracingImpl::visitHitKindOp(lgc::rt::HitKindOp &inst) {
 // Visits "lgc.rt.triangle.vertex.position" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitTriangleVertexPositionsOp(lgc::rt::TriangleVertexPositionsOp &inst) {
+void LowerRayTracingImpl::visitTriangleVertexPositionsOp(lgc::rt::TriangleVertexPositionsOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto triangleVertexPositions = m_builder->CreateLoad(m_traceParamsTys[TraceParam::HitTriangleVertexPositions],
@@ -2926,7 +2883,7 @@ void SpirvLowerRayTracingImpl::visitTriangleVertexPositionsOp(lgc::rt::TriangleV
 // Visits "lgc.rt.ray.flags" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitRayFlagsOp(lgc::rt::RayFlagsOp &inst) {
+void LowerRayTracingImpl::visitRayFlagsOp(lgc::rt::RayFlagsOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto rayFlags = m_builder->CreateLoad(m_traceParamsTys[TraceParam::RayFlags], m_traceParams[TraceParam::RayFlags]);
@@ -2940,7 +2897,7 @@ void SpirvLowerRayTracingImpl::visitRayFlagsOp(lgc::rt::RayFlagsOp &inst) {
 // Visits "lgc.rt.geometry.index" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitGeometryIndexOp(lgc::rt::GeometryIndexOp &inst) {
+void LowerRayTracingImpl::visitGeometryIndexOp(lgc::rt::GeometryIndexOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto geometryIndex =
@@ -2955,7 +2912,7 @@ void SpirvLowerRayTracingImpl::visitGeometryIndexOp(lgc::rt::GeometryIndexOp &in
 // Visits "lgc.rt.instance.id" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitInstanceIdOp(lgc::rt::InstanceIdOp &inst) {
+void LowerRayTracingImpl::visitInstanceIdOp(lgc::rt::InstanceIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto instNodeAddr = createLoadInstNodeAddr();
@@ -2970,7 +2927,7 @@ void SpirvLowerRayTracingImpl::visitInstanceIdOp(lgc::rt::InstanceIdOp &inst) {
 // Visits "lgc.rt.primitive.index" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitPrimitiveIndexOp(lgc::rt::PrimitiveIndexOp &inst) {
+void LowerRayTracingImpl::visitPrimitiveIndexOp(lgc::rt::PrimitiveIndexOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto primitiveIndex =
@@ -2985,7 +2942,7 @@ void SpirvLowerRayTracingImpl::visitPrimitiveIndexOp(lgc::rt::PrimitiveIndexOp &
 // Visits "lgc.rt.instance.inclusion.mask" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitInstanceInclusionMaskOp(lgc::rt::InstanceInclusionMaskOp &inst) {
+void LowerRayTracingImpl::visitInstanceInclusionMaskOp(lgc::rt::InstanceInclusionMaskOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto cullMask = m_builder->CreateLoad(m_traceParamsTys[TraceParam::InstanceInclusionMask],
@@ -2999,7 +2956,7 @@ void SpirvLowerRayTracingImpl::visitInstanceInclusionMaskOp(lgc::rt::InstanceInc
 // Visits "lgc.rt.shader.index" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst) {
+void LowerRayTracingImpl::visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst) {
   // FIXME: This could be wrong if lgc.rt.shader.index is not in the same function as m_shaderRecordIndex, but is
   // this really the case?
   inst.replaceAllUsesWith(m_shaderRecordIndex);
@@ -3012,7 +2969,7 @@ void SpirvLowerRayTracingImpl::visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst) 
 // Visits "lgc.rt.shader.record.buffer" instructions
 //
 // @param inst : The instruction
-void SpirvLowerRayTracingImpl::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst) {
+void LowerRayTracingImpl::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst) {
   m_builder->SetInsertPoint(m_insertPosPastInit);
 
   auto tableIndex = inst.getShaderIndex();
@@ -3072,7 +3029,7 @@ void SpirvLowerRayTracingImpl::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBu
 // Creates instructions to emit SQTT shader data call compact token
 //
 // @param stage : Ray tracing shader stage
-void SpirvLowerRayTracingImpl::createSqttCallCompactToken(ShaderStage stage) {
+void LowerRayTracingImpl::createSqttCallCompactToken(ShaderStage stage) {
   // The token is a 32-bit uint compacted with following bit representation:
   // 31-13: extended data, 12-8: data_tokens, 7: extended, 6: special, 5-0: well_known
   // If extended is 0, this is a well known packet type, and data_tokens and extended_data may be interpreted as
@@ -3133,15 +3090,42 @@ void SpirvLowerRayTracingImpl::createSqttCallCompactToken(ShaderStage stage) {
 }
 
 // =====================================================================================================================
+// Creates instructions to emit SQTT indirect function call token
+void LowerRayTracingImpl::createSqttIndirectFunctionCallToken() {
+  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata_imm, {},
+                             m_builder->getInt16(SqttWellKnownTypeIndirectFunctionCall));
+
+  // We also need to emit current exec_mask as per the spec
+  auto waveSize = m_context->getPipelineContext()->getRayTracingWaveSize();
+  Value *execMask =
+      m_builder->CreateIntrinsic(m_builder->getIntNTy(waveSize), Intrinsic::amdgcn_ballot, m_builder->getInt1(true));
+  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata, {},
+                             m_builder->CreateTrunc(execMask, m_builder->getInt32Ty()));
+
+  if (waveSize > 32) {
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata, {},
+                               m_builder->CreateTrunc(m_builder->CreateLShr(execMask, 32), m_builder->getInt32Ty()));
+  }
+}
+
+// =====================================================================================================================
+// Creates instructions to emit SQTT shader hash token
+void LowerRayTracingImpl::createSqttShaderHashToken() {
+  m_builder->create<lgc::EmitShaderHashTokenOp>();
+}
+
+// =====================================================================================================================
 // Creates instructions to emit SQTT shader data function return token
-void SpirvLowerRayTracingImpl::createSqttFunctionReturnToken() {
+void LowerRayTracingImpl::createSqttFunctionReturnToken() {
   m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata_imm, {},
                              m_builder->getInt16(SqttWellKnownTypeFunctionReturn));
+
+  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata, {}, m_builder->getInt32(SqttWellKnownTypeFunctionReturn));
 }
 
 // =====================================================================================================================
 // Creates instructions to load instance node address
-Value *SpirvLowerRayTracingImpl::createLoadInstNodeAddr() {
+Value *LowerRayTracingImpl::createLoadInstNodeAddr() {
   auto instNodeAddrTy = m_traceParamsTys[TraceParam::InstNodeAddrLo];
   assert(instNodeAddrTy == m_traceParamsTys[TraceParam::InstNodeAddrHi]);
   Value *instNodeAddrLo = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrLo]);
@@ -3160,7 +3144,7 @@ Value *SpirvLowerRayTracingImpl::createLoadInstNodeAddr() {
 //
 // @param inst : The instruction
 // @param args : Additional TraceSet arguments
-llvm::Function *SpirvLowerRayTracingImpl::createImplFunc(CallInst &inst, ArrayRef<Value *> args) {
+llvm::Function *LowerRayTracingImpl::createImplFunc(CallInst &inst, ArrayRef<Value *> args) {
   std::string mangledName = inst.getCalledFunction()->getName().str() + ".impl";
   SmallVector<Value *, 10> implCallArgs(inst.args());
   for (auto &arg : args) {
@@ -3174,7 +3158,7 @@ llvm::Function *SpirvLowerRayTracingImpl::createImplFunc(CallInst &inst, ArrayRe
   return m_module->getFunction(mangledName);
 }
 
-lgc::rt::RayTracingShaderStage SpirvLowerRayTracingImpl::mapStageToLgcRtShaderStage(ShaderStage stage) {
+lgc::rt::RayTracingShaderStage LowerRayTracingImpl::mapStageToLgcRtShaderStage(ShaderStage stage) {
   assert((stage >= ShaderStageRayTracingRayGen) && (stage <= ShaderStageRayTracingCallable));
   return static_cast<lgc::rt::RayTracingShaderStage>(stage - ShaderStageRayTracingRayGen);
 }
@@ -3182,7 +3166,7 @@ lgc::rt::RayTracingShaderStage SpirvLowerRayTracingImpl::mapStageToLgcRtShaderSt
 // =====================================================================================================================
 // Generate a static ID for current Trace Ray call
 //
-unsigned SpirvLowerRayTracingImpl::generateTraceRayStaticId() {
+unsigned LowerRayTracingImpl::generateTraceRayStaticId() {
   Util::MetroHash64 hasher;
   hasher.Update(m_nextTraceRayId++);
   hasher.Update(m_module->getName().bytes_begin(), m_module->getName().size());
@@ -3197,7 +3181,7 @@ unsigned SpirvLowerRayTracingImpl::generateTraceRayStaticId() {
 // Erase BasicBlocks from the Function
 //
 // @param func : Function
-void SpirvLowerRayTracingImpl::eraseFunctionBlocks(Function *func) {
+void LowerRayTracingImpl::eraseFunctionBlocks(Function *func) {
   for (auto blockIt = func->begin(), blockEnd = func->end(); blockIt != blockEnd;) {
     BasicBlock *basicBlock = &*blockIt++;
     basicBlock->dropAllReferences();
@@ -3209,7 +3193,7 @@ void SpirvLowerRayTracingImpl::eraseFunctionBlocks(Function *func) {
 // Call GpuRt Library Func to load a 3x4 matrix from given address at the current insert point
 //
 // @param instanceNodeAddr : instanceNode address, which type is i64
-Value *SpirvLowerRayTracingImpl::createLoadMatrixFromFunc(Value *instanceNodeAddr, unsigned builtInId) {
+Value *LowerRayTracingImpl::createLoadMatrixFromFunc(Value *instanceNodeAddr, unsigned builtInId) {
   auto floatx3Ty = FixedVectorType::get(m_builder->getFloatTy(), 3);
   auto matrixTy = ArrayType::get(floatx3Ty, 4);
 
@@ -3258,7 +3242,7 @@ Value *SpirvLowerRayTracingImpl::createLoadMatrixFromFunc(Value *instanceNodeAdd
 
 // =====================================================================================================================
 // Looks up an exported function in the GPURT module
-Function *SpirvLowerRayTracingImpl::getGpurtFunction(StringRef name) {
+Function *LowerRayTracingImpl::getGpurtFunction(StringRef name) {
   auto &gpurtContext = lgc::GpurtContext::get(*m_context);
   Function *fn = gpurtContext.theModule->getFunction(name);
   assert(fn);
@@ -3271,7 +3255,7 @@ Function *SpirvLowerRayTracingImpl::getGpurtFunction(StringRef name) {
 // So "isIndex = true" means we use InstanceId(InstanceIndex for GPURT) for vulkan,
 // and "isIndex = false" means we use InstanceIndex(InstanceId for GPURT) for vulkan,
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
-Value *SpirvLowerRayTracingImpl::createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex) {
+Value *LowerRayTracingImpl::createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex) {
   Value *instanceIdPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt64Ty());
   m_builder->CreateStore(instNodeAddr, instanceIdPtr);
 
@@ -3286,8 +3270,8 @@ Value *SpirvLowerRayTracingImpl::createLoadInstanceIndexOrId(Value *instNodeAddr
 
 // =====================================================================================================================
 // Run the pass with a one-time instantiation of the impl class. This ensures that each run starts with a clean state.
-PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  SpirvLowerRayTracingImpl impl;
+PreservedAnalyses LowerRayTracing::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  LowerRayTracingImpl impl;
   return impl.run(module, analysisManager);
 }
 

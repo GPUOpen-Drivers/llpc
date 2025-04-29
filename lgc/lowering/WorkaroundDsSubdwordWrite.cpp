@@ -84,7 +84,7 @@ PreservedAnalyses WorkaroundDsSubdwordWrite::run(Module &module, ModuleAnalysisM
         LLVM_DEBUG(dbgs() << SI);
         LLVM_DEBUG(dbgs() << "\n");
         BuilderImpl builderImpl(pipelineState);
-        builderImpl.createWaterfallLoop(SI, /*ptr must be uniform*/ 1, false, /*useVgprForOperands*/ true, "");
+        builderImpl.createWaterfallLoop(SI, /*ptr must be uniform*/ 1, /*useVgprForOperands*/ true, "");
         isChanged = true;
       }
     }

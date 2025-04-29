@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -forward-propagate-no-contract -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
@@ -38,7 +38,6 @@
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
-
 
 ; SPIR-V
 ; Version: 1.3

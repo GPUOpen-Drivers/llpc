@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -238,6 +238,19 @@ enum class ResourceLayoutScheme : unsigned {
 
 template <typename T>
 using ShaderStageMap = llvm::SmallDenseMap<ShaderStageEnum, T, llvm::NextPowerOf2(ShaderStages.size())>;
+
+// Wave state register
+namespace WaveStateReg {
+enum WaveStateReg : unsigned {
+  MODE = 1,        // Wave mode bits
+  STATUS = 2,      // Wave status
+  SCRATCH_LO = 20, // Scratch address low
+  SCRATCH_HI = 21, // Scratch address high
+  HW_ID1 = 23,     // Hardware internal register 1
+  HW_ID2 = 24,     // Hardware internal register 2
+};
+} // namespace WaveStateReg
+
 } // namespace lgc
 
 namespace llvm {

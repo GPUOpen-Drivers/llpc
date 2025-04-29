@@ -39,6 +39,7 @@
 #include "lgc/lowering/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include <memory>
@@ -51,7 +52,7 @@ constexpr unsigned MemcpyScopeWorkGroup = 2;
 
 // =====================================================================================================================
 // The entry-point mutation pass
-class MutateEntryPoint : public Patch, public llvm::PassInfoMixin<MutateEntryPoint> {
+class MutateEntryPoint : public LgcLowering, public llvm::PassInfoMixin<MutateEntryPoint> {
 public:
   MutateEntryPoint();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
@@ -107,7 +108,7 @@ private:
     // Entry argument index for each user data dword that has one.
     llvm::SmallVector<unsigned> entryArgIdxs;
     // Per-UserDataMapping lists of lgc.special.user.data calls
-    llvm::SmallVector<SpecialUserDataNodeUsage, 18> specialUserData;
+    llvm::DenseMap<unsigned, SpecialUserDataNodeUsage> specialUserData;
     // Usage of streamout table
     bool usesStreamOutTable = false;
   };
@@ -148,9 +149,11 @@ private:
 
   // Information about each cps exit (return or cps.jump) used for exit unification.
   struct CpsExitInfo {
-    CpsExitInfo(llvm::BasicBlock *_pred, llvm::SmallVector<llvm::Value *> _vgpr) : pred(_pred), vgpr(_vgpr) {}
+    CpsExitInfo(llvm::BasicBlock *_pred, llvm::SmallVector<llvm::Value *> _vgpr, bool _containsInactiveVgprs = false)
+        : pred(_pred), vgpr(_vgpr), containsInactiveVgprs(_containsInactiveVgprs) {}
     llvm::BasicBlock *pred;                // The predecessor that will branch to the unified exit.
     llvm::SmallVector<llvm::Value *> vgpr; // The vgpr values from the exit.
+    bool containsInactiveVgprs;            // Only relevant when using init.whole.wave.
   };
 
   bool lowerCpsOps(llvm::Function *func, ShaderInputs *shaderInputs);
@@ -178,16 +181,15 @@ private:
   void processDriverTableLoad(llvm::Module &module);
   void lowerDriverTableLoad(LoadDriverTableEntryOp &loadDriverTablePtrOp);
 
-#if LLPC_BUILD_GFX12
   bool isDynamicVgprEnabled() {
     return (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) &&
            !(m_pipelineState->getOptions().disableDynamicVgpr);
   }
 
   llvm::Function *createRetryVgprAllocFunc(llvm::FixedVectorType *sgprsTy);
-#endif
 
   bool useInitWholeWave() const;
+  bool useDeadInsteadOfPoison() const;
 
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
@@ -223,6 +225,7 @@ private:
   CpsShaderInputCache m_cpsShaderInputCache;
   llvm::Intrinsic::ID m_setInactiveChainArgId;
   llvm::Intrinsic::ID m_initWholeWaveId;
+  llvm::Intrinsic::ID m_deadId;
 
   unsigned m_cpsStackAddrspace;
   // Map from a cps function to the original entry block, in case we're using llvm.amdgcn.init.whole.wave.

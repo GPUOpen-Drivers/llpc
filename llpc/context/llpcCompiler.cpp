@@ -183,33 +183,10 @@ opt<bool> EnablePartPipeline("enable-part-pipeline", cl::desc("Enable part pipel
 opt<int> AddRtHelpers("add-rt-helpers", cl::desc("Add this number of helper threads for each RT pipeline compile"),
                       init(0));
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
-// -shader-cache-file-dir: root directory to store shader cache
-opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root directory to store shader cache"),
-                                    value_desc("dir"), init("."));
-
-// -shader-cache-mode: shader cache mode:
-// 0 - Disable
-// 1 - Runtime cache
-// 2 - Cache to disk
-// 3 - Use internal on-disk cache in read/write mode.
-// 4 - Use internal on-disk cache in read-only mode.
-opt<unsigned> ShaderCacheMode("shader-cache-mode",
-                              desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
-                                   "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
-                              init(0));
-
-// -executable-name: executable file name
-opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
-                                init("amdllpc"));
-#endif
-
 extern opt<bool> EnableOuts;
-
 extern opt<bool> EnableErrs;
 
 extern opt<std::string> LogFileDbgs;
-
 extern opt<std::string> LogFileOuts;
 
 } // namespace cl
@@ -1093,7 +1070,7 @@ void Compiler::buildShaderModuleResourceUsage(
     auto var = static_cast<SPIRVVariable *>(module->getValue(varId));
 
     if (var->getStorageClass() == StorageClassInput) {
-      if (shaderStage == ShaderStageVertex) {
+      if (shaderStage == ShaderStageVertex || shaderInfo->entryStage == ShaderStageFragment) {
         ResourceNodeData inputSymbol = {};
         if (!getSymbolInfoFromSpvVariable(var, &inputSymbol))
           inputSymbolWithArrayInfo.push_back(inputSymbol);
@@ -1107,7 +1084,7 @@ void Compiler::buildShaderModuleResourceUsage(
 
   // SPIR-V Reader will expand matrix to vector arrays.
   // Add more rsrc node here to avoid poison value in vtxFetch.
-  if (shaderInfo->entryStage == ShaderStage::ShaderStageVertex) {
+  if (shaderInfo->entryStage == ShaderStageVertex || shaderInfo->entryStage == ShaderStageFragment) {
     size_t inputSymbolSize = inputSymbolWithArrayInfo.size();
     for (size_t i = 0; i < inputSymbolSize; i++) {
       auto symbol = inputSymbolWithArrayInfo[i];
@@ -1925,7 +1902,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
-      SpirvLower::registerTranslationPasses(*lowerPassMgr);
+      Lowering::registerTranslationPasses(*lowerPassMgr);
 
       // Start timer for translate.
       timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
@@ -1996,7 +1973,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
-      SpirvLower::registerLoweringPasses(*lowerPassMgr);
+      Lowering::registerLoweringPasses(*lowerPassMgr);
 
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
       LowerFlag flag = {};
@@ -2004,7 +1981,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       flag.isRayQuery = moduleData->usage.enableRayQuery;
       flag.isInternalRtShader = moduleData->usage.isInternalRtShader;
       flag.usesAdvancedBlend = enableAdvancedBlend;
-      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerFeLowering), flag);
+      Lowering::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerFeLowering), flag);
       // Run the passes.
       lowerPassMgr->run(*modules[shaderIndex]);
 
@@ -2107,7 +2084,7 @@ Result Compiler::buildTransformVertexShader(Context *context, const PipelineShad
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC GfxRuntime",
                               TimerProfiler::PipelineTimerEnableMask);
   std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
-  SpirvLower::registerTranslationPasses(*lowerPassMgr);
+  Lowering::registerTranslationPasses(*lowerPassMgr);
 
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
@@ -2370,9 +2347,12 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
                                  : wholeStageMask & ~shaderStageToMask(ShaderStageFragment);
     context->getPipelineContext()->setShaderStageMask(partStageMask);
 
-    if (partPipelineStage == PartPipelineStageFragment && isShaderStageInMask(ShaderStageGeometry, wholeStageMask))
-      context->getPipelineContext()->setPreRasterHasGs(true);
-
+    // TODO: preRasterFlags.hasXfb may need to be set properly for graphics Separate Compilation.
+    if (partPipelineStage == PartPipelineStageFragment && isShaderStageInMask(ShaderStageGeometry, wholeStageMask)) {
+      lgc::PreRasterFlags preRasterFlags{};
+      preRasterFlags.hasGs = true;
+      context->getPipelineContext()->setPreRasterFlags(preRasterFlags);
+    }
     // Hash the selected shaders and the pipeline state applicable to them.
     Util::MetroHash64 hasher;
     for (const PipelineShaderInfo *shaderInfoEntry : shaderInfo) {
@@ -3032,11 +3012,12 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
   }
 
   pipeline.setOptions(options);
-
   generatePipeline(context, moduleIndex, std::move(module), pipelineElf, &pipeline, timerProfiler);
 
   if (moduleIndex > 0)
     adjustRayTracingElf(&pipelineElf, rtContext, shaderProps[moduleIndex - 1]);
+  else
+    checkRayTracingLeadElf(&pipelineElf, rtContext);
 
   return Result::Success;
 }
@@ -3142,7 +3123,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
     lowerPassMgr->setPassIndex(&passIndex);
-    SpirvLower::registerTranslationPasses(*lowerPassMgr);
+    Lowering::registerTranslationPasses(*lowerPassMgr);
 
     // SPIR-V translation, then dump the result.
     lowerPassMgr->addPass(LowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
@@ -3177,6 +3158,20 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   }
 
   bool needTraversal = rtContext.getRayTracingLibrarySummary().usesTraceRay;
+
+  // In continuations mode we need to build traversal module if persistent dispatch is enabled so that subsequent
+  // raygen shaders can be launched.
+  // TODO: Remove this when GPURT scheduler takes over raygen launching.
+  if (isContinuationsMode) {
+    // Check if persistent dispatch is enabled in GPURT.
+    Function *persistentLaunchFunc = gpurtContext.theModule->getFunction("_cont_option_persistentLaunchEnabled");
+    Value *Ret = cast<ReturnInst>(persistentLaunchFunc->front().getTerminator())->getReturnValue();
+    bool persistentLaunchEnabled = !cast<ConstantInt>(Ret)->isZero();
+    assert((!(rtContext.getCpsFlag() & Vkgc::CpsFlag::CpsFlagStackInGlobalMem) || persistentLaunchEnabled) &&
+           "Global stacks should not be enabled without persistent dispatch");
+
+    needTraversal |= persistentLaunchEnabled;
+  }
 
   // When compiling library, we do not build traversal module, as we will always use the one from complete pipeline.
   if (rtContext.getRayTracingPipelineBuildInfo()->libraryMode == LibraryMode::Library)
@@ -3222,14 +3217,14 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     Timer *lowerTimer = timerProfiler.getTimer(TimerFeLowering);
     auto passMgr = lgc::MbPassManager::Create(builderContext->getTargetMachine());
     passMgr->setPassIndex(&passIndex);
-    SpirvLower::registerLoweringPasses(*passMgr);
+    Lowering::registerLoweringPasses(*passMgr);
 
     passMgr->addPass(ModuleBunchToModulePassAdaptor([mainContext, isContinuationsMode, lowerTimer]() {
       ModulePassManager mpm;
       LowerFlag flag = {};
       flag.isRayTracing = true;
       flag.isInternalRtShader = false;
-      SpirvLower::addPasses(mainContext, ShaderStageCompute, mpm, lowerTimer, flag);
+      Lowering::addPasses(mainContext, ShaderStageCompute, mpm, lowerTimer, flag);
       if (isContinuationsMode) {
         mpm.addPass(PrepareContinuations());
       }
@@ -3375,13 +3370,12 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       return result;
   }
 
-#if LLPC_BUILD_GFX12
   if (rtContext.isDynamicVgprEnabled()) {
     // Set up max outgoing VGPR count metadata for kernel entry
     lgc::cps::setMaxOutgoingVgprCount(*getEntryPoint(entry.get()),
                                       rtContext.getRayTracingLibrarySummary().maxOutgoingVgprCount);
   }
-#endif
+
   // Build entry module at very last.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 75
   const bool needEntry = true;
@@ -3453,7 +3447,6 @@ void Compiler::adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *r
     shaderFunction[PalAbi::ShaderMetadataKey::ApiShaderHash].getArray(true)[1] = pipelineHash[1];
   }
 
-#if LLPC_BUILD_GFX12
   if (rtContext->isDynamicVgprEnabled()) {
     // 3. Resolve DVGPR requirement and relocations
     ElfReader<Elf64> reader(m_gfxIp);
@@ -3512,7 +3505,6 @@ void Compiler::adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *r
       summary.maxOutgoingVgprCount = std::max(summary.maxOutgoingVgprCount, maxOutGoingVgprCount);
     }
   }
-#endif
 
   // Write modified metadata to the pipeline ELF
   ElfNote newMetaNote = metaNote;
@@ -3524,6 +3516,41 @@ void Compiler::adjustRayTracingElf(ElfPackage *pipelineElf, RayTracingContext *r
   newMetaNote.data = newData;
   writer.setNote(&newMetaNote);
   writer.writeToBuffer(pipelineElf);
+}
+
+// =====================================================================================================================
+// Check raytracing pipeline ELF package for kernel entry module
+//
+// @param [in/out] pipelineElf : The pipeline ELF
+void Compiler::checkRayTracingLeadElf(ElfPackage *pipelineElf, RayTracingContext *rtContext) {
+  if (!rtContext->isContinuationsMode() || !rtContext->isDynamicVgprEnabled())
+    return;
+
+  // Read the ELF package
+  ElfReader<Elf64> reader(m_gfxIp);
+  size_t readSize = 0;
+  Result result = reader.ReadFromBuffer(pipelineElf->data(), &readSize);
+  if (result != Result::Success) {
+    // Not an ELF file, this is the case when -emit-llvm or -emit-lgc is passed
+    return;
+  }
+
+  ElfNote metaNote = reader.getNote(Abi::MetadataNoteType);
+  msgpack::Document document;
+
+  auto success =
+      document.readFromBlob(StringRef(reinterpret_cast<const char *>(metaNote.data), metaNote.hdr.descSize), false);
+  assert(success);
+  (void(success)); // unused
+
+  // Get the hardware_stages section
+  auto &pipeline = document.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
+  auto &hardwareStagesSection = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::HardwareStages].getMap(true);
+
+  uint64_t entryFuncVgprCount =
+      hardwareStagesSection.begin()->second.getMap(true)[PalAbi::HardwareStageMetadataKey::VgprCount].getUInt();
+  if (entryFuncVgprCount > 16)
+    report_fatal_error("Kernel entry should not use more than 16 VGPRs.");
 }
 
 // =====================================================================================================================

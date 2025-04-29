@@ -54,9 +54,6 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIp, const char *apiName,
       m_representativeShaderInfo(), m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
       m_callableDataMaxSize(0), m_rayFlagsKnownBits(std::nullopt) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  gpurtShaderLibrary = &pipelineInfo->shaderTraceRay;
-#endif
   setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   m_resourceMapping = pipelineInfo->resourceMapping;
@@ -169,12 +166,10 @@ bool RayTracingContext::isContinuationsMode() const {
   // Continuations mode is only enabled for indirect mode.
   if (getIndirectStageMask() != 0) {
     if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Auto) {
-#if LLPC_BUILD_GFX12
       if (getGfxIpVersion().major >= 12) {
         // For GFX12+, enable continuations mode by default.
         isContinuations = true;
       }
-#endif
     } else if (getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
       // Client require continuations mode explicitly.
       isContinuations = true;
@@ -310,20 +305,14 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
   // NOTE: raytracing waveSize and subgroupSize can be different.
   options.fullSubgroups = false;
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 68
   if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continufy)
     options.rtIndirectMode = lgc::RayTracingIndirectMode::ContinuationsContinufy;
   else if (isContinuationsMode())
     options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
 
   options.cpsFlags = m_pipelineInfo->cpsFlags;
-
-#if LLPC_BUILD_GFX12
   options.disableDynamicVgpr = m_pipelineInfo->disableDynamicVgpr;
   options.dynamicVgprBlockSize = m_pipelineInfo->dynamicVgprBlockSize;
-#endif
-
-#endif
 
   return options;
 }

@@ -409,10 +409,8 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
     CoherentFlag coherent = {};
     if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11)
       coherent.bits.slc = isNonTemporal ? 1 : 0;
-#if LLPC_BUILD_GFX12
     else
       coherent.gfx12.th = isNonTemporal ? TH::TH_NT : TH::TH_RT;
-#endif
 
     Value *atomicCall;
     if (atomicCmpXchgInst.getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
@@ -578,9 +576,7 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
       CoherentFlag coherent = {};
       if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
         coherent.bits.slc = isNonTemporal ? 1 : 0;
-      }
-#if LLPC_BUILD_GFX12
-      else {
+      } else {
         coherent.gfx12.th = isNonTemporal ? TH::TH_NT : TH::TH_RT;
 
         SyncScope::ID id = atomicRmwInst.getSyncScopeID();
@@ -602,7 +598,6 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
         }
         coherent.gfx12.scope = scope;
       }
-#endif
 
       Value *atomicCall;
       if (isStructBuffer) {
@@ -765,14 +760,19 @@ void BufferOpLowering::visitConvertToStridedBufferPointer(ConvertToStridedBuffer
     auto *newDword1 = m_builder.CreateAnd(currentDword1, ~0x3FFF0000);
     newDword1 = m_builder.CreateOr(newDword1, m_builder.CreateShl(stride, 16));
     newDescriptor = m_builder.CreateInsertElement(oldDescriptor, newDword1, 1);
-    // Set NumRecords[95:64]
-    auto *currentNumRecords = m_builder.CreateExtractElement(newDescriptor, 2);
-    auto *newNumRecords = m_builder.CreateUDiv(currentNumRecords, stride);
-    newDescriptor = m_builder.CreateInsertElement(newDescriptor, newNumRecords, 2);
-    // Set OOB[125:124] as 0b01, (total_offset + payload) > numRecord
+    // Unstrided buffers declare their NumRecords as number of bytes, and strided buffers
+    // declare them in units of stride, i.e., the number of in-bounds bytes is calculated via
+    // stride * NumRecords. However, this is a problem if the last element is not stride bytes long,
+    // e.g., a buffer with stride 6, but a length of 14 bytes. If NumRecords is 3, then
+    // the last 4 bytes are out-of-bounds.
+    // To fix this, we disable bounds checking for strided buffers.
+    // We can only do this if robust buffer access is turned off.
+    // If robust buffer access is enabled, we disable the conversion to strided buffers.
+    // Because bounds checking is disabled, we do not need to change NumRecords.
     auto *currentDword3 = m_builder.CreateExtractElement(newDescriptor, 3);
     currentDword3 = m_builder.CreateAnd(currentDword3, 0xCFFFFFFF);
-    currentDword3 = m_builder.CreateOr(currentDword3, 0x10000000);
+    // Set OOB_SELECT field to 2 (only checking if NumRecords == 0)
+    currentDword3 = m_builder.CreateOr(currentDword3, 0x20000000);
     newDescriptor = m_builder.CreateInsertElement(newDescriptor, currentDword3, 3);
   } else {
     llvm_unreachable("Unsupported gfxip");
@@ -798,7 +798,8 @@ void BufferOpLowering::visitStridedBufferDescToPtr(StridedBufferDescToPtrOp &des
   m_typeLowering.replaceInstruction(&descToPtr,
                                     {descriptor, ConstantPointerNull::get(m_offsetType), m_builder.getInt32(0),
                                      m_builder.getFalse(), PoisonValue::get(m_builder.getInt32Ty())});
-
+  if (m_pipelineState.getOptions().stridedBufferOverrideMode == DirectStride)
+    m_stridedDescriptors.insert({descriptor, {descriptor, m_builder.getInt32(descToPtr.getStride())}});
   auto &di = m_descriptors[descriptor];
 
   di.divergent = m_uniformityInfo.isDivergent(descriptor);
@@ -838,8 +839,8 @@ void BufferOpLowering::visitBufferLoadDescToPtr(BufferLoadDescToPtrOp &loadDescT
   bool needLoadDesc = true;
   // NOTE: Rely on later cleanup passes to handle the case where we create descriptor load instructions that end up
   // being unnecessary due to indexed loads
-  Value *descriptor =
-      createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(), loadDescToPtr.getIsCompact());
+  Value *descriptor = createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(),
+                                     loadDescToPtr.getIsCompact(), nullptr);
   if (needLoadDesc) {
     if (loadDescToPtr.getIsCompact())
       descriptor = m_builder.buildBufferCompactDesc(descriptor, nullptr);
@@ -870,8 +871,8 @@ void BufferOpLowering::visitBufferLoadDescToPtr(BufferLoadDescToPtrOp &loadDescT
 void BufferOpLowering::visitStridedBufferLoadDescToPtr(StridedBufferLoadDescToPtrOp &loadDescToPtr) {
   m_builder.SetInsertPoint(&loadDescToPtr);
   bool needLoadDesc = true;
-  Value *descriptor =
-      createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(), loadDescToPtr.getIsCompact());
+  Value *descriptor = createLoadDesc(loadDescToPtr.getDescPtr(), loadDescToPtr.getForceRawView(),
+                                     loadDescToPtr.getIsCompact(), loadDescToPtr.getStride());
   if (needLoadDesc) {
     if (loadDescToPtr.getIsCompact())
       descriptor = m_builder.buildBufferCompactDesc(descriptor, loadDescToPtr.getStride());
@@ -886,6 +887,8 @@ void BufferOpLowering::visitStridedBufferLoadDescToPtr(StridedBufferLoadDescToPt
   }
 
   auto &di = m_descriptors[descriptor];
+  if (m_pipelineState.getOptions().stridedBufferOverrideMode == DirectStride)
+    m_stridedDescriptors.insert({descriptor, {descriptor, cast<ConstantInt>(loadDescToPtr.getStride())}});
 
   // The loadInst isn't computed by UniformityAnalysis so that we should use its source for divergent check
   Value *loadSrc = loadDescToPtr.getDescPtr();
@@ -1467,10 +1470,22 @@ void BufferOpLowering::postVisitLoadTfeOp(LoadTfeOp &loadTfe) {
   m_builder.SetInsertPoint(&loadTfe);
   auto pointerValues = m_typeLowering.getValue(pointerOperand);
   Value *bufferDesc = pointerValues[0];
+  bool isIndexedDesc = false;
+  const bool isStridedPointer =
+      pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER;
+  unsigned isIndexedIdx = isStridedPointer ? 3 : 2;
   Value *const offset = m_builder.CreatePtrToInt(pointerValues[1], m_builder.getInt32Ty());
   Instruction *bufferLoad = nullptr;
 
-  if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
+  Value *waterfallBegin = nullptr;
+  if (!isIndexedDesc && getDescriptorInfo(pointerValues[0]).divergent.value()) {
+    SmallVector<Value *> nonUniforms;
+    Value *ptrToInt = m_builder.CreatePtrToInt(pointerValues[isIndexedIdx + 1], m_builder.getInt32Ty());
+    nonUniforms.push_back(ptrToInt);
+    waterfallBegin = m_builder.beginWaterfallLoop(nonUniforms, &loadTfe);
+  }
+
+  if (!isStridedPointer) {
     bufferLoad = m_builder.CreateIntrinsic(loadTfe.getType(), Intrinsic::amdgcn_raw_buffer_load,
                                            {bufferDesc, offset, m_builder.getInt32(0), m_builder.getInt32(0)});
   } else {
@@ -1478,14 +1493,15 @@ void BufferOpLowering::postVisitLoadTfeOp(LoadTfeOp &loadTfe) {
     bufferLoad = m_builder.CreateIntrinsic(loadTfe.getType(), Intrinsic::amdgcn_struct_buffer_load,
                                            {bufferDesc, index, offset, m_builder.getInt32(0), m_builder.getInt32(0)});
   }
-  if (getDescriptorInfo(bufferDesc).divergent.value())
-    bufferLoad = m_builder.createWaterfallLoop(bufferLoad, 0, false);
+  Value *result = bufferLoad;
+  if (waterfallBegin)
+    result = m_builder.endWaterfallLoop(bufferLoad, waterfallBegin);
 
   // Record the load instruction so we remember to delete it later.
   m_typeLowering.eraseInstruction(&loadTfe);
   // Replace the mapping.
-  m_typeLowering.replaceValue(&loadTfe, bufferLoad);
-  loadTfe.replaceAllUsesWith(bufferLoad);
+  m_typeLowering.replaceValue(&loadTfe, result);
+  loadTfe.replaceAllUsesWith(result);
 }
 
 // =====================================================================================================================
@@ -1717,9 +1733,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       coherent.bits.glc = isGlc;
       if (!isInvariant)
         coherent.bits.slc = isNonTemporal;
-    }
-#if LLPC_BUILD_GFX12
-    else {
+    } else {
       coherent.gfx12.scope = isGlc ? MemoryScope::MEMORY_SCOPE_DEV : MemoryScope::MEMORY_SCOPE_CU;
       if (!isInvariant)
         coherent.gfx12.th = m_pipelineState.getTemporalHint(isNonTemporal ? TH::TH_NT : TH::TH_RT,
@@ -1729,7 +1743,6 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         coherent.gfx12.th = TH::TH_RT_NT;
       }
     }
-#endif
 
     Value *indexValue = isStridedPointer ? pointerValues[2] : nullptr;
     if (isLoad) {
@@ -1740,12 +1753,10 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         accessSizeAllowed = accessSize >= 4;
       }
 
-#if LLPC_BUILD_GFX12
       if (!m_pipelineState.getOptions().padBufferSizeToNextDword &&
           m_pipelineState.getTargetInfo().getGfxIpVersion().major == 12) {
         accessSizeAllowed = accessSize >= 4;
       }
-#endif
 
       const bool isDivergentPtr = m_uniformityInfo.isDivergent(pointerOperand);
 
@@ -2015,7 +2026,8 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
 // @param buffAddress : The buffer address
 // @param forceView : Whether to force a raw buffer view
 // @param isCompact : Whether to load a compact buffer
-Value *BufferOpLowering::createLoadDesc(Value *buffAddress, bool forceRawView, bool isCompact) {
+Value *BufferOpLowering::createLoadDesc(llvm::Value *buffAddress, bool forceRawView, bool isCompact,
+                                        llvm::Value *forcedStride) {
   Type *descTy = FixedVectorType::get(m_builder.getInt32Ty(), isCompact ? 2 : 4);
   Value *descriptor = m_builder.CreateLoad(descTy, buffAddress);
   {
@@ -2037,10 +2049,37 @@ Value *BufferOpLowering::createLoadDesc(Value *buffAddress, bool forceRawView, b
           m_builder.CreateInsertElement(descriptor, m_builder.CreateOr(desc3, m_builder.getInt32(0x30000000)), 3);
     }
   }
+  // Force strided view
+  unsigned mode = m_pipelineState.getOptions().stridedBufferOverrideMode;
+  if (forcedStride != nullptr) {
+    if (mode == OverrideStrideNumRecords) {
+      Value *desc1 = m_builder.CreateExtractElement(descriptor, 1);
+      Value *desc2 = m_builder.CreateExtractElement(descriptor, 2);
+      Value *isRaw =
+          m_builder.CreateAnd(m_builder.CreateLShr(desc1, m_builder.getInt32(16)), m_builder.getInt32(0x3fff));
+      isRaw = m_builder.CreateICmpEQ(isRaw, m_builder.getInt32(0));
+      // set srd with new num_record = old num_record / stride, num_record is dword2[31:0]
+      Value *newDesc2 = m_builder.CreateUDiv(desc2, forcedStride);
+      // set srd with new stride, stride is 14 bits in dword1[29:16]
+      Value *stride =
+          m_builder.CreateShl(m_builder.CreateAnd(forcedStride, m_builder.getInt32(0x3fff)), m_builder.getInt32(16));
+      Value *newDesc1 = m_builder.CreateOr(stride, m_builder.CreateAnd(desc1, m_builder.getInt32(0xc000ffff)));
+      desc1 = m_builder.CreateSelect(isRaw, newDesc1, desc1);
+      desc2 = m_builder.CreateSelect(isRaw, newDesc2, desc2);
+      descriptor = m_builder.CreateInsertElement(descriptor, desc1, 1);
+      descriptor = m_builder.CreateInsertElement(descriptor, desc2, 2);
+    } else if (mode == OverrideStride) {
+      Value *desc1 = m_builder.CreateExtractElement(descriptor, 1);
+      // override stride only
+      Value *stride =
+          m_builder.CreateShl(m_builder.CreateAnd(forcedStride, m_builder.getInt32(0x3fff)), m_builder.getInt32(16));
+      desc1 = m_builder.CreateOr(stride, m_builder.CreateAnd(desc1, m_builder.getInt32(0xc000ffff)));
+      descriptor = m_builder.CreateInsertElement(descriptor, desc1, 1);
+    }
+  }
   return descriptor;
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Get the shader stage
 //
@@ -2052,4 +2091,3 @@ ShaderStageEnum BufferOpLowering::getMemoryInstShaderStage(llvm::Instruction *in
     return ShaderStageEnum(mdconst::extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
   return ShaderStageEnum::Invalid;
 }
-#endif

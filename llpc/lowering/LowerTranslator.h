@@ -37,7 +37,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Pass to translate the SPIR-V modules and generate an IR module for the whole pipeline
-class LowerTranslator : public SpirvLower, public llvm::PassInfoMixin<LowerTranslator> {
+class LowerTranslator : public Lowering, public llvm::PassInfoMixin<LowerTranslator> {
 public:
   LowerTranslator() {}
 

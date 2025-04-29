@@ -43,7 +43,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering operations for constant immediate store
-class LowerConstImmediateStore : public SpirvLower, public llvm::PassInfoMixin<LowerConstImmediateStore> {
+class LowerConstImmediateStore : public Lowering, public llvm::PassInfoMixin<LowerConstImmediateStore> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Test on fma((b==0.0 ? 0.0 : a), (a==0.0 ? 0.0 : b), c)
 
@@ -52,7 +52,7 @@
                OpName %c "c"
                OpName %d "d"
                OpName %fragColor "fragColor"
-               OpDecorate %c Location 2 
+               OpDecorate %c Location 2
                OpDecorate %b Location 1
                OpDecorate %a Location 0
                OpDecorate %fragColor Location 0

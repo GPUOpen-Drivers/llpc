@@ -63,7 +63,7 @@ ProcessGpuRtLibrary::ProcessGpuRtLibrary(const GpurtKey &key) : m_gpurtKey(key) 
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses ProcessGpuRtLibrary::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-gpurt-library\n");
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   // Imbue the module with settings from the GPURT key.
   ContHelper::setStackAddrspace(module, m_gpurtKey.rtPipeline.cpsFlags & Vkgc::CpsFlag::CpsFlagStackInGlobalMem
@@ -176,21 +176,15 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
       &ProcessGpuRtLibrary::createConstantLoadDwordAtAddrx4;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf"] = &ProcessGpuRtLibrary::createConvertF32toF16NegInf;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf"] = &ProcessGpuRtLibrary::createConvertF32toF16PosInf;
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectBvhNode"] = &ProcessGpuRtLibrary::createIntersectBvh;
-#else
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &ProcessGpuRtLibrary::createIntersectBvh;
-#endif
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ShaderMarker"] = &ProcessGpuRtLibrary::createShaderMarker;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_WaveScan"] = &ProcessGpuRtLibrary::createWaveScan;
-#if LLPC_BUILD_GFX12
   m_libFuncPtrs["AmdTraceRayDualIntersectRay"] = &ProcessGpuRtLibrary::createDualIntersectRay;
   m_libFuncPtrs["AmdTraceRayIntersectRayBvh8"] = &ProcessGpuRtLibrary::createIntersectRayBvh8;
   m_libFuncPtrs["AmdTraceRayDsStackPush8Pop1"] = &ProcessGpuRtLibrary::createDsStackPush8Pop1;
   m_libFuncPtrs["AmdTraceRayDsStackPush8Pop2"] = &ProcessGpuRtLibrary::createDsStackPush8Pop2;
   m_libFuncPtrs["AmdTraceRayDsStackPush8Pop1PrimRangeEnabled"] =
       &ProcessGpuRtLibrary::createDsStackPush8Pop1PrimRangeEnabled;
-#endif
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] = &ProcessGpuRtLibrary::createFloatOpWithRoundMode;
   m_libFuncPtrs["AmdExtDispatchThreadIdFlat"] = &ProcessGpuRtLibrary::createDispatchThreadIdFlat;
   m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &ProcessGpuRtLibrary::createSampleGpuTimer;
@@ -209,9 +203,7 @@ ProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRaySetParentId"] = &ProcessGpuRtLibrary::createSetParentId;
   m_libFuncPtrs["AmdTraceRayDispatchRaysIndex"] = &ProcessGpuRtLibrary::createDispatchRayIndex;
   m_libFuncPtrs["AmdTraceRayGetStaticId"] = &ProcessGpuRtLibrary::createGetStaticId;
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 50
   m_libFuncPtrs["AmdTraceRayInitStaticId"] = &ProcessGpuRtLibrary::createInitStaticId;
-#endif
   m_libFuncPtrs["AmdTraceRayGetKnownSetRayFlags"] = &ProcessGpuRtLibrary::createGetKnownSetRayFlags;
   m_libFuncPtrs["AmdTraceRayMakePC"] = &ProcessGpuRtLibrary::createMakePc;
   m_libFuncPtrs["AmdTraceRayGetKnownUnsetRayFlags"] = &ProcessGpuRtLibrary::createGetKnownUnsetRayFlags;
@@ -250,20 +242,11 @@ bool ProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     return true;
   }
 
-  if (funcName.starts_with("_AmdValueI32Count")) {
-    ContHelper::handleValueI32Count(*func, *m_builder);
-    return true;
-  }
-
   if (funcName.starts_with("_AmdValueGetI32") || funcName.starts_with("_AmdValueSetI32")) {
     // The intrinsic handling require first argument to be a pointer, the rest to be values.
     SmallBitVector promotionMask(func->arg_size(), true);
     promotionMask.reset(0);
-    auto newFunc = compilerutils::promotePointerArguments(func, promotionMask);
-    if (funcName.starts_with("_AmdValueGetI32"))
-      ContHelper::handleValueGetI32(*newFunc, *m_builder);
-    else
-      ContHelper::handleValueSetI32(*newFunc, *m_builder);
+    compilerutils::promotePointerArguments(func, promotionMask);
     return true;
   }
 
@@ -541,13 +524,8 @@ void ProcessGpuRtLibrary::createIntersectBvh(Function *func) {
     return;
   }
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-  // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectBvhNode
-  // uint4 AmdExtD3DShaderIntrinsics_IntersectBvhNode(
-#else
   // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectInternal
   // uint4 AmdExtD3DShaderIntrinsics_IntersectInternal(
-#endif
   //     in uint2  address,
   //     in float  ray_extent,
   //     in float3 ray_origin,
@@ -961,6 +939,8 @@ void ProcessGpuRtLibrary::createEnqueue(Function *func) {
   }
 
   // TODO: pass the levelMask correctly.
+  if (!funcName.contains("EnqueueAnyHit"))
+    tailArgs.insert(tailArgs.begin() + 1, PoisonValue::get(StructType::get(m_builder->getContext())));
   m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(m_builder->getInt32Ty()), shaderIndex, retAddr, tailArgs);
   m_builder->CreateUnreachable();
 
@@ -1009,7 +989,6 @@ void ProcessGpuRtLibrary::createWaveScan(llvm::Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtWaveScanOp>(waveOp, flags, src0));
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 void ProcessGpuRtLibrary::createDualIntersectRay(Function *func) {
   createIntersectRay(func, true);
@@ -1025,7 +1004,7 @@ void ProcessGpuRtLibrary::createIntersectRayBvh8(Function *func) {
 // @param func : The function to create
 void ProcessGpuRtLibrary::createIntersectRay(Function *func, bool isDualNode) {
   auto rtip = m_gpurtKey.rtipVersion;
-  if (m_gpurtKey.bvhResDesc.size() < 4 || (rtip < Vkgc::RtIpVersion({3, 0}) && rtip != Vkgc::RtIpVersion({1, 5}))) {
+  if (m_gpurtKey.bvhResDesc.size() < 4 || (rtip < 3 && rtip != Vkgc::RtIpVersion({1, 5}))) {
     // Don't generate code for non fitting RTIP.
     m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
     return;
@@ -1210,7 +1189,7 @@ void ProcessGpuRtLibrary::createDsStackPush8PopN(Function *func, unsigned return
 //
 // @param func : The function to create
 void ProcessGpuRtLibrary::createDsStackPush8Pop1(Function *func) {
-  if (m_gpurtKey.rtipVersion >= Vkgc::RtIpVersion({3, 0}))
+  if (m_gpurtKey.rtipVersion >= 3)
     createDsStackPush8PopN(func, 1, false);
   else
     m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
@@ -1221,7 +1200,7 @@ void ProcessGpuRtLibrary::createDsStackPush8Pop1(Function *func) {
 //
 // @param func : The function to create
 void ProcessGpuRtLibrary::createDsStackPush8Pop2(Function *func) {
-  if (m_gpurtKey.rtipVersion >= Vkgc::RtIpVersion({3, 0}) || m_gpurtKey.rtipVersion == Vkgc::RtIpVersion({1, 5}))
+  if (m_gpurtKey.rtipVersion >= 3 || m_gpurtKey.rtipVersion == Vkgc::RtIpVersion({1, 5}))
     createDsStackPush8PopN(func, 2, false);
   else
     m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
@@ -1232,11 +1211,10 @@ void ProcessGpuRtLibrary::createDsStackPush8Pop2(Function *func) {
 //
 // @param func : The function to create
 void ProcessGpuRtLibrary::createDsStackPush8Pop1PrimRangeEnabled(Function *func) {
-  if (m_gpurtKey.rtipVersion >= Vkgc::RtIpVersion({3, 0}))
+  if (m_gpurtKey.rtipVersion >= 3)
     createDsStackPush8PopN(func, 1, true);
   else
     m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
 }
-#endif
 
 } // namespace Llpc

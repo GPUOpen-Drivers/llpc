@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LgcLowering.h
- * @brief LLPC header file: contains declaration of class lgc::Patch.
+ * @brief LLPC header file: contains declaration of class lgc::LgcLowering.
  ***********************************************************************************************************************
  */
 #pragma once
@@ -47,18 +47,18 @@ class PassManager;
 
 // =====================================================================================================================
 // Represents the pass of LGC lowering operations, as the base class.
-class Patch {
+class LgcLowering {
 public:
-  Patch() : m_module(nullptr), m_context(nullptr), m_entryPoint(nullptr) {}
-  virtual ~Patch() = default;
+  LgcLowering() : m_module(nullptr), m_context(nullptr), m_entryPoint(nullptr) {}
+  virtual ~LgcLowering() = default;
 
-  static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, llvm::Timer *patchTimer,
+  static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, llvm::Timer *loweringTimer,
                         llvm::Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel);
 
-  // Register all the patching passes into the given pass manager
+  // Register all the LGC lowering passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);
 
-  // Register all the patching passes into the given pass builder
+  // Register all the LGC lowering passes into the given pass builder
   static void registerPasses(llvm::PassBuilder &passBuilder);
 
   static llvm::Constant *getLdsVariable(PipelineState *pipelineState, llvm::Function *func, bool rtStack = false);

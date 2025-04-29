@@ -1,0 +1,102 @@
+
+;;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ ;
+ ;  Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ ;
+ ;  Permission is hereby granted, free of charge, to any person obtaining a copy
+ ;  of this software and associated documentation files (the "Software"), to
+ ;  deal in the Software without restriction, including without limitation the
+ ;  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ ;  sell copies of the Software, and to permit persons to whom the Software is
+ ;  furnished to do so, subject to the following conditions:
+ ;
+ ;  The above copyright notice and this permission notice shall be included in all
+ ;  copies or substantial portions of the Software.
+ ;
+ ;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ ;  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ ;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ ;  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ ;  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ ;  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ ;  IN THE SOFTWARE.
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Test the loop options(like disableLoopUnroll, forceLoopUnrollCount and unrollHintThreshold etc) are able to work
+; regardless of whether this loop contains metadata or not.
+
+; This test sets forceLoopUnrollCount=25, and the loop doesn't have metadata.
+
+; RUN: lgc -mcpu=gfx1010 -v -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
+; CHECK-LABEL: {{^// LLPC}} final pipeline module info
+; CHECK: [[LOOP8:![0-9]+]] = distinct !{[[LOOP8]], [[META9:![0-9]+]], [[META10:![0-9]+]]}
+; CHECK: [[META9]] = !{!"llvm.loop.unroll.count", i32 25}
+; CHECK: [[META10]] = !{!"llvm.loop.disable_nonforced"}
+
+; ModuleID = 'lgcPipeline'
+source_filename = "llpc_fragment_7"
+target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-p7:160:256:256:32-p8:128:128-p9:192:256:256:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7:8:9-p32:32:32-p64:32:32-p65:32:32"
+target triple = "amdgcn--amdpal"
+
+@data = internal unnamed_addr addrspace(4) constant [2048 x <4 x float>] poison
+
+; Function Attrs: alwaysinline nounwind
+define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spirv.ExecutionModel !9 !lgc.shaderstage !10 {
+.entry:
+  %0 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
+  %1 = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) %0)
+  br label %2
+
+2:                                                ; preds = %5, %.entry
+  %i.0 = phi i32 [ 0, %.entry ], [ %6, %5 ]
+  %3 = load i32, ptr addrspace(7) %0, align 4
+  %4 = icmp slt i32 %i.0, %3
+  %cond.freeze = freeze i1 %4
+  br i1 %cond.freeze, label %5, label %7
+
+5:                                                ; preds = %2
+  %6 = add i32 %i.0, 1
+  br label %2
+
+7:                                                ; preds = %2
+  call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> undef) #3
+  ret void
+}
+
+; Function Attrs: nodivergencesource nounwind willreturn memory(none)
+declare ptr addrspace(7) @lgc.load.buffer.desc(i64, i32, i32, i32) local_unnamed_addr #1
+
+; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
+declare ptr @llvm.invariant.start.p7(i64 immarg, ptr addrspace(7) captures(none)) #2
+
+; Function Attrs: nounwind
+declare void @lgc.output.export.generic.i32.i32.v4f32(i32, i32, <4 x float>) #3
+
+attributes #0 = { alwaysinline nounwind "denormal-fp-math-f32"="preserve-sign" "target-features"=",+wavefrontsize64" }
+attributes #1 = { nodivergencesource nounwind willreturn memory(none) }
+attributes #2 = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
+attributes #3 = { nounwind }
+
+!lgc.client = !{!0}
+!lgc.unlinked = !{!1}
+!lgc.options = !{!2}
+!lgc.options.FS = !{!3}
+!lgc.user.data.nodes = !{!4, !5}
+!lgc.color.export.formats = !{!6}
+!lgc.wave.size = !{!7}
+!lgc.subgroup.size = !{!7}
+!amdgpu.pal.metadata.msgpack = !{!8}
+
+!0 = !{!"Vulkan"}
+!1 = !{i32 1}
+!2 = !{i32 1500244282, i32 -1152672471, i32 -424755361, i32 2004704952, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 256, i32 256, i32 2, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 256, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 256}
+!3 = !{i32 -573119231, i32 1430503359, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 25, i32 0, i32 20, i32 1800, i32 0, i32 0, i32 1}
+!4 = !{!"DescriptorTableVaPtr", i32 7, i32 64, i32 0, i32 1, i32 1}
+!5 = !{!"DescriptorBuffer", i32 6, i32 64, i32 0, i32 4, i64 0, i32 0, i32 4}
+!6 = !{i32 14, i32 7, i32 0, i32 0, i32 15}
+!7 = !{i32 32, i32 64, i32 64, i32 64, i32 64, i32 32, i32 64, i32 32}
+!8 = !{!"\82\B0amdpal.pipelines\91\83\B0.spill_threshold\CD\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CFeh\BA\CC\B8\0F\D8\83\CF\A5LW\9E\19\1B\9C\D6\AD.llpc_version\A476.0\AEamdpal.version\92\03\00"}
+!9 = !{i32 4}
+!10 = !{i32 6}

@@ -103,6 +103,7 @@ const llvm_dialects::OpMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {{
     GPURTMAP_ENTRY(GeometryIndexOp, "GeometryIndex", true),
     GPURTMAP_ENTRY(InstanceInclusionMaskOp, "InstanceInclusionMask", false),
     GPURTMAP_ENTRY(TriangleVertexPositionsOp, "TriangleVertexPositions", true),
+    GPURTMAP_ENTRY(GlobalHitObjectOp, "GlobalHitObject", false),
 }};
 
 #undef GPURTMAP_ENTRY
@@ -499,7 +500,6 @@ void ContHelper::addContinuationPasses(ModulePassManager &MPM) {
   MPM.addPass(CoroCleanupPass());
 
   MPM.addPass(CleanupContinuationsPass());
-  MPM.addPass(ContinuationsStatsReportPass());
   MPM.addPass(DXILContPostProcessPass());
 
 #ifndef NDEBUG
@@ -732,9 +732,9 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDa
   return B.CreateInBoundsGEP(OrigSystemDataTy, SystemData, Indices);
 }
 
-Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData,
+Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData, Value *HitObjectDataAlloca,
                                   lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
-                                  compilerutils::CrossModuleInliner &Inliner, bool KeepBuilderPos) {
+                                  CompilerUtils::CrossModuleInliner &Inliner, bool KeepBuilderPos) {
   if (!KeepBuilderPos)
     B.SetInsertPoint(Call);
 
@@ -752,10 +752,28 @@ Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *Sys
   LLVM_DEBUG(dbgs() << "Getting system data for " << Name << "\n");
   Arguments.push_back(getDXILSystemData(B, SystemData, SystemDataTy, getFuncArgPtrElementType(IntrImpl, 0)));
 
+  // This is initialized to 1 as we are skipping the intrinsic's first argument (system data).
+  unsigned ImplIdx = 1;
+
+  // Check if function take a hit HitObjectDataAlloca add as the second argument
+  if ((HitObjectDataAlloca != nullptr) && (IntrImpl->getFunctionType()->getNumParams() > 1)) {
+    auto *IntrArgType = cast<StructType>(getFuncArgPtrElementType(IntrImpl, 1));
+    auto *GlobalHitObjectFunc = GpurtLibrary->getFunction(ContDriverFunc::GlobalHitObjectName);
+    auto *HitObjectTy = cast<StructType>(GlobalHitObjectFunc->getReturnType());
+
+    if (IntrArgType == HitObjectTy) {
+      Arguments.push_back(HitObjectDataAlloca);
+      ++ImplIdx;
+    }
+  }
+
   // For hit data accessors, get the hit data struct
   if (IntrImplEntry->AccessesHitData) {
     Function *GetHitData;
-    if (Kind == lgc::rt::RayTracingShaderStage::AnyHit || Kind == lgc::rt::RayTracingShaderStage::Intersection) {
+
+    // ContDriverFunc::RayTCurrentName is a special case, that needs to use the committed state.
+    if ((Kind == lgc::rt::RayTracingShaderStage::AnyHit ||
+         (Kind == lgc::rt::RayTracingShaderStage::Intersection && Name != ContDriverFunc::RayTCurrentName))) {
       auto *GetCandidateState = GpurtLibrary->getFunction(ContDriverFunc::GetCandidateStateName);
       assert(GetCandidateState && "Could not find GetCandidateState function");
       assert(GetCandidateState->getReturnType()->isStructTy() &&
@@ -784,16 +802,14 @@ Value *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *Sys
             .returnValue;
     B.CreateStore(HitData, HitDataAlloca);
     Arguments.push_back(HitDataAlloca);
+    ++ImplIdx;
   }
 
-  // Skip the intrinsic id argument, the system data argument and the hit data
-  // argument
   auto *IntrType = IntrImpl->getFunctionType();
-  for (unsigned CallI = 0, ImplI = IntrImplEntry->AccessesHitData ? 2 : 1, ImplE = IntrType->getNumParams();
-       ImplI < ImplE; CallI++, ImplI++) {
+  for (unsigned CallI = 0, ImplE = IntrType->getNumParams(); ImplIdx < ImplE; CallI++, ImplIdx++) {
     Value *Arg = Call->getArgOperand(CallI);
     Type *ArgType = Arg->getType();
-    Type *NewType = IntrType->getParamType(ImplI);
+    Type *NewType = IntrType->getParamType(ImplIdx);
     if (ArgType == NewType) {
       Arguments.push_back(Arg);
     } else if (NewType->isIntegerTy() && ArgType->isIntegerTy()) {
@@ -878,6 +894,10 @@ static bool replaceEnqueueIntrinsic(Function &F) {
     SmallVector<Value *> TailArgs;
     const uint32_t TailArgStartIdx = WaitMask ? 4 : 3;
     TailArgs.append(CInst.arg_begin() + TailArgStartIdx, CInst.arg_end());
+    // On non-AmdEnqueueAnyHit calls, pass a dummy argument for the hit attributes to the resulting lgc.cps.jump call to
+    // achieve consistent argument indexing.
+    if (!FuncName.contains("EnqueueAnyHit"))
+      TailArgs.insert(TailArgs.begin() + 1, PoisonValue::get(StructType::get(CInst.getContext())));
 
     // For DX, these arguments are unused right now and are just here to fulfill the `JumpOp`s requirements as being
     // defined in the LgcCpsDialect.
@@ -953,6 +973,28 @@ static void handleContinuationStackIsGlobal(Function &Func, ContStackAddrspace S
                                                                StackAddrspace == ContStackAddrspace::GlobalLLPC);
 
   llvm::replaceCallsToFunction(Func, *IsGlobal);
+}
+
+AllocaInst *llvm::createAllocaForGlobalHitObject(IRBuilder<> &B, Function &F, Module *GpurtLibrary, Value *SystemData) {
+  // Create an alloca for the global hit object
+  AllocaInst *HitObjectAlloca = nullptr;
+  auto *GlobalHitObjectFunc = GpurtLibrary->getFunction(ContDriverFunc::GlobalHitObjectName);
+  assert(GlobalHitObjectFunc && "Could not find GlobalHitObject function");
+  {
+    IRBuilder<>::InsertPointGuard Guard(B);
+    B.SetInsertPointPastAllocas(&F);
+    auto *HitObjectTy = cast<StructType>(GlobalHitObjectFunc->getReturnType());
+    HitObjectAlloca = B.CreateAlloca(HitObjectTy);
+    HitObjectAlloca->setName("HitObjectAlloca");
+  }
+
+  // Call GlobalHitObject GpuRT function
+  SmallVector<Value *> GlobalHitObjectOpArgs;
+  GlobalHitObjectOpArgs.push_back(SystemData);
+  compilerutils::CrossModuleInliner CrossInliner;
+  auto *HitObjectAttrs = CrossInliner.inlineCall(B, GlobalHitObjectFunc, GlobalHitObjectOpArgs).returnValue;
+  B.CreateStore(HitObjectAttrs, HitObjectAlloca);
+  return HitObjectAlloca;
 }
 
 static void handleGetRtip(Function &Func, uint32_t RtipLevel) {
@@ -1288,7 +1330,9 @@ void addLgcContinuationTransform(ModulePassManager &MPM) {
 
   // Scalarizer pass could break down system data structure (and possibly other data) which would help to reduce size of
   // continuations state.
-  MPM.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass()));
+  ScalarizerPassOptions scalarizerOptions;
+  scalarizerOptions.ScalarizeMinBits = 32;
+  MPM.addPass(createModuleToFunctionPassAdaptor(ScalarizerPass(scalarizerOptions)));
 
   MPM.addPass(CoroEarlyPass());
   CGSCCPassManager CGPM;
@@ -1302,7 +1346,6 @@ void addLgcContinuationTransform(ModulePassManager &MPM) {
 #ifndef NDEBUG
   MPM.addPass(ContinuationsLintPass());
 #endif
-  MPM.addPass(ContinuationsStatsReportPass());
 
   MPM.addPass(createModuleToFunctionPassAdaptor(LowerSwitchPass()));
   MPM.addPass(createModuleToFunctionPassAdaptor(FixIrreduciblePass()));

@@ -174,3 +174,19 @@ def GetVspOp : LgcCpsOp<"get.vsp", [Memory<[(read InaccessibleMem)]>, NoUnwind, 
         Return the current top of continuation stack pointer.
     }];
 }
+
+// =====================================================================================================================
+def DeadOp : LgcCpsOp<"dead", [NoUnwind, WillReturn]> {
+    let arguments = (ins);
+    let results = (outs value:$out);
+
+    let defaultBuilderHasExplicitResultType = true;
+
+    let summary = "Return a poison value.";
+    let description = [{
+        This is a marker to tell the backend a value is dead.
+        It is equivalent to poison. However, in contrast to poison,
+        this intrinsic cannot be optimized away and helps
+        the backend understand that the value is not alive.
+    }];
+}

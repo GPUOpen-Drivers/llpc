@@ -38,6 +38,8 @@
 #define GPURT_INOUT GFX_RUNTIME_COMMON_INOUT
 #define GPURT_DECL GFX_RUNTIME_COMMON_DECL
 
+#define PASS_HIT_OBJECT_ARG 1
+
 //=====================================================================================================================
 // Continuation intrinsics
 //

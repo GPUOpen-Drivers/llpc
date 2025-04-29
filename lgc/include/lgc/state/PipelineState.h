@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "compilerutils/CompilerUtils.h"
 #include "lgc/Pipeline.h"
 #include "lgc/state/Abi.h"
 #include "lgc/state/Defs.h"
@@ -123,9 +124,9 @@ public:
   // Set the resource mapping nodes for the pipeline
   void setUserDataNodes(llvm::ArrayRef<ResourceNode> nodes) override final;
 
-  // Set whether pre-rasterization part has a geometry shader
-  // NOTE: Only applicable in the part pipeline compilation mode.
-  void setPreRasterHasGs(bool preRasterHasGs) override final { m_preRasterHasGs = preRasterHasGs; }
+  // Set pre-rasterization flags (hasGs, hasXfb) when compiling the fragment shader part-pipeline
+  // in graphics separate compilation mode.
+  void setPreRasterFlags(PreRasterFlags flags) override final { m_preRasterFlags = flags; }
 
   // Set client name
   void setClient(llvm::StringRef client) override final { m_client = client.str(); }
@@ -253,8 +254,7 @@ public:
 
   // Accessors for shader stage mask
   ShaderStageMask getShaderStageMask();
-  bool getPreRasterHasGs() const { return m_preRasterHasGs; }
-
+  PreRasterFlags getPreRasterFlags() const { return m_preRasterFlags; }
   bool hasShaderStage(ShaderStageEnum stage) { return getShaderStageMask().contains(stage); }
   bool isGraphics();
   bool isComputeLibrary() const { return m_computeLibrary; }
@@ -351,8 +351,8 @@ public:
   // Checks if SW-emulated stream-out should be enabled
   bool enableSwXfb();
 
-  // Checks if we export vertex/primitive attributes by parameter export instruction
-  bool exportAttributeByExportInstruction() const;
+  // Checks if we export vertex/primitive attributes to parameter cache through SX or through memory
+  bool attributeThroughExport() const;
 
   // Gets resource usage of the specified shader stage
   ResourceUsage *getShaderResourceUsage(ShaderStageEnum shaderStage);
@@ -441,10 +441,8 @@ public:
     return m_xfbStateMetadata.streamActive[streamId];
   }
 
-#if LLPC_BUILD_GFX12
   // Get the temporal hint.
   unsigned getTemporalHint(unsigned th, TemporalHintOpType opType, ShaderStageEnum stage = ShaderStageEnum::Invalid);
-#endif
 
   // Set user data for a specific shader stage
   void setUserDataMap(ShaderStageEnum shaderStage, llvm::ArrayRef<unsigned> userDataValues) {
@@ -468,36 +466,6 @@ public:
   // Get spill_threshold for a specific shader stage
   unsigned getSpillThreshold(ShaderStageEnum shaderStage) { return m_shaderSpillThreshold[shaderStage]; }
 
-  // -----------------------------------------------------------------------------------------------------------------
-  // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
-
-  // Get a metadata node containing an array of i32 values, which can be read from any type.
-  // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
-  // returns nullptr.
-  //
-  // @param context : LLVM context
-  // @param value : Value to write as array of i32
-  // @param atLeastOneValue : True to generate node with one value even if all values are zero
-  template <typename T>
-  static llvm::MDNode *getArrayOfInt32MetaNode(llvm::LLVMContext &context, const T &value, bool atLeastOneValue) {
-    llvm::IRBuilder<> builder(context);
-    static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
-    llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned *>(&value), sizeof(value) / sizeof(unsigned));
-
-    while (!values.empty() && values.back() == 0) {
-      if (values.size() == 1 && atLeastOneValue)
-        break;
-      values = values.slice(0, values.size() - 1);
-    }
-    if (values.empty())
-      return nullptr;
-
-    llvm::SmallVector<llvm::Metadata *, 8> operands;
-    for (unsigned value : values)
-      operands.push_back(llvm::ConstantAsMetadata::get(builder.getInt32(value)));
-    return llvm::MDNode::get(context, operands);
-  }
-
   // Set a named metadata node to point to an array of i32 values, which can be read from any type.
   // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
   // removes the named metadata node (if it existed).
@@ -508,7 +476,7 @@ public:
   template <typename T>
   static void setNamedMetadataToArrayOfInt32(llvm::Module *module, const T &value, llvm::StringRef metaName) {
     static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
-    llvm::MDNode *arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), value, false);
+    llvm::MDNode *arrayMetaNode = CompilerUtils::getArrayOfInt32MetaNode(module->getContext(), value, false);
     if (!arrayMetaNode) {
       if (auto namedMetaNode = module->getNamedMetadata(metaName))
         module->eraseNamedMetadata(namedMetaNode);
@@ -518,20 +486,6 @@ public:
     auto namedMetaNode = module->getOrInsertNamedMetadata(metaName);
     namedMetaNode->clearOperands();
     namedMetaNode->addOperand(arrayMetaNode);
-  }
-
-  // Read an array of i32 values out of a metadata node, writing into any type.
-  // Returns the number of i32s read.
-  //
-  // @param metaNode : Metadata node to read from
-  // @param [out] value : Value to write into (caller must zero initialize)
-  template <typename T> static unsigned readArrayOfInt32MetaNode(llvm::MDNode *metaNode, T &value) {
-    static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
-    llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned *>(&value), sizeof(value) / sizeof(unsigned));
-    unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
-    for (unsigned index = 0; index < count; ++index)
-      values[index] = llvm::mdconst::extract<llvm::ConstantInt>(metaNode->getOperand(index))->getZExtValue();
-    return count;
   }
 
   // Read an array of i32 values out of a metadata node that is operand 0 of the named metadata node,
@@ -546,7 +500,7 @@ public:
     auto namedMetaNode = module->getNamedMetadata(metaName);
     if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
       return 0;
-    return readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
+    return CompilerUtils::readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
   }
 
   // Set a named metadata node to point to its previous array of i32 values, with a new array of i32 ORed in.
@@ -563,10 +517,10 @@ public:
     unsigned oredValues[sizeof(value) / sizeof(unsigned)] = {};
     auto namedMetaNode = module->getOrInsertNamedMetadata(metaName);
     if (namedMetaNode->getNumOperands() >= 1)
-      readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), oredValues);
+      CompilerUtils::readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), oredValues);
     for (unsigned idx = 0; idx != sizeof(value) / sizeof(unsigned); ++idx)
       oredValues[idx] |= values[idx];
-    llvm::MDNode *arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), oredValues, false);
+    llvm::MDNode *arrayMetaNode = CompilerUtils::getArrayOfInt32MetaNode(module->getContext(), oredValues, false);
     if (!arrayMetaNode) {
       module->eraseNamedMetadata(namedMetaNode);
       return;
@@ -628,7 +582,6 @@ private:
   // Whether generating pipeline or unlinked part-pipeline
   PipelineLink m_pipelineLink = PipelineLink::WholePipeline;
   ShaderStageMask m_stageMask;                          // Mask of active shader stages
-  bool m_preRasterHasGs = false;                        // Whether pre-rasterization part has a geometry shader
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   std::string m_client;                                 // Client name for PAL metadata
   Options m_options = {};                               // Per-pipeline options
@@ -645,6 +598,7 @@ private:
   NggControl m_nggControl = {};                                     // NGG control settings
   ShaderModes m_shaderModes;                                        // Shader modes for this pipeline
   unsigned m_deviceIndex = 0;                                       // Device index
+  PreRasterFlags m_preRasterFlags;                                  // Holds flags for pre-rasterization configurations
   std::vector<VertexInputDescription> m_vertexInputDescriptions;    // Vertex input descriptions
   llvm::SmallVector<ColorExportFormat, 8> m_colorExportFormats;     // Color export formats
   ColorExportState m_colorExportState = {};                         // Color export state

@@ -38,7 +38,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Represents the pass of LGC lowering operations for checking shader cache
-class CheckShaderCache : public Patch, public llvm::PassInfoMixin<CheckShaderCache> {
+class CheckShaderCache : public LgcLowering, public llvm::PassInfoMixin<CheckShaderCache> {
 public:
   CheckShaderCache() {}
 

@@ -272,9 +272,7 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   // LS VGPRs
   argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
   if (m_gfxIp.major <= 11) {
-#if LLPC_BUILD_GFX12
     // NOTE: GFX12 removes those two LS VGPRs.
-#endif
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Unused
   }
@@ -368,12 +366,6 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto entryBlock = BasicBlock::Create(*m_context, ".entry", entryPoint);
   auto beginLsBlock = BasicBlock::Create(*m_context, ".beginLs", entryPoint);
   auto endLsBlock = BasicBlock::Create(*m_context, ".endLs", entryPoint);
-  BasicBlock *distribHsPatchCountBlock = nullptr;
-  BasicBlock *endDistribHsPatchCountBlock = nullptr;
-  if (m_pipelineState->canOptimizeTessFactor()) {
-    distribHsPatchCountBlock = BasicBlock::Create(*m_context, ".distribHsPatchCount", entryPoint);
-    endDistribHsPatchCountBlock = BasicBlock::Create(*m_context, ".endDistribHsPatchCount", entryPoint);
-  }
   auto beginHsBlock = BasicBlock::Create(*m_context, ".beginHs", entryPoint);
   auto endHsBlock = BasicBlock::Create(*m_context, ".endHs", entryPoint);
 
@@ -410,16 +402,12 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     relVertexId = vgprArgs[3];
     instanceId = vgprArgs[5];
   } else {
-#if LLPC_BUILD_GFX12
     Value *waveIdInGroup = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::waveIdInGroup));
     waveIdInGroup = builder.CreateAnd(waveIdInGroup, 0x1F, "waveIdInGroup"); // waveIdInGroup = [4:0]
 
     relVertexId = builder.CreateMul(builder.getInt32(waveSize), waveIdInGroup);
     relVertexId = builder.CreateAdd(relVertexId, threadIdInWave);
     instanceId = vgprArgs[3];
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   // Vertex fetch VGPRs
@@ -428,6 +416,13 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto hsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
   hsVertCount->setName("hsVertCount");
+
+  if (m_pipelineState->canOptimizeTessFactor()) {
+    // Clear hsPatchCount to zero
+    const auto hsPatchCountStart = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)
+                                       ->inOutUsage.tcs.hwConfig.onChip.hsPatchCountStart;
+    writeValueToLds(builder.getInt32(0), builder.getInt32(hsPatchCountStart), builder);
+  }
 
   auto validLsVert = builder.CreateICmpULT(threadIdInWave, lsVertCount, "validLsVert");
   builder.CreateCondBr(validLsVert, beginLsBlock, endLsBlock);
@@ -468,35 +463,38 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // Construct ".endLs" block
   builder.SetInsertPoint(endLsBlock);
 
-  if (m_pipelineState->canOptimizeTessFactor()) {
-    assert(distribHsPatchCountBlock);
-    assert(endDistribHsPatchCountBlock);
-
-    // firstWave = mergedWaveInfo[31]
-    Value *firstWaveInGroup = builder.CreateAnd(mergeWaveInfo, 0x80000000);
-    firstWaveInGroup = builder.CreateICmpNE(firstWaveInGroup, builder.getInt32(0), "firstWaveInGroup");
-    builder.CreateCondBr(firstWaveInGroup, distribHsPatchCountBlock, endDistribHsPatchCountBlock);
-
-    // Construct ".distribHsPatchCount" block
-    builder.SetInsertPoint(distribHsPatchCountBlock);
-
-    // NOTE: The hsPatchCount is only valid for the first wave in the group. We have to store it to LDS to distribute
-    // it through the group.
-    Value *hsPatchCount = builder.CreateLShr(mergeWaveInfo, 16); // hsWaveCount = mergedWaveInfo[24:16]
-    hsPatchCount = builder.CreateAnd(hsPatchCount, 0xFF);
-    const auto hsPatchCountStart = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)
-                                       ->inOutUsage.tcs.hwConfig.onChip.hsPatchCountStart;
-    writeValueToLds(hsPatchCount, builder.getInt32(hsPatchCountStart), builder);
-    builder.CreateBr(endDistribHsPatchCountBlock);
-
-    // Construct ".endDistribHsPatchCount" block
-    builder.SetInsertPoint(endDistribHsPatchCountBlock);
-  }
-
   SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
   builder.CreateFence(AtomicOrdering::Release, syncScope);
   createBarrier(builder);
   builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+
+  if (m_pipelineState->canOptimizeTessFactor()) {
+    auto accumulateHsPatchCountBlock = BasicBlock::Create(*m_context, ".accumulateHsPatchCount", entryPoint);
+    accumulateHsPatchCountBlock->moveAfter(endLsBlock);
+    auto endAccumulateHsPatchCountBlock = BasicBlock::Create(*m_context, ".endAccumulateHsPatchCount", entryPoint);
+    endAccumulateHsPatchCountBlock->moveAfter(accumulateHsPatchCountBlock);
+
+    Value *hsPatchCount = builder.CreateLShr(mergeWaveInfo, 16); // hsWaveCount = mergedWaveInfo[24:16]
+    hsPatchCount = builder.CreateAnd(hsPatchCount, 0xFF);
+
+    // If hsPatchCount is not zero for this wave, accumulate it
+    auto hsPatchCountNotZero = builder.CreateICmpNE(hsPatchCount, builder.getInt32(0), "hsPatchCountNotZero");
+    auto firstThreadInWave = builder.CreateICmpEQ(threadIdInWave, builder.getInt32(0), "firstThreadInWave");
+
+    builder.CreateCondBr(builder.CreateAnd(hsPatchCountNotZero, firstThreadInWave), accumulateHsPatchCountBlock,
+                         endAccumulateHsPatchCountBlock);
+
+    // Construct ".accumulateHsPatchCount" block
+    builder.SetInsertPoint(accumulateHsPatchCountBlock);
+
+    const auto hsPatchCountStart = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)
+                                       ->inOutUsage.tcs.hwConfig.onChip.hsPatchCountStart;
+    atomicAdd(hsPatchCount, builder.getInt32(hsPatchCountStart), builder); // Accumulate hsPatchCount for each wave
+    builder.CreateBr(endAccumulateHsPatchCountBlock);
+
+    // Construct ".endAccumulateHsPatchCount" block
+    builder.SetInsertPoint(endAccumulateHsPatchCountBlock);
+  }
 
   auto validHsVert = builder.CreateICmpULT(threadIdInWave, hsVertCount, "validHsVert");
   builder.CreateCondBr(validHsVert, beginHsBlock, endHsBlock);
@@ -528,19 +526,19 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
     CallInst *call = callFunctionHelper(hsEntryPoint, hsArgs, builder.GetInsertBlock());
     call->setCallingConv(CallingConv::AMDGPU_HS);
+
+    // Store TF and HS outputs
+    if (m_pipelineState->canOptimizeTessFactor()) {
+      auto relativePatchId = builder.CreateAnd(relPatchId, builder.getInt32(0xFF));
+      auto vertexIdx = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
+                                               {relPatchId, builder.getInt32(8), builder.getInt32(5)});
+      storeTessFactorsAndHsOutputsWithOpt(threadIdInWave, relativePatchId, vertexIdx, builder);
+    }
   }
   builder.CreateBr(endHsBlock);
 
   // Construct ".endHs" block
   builder.SetInsertPoint(endHsBlock);
-
-  if (m_pipelineState->canOptimizeTessFactor()) {
-    auto relativePatchId = builder.CreateAnd(relPatchId, builder.getInt32(0xFF));
-    auto vertexIdx = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
-                                             {relPatchId, builder.getInt32(8), builder.getInt32(5)});
-    storeTessFactorsAndHsOutputsWithOpt(threadIdInWave, relativePatchId, vertexIdx, builder);
-  }
-
   builder.CreateRetVoid();
 
   return entryPoint;
@@ -990,7 +988,7 @@ void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entr
     }
 
     if (hasLdsStack) {
-      auto lds = Patch::getLdsVariable(m_pipelineState, entryPoint, /*rtStack=*/true);
+      auto lds = LgcLowering::getLdsVariable(m_pipelineState, entryPoint, /*rtStack=*/true);
       auto newLdsStack = ConstantExpr::getBitCast(lds, ldsStack->getType());
 
       SmallVector<Instruction *, 4> ldsStackInsts;
@@ -1055,11 +1053,9 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
   //     }
   //   }
   //
-  //   if (threadIdInWave < hsVertexCount) {
-  //     Read TFs from LDS (each thread corresponds to an output vertex)
-  //     if (outerTfs > 0.0)
-  //       Write HS outputs to off-chip LDS buffer
-  //   }
+  //   Read TFs from LDS (each thread corresponds to an output vertex)
+  //   if (outerTfs > 0.0)
+  //     Write HS outputs to off-chip LDS buffer
   // }
   //
 
@@ -1102,21 +1098,29 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
 
   // Define basic blocks
   auto checkSpecilTfInWaveBlock = createBlock(".checkSpecialTfInWave");
+  checkSpecilTfInWaveBlock->moveAfter(insertBlock);
   auto endCheckSpecialTfInWaveBlock = createBlock(".endCheckSpecialTfInWave");
+  endCheckSpecialTfInWaveBlock->moveAfter(checkSpecilTfInWaveBlock);
 
   auto handleMultiWaveBlock = createBlock(".handleMultiWave");
+  handleMultiWaveBlock->moveAfter(endCheckSpecialTfInWaveBlock);
   auto checkSpecilTfInGroupBlock = createBlock(".checkSpecialTfInGroup");
+  checkSpecilTfInGroupBlock->moveAfter(handleMultiWaveBlock);
   auto endCheckSpecialTfInGroupBlock = createBlock(".endCheckSpecialTfInGroup");
+  endCheckSpecialTfInGroupBlock->moveAfter(checkSpecilTfInGroupBlock);
   auto endHandleMultiWaveBlock = createBlock(".endHandleMultiWave");
+  endHandleMultiWaveBlock->moveAfter(endCheckSpecialTfInGroupBlock);
 
   auto tryStoreTfBlock = createBlock(".tryStoreTf");
+  tryStoreTfBlock->moveAfter(endHandleMultiWaveBlock);
   auto checkSendTfMessageBlock = createBlock(".checkSendTfMessage");
+  checkSendTfMessageBlock->moveAfter(tryStoreTfBlock);
   auto sendTfMessageBlock = createBlock(".sendTfMessage");
+  sendTfMessageBlock->moveAfter(checkSendTfMessageBlock);
   auto storeTfBlock = createBlock(".storeTf");
+  storeTfBlock->moveAfter(sendTfMessageBlock);
   auto endTryStoreTfBlock = createBlock(".endTryStoreTf");
-
-  auto tryStoreHsOutputsBlock = createBlock(".tryStoreHsOutputs");
-  auto endTryStoreHsOutputsBlock = createBlock(".endTryStoreHsOutputs");
+  endTryStoreTfBlock->moveAfter(storeTfBlock);
 
   // Construct current insert block
   Type *bufferDescTy = FixedVectorType::get(builder.getInt32Ty(), 4);
@@ -1130,7 +1134,11 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
     auto globalTable = builder.CreateExtractElement(
         userData, static_cast<uint64_t>(0)); // The first element of user data argument is always internal global table
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+    Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {});
+#else
     Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+#endif
     pc = builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2));
 
     globalTablePtr = builder.CreateInsertElement(pc, globalTable, static_cast<uint64_t>(0));
@@ -1365,20 +1373,6 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
   {
     builder.SetInsertPoint(endTryStoreTfBlock);
 
-    // hsVertexCount = mergeWaveInfo[15:8]
-    auto mergeWaveInfo = getFunctionArgument(entryPoint, getSpecialSgprInputIndex(m_gfxIp, LsHs::MergedWaveInfo));
-    auto hsVertexCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
-                                                 {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
-    hsVertexCount->setName("hsVertexCount");
-
-    auto validHsVertex = builder.CreateICmpULT(threadIdInWave, hsVertexCount, "validHsVertex");
-    builder.CreateCondBr(validHsVertex, tryStoreHsOutputsBlock, endTryStoreHsOutputsBlock);
-  }
-
-  // Construct ".tryStoreHsOutputs" block
-  {
-    builder.SetInsertPoint(tryStoreHsOutputsBlock);
-
     Value *offChipLdsDescPtr = builder.CreateConstGEP1_32(builder.getInt8Ty(), globalTablePtr,
                                                           SiDrvTableHsBufferOffs * 4, "offChipLdsDescPtr");
     auto offChipLdsDesc = builder.CreateLoad(bufferDescTy, offChipLdsDescPtr, "offChipLdsDesc");
@@ -1388,14 +1382,6 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
     const auto &[outerTf, innerTf] = PreparePipelineAbi::readTessFactors(m_pipelineState, relPatchId, builder);
     PreparePipelineAbi::writeHsOutputs(m_pipelineState, offChipLdsDesc, offChipLdsBase, relPatchId, vertexIdx, outerTf,
                                        builder);
-
-    builder.CreateBr(endTryStoreHsOutputsBlock);
-  }
-
-  // Construct ".endTryStoreHsOutputs" block
-  {
-    builder.SetInsertPoint(endTryStoreHsOutputsBlock);
-    // Do nothing
   }
 
   builder.setFastMathFlags(fastMathFlags); // Restore fast math flags
@@ -1411,14 +1397,14 @@ void ShaderMerger::storeTessFactorsAndHsOutputsWithOpt(Value *threadIdInWave, Va
 Value *ShaderMerger::readValueFromLds(Type *readTy, Value *ldsOffset, IRBuilder<> &builder) {
   assert(readTy->getScalarSizeInBits() == 32); // Only accept 32-bit data
 
-  auto lds = Patch::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
+  auto lds = LgcLowering::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
   Value *readPtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
   readPtr = builder.CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
   return builder.CreateAlignedLoad(readTy, readPtr, Align(4));
 }
 
 // =====================================================================================================================
-// Write value to mesh shader LDS.
+// Write value to LDS.
 //
 // @param writeValue : Value to write
 // @param ldsOffset : LDS offset in dwords
@@ -1427,10 +1413,27 @@ void ShaderMerger::writeValueToLds(Value *writeValue, Value *ldsOffset, IRBuilde
   auto writeTy = writeValue->getType();
   assert(writeTy->getScalarSizeInBits() == 32); // Only accept 32-bit data
 
-  auto lds = Patch::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
+  auto lds = LgcLowering::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
   Value *writePtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
   writePtr = builder.CreateBitCast(writePtr, PointerType::get(writeTy, writePtr->getType()->getPointerAddressSpace()));
   builder.CreateAlignedStore(writeValue, writePtr, Align(4));
+}
+
+// =====================================================================================================================
+// Do atomic add with the value stored in LDS.
+//
+// @param value : Value to do atomic add
+// @param ldsOffset : LDS offset to do atomic add
+// @param builder : IR builder to insert instructions
+void ShaderMerger::atomicAdd(Value *value, Value *ldsOffset, IRBuilder<> &builder) {
+  assert(value->getType()->isIntegerTy(32));
+
+  auto lds = LgcLowering::getLdsVariable(m_pipelineState, builder.GetInsertBlock()->getParent());
+  Value *atomicPtr = builder.CreateGEP(builder.getInt32Ty(), lds, ldsOffset);
+
+  builder.CreateAtomicRMW(AtomicRMWInst::BinOp::Add, atomicPtr, value, MaybeAlign(),
+                          AtomicOrdering::SequentiallyConsistent,
+                          builder.getContext().getOrInsertSyncScopeID("workgroup"));
 }
 
 // =====================================================================================================================
@@ -1438,14 +1441,16 @@ void ShaderMerger::writeValueToLds(Value *writeValue, Value *ldsOffset, IRBuilde
 //
 // @param builder : IR builder to insert instructions
 void ShaderMerger::createBarrier(IRBuilder<> &builder) {
-#if LLPC_BUILD_GFX12
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
     builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, builder.getInt32(WorkgroupNormalBarrierId));
     builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
                             builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
     return;
   }
-#endif
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {});
+#else
   builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+#endif
 }

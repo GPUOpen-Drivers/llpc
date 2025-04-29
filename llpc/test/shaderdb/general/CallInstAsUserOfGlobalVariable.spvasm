@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,13 +24,10 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; This test checks if lowerGlobal is handling properly case with removed zero-index GEPs.
 
 ; @_ug_input23 = external addrspace(7) global [2 x <{ [0 x float] }>], !spirv.Resource !2, !spirv.Block !1
 ; %2 = call i64 @lgc.buffer.length(ptr addrspace(7) @_ug_input23, i64 0)
-
-
 
 ; RUN: amdllpc -v -gfxip=11.0 %s | FileCheck %s
 

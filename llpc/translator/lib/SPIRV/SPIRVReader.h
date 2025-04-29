@@ -276,7 +276,7 @@ private:
   typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
   typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
-  typedef DenseMap<SPIRVType *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
+  typedef DenseMap<Type *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
   typedef DenseMap<SPIRVValue *, Type *> SPIRVAccessChainValueToLLVMRetTypeMap;
   typedef DenseMap<const SPIRVEntry *, Value *> SPIRVToLLVMEntryMap;
   typedef DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> BlockPredecessorToCountInFunction;
@@ -321,7 +321,6 @@ private:
   DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
   DenseMap<Function *, BlockPredecessorToCountInFunction> m_blockPredecessorToCount;
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
-
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
   bool m_workaroundStorageImageFormats;
   unsigned m_spirvOpMetaKindId;
@@ -377,14 +376,12 @@ private:
       m_accessChainRetTypeMap[v] = t;
   }
 
-  void recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to);
+  void recordRemappedTypeElements(Type *t, unsigned from, unsigned to);
 
-  bool isRemappedTypeElements(SPIRVType *bt) const { return m_remappedTypeElements.count(bt) > 0; }
-
-  unsigned lookupRemappedTypeElements(SPIRVType *bt, unsigned from) {
-    assert(m_remappedTypeElements.count(bt) > 0);
-    assert(m_remappedTypeElements[bt].size() > from);
-    return m_remappedTypeElements[bt][from];
+  unsigned lookupRemappedTypeElements(Type *t, unsigned from) {
+    assert(m_remappedTypeElements.count(t) > 0);
+    assert(m_remappedTypeElements[t].size() > from);
+    return m_remappedTypeElements[t][from];
   }
 
   Type *getPadType(unsigned bytes) { return ArrayType::get(getBuilder()->getInt8Ty(), bytes); }

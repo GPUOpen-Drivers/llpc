@@ -37,14 +37,14 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     76.2 | Add enableRobustUnboundVertex to PipelineOptions.                                                     |
+//  |     76.1 | Add promoteAllocaRegLimit and promoteAllocaRegRatio to PipelineShaderOptions.                         |
 //  |     75.12| Add enableDepthCompareParam to PipelineOptions.                                                       |
 //  |     75.11| Add scheduleStrategy to PipelineShaderOptions                                                         |
 //  |     75.10| Add temporalHintShaderControl to PipelineShaderOptions                                                |
 //  |     75.9 | Add rtIgnoreDeclaredPayloadSize to RayTracingPipelineBuildInfo.                                       |
 //  |     75.8 | Add forceMemoryBarrierScope to PipelineShaderOptions.                                                 |
-#if LLPC_BUILD_GFX12
 //  |     75.7 | Add temporalHintControl and cachePolicyLlc to PipelineOptions.                                        |
-#endif
 //  |     75.6 | Add enableRemapLocation to PipelineOptions. Add outLocationMaps to GraphicsPipelineBuildInfo.         |
 //  |     75.5 | Add optimizePointSizeWrite to PipelineShaderOptions in order to optimize the case PointSize = 1.0.    |
 //  |     75.4 | Add disableGlPositionOpt to PipelineShaderOptions.                                                    |
@@ -75,9 +75,7 @@
 //  |            Add columnCount to ResourceNodeData.                                                                  |
 //  |            Support vertex fetch in Byte, refine vertex fetch to always fetch in Component.                       |
 //  |     70.4 | Add LibraryMode and pLibrarySummaries to RayTracingPipelineBuildInfo                                  |
-#if LLPC_BUILD_GFX12
 //  |     70.3 | Add disableDynamicVgpr to RayTracingPipelineBuildInfo                                                 |
-#endif
 //  |     70.2 | Add useSoftwareVertexBufferDescriptors to GraphicsPipelineBuildInfo                                   |
 //  |     70.1 | Add cpsFlags to RayTracingPipelineBuildInfo                                                           |
 //  |     70.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
@@ -93,13 +91,9 @@
 //  |     65.4 | Add disableSampleMask to PipelineOptions                                                              |
 //  |     65.3 | Add originUpperLeft to GraphicsPipelineBuildInfo                                                      |
 //  |     65.2 | Support SPIRV extended vertex attribute formats during vertex fetch module.                           |
-#if LLPC_BUILD_GFX12
 //  |     65.1 | Add cacheScopePolicyControl to PipelineOptions                                                        |
-#endif
 //  |     65.0 | Remove updateDescInElf                                                                                |
-#if LLPC_BUILD_GFX12
 //  |     64.3 | Add workgroupRoundRobin to PipelineShaderOptions.                                                     |
-#endif
 //  |     64.2 | Add dynamicSampleInfo to GraphicsPipelineBuildInfo::rsState                                           |
 //  |     64.1 | Add disableTruncCoordForGather to PipelineOptions.                                                    |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
@@ -123,10 +117,7 @@
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
-//  |     61.0 | Add DescriptorMutable type and ResourceMappingNode::strideInDwords to support mutable descriptors     |
-#if LLPC_BUILD_GFX12
 //  |     60.1 | Add expertSchedulingMode in PipelineOptions                                                           |
-#endif
 //  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
 //  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
 //  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
@@ -215,10 +206,10 @@
 #pragma once
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 75
+#define LLPC_INTERFACE_MAJOR_VERSION 76
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 11
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
@@ -229,6 +220,6 @@
 #error Client of LLPC must set LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
 #error LLPC client version is too old
 #endif

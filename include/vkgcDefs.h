@@ -319,13 +319,9 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
   InlineBuffer,                 ///< Push constant with binding
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-  DescriptorMutable, ///< Mutable descriptor type
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
-  DescriptorAtomicCounter, ///< Generic descriptor: atomic counter
-#endif
-  Count, ///< Count of resource mapping node types.
+  DescriptorMutable,            ///< Mutable descriptor type
+  DescriptorAtomicCounter,      ///< Generic descriptor: atomic counter
+  Count,                        ///< Count of resource mapping node types.
 };
 
 /// Enumerates part-pipeline stages of compilation.
@@ -347,12 +343,10 @@ struct ResourceMappingNode {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,
     /// DescriptorTexelBuffer, DescriptorBuffer and DescriptorBufferCompact)
     struct {
-      unsigned set;     ///< Descriptor set
-      unsigned binding; ///< Descriptor binding
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
+      unsigned set;            ///< Descriptor set
+      unsigned binding;        ///< Descriptor binding
       unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
                                ///  a stride of zero will use the type of the node to determine the stride
-#endif
     } srdRange;
     /// Info for hierarchical nodes (DescriptorTableVaPtr)
     struct {
@@ -453,7 +447,6 @@ struct CompileTimeConst {
   } values;          ///< The compile-time values for this slot.
 };
 
-#if LLPC_BUILD_GFX12
 /// Handle temporal hint
 enum TemporalHintOpType {
   TemporalHintAtmWrite = 0,
@@ -465,7 +458,6 @@ enum TemporalHintOpType {
   TemporalHintBufferRead = 24,
   TemporalHintBufferWrite = 28,
 };
-#endif
 
 /// Represents info of compile-time constants within a shader of a specified stage.
 struct CompileConstInfo {
@@ -484,6 +476,7 @@ struct PipelineOptions {
   bool robustBufferAccess;         ///< If set, out of bounds accesses to buffer or private array will be handled.
                                    ///  for now this option is used by LLPC shader and affects only the private array,
                                    ///  the out of bounds accesses will be skipped with this setting.
+  bool enableRobustUnboundVertex;  ///< If set, access to unbound vertex attribute will result in reading (0,0,0,0).
   bool enableRelocatableShaderElf; ///< If set, the pipeline will be compiled by compiling each shader separately, and
                                    ///  then linking them, when possible.  When not possible this option is ignored.
   bool disableImageResourceCheck;  ///< If set, the pipeline shader will not contain code to check and fix invalid image
@@ -510,11 +503,7 @@ struct PipelineOptions {
   bool reverseThreadGroup;                        ///< If set, enable thread group reversing
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
-#if LLPC_BUILD_GFX12
-  bool expertSchedulingMode;
-#else
-  bool reserved16;
-#endif
+  bool expertSchedulingMode;                      ///< If set, enable expert scheduling mode
 
   struct GLState {
     bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
@@ -534,30 +523,23 @@ struct PipelineOptions {
     bool enablePointSmooth;                 ///< For OGL only, enable point smooth mode.
     bool enableRemapLocation;               ///< For OGL only, enables location remapping.
     bool enableDepthCompareParam;           ///< For OGL only, enable depth compare param descriptor.
+    bool enableDepthCompareFailValue;       ///< For OGL only, enable depth texture compare fail value.
   } glState;
   const auto &getGlState() const { return glState; }
 
-#if LLPC_BUILD_GFX12
   unsigned cacheScopePolicyControl; ///< Control cache scope policy. attributes-through-memory read/write is
                                     ///  available.
-#else
-  unsigned reserved20;
-#endif
-  bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
-  bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
+  bool enablePrimGeneratedQuery;    ///< If set, primitive generated query is enabled
+  bool disablePerCompFetch;         ///< Disable per component fetch in uber fetch shader.
   bool reserved21;
   bool optimizePointSizeWrite;        ///< If set, the write of PointSize in the last vertex processing stage will be
                                       ///< eliminated if the write value is 1.0.
   CompileConstInfo *compileConstInfo; ///< Compile time constant data.
-#if LLPC_BUILD_GFX12
-  unsigned temporalHintControl; ///< Override value for temporal hint. A load/store occupies 4 bits. The highest bit
-                                ///  of 4 bits marks whether to override temporal hint.
-                                ///  Arrange from the low bit to high bit in the following order:
-                                ///  TemporalHintAtmWrite,TemporalHintImageRead, TemporalHintImageWrite,
-                                ///  TemporalHintTessFactorWrite, TemporalHintTessRead, TemporalHintTessWrite
-#else
-  unsigned reserved22;
-#endif
+  unsigned temporalHintControl;  ///< Override value for temporal hint. A load/store occupies 4 bits. The highest bit
+                                 ///  of 4 bits marks whether to override temporal hint.
+                                 ///  Arrange from the low bit to high bit in the following order:
+                                 ///  TemporalHintAtmWrite,TemporalHintImageRead, TemporalHintImageWrite,
+                                 ///  TemporalHintTessFactorWrite, TemporalHintTessRead, TemporalHintTessWrite
   bool padBufferSizeToNextDword; ///< Vulkan only, set if the driver rounds the buffer size up the next dword
 };
 
@@ -807,7 +789,6 @@ inline unsigned compact32(ShaderHash hash) {
 /// Represent a pipeline option which can be automatic as well as explicitly set.
 enum InvariantLoads : unsigned { Auto = 0, EnableOptimization = 1, DisableOptimization = 2, ClearInvariants = 3 };
 
-#if LLPC_BUILD_GFX12
 /// Control cache policy: whether to use LLC (last level cache, aka set noAlloc).
 struct CachePolicyLlc {
   union NoAllocResource {
@@ -827,7 +808,6 @@ struct CachePolicyLlc {
   const unsigned *noAllocs; // Set for each resource.
   unsigned resourceCount;   // The count of resources
 };
-#endif
 
 /// Represents per shader stage options.
 struct PipelineShaderOptions {
@@ -956,9 +936,6 @@ struct PipelineShaderOptions {
   /// of written channels.
   bool workaroundStorageImageFormats;
 
-  /// Initialize outputs to zero if it is true
-  bool workaroundInitializeOutputsToZero;
-
   /// Application workaround: Treat GLSL.ext fma instruction as OpFMul + OpFAdd
   bool disableFMA;
 
@@ -971,10 +948,9 @@ struct PipelineShaderOptions {
   /// Application workaround: forward propagate NoContraction decoration to any related FAdd operation.
   bool forwardPropagateNoContract;
 
-#if LLPC_BUILD_GFX12
   /// Enable round-robin mode for waves in workgroup.
   bool workgroupRoundRobin;
-#endif
+
   /// Binding ID offset of default uniform block
   unsigned constantBufferBindingOffset;
 
@@ -988,14 +964,12 @@ struct PipelineShaderOptions {
   /// will be assigned values as if they were decorated as DeviceIndex.
   bool viewIndexFromDeviceIndex;
 
-#if LLPC_BUILD_GFX12
   /// Control LLC cache policy
   CachePolicyLlc cachePolicyLlc;
 
   /// Override value for temporal hint. A load/store occupies 4 bits. The highest bit of 4 bits marks whether to
   /// override temporal hint.
   unsigned temporalHintShaderControl;
-#endif
 
   /// Indicate whether the vertex shader is used by transform pipeline
   bool enableTransformShader;
@@ -1011,6 +985,12 @@ struct PipelineShaderOptions {
 
   /// Choose llvm's instruction scheduling strategy.
   LlvmScheduleStrategy scheduleStrategy;
+
+  /// Maximum alloca size (in VGPRs) that can be promoted to registers (0 = backend decides).
+  unsigned promoteAllocaRegLimit;
+
+  /// Ratio of VGPR budget to use for promoting alloca to registers (0 = backend decides).
+  unsigned promoteAllocaRegRatio;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1218,6 +1198,7 @@ struct RayTracingShaderExportConfig {
   bool readsDispatchRaysIndex;        // Shader reads dispatchRaysIndex
   bool enableDynamicLaunch;           // Enable dynamic launch
   bool emitRaytracingShaderDataToken; // Emitting Raytracing ShaderData SQTT Token
+  bool emitRaytracingShaderHashToken; // Emitting Raytracing shader hash SQTT Token
 };
 
 /// Enumerates the method of mapping from ray tracing launch ID to native thread ID
@@ -1231,14 +1212,10 @@ enum class LlpcRaytracingMode : unsigned {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 74
   None = 0, // Not goto any raytracing compiling path
 #else
-  Auto = 0,  // Automatically select the raytracing compiling path
+  Auto = 0, // Automatically select the raytracing compiling path
 #endif
-  Legacy, // LLpc Legacy compiling path
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
-  Gpurt2, // Raytracing lowering at the end of spirvLower.
-#else
-  Continufy, // Enable continuation with the continufy path.
-#endif
+  Legacy,        // LLpc Legacy compiling path
+  Continufy,     // Enable continuation with the continufy path.
   Continuations, // Enable continuation in the new raytracing path
 };
 
@@ -1252,6 +1229,12 @@ enum class LibraryMode : unsigned {
   Any,      //< Compiler output can be used as both a pipeline and a library
   Pipeline, //< Compiler output can be used only as a completed pipeline
   Library,  //< Compiler output can only be used as a library
+};
+
+/// GPURT option
+struct GpurtOption {
+  uint64_t nameHash; ///< A hash value that is used as name.
+  uint64_t value;    ///< Value of the setting
 };
 
 /// RayTracing state
@@ -1296,21 +1279,14 @@ struct RtState {
 
   /// If true, force the compiler to use gpurtShaderLibrary. Otherwise, it is up to the compiler whether it uses
   /// gpurtShaderLibrary or obtains a library directly from GPURT.
-  ///
-  /// If LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62, the compiler always behaves as if this was true.
   bool gpurtOverride;
 
   /// If true, force the compile to use rtIpVersion. If false, the compiler may derive the default RTIP version from
   /// the GFXIP version.
-  ///
-  /// If LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62, the compiler always behaves as if this was true.
   bool rtIpOverride;
-};
 
-/// GPURT option
-struct GpurtOption {
-  uint64_t nameHash; ///< A hash value that is used as name.
-  uint64_t value;    ///< Value of the setting
+  GpurtOption *pGpurtOptions; ///< Array of GPURT options
+  unsigned gpurtOptionCount;  ///< Number of GPURT options
 };
 
 struct UniformConstantMapEntry {
@@ -1366,10 +1342,7 @@ struct GraphicsPipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
-  ICache *cache; ///< ICache, used to search for the compiled shader data
-#endif
-  uint64_t pipelineApiHash; ///< Pipeline hash. If non-zero, this will be used directly as stable hash
+  uint64_t pipelineApiHash;       ///< Pipeline hash. If non-zero, this will be used directly as stable hash
 
   PipelineShaderInfo task; ///< Task shader
   PipelineShaderInfo vs;   ///< Vertex shader
@@ -1444,10 +1417,7 @@ struct GraphicsPipelineBuildInfo {
   bool useSoftwareVertexBufferDescriptors; ///< Use software vertex buffer descriptors to structure SRD.
   bool dynamicTopology;                    ///< Whether primitive topology is dynamic.
   OutputLocationMap *outLocationMaps;      ///< Array of location remapping pointers, sized by ShaderStageGfxCount.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  BinaryData shaderLibrary; ///< SPIR-V library binary data
-#endif
-  RtState rtState; ///< Ray tracing state
+  RtState rtState;                         ///< Ray tracing state
 
   struct {
     bool originUpperLeft;                         ///< Whether origin coordinate of framebuffer is upper-left.
@@ -1468,7 +1438,11 @@ struct GraphicsPipelineBuildInfo {
     float lineSmooth[4];                          ///< Line smooth pattern
     float pointSmooth[2];                         ///< Point smooth pattern
     bool enableMapClipDistMask;                   ///< Whether to remap the clip distances.
+    bool disablePointCoord;                       ///< Whether point coordinate is disabled or not set
     AlphaTestFunc alphaTestFunc;                  ///< AlphaTestFunc type
+    uint32_t numTexPointSprite;                   ///< The number of texture coords replace by point sprite
+    uint8_t texPointSpriteLocs[8];                ///< Only use for point sprite, indicate which
+                                                  ///< texture coordinate will be replaced by point coordinate
   } glState;
   const auto &getGlState() const { return glState; }
 
@@ -1479,12 +1453,9 @@ struct GraphicsPipelineBuildInfo {
 
 /// Represents info to build a compute pipeline.
 struct ComputePipelineBuildInfo {
-  void *pInstance;                ///< Vulkan instance object
-  void *pUserData;                ///< User data
-  OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
-  ICache *cache; ///< ICache, used to search for the compiled shader data
-#endif
+  void *pInstance;                     ///< Vulkan instance object
+  void *pUserData;                     ///< User data
+  OutputAllocFunc pfnOutputAlloc;      ///< Output buffer allocator
   uint64_t pipelineApiHash;            ///< Pipeline hash. If non-zero, this will be used directly as stable hash
   unsigned deviceIndex;                ///< Device index for device group
   PipelineShaderInfo cs;               ///< Compute shader
@@ -1492,25 +1463,19 @@ struct ComputePipelineBuildInfo {
   uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash
   PipelineOptions options;             ///< Per pipeline tuning options
   bool unlinked;                       ///< True to build an "unlinked" half-pipeline ELF
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  BinaryData shaderLibrary; ///< SPIR-V library binary data
-#endif
-  RtState rtState;                 ///< Ray tracing state
-  const void *pClientMetadata;     ///< Pointer to (optional) client-defined data to be stored inside the ELF
-  size_t clientMetadataSize;       ///< Size (in bytes) of the client-defined data
-  UniformConstantMap *pUniformMap; ///< Pointer to the uniform constants map
+  RtState rtState;                     ///< Ray tracing state
+  const void *pClientMetadata;         ///< Pointer to (optional) client-defined data to be stored inside the ELF
+  size_t clientMetadataSize;           ///< Size (in bytes) of the client-defined data
+  UniformConstantMap *pUniformMap;     ///< Pointer to the uniform constants map
   GraphicsPipelineBuildInfo *transformGraphicsPipeline; ///< For OpenGL: Graphics pipeline build info holding a vertex
                                                         ///< shader that can be invoked by the compute shader
 };
 
 /// Represents output of building a ray tracing pipeline.
 struct RayTracingPipelineBuildInfo {
-  void *pInstance;                ///< Vulkan instance object
-  void *pUserData;                ///< User data
-  OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
-  ICache *cache; ///< ICache, used to search for the compiled shader data
-#endif
+  void *pInstance;                     ///< Vulkan instance object
+  void *pUserData;                     ///< User data
+  OutputAllocFunc pfnOutputAlloc;      ///< Output buffer allocator
   uint64_t pipelineApiHash;            ///< Pipeline hash. If non-zero, this will be used directly as stable hash
   unsigned deviceIndex;                ///< Device index for device group
   unsigned deviceCount;                ///< Device count for device group
@@ -1523,14 +1488,11 @@ struct RayTracingPipelineBuildInfo {
   LibraryMode libraryMode;                                   ///< Whether to compile as pipeline or library or both
   unsigned libraryCount;                                     ///< Count of libraries linked into this build
   const BinaryData *pLibrarySummaries;                       ///< MsgPack summaries of libraries linked into this build
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  BinaryData shaderTraceRay; ///< Trace-ray SPIR-V binary data
-#endif
-  PipelineOptions options;    ///< Per pipeline tuning options
-  unsigned maxRecursionDepth; ///< Ray tracing max recursion depth
-  unsigned indirectStageMask; ///< Ray tracing indirect stage mask
-  LlpcRaytracingMode mode;    ///< Ray tracing compiling mode
-  RtState rtState;            ///< Ray tracing state
+  PipelineOptions options;                                   ///< Per pipeline tuning options
+  unsigned maxRecursionDepth;                                ///< Ray tracing max recursion depth
+  unsigned indirectStageMask;                                ///< Ray tracing indirect stage mask
+  LlpcRaytracingMode mode;                                   ///< Ray tracing compiling mode
+  RtState rtState;                                           ///< Ray tracing state
   // These pipeline library fields are superseded by the pLibrarySummaries when available.
   //@{
   bool hasPipelineLibrary;       ///< Whether include pipeline library
@@ -1544,13 +1506,9 @@ struct RayTracingPipelineBuildInfo {
                                   ///  stored inside the ELF
   size_t clientMetadataSize;      ///< Size (in bytes) of the client-defined data
   unsigned cpsFlags;              ///< Cps feature flags
-#if LLPC_BUILD_GFX12
-  bool disableDynamicVgpr;       ///< Whether to disable dynamic VGPR mode for continuations. If not set, dVGPR mode is
-                                 /// enabled by default.
-  unsigned dynamicVgprBlockSize; ///< The size of the VGPR allocation granule used in dVGPR mode.
-#endif
-  GpurtOption *pGpurtOptions;       ///< Array of GPURT options
-  unsigned gpurtOptionCount;        ///< Number of GPURT options
+  bool disableDynamicVgpr;        ///< Whether to disable dynamic VGPR mode for continuations. If not set, dVGPR mode is
+                                  /// enabled by default.
+  unsigned dynamicVgprBlockSize;  ///< The size of the VGPR allocation granule used in dVGPR mode.
   bool rtIgnoreDeclaredPayloadSize; ///< Ignore the declared payload size in the shader to address issues with Proton.
                                     ///  Proton games pass a dynamic maxPipelineRayPayloadSize into the API.
                                     ///  This dynamic size is used by the pipeline instead of the declared payload size
@@ -1582,16 +1540,6 @@ struct RayTracingShaderIdentifier {
   uint64_t anyHitId;       ///< AnyHit ID for hit groups
   uint64_t intersectionId; ///< Intersection shader ID for hit groups
   uint64_t padding;        ///< Padding to meet 32-byte api requirement and 8-byte alignment for descriptor table offset
-};
-
-/// Values to be bitwise OR'd into the result of the mapping procedure applied to shader IDs.
-///
-/// The compiler may use this to encode additional metadata into bits that are otherwise unused, e.g. LSBs that are
-/// available based on alignment, or in the high 32 bits.
-struct RayTracingShaderIdentifierExtraBits {
-  uint64_t shader;
-  uint64_t anyHit;
-  uint64_t intersection;
 };
 
 /// Represents ray-tracing capture replay GPU VA remapping table entry
@@ -1783,6 +1731,26 @@ public:
   /// @param [in] spvBin   SPIR-V binary
   static const char *VKAPI_CALL GetEntryPointNameFromSpirvBinary(const BinaryData *spvBin);
   static const char *VKAPI_CALL GetResourceMappingNodeTypeName(ResourceMappingNodeType type);
+
+  /// Disassembles a symbol from an ELF object
+  /// If pOutDisassembly is null, only the size of the disassembly is written to pDisassemblySize
+  /// Returns Result::Success if the operation completed successfully, all other results mean the operation was
+  /// semantically a no-op.
+  ///
+  /// @param [in] pElfObj : ELF object data
+  /// @param [in] objSize : size of ELF object data
+  /// @param [in] pSymbolName : symbol to disassemble
+  /// @param [out] pDisassemblySize : size of disassembled code
+  /// @param [out] pOutDisassembly : disassembled code
+  /// @returns : Success code, possible values:
+  ///   * Success: operation completed successfully
+  ///   * ErrorInvalidPointer: pElfObj is nullptr
+  ///   * ErrorInvalidShader: pElfObj could not be decoded
+  ///   * NotFound: pSymbolName not found in pElfObj
+  ///   * ErrorUnknown: other error occurred during disassembly
+  static Result VKAPI_CALL GetSymbolDisassemblyFromElf(const void *pElfObj, const size_t objSize,
+                                                       const char *pSymbolName, size_t *pDisassemblySize,
+                                                       void *pOutDisassembly);
 };
 
 /// 128-bit hash compatible structure

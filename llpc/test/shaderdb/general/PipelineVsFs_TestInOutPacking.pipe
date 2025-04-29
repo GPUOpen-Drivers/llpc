@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP0 %s
@@ -104,7 +104,6 @@
 ; SHADERTEST_PP0: (VS) Output: [location, component] = [17, 2]  =>  Mapped = [5, 2]
 ; SHADERTEST_PP0: AMDLLPC SUCCESS
 ; END_SHADERTEST
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST_PP1 %s
@@ -215,7 +214,6 @@ layout(location = 14) out i8vec2 v2i8_0;
 layout(location = 15) out i16vec2 v2i16_0;
 layout(location = 16) out f16vec4 v4f16_2;
 layout(location = 17) out vec3 interp;
-
 
 void main()
 {

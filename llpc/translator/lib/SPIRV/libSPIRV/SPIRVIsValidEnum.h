@@ -1,11 +1,11 @@
-//===- SPIRVIsValidEnum.h - SPIR-V isValid enums ----------------*- C++ -*-===//
+﻿//===- SPIRVIsValidEnum.h - SPIR-V isValid enums ----------------*- C++ -*-===//
 //
 //                     The LLVM/SPIRV Translator
 //
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-// Copyright (c) 2014 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2014-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
 // copy of this software and associated documentation files (the "Software"),
@@ -579,6 +579,8 @@ inline bool isValid(spv::Capability V) {
   case CapabilityFragmentShaderShadingRateInterlockEXT:
   case CapabilityFragmentShaderPixelInterlockEXT:
   case CapabilityReplicatedCompositesEXT:
+  case CapabilityOptNoneEXT:
+  case CapabilityArithmeticFenceEXT:
     return true;
   default:
     return false;
@@ -600,6 +602,7 @@ inline bool isValid(spv::Op V) {
   case OpExtension:
   case OpExtInstImport:
   case OpExtInst:
+  case OpExtInstWithForwardRefsKHR:
   case OpMemoryModel:
   case OpEntryPoint:
   case OpExecutionMode:
@@ -952,6 +955,7 @@ inline bool isValid(spv::Op V) {
   case OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
   case OpExpectKHR:
   case OpAssumeTrueKHR:
+  case OpArithmeticFenceEXT:
   case OpTypeCooperativeMatrixKHR:
   case OpCooperativeMatrixLoadKHR:
   case OpCooperativeMatrixStoreKHR:
@@ -1043,6 +1047,7 @@ inline bool isValidFunctionControlMask(SPIRVWord Mask) {
   ValidMask |= FunctionControlDontInlineMask;
   ValidMask |= FunctionControlPureMask;
   ValidMask |= FunctionControlConstMask;
+  ValidMask |= FunctionControlOptNoneEXTMask;
 
   return (Mask & ~ValidMask) == 0;
 }

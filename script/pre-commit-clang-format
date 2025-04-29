@@ -1,7 +1,8 @@
+#!/bin/sh
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2024-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2025 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to
@@ -22,6 +23,32 @@
  #  IN THE SOFTWARE.
  #
  #######################################################################################################################
+# A pre-commit hook to prevent a commit if clang-format has not yet
+# been applied. This usually leads to a preventable failure in CI.
 
-if "llpc_build_gfx12" not in config.available_features:
-    config.unsupported = True
+CLANG_FORMAT_VERSION=14
+CLANG_FORMAT_DIFF_EXECUTABLE="clang-format-diff-$CLANG_FORMAT_VERSION"
+
+if ! command -v ${CLANG_FORMAT_DIFF_EXECUTABLE} 2>&1 > /dev/null ; then
+    echo "Specific ${CLANG_FORMAT_DIFF_EXECUTABLE} does not exist."
+    CLANG_FORMAT_DIFF_EXECUTABLE="clang-format-diff"
+    echo "Trying ${CLANG_FORMAT_DIFF_EXECUTABLE} as fallback instead."
+    if ! command -v ${CLANG_FORMAT_DIFF_EXECUTABLE} 2>&1 > /dev/null ; then
+        echo "${CLANG_FORMAT_DIFF_EXECUTABLE} does not exist. Aborting."
+        exit 0
+    fi
+fi
+
+FORMAT_FILE=$(mktemp /tmp/formatted-diff-XXXXXX.diff)
+
+# Check whether any of the changes would be re-formatted.
+git diff HEAD -U0 --no-color -- '**/*.cpp' '**/*.cc' '**/*.h' '**/*.hh' | ${CLANG_FORMAT_DIFF_EXECUTABLE} -p1 > $FORMAT_FILE
+
+if ! grep -q '[^[:space:]]' ${FORMAT_FILE} ; then
+    echo "The code is properly formatted."
+else
+    echo "The code was not properly formatted. Please re-run git-clang-format. You can use the diff in ${FORMAT_FILE} as git patch."
+    echo "Diff:"
+    cat $FORMAT_FILE
+    exit 1
+fi

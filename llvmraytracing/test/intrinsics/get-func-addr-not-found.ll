@@ -24,7 +24,7 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint' -S %s --lint-abort-on-error 2>&1 | FileCheck %s
+; RUN: not --crash opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint<abort-on-error>,lower-raytracing-pipeline,lint<abort-on-error>' -S %s 2>&1 | FileCheck %s
 
 ; CHECK: ERROR: Did not find function '' requested by _AmdGetFuncAddr
 

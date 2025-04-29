@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -31,6 +31,7 @@
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/ADT/APFloat.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include <float.h>
@@ -254,7 +255,7 @@ llvm::Value *BuilderImpl::CreateFp8Convert(llvm::Value *value, llvm::Type *destT
   // float32 -> float8
   inst = isBfloat ? Intrinsic::amdgcn_cvt_pk_bf8_f32 : Intrinsic::amdgcn_cvt_pk_fp8_f32;
   if (eleCount == 1) {
-    value = CreateIntrinsic(getInt32Ty(), inst, {value, value, getFalse()});
+    value = CreateIntrinsic(getInt32Ty(), inst, {value, value, PoisonValue::get(getInt32Ty()), getFalse()});
     return CreateTrunc(value, destTy);
   }
 
@@ -811,14 +812,28 @@ Value *BuilderImpl::CreateSmoothStep(Value *edge0, Value *edge1, Value *x, const
 // @param exp : Exponent
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
-  // Ensure exponent is i32.
-  if (exp->getType()->getScalarType()->isIntegerTy(16))
-    exp = CreateSExt(exp, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
-  else if (exp->getType()->getScalarType()->isIntegerTy(64))
-    exp = CreateTrunc(exp, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
-
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, exp, [this](Value *x, Value *exp) {
+    Value *lessThanMinExp = nullptr;
+    if (exp->getType()->getScalarType()->isIntegerTy(64)) {
+      // Check if input exponent is less than the min value.
+      int64_t minExp = 0;
+      if (x->getType()->getScalarType()->isHalfTy())
+        minExp = APFloat::semanticsMinExponent(APFloat::IEEEhalf());
+      else if (x->getType()->getScalarType()->isFloatTy())
+        minExp = APFloat::semanticsMinExponent(APFloat::IEEEsingle());
+      else if (x->getType()->getScalarType()->isDoubleTy())
+        minExp = APFloat::semanticsMinExponent(APFloat::IEEEdouble());
+      else
+        llvm_unreachable("Unexpected floating point type!");
+
+      lessThanMinExp = CreateICmpSLT(exp, ConstantInt::get(exp->getType(), minExp));
+
+      exp = CreateTrunc(exp, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
+    } else if (exp->getType()->getScalarType()->isIntegerTy(8) || exp->getType()->getScalarType()->isIntegerTy(16)) {
+      exp = CreateSExt(exp, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
+    }
+
     Value *ldexp = CreateIntrinsic(x->getType(), Intrinsic::ldexp, {x, exp});
     if (x->getType()->getScalarType()->isDoubleTy()) {
       // NOTE: If LDEXP result is a denormal, we can flush it to zero. This is allowed. For double type, LDEXP
@@ -827,6 +842,11 @@ Value *BuilderImpl::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
       // Exponent < DBL_MIN_EXP is denormal
       ldexp = CreateSelect(CreateICmpSLT(exp, ConstantInt::get(exp->getType(), DBL_MIN_EXP)),
                            ConstantFP::get(x->getType(), 0.0), ldexp);
+    }
+
+    if (lessThanMinExp) {
+      // Suggested by spec, if input exponent is less than the min value, flush the result to zero.
+      ldexp = CreateSelect(lessThanMinExp, ConstantFP::get(x->getType(), 0.0), ldexp);
     }
     return ldexp;
   });
@@ -1020,7 +1040,11 @@ Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const T
     Value *max = CreateMaxNum(x, minVal);
     if (auto *call = dyn_cast<CallInst>(max))
       call->setFastMathFlags(getFastMathFlags());
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 529265
+    Value *min = CreateMinNum(max, maxVal, /*FMFSource=*/nullptr, instName);
+#else
     Value *min = CreateMinNum(max, maxVal, instName);
+#endif
     if (auto *call = dyn_cast<CallInst>(min))
       call->setFastMathFlags(getFastMathFlags());
     result = min;
@@ -1140,7 +1164,11 @@ Value *BuilderImpl::CreateFMid3(Value *value1, Value *value2, Value *value3, con
     if (auto *call = dyn_cast<CallInst>(min2))
       call->setFastMathFlags(getFastMathFlags());
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 529265
+    Value *max2 = CreateMaxNum(min1, min2, /*FMFSource=*/nullptr, instName);
+#else
     Value *max2 = CreateMaxNum(min1, min2, instName);
+#endif
     if (auto *call = dyn_cast<CallInst>(max2))
       call->setFastMathFlags(getFastMathFlags());
     result = max2;

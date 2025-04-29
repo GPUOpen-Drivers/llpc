@@ -221,16 +221,19 @@ Value *BuilderImpl::createSubgroupBroadcastFirst(const SubgroupHelperLaneState &
   // We need filter out the helperlane and use readlane instead if don't care helper lanes.
   if (state.excluded()) {
     Value *ballot = createGroupBallot(state, getTrue());
+    Value *onlyHelperLanes = CreateICmpEQ(ballot, getInt64(0));
     Value *firstlane = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), {ballot, getTrue()});
     firstlane = CreateTrunc(firstlane, getInt32Ty());
 
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                       ArrayRef<Value *> passthroughArgs) -> Value * {
-      return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
-                                     {mappedArgs[0], passthroughArgs[0]});
+      Value *laneValue = builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                 {mappedArgs[0], passthroughArgs[0]});
+      // If only helper lanes, return 0.
+      return builder.CreateSelect(passthroughArgs[1], builder.getInt32(0), laneValue);
     };
 
-    return CreateMapToSimpleType(mapFunc, value, firstlane);
+    return CreateMapToSimpleType(mapFunc, value, {firstlane, onlyHelperLanes});
   }
 
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
@@ -872,16 +875,13 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
     Value *isPreviousLaneValid = CreateICmpNE(preClusterMask, constZero);
     Value *previousLaneIndex = createFindMsb(preClusterMask);
     Value *previousLaneValue = nullptr;
-#if LLPC_BUILD_GFX12
     // v_permLane16_var can only shuffle within clusters of 16. For log2ClusterSize == 4, v_permLanex16_var needs to be
     // used to fetch a value from the other 16-row. For log2ClusterSize == 5, we need the full power of the subgroup
     // shuffle.
     if (log2ClusterSize < 5 && supportPermLaneVar()) {
       previousLaneValue = log2ClusterSize < 4 ? createPermLane16Var(result, result, previousLaneIndex, false, true)
                                               : createPermLaneX16Var(result, result, previousLaneIndex, false, true);
-    } else
-#endif
-    {
+    } else {
       previousLaneValue = createSubgroupShuffle(SubgroupHelperLaneState::get(std::nullopt, state.requireHelperLanes),
                                                 result, previousLaneIndex, m_shaderStage.value(), instName);
     }
@@ -915,16 +915,13 @@ Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const
   Value *result = PoisonValue::get(value->getType());
 
   const unsigned indexBits = index->getType()->getPrimitiveSizeInBits();
-#if LLPC_BUILD_GFX12
   if (supportPermLaneVar()) {
     Value *laneId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
 
     // The gather lane pattern = (laneId & ~0x3 | index & 0x3)
     Value *select = CreateOr(CreateAnd(laneId, CreateNot(getInt32(0x3))), CreateAnd(index, getInt32(0x3)));
     result = createPermLane16Var(value, value, select, false, true);
-  } else
-#endif
-  {
+  } else {
     Value *compare = CreateICmpEQ(index, getIntN(indexBits, 0));
     result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm0000, 0xF, 0xF, true), result);
 
@@ -1605,7 +1602,6 @@ Value *BuilderImpl::CreateQuadAny(Value *const value, bool requireFullQuads, con
   return result;
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Create a call to permute var lane within a row.
 //
@@ -1655,4 +1651,3 @@ Value *BuilderImpl::createPermLaneX16Var(Value *const origValue, Value *const up
                                },
                                {select, getInt1(fetchInactive), getInt1(boundCtrl)});
 }
-#endif

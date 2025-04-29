@@ -4,7 +4,6 @@
 ; If multiview is enabled, it will fail to build with relocatable ELF.
 
 ; RUN: amdllpc -enable-relocatable-shader-elf -emit-llvm -o - -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
-
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -29,7 +28,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 [Version]
 version = 52
@@ -74,7 +72,6 @@ colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
 colorBuffer[0].channelWriteMask = 15
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 1
-
 
 [VertexInputState]
 binding[0].binding = 0

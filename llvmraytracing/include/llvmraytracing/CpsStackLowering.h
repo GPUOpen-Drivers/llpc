@@ -91,8 +91,6 @@ private:
   void visitBitCastInst(llvm::BitCastInst &);
   void visitLoad(llvm::LoadInst &);
   void visitStore(llvm::StoreInst &);
-  void visitContinue(lgc::ilcps::ContinueOp &);
-  void visitWaitContinue(lgc::ilcps::WaitContinueOp &);
   llvm::Value *getRealMemoryAddress(llvm::Value *);
   llvm::Function *addOrInitCsp(llvm::Function *F, llvm::Function *GetGlobalMemBase, bool RequiresIncomingCsp);
 

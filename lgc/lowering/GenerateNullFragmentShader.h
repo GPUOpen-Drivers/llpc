@@ -37,11 +37,11 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to generate null fragment shader if required
-class GenerateNullFragmentShader : public Patch, public llvm::PassInfoMixin<GenerateNullFragmentShader> {
+class GenerateNullFragmentShader : public LgcLowering, public llvm::PassInfoMixin<GenerateNullFragmentShader> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  static llvm::StringRef name() { return "Patch LLVM for null fragment shader generation"; }
+  static llvm::StringRef name() { return "Generate null fragment shader"; }
   void updatePipelineState(PipelineState *pipelineState) const;
 };
 

@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/LgcXdlTypes.h"
+#include "llvm/IR/Instruction.h"
 
 namespace llvm {
 class Type;
@@ -42,14 +43,16 @@ class Builder;
 } // namespace llvm_dialects
 
 namespace lgc::xdl {
+// Get the cast opcode for cooperative matrix.
+llvm::Instruction::CastOps getCooperativeMatrixCastOp(CooperativeMatrixElementType srcElemType, bool srcIsSigned,
+                                                      CooperativeMatrixElementType dstElemType, bool dstIsSigned);
+
 // Get the LGC type of a cooperative matrix with the given element type, layout and K size.
 llvm::Type *getCooperativeMatrixTy(llvm_dialects::Builder &builder, CooperativeMatrixElementType elemType,
                                    CooperativeMatrixLayout layout, unsigned kSize = 16);
 
-#if LLPC_BUILD_GFX12
 // Get the llvm type of a sparse index for the sparseCooperativeMatrix.
 llvm::Type *getSparseIndexTy(llvm_dialects::Builder &builder, SparseCooperativeMatrixSparsityFormat format);
-#endif
 
 // Whether the type of a cooperative matrix is integer.
 bool isUnderlyingIntegerCooperativeMatrix(CooperativeMatrixElementType elemType);

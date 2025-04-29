@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -445,20 +445,6 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 #endif
     }
   }
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  const BinaryData *shaderLibrary = nullptr;
-  if (pipelineState->pipelineType == VfxPipelineTypeRayTracing) {
-    shaderLibrary = &pipelineState->rayPipelineInfo.shaderTraceRay;
-  } else if (pipelineState->pipelineType == VfxPipelineTypeCompute)
-    shaderLibrary = &pipelineState->compPipelineInfo.shaderLibrary;
-  else {
-    assert(pipelineState->pipelineType == VfxPipelineTypeGraphics);
-    shaderLibrary = &pipelineState->gfxPipelineInfo.shaderLibrary;
-  }
-  if (shaderLibrary->codeSize > 0 && EnableOuts())
-    disassembleSpirv(shaderLibrary->codeSize, shaderLibrary->pCode, "Ray tracing library");
-#endif
 
   const bool isGraphics = compileInfo.pipelineType == VfxPipelineTypeGraphics;
   assert(!(isGraphics && isComputePipeline(compileInfo.stageMask)) && "Bad stage mask");

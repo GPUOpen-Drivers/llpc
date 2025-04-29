@@ -109,6 +109,9 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
 ; CHECK-NEXT:    call void (ptr, i32, <20 x i32>, { i32, i32, i32, i32, i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v20i32.sl_i32i32i32i32i32i32s(ptr inreg [[TMP27]], i32 inreg [[TMP57]], <20 x i32> inreg [[TMP55]], { i32, i32, i32, i32, i32, i32 } [[TMP56]], i32 1, i32 [[TMP31]], i32 -1, ptr @retry_vgpr_alloc.v20i32)
 ; CHECK-NEXT:    unreachable
 ;
+; CHECK: !amdgpu.pal.metadata.msgpack = !{[[PAL_MD:![0-9]+]]}
+; CHECK: [[PAL_MD]] = {{.*}}outgoing_vgpr_count\0E\{{.*}}
+
 .entry:
   %csp = alloca i32, align 4
   %desc = call <4 x i32> @lgc.load.user.data__v4i32(i32 0)

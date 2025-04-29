@@ -34,40 +34,66 @@ using namespace llvm;
 using namespace lgc;
 
 namespace lgc {
+
 // =====================================================================================================================
-// Get 64/32 bit NumRecords from the buffer descriptor resource
+// Get 64/32 bit NUM_RECORDS from the buffer descriptor resource
 //
-// @gfxIpVer : GfxIp version
-// @builder : Passed in Builder
-// @bufferDesc : Buffer descriptor resource
-Value *getBufferNumRecords(const GfxIpVersion &gfxIpVer, BuilderCommon &builder, Value *const bufferDesc) {
+// @param gfxIp : Graphics IP version
+// @param builder : Builder for inserting instructions
+// @param bufferDesc : Buffer descriptor resource
+// @returns : NUM_RECORDS field value in buffer descriptor resource
+Value *getBufferNumRecords(const GfxIpVersion &gfxIp, BuilderCommon &builder, Value *const bufferDesc) {
   Value *numRecords = nullptr;
-  if (gfxIpVer.major <= 12) {
+  if (gfxIp.major <= 12) {
     // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
     numRecords = builder.CreateExtractElement(bufferDesc, 2);
   } else {
-    llvm_unreachable("Unsupported gfxip!");
+    llvm_unreachable("Unsupported GFX IP!");
   }
   return numRecords;
 }
 
 // =====================================================================================================================
-// Get 32bit Stride from the buffer descriptor resource
+// Get 32 bit STRIDE from the buffer descriptor resource
 //
-// @gfxIpVer : GfxIp version
-// @builder : Passed in Builder
-// @bufferDesc : Buffer descriptor resource
-Value *getBufferStride(const GfxIpVersion &gfxIpVer, BuilderCommon &builder, Value *const bufferDesc) {
+// NOTE: This function just returns STRIDE field value from the buffer descriptor resource. The STRIDE_SCALE field value
+// is not taken into account (STRIDE_SCALE: 0 = 1x, 1 = 4x, 2 = 8x, 3 = 32x).
+//
+// @param gfxIp : Graphics IP version
+// @param builder : Passed in Builder
+// @param bufferDesc : Buffer descriptor resource
+// @returns : STRIDE field value in buffer descriptor resource
+Value *getBufferStride(const GfxIpVersion &gfxIp, BuilderCommon &builder, Value *const bufferDesc) {
   Value *stride = nullptr;
-  if (gfxIpVer.major <= 12) {
-    // stride[61:48]
-    Value *desc1 = builder.CreateExtractElement(bufferDesc, 1);
-    stride = builder.CreateAnd(builder.CreateLShr(desc1, builder.getInt32(16)), builder.getInt32(0x3fff));
+  if (gfxIp.major <= 12) {
+    // STRIDE = [61:48]
+    Value *dword1 = builder.CreateExtractElement(bufferDesc, 1);
+    stride = builder.CreateAnd(builder.CreateLShr(dword1, builder.getInt32(16)), builder.getInt32(0x3FFF));
   } else {
-    llvm_unreachable("Unsupported gfxip!");
+    llvm_unreachable("Unsupported GFX IP!");
   }
-  // TODO:stride is possibly required to updated with stride_scale, stride_scale value:0 = 1x, 1 = 4x, 2 = 8x, 3 = 32x
+
   return stride;
+}
+
+// =====================================================================================================================
+// Set 32 bit STRIDE to buffer resource descriptor
+//
+// NOTE: This function just sets STRIDE field value to the buffer descriptor resource. The STRIDE_SCALE field value
+// is not taken into account (STRIDE_SCALE: 0 = 1x, 1 = 4x, 2 = 8x, 3 = 32x).
+//
+// @param gfxIp : Graphics IP version
+// @param builder : Passed in Builder
+// @param [in/out] bufferDesc : Buffer descriptor resource
+// @param stride : Value to set STRIDE field
+void setBufferStride(const GfxIpVersion &gfxIp, BuilderCommon &builder, Value *&bufferDesc, Value *const stride) {
+  if (gfxIp.major <= 12) {
+    // STRIDE = [61:48]
+    Value *dword1 = builder.CreateExtractElement(bufferDesc, 1);
+    dword1 = builder.CreateAnd(dword1, ~0x3FFF0000);                                             // Clear old STRIDE
+    dword1 = builder.CreateOr(dword1, builder.CreateShl(builder.CreateAnd(stride, 0x3FFF), 16)); // Set new STRIDE
+    bufferDesc = builder.CreateInsertElement(bufferDesc, dword1, 1);
+  }
 }
 
 } // namespace lgc

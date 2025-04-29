@@ -31,6 +31,7 @@
 #include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/PalMetadata.h"
@@ -130,7 +131,7 @@ Value *BuilderImpl::createBufferDesc(uint64_t descSet, unsigned binding, Value *
       if (stride == 0)
         desc = create<BufferDescToPtrOp>(desc, globallyCoherent);
       else
-        desc = create<StridedBufferDescToPtrOp>(desc, globallyCoherent);
+        desc = create<StridedBufferDescToPtrOp>(desc, stride, globallyCoherent);
     }
   } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
     // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
@@ -422,16 +423,12 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc, Value *stride) {
       sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
       sqBufRsrcWord3.gfx11.oobSelect = stride ? 3 : 2;
       assert(sqBufRsrcWord3.u32All == 0x20014FAC || sqBufRsrcWord3.u32All == 0x30014FAC);
-    }
-#if LLPC_BUILD_GFX12
-    else if (gfxIp.major == 12) {
+    } else if (gfxIp.major == 12) {
       sqBufRsrcWord3.gfx12.format = BUF_FORMAT_32_UINT;
       sqBufRsrcWord3.gfx12.compressionEn = 1;
       sqBufRsrcWord3.gfx12.oobSelect = stride ? 3 : 2;
       assert(sqBufRsrcWord3.u32All == 0x22014FAC || sqBufRsrcWord3.u32All == 0x32014FAC);
-    }
-#endif
-    else {
+    } else {
       llvm_unreachable("Not implemented!");
     }
     bufDesc = CreateInsertElement(bufDesc, getInt32(sqBufRsrcWord3.u32All), 3);

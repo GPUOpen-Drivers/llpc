@@ -62,7 +62,7 @@ public:
   llvm::Constant *getFpConstant(llvm::Type *ty, llvm::APFloat value);
 
   // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
-  // For buffer fat pointers, delays the translation to patch phase.
+  // For buffer fat pointers, delays the translation to LGC lowering phase.
   //
   // @param ty : Element type of the pointers.
   // @param lhs : Left hand side of the subtraction.
@@ -105,6 +105,24 @@ public:
   //
   // @param instName : Name to give instruction(s)
   llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "");
+
+  // Create an "s_setreg" to set specified bits of a hardware register.
+  //
+  // @param waveRegIdx : The wave state register Index
+  // @param offset: The starting offset
+  // @param size: The size of bits
+  // @param value : The value to set to the register
+  // @param instName : Name to give instruction(s)
+  llvm::Instruction *CreateSetReg(unsigned waveRegIdx, unsigned offset, unsigned size, llvm::Value *value,
+                                  const llvm::Twine &instName = "");
+
+  // Create an "s_getreg" to get specified bits of a hardware register.
+  //
+  // @param waveRegIdx : The wave state register Index
+  // @param offset: The starting offset
+  // @param size: The size of bits
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateGetReg(unsigned waveRegIdx, unsigned offset, unsigned size, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

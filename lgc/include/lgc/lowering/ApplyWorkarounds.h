@@ -47,7 +47,7 @@ namespace lgc {
 //   require a fix so the hardware will ignore this difference (actually an app error, but common enough to require
 //   handling)
 //
-class ApplyWorkarounds final : public Patch, public llvm::PassInfoMixin<ApplyWorkarounds> {
+class ApplyWorkarounds final : public LgcLowering, public llvm::PassInfoMixin<ApplyWorkarounds> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 

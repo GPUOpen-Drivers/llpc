@@ -57,7 +57,7 @@ static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row e
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
-static const char PreRasterHasGsMetadataName[] = "lgc.prerast.has.gs";
+static const char PreRasterFlagsMetadataName[] = "lgc.prerast.flags";
 static const char ClientMetadataName[] = "lgc.client";
 static const char OptionsMetadataName[] = "lgc.options";
 static const char UserDataMetadataName[] = "lgc.user.data.nodes";
@@ -629,8 +629,9 @@ void PipelineState::recordOptions(Module *module) {
 
   if (unsigned unlinkedAsInt = unsigned(m_pipelineLink))
     setNamedMetadataToArrayOfInt32(module, unlinkedAsInt, UnlinkedMetadataName);
-  if (unsigned preRasterHasGs = unsigned(m_preRasterHasGs))
-    setNamedMetadataToArrayOfInt32(module, preRasterHasGs, PreRasterHasGsMetadataName);
+  if (unsigned preRasterFlags = unsigned(m_preRasterFlags.allFlags))
+    setNamedMetadataToArrayOfInt32(module, preRasterFlags, PreRasterFlagsMetadataName);
+
   setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
   // Iterate stages in deterministic order
   for (auto stage : ShaderStagesNative) {
@@ -662,9 +663,9 @@ void PipelineState::readOptions(Module *module) {
   unsigned unlinkedAsInt = 0;
   readNamedMetadataArrayOfInt32(module, UnlinkedMetadataName, unlinkedAsInt);
   m_pipelineLink = PipelineLink(unlinkedAsInt);
-  unsigned preRasterHasGsAsInt = 0;
-  readNamedMetadataArrayOfInt32(module, PreRasterHasGsMetadataName, preRasterHasGsAsInt);
-  m_preRasterHasGs = preRasterHasGsAsInt;
+  unsigned flagsAsInt = 0;
+  readNamedMetadataArrayOfInt32(module, PreRasterFlagsMetadataName, flagsAsInt);
+  m_preRasterFlags.allFlags = flagsAsInt;
 
   readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
   for (auto stage : ShaderStagesNative) {
@@ -673,7 +674,7 @@ void PipelineState::readOptions(Module *module) {
     auto namedMetaNode = module->getNamedMetadata(metadataName);
     if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
       continue;
-    readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), m_shaderOptions[stage]);
+    CompilerUtils::readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), m_shaderOptions[stage]);
   }
 }
 
@@ -1065,7 +1066,6 @@ const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType n
   return nullptr;
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Get the temporal hint.
 //
@@ -1088,7 +1088,6 @@ unsigned PipelineState::getTemporalHint(unsigned th, TemporalHintOpType opType, 
   }
   return th;
 }
-#endif
 
 // =====================================================================================================================
 // Get the cached MDString for the name of a resource mapping node type, as used in IR metadata for user data nodes.
@@ -1161,7 +1160,8 @@ void PipelineState::recordVertexInputDescriptions(Module *module) {
   vertexInputsMetaNode->clearOperands();
 
   for (const VertexInputDescription &input : m_vertexInputDescriptions)
-    vertexInputsMetaNode->addOperand(getArrayOfInt32MetaNode(getContext(), input, /*atLeastOneValue=*/true));
+    vertexInputsMetaNode->addOperand(
+        CompilerUtils::getArrayOfInt32MetaNode(getContext(), input, /*atLeastOneValue=*/true));
 }
 
 // =====================================================================================================================
@@ -1180,7 +1180,8 @@ void PipelineState::readVertexInputDescriptions(Module *module) {
   unsigned nodeCount = vertexInputsMetaNode->getNumOperands();
   for (unsigned nodeIndex = 0; nodeIndex < nodeCount; ++nodeIndex) {
     m_vertexInputDescriptions.push_back({});
-    readArrayOfInt32MetaNode(vertexInputsMetaNode->getOperand(nodeIndex), m_vertexInputDescriptions.back());
+    CompilerUtils::readArrayOfInt32MetaNode(vertexInputsMetaNode->getOperand(nodeIndex),
+                                            m_vertexInputDescriptions.back());
   }
 }
 
@@ -1233,7 +1234,8 @@ void PipelineState::recordColorExportState(Module *module) {
     // - N metadata nodes for N color targets, each one containing
     // { dfmt, nfmt, blendEnable, blendSrcAlphaToColor, channelWriteMask }
     for (const ColorExportFormat &target : m_colorExportFormats)
-      exportFormatsMetaNode->addOperand(getArrayOfInt32MetaNode(getContext(), target, /*atLeastOneValue=*/true));
+      exportFormatsMetaNode->addOperand(
+          CompilerUtils::getArrayOfInt32MetaNode(getContext(), target, /*atLeastOneValue=*/true));
   }
 
   setNamedMetadataToArrayOfInt32(module, m_colorExportState, ColorExportStateMetadataName);
@@ -1251,7 +1253,8 @@ void PipelineState::readColorExportState(Module *module) {
     // Read the color target nodes.
     for (unsigned nodeIndex = 0; nodeIndex < exportFormatsMetaNode->getNumOperands(); ++nodeIndex) {
       m_colorExportFormats.push_back({});
-      readArrayOfInt32MetaNode(exportFormatsMetaNode->getOperand(nodeIndex), m_colorExportFormats.back());
+      CompilerUtils::readArrayOfInt32MetaNode(exportFormatsMetaNode->getOperand(nodeIndex),
+                                              m_colorExportFormats.back());
     }
   }
 
@@ -1762,16 +1765,14 @@ bool PipelineState::enableSwXfb() {
 }
 
 // =====================================================================================================================
-// Checks if we export vertex/primitive attributes by parameter export instruction.
-bool PipelineState::exportAttributeByExportInstruction() const {
+// Checks if we export vertex/primitive attributes to parameter cache through SX or through memory
+bool PipelineState::attributeThroughExport() const {
   const auto gfxIp = getTargetInfo().getGfxIpVersion();
   switch (gfxIp.major) {
   case 10:
     return true; // Always use parameter export instruction
   case 11:
-#if LLPC_BUILD_GFX12
   case 12:
-#endif
     return false; // Always use attribute-through-memory (ATM)
   default:
     llvm_unreachable("Unexpected GFX generation!");
@@ -1879,7 +1880,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location, b
   bool supportRbPlus = getTargetInfo().getGpuProperty().supportsRbPlus;
 
   if (colorExportFormat->dfmt == BufDataFormatInvalid)
-    expFmt = EXP_FORMAT_ZERO;
+    expFmt = enableAlphaToCoverage ? EXP_FORMAT_32_AR : EXP_FORMAT_ZERO;
   else if (compSetting == CompSetting::OneCompRed && !alphaExport && !isSrgbFormat &&
            (!supportRbPlus || maxCompBitCount == 32)) {
     // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
@@ -1996,15 +1997,21 @@ bool PipelineState::canOptimizeTessFactor() {
 void PipelineState::initializeInOutPackState() {
   // If the pipeline is not unlinked, the state of input/output pack in specified shader stages is enabled
   if (!isUnlinked()) {
-    // The generic input imports of {TCS, GS, FS} are packed by default
+    // For OGL point sprite, the spi_ps_input_cntl.offset(specifies attribute src location in param cache) requires the
+    // VS output unpacked, it is incorrect if VS output consumes two locations, so disable in/out packing for VS and FS
+    // if point sprite is enabled
+    if (m_options.numTexPointSprite == 0) {
+      m_inputPackState[ShaderStage::Fragment] = true;
+      m_outputPackState[ShaderStage::Vertex] = true;
+    }
+
+    // The generic input imports of {TCS, GS} are packed by default
     m_inputPackState[ShaderStage::TessControl] = true;
     m_inputPackState[ShaderStage::Geometry] = true;
-    m_inputPackState[ShaderStage::Fragment] = true;
-    // The generic output exports of {VS, TES, GS} are packed by default
-    m_outputPackState[ShaderStage::Vertex] = true;
+
+    // The generic output exports of {TES, GS} are packed by default
     m_outputPackState[ShaderStage::TessEval] = true;
     m_outputPackState[ShaderStage::Geometry] = true;
-
   } else {
     // For unlinked shaders, we can do in-out packing if the pipeline has two adjacent shaders.
     // We are assuming that if any of the vertex processing, then the vertex processing stages are complete.  For

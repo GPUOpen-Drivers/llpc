@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -35,40 +35,7 @@
 namespace GpuRt {
 
 #pragma pack(push, 4)
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-struct DispatchRaysInfoData {
-  uint64_t rayGenerationTable; ///< Shader record table for raygeneration shaders
-  unsigned rayDispatchWidth;   ///< Width of the ray dispatch
-  unsigned rayDispatchHeight;  ///< Height of the ray dispatch
-  unsigned rayDispatchDepth;   ///< Depth of the ray dispatch
 
-  struct {
-    uint64_t baseAddress;
-    unsigned strideInBytes;
-  } missTable; ///< Miss shader record table
-
-  unsigned maxRecursionDepth; ///< Maximum recursion depth
-
-  struct {
-    uint64_t baseAddress;
-    unsigned strideInBytes;
-  } hitGroupTable; ///< Hit group shader record table
-
-  unsigned maxAttributeSize; ///< Maximum attribute size
-
-  struct {
-    uint64_t baseAddress;
-    unsigned strideInBytes;
-  } callableTable; ///< Callable shader table record
-
-  struct {
-    unsigned rayFlags;      ///< Ray flags applied when profiling is enabled
-    unsigned maxIterations; ///< Maximum trace ray loop iteration limit
-  } profile;
-
-  uint64_t traceRayGpuVa; ///< Internal TraceRays indirect function GPU VA
-};
-#endif
 struct DispatchRaysConstantData {
   unsigned rayGenerationTableAddressLo; ///< Ray generation table base address low 32-bits
   unsigned rayGenerationTableAddressHi; ///< Ray generation table base address high 32-bits

@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; Test that only payloadSizeMaxInLib would be honored when rtIgnoreDeclaredPayloadSize is enable.
 ; BEGIN_SHADERTEST
@@ -109,7 +109,6 @@ options.forceLateZ = 0
 options.nsaThreshold = 0
 options.aggressiveInvariantLoads = Auto
 options.workaroundStorageImageFormats = 0
-options.workaroundInitializeOutputsToZero = 0
 options.disableFMA = 0
 options.disableReadFirstLaneWorkaround = 0
 options.backwardPropagateNoContract = 0

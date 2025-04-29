@@ -134,9 +134,12 @@ Value *getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDataTy, 
 
 /// Replace call to intrinsic (lgc.rt.*) with a call to the driver
 /// implementation (_cont_*).
-Value *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData, lgc::rt::RayTracingShaderStage Kind,
-                            CallInst *Call, Module *GpurtLibrary, compilerutils::CrossModuleInliner &Inliner,
-                            bool KeepBuilderPos = false);
+Value *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy, Value *SystemData, Value *HitObjectDataAlloca,
+                            lgc::rt::RayTracingShaderStage Kind, CallInst *Call, Module *GpurtLibrary,
+                            CompilerUtils::CrossModuleInliner &Inliner, bool KeepBuilderPos = false);
+
+/// Create an alloca for the global hit object.
+AllocaInst *createAllocaForGlobalHitObject(IRBuilder<> &B, Function &F, Module *GpurtLibrary, Value *SystemData);
 
 /// Promote pointer arguments of a GPURT function @Func to by-value if appropriate (e. g. depending on pointeetys
 /// metadata).
@@ -172,15 +175,6 @@ public:
   llvm::PreservedAnalyses run(llvm::Module &Module, llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "continuation cleanup"; }
-};
-
-// A pass that reports statistics from the continuations module.
-class ContinuationsStatsReportPass : public llvm::PassInfoMixin<ContinuationsStatsReportPass> {
-public:
-  ContinuationsStatsReportPass() = default;
-  llvm::PreservedAnalyses run(llvm::Module &Module, llvm::ModuleAnalysisManager &AnalysisManager);
-
-  static llvm::StringRef name() { return "Continuations statistics reporting pass"; }
 };
 
 class LowerRaytracingPipelinePass : public llvm::PassInfoMixin<LowerRaytracingPipelinePass> {
@@ -279,30 +273,9 @@ public:
 
 class DXILContLgcRtOpConverterPass : public llvm::PassInfoMixin<DXILContLgcRtOpConverterPass> {
 public:
-  DXILContLgcRtOpConverterPass() = default;
   llvm::PreservedAnalyses run(llvm::Module &Module, llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "Convert DXIL ops into lgc.rt ops"; }
-
-private:
-  std::unique_ptr<llvm_dialects::Builder> Builder;
-  Module *M = nullptr;
-  const llvm::DataLayout *DL = nullptr;
-
-  bool convertDxOp(llvm::Function &Func);
-  using OpCallbackType = std::function<llvm::Value *(llvm::CallInst &, DXILContLgcRtOpConverterPass *)>;
-  std::optional<OpCallbackType> getCallbackByOpName(StringRef OpName);
-
-  template <typename T> Value *handleSimpleCall(CallInst &CI);
-  Value *handleTraceRayOp(CallInst &CI);
-  Value *handleReportHitOp(CallInst &CI);
-  Value *handleCallShaderOp(CallInst &CI);
-  template <typename T, unsigned MaxElements = 3> Value *handleVecResult(CallInst &CI);
-  template <typename Op, unsigned MaxRows = 3, unsigned MaxColumns = 4> Value *handleMatrixResult(CallInst &CI);
-  Value *createVec3(Value *X, Value *Y, Value *Z);
-  void addDXILPayloadTypeToCall(Function &DXILFunc, CallInst &CI);
-  bool prepareEntryPointShaders();
-  void setupLocalRootIndex(Function *F);
 };
 
 /// Add necessary continuation transform passes for LGC.

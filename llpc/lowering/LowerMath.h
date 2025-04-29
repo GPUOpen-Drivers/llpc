@@ -39,7 +39,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // FE lowering operations for math transformation.
-class LowerMath : public SpirvLower {
+class LowerMath : public Lowering {
 public:
   LowerMath();
 
@@ -70,7 +70,7 @@ public:
 
 // =====================================================================================================================
 // FE lowering operations to adjust fast math flags.
-class LowerMathPrecision : public SpirvLower, public llvm::PassInfoMixin<LowerMathPrecision> {
+class LowerMathPrecision : public Lowering, public llvm::PassInfoMixin<LowerMathPrecision> {
 
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);

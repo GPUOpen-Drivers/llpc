@@ -77,7 +77,7 @@ PreservedAnalyses InitializeWorkgroupMemory::run(Module &module, ModuleAnalysisM
   if (workgroupGlobals.empty())
     return PreservedAnalyses::all();
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
   m_shaderStage = ShaderStage::Compute;
   m_entryPoint = pipelineShaders.getEntryPoint(m_shaderStage.value());
   BuilderBase builder(*m_context);
@@ -233,15 +233,15 @@ void InitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, BuilderB
     SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
     builder.CreateFence(AtomicOrdering::Release, workgroupScope);
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+      builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {});
+#else
       builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+#endif
     } else {
-#if LLPC_BUILD_GFX12
       builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, builder.getInt32(WorkgroupNormalBarrierId));
       builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
                               builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
     builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
   }

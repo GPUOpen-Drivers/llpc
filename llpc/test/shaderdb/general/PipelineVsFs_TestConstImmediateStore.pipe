@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,8 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -178,8 +177,6 @@ version = 3
                OpReturn
                OpFunctionEnd
 
-
-
 [VsInfo]
 entryPoint = main
 userDataNode[0].type = PushConst
@@ -203,7 +200,6 @@ userDataNode[2].type = IndirectUserDataVaPtr
 userDataNode[2].offsetInDwords = 5
 userDataNode[2].sizeInDwords = 1
 userDataNode[2].indirectUserDataCount = 4
-
 
 [FsSpirv]
 
@@ -399,8 +395,6 @@ userDataNode[2].indirectUserDataCount = 4
                OpReturn
                OpFunctionEnd
 
-
-
 [FsInfo]
 entryPoint = main
 userDataNode[0].type = PushConst
@@ -420,7 +414,6 @@ userDataNode[1].next[1].sizeInDwords = 8
 userDataNode[1].next[1].set = 1
 userDataNode[1].next[1].binding = 0
 
-
 [GraphicsPipelineState]
 topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 patchControlPoints = 0
@@ -437,7 +430,6 @@ dualSourceBlendEnable = 0
 colorBuffer[0].format = VK_FORMAT_R16G16_SFLOAT
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 0
-
 
 [VertexInputState]
 binding[0].binding = 0

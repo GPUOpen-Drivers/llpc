@@ -104,9 +104,6 @@ public:
   bool isPerPrimitive() const { return m_data.bits.perPrimitive; }
   void setPerPrimitive(bool perPrimitive = true) { m_data.bits.perPrimitive = perPrimitive; }
 
-  bool isProvokingVertexModeDisabled() const { return m_data.bits.disableProvokingVertexMode; }
-  void disableProvokingVertexMode(bool disable = true) { m_data.bits.disableProvokingVertexMode = disable; }
-
   unsigned getComponent() const { return m_data.bits.component; }
   void setComponent(unsigned component) {
     assert(component < 4); // Valid component offsets are 0~3
@@ -143,7 +140,6 @@ private:
                                   //    associated call that reads/writes an input/output. In dynamic component indexing
                                   //    case, this field must be specified by frontend when invoking such input/output
                                   //    reading/writing call.
-      unsigned disableProvokingVertexMode : 1; // Disable the provoking vertex mode
     } bits;
 
     unsigned u32All;
@@ -983,11 +979,11 @@ public:
   // @param resultTy : Result type
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor.
+  // @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor.
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+  llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
                                llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "");
 
   // Create an image load with fmask. Dim must be 2DMsaa or 2DArrayMsaa. If the F-mask descriptor has a valid
@@ -1014,11 +1010,11 @@ public:
   // @param texel : Texel value to store; v4i16, v4i32, v4f16 or v4f32
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
+  // @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param mipLevel : Mipmap level if doing store_mip, otherwise nullptr
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateImageStore(llvm::Value *texel, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+  llvm::Value *CreateImageStore(llvm::Value *texel, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
                                 llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "");
 
   // Create an image sample.
@@ -1033,12 +1029,12 @@ public:
   // @param resultTy : Result type
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : The pointer to the image descriptor
-  // @param samplerDesc : The pointer to the sampler descriptor
+  // @param imageDescPointer : The pointer to the image descriptor
+  // @param samplerDescPointer : The pointer to the sampler descriptor
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                 llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
+  llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
+                                 llvm::Value *samplerDescPointer, llvm::ArrayRef<llvm::Value *> address,
                                  const llvm::Twine &instName = "");
 
   // Create an image sample with a converting sampler.
@@ -1070,8 +1066,8 @@ public:
   // @param samplerDesc : The pointer to the sampler descriptor
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                 llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
+  llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescPointer,
+                                 llvm::Value *samplerDescPointer, llvm::ArrayRef<llvm::Value *> address,
                                  const llvm::Twine &instName = "");
 
   // Create an image atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
@@ -1084,12 +1080,12 @@ public:
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
   // @param ordering : Atomic ordering
-  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
+  // @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param inputValue : Input value: i32
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                 llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                 llvm::Value *imageDescPointer, llvm::Value *coord, llvm::Value *inputValue,
                                  const llvm::Twine &instName = "");
 
   // Create an image atomic compare-and-swap.
@@ -1100,13 +1096,13 @@ public:
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
   // @param ordering : Atomic ordering
-  // @param imageDesc : The pointer to the image descriptor or texel buffer descriptor
+  // @param imageDescPointer : The pointer to the image descriptor or texel buffer descriptor
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param inputValue : Input value: i32
   // @param comparatorValue : Value to compare against: i32
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                            llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                            llvm::Value *imageDescPointer, llvm::Value *coord, llvm::Value *inputValue,
                                             llvm::Value *comparatorValue, const llvm::Twine &instName = "");
 
   // Create a query of the number of mipmap levels in an image. Returns an i32 value.
@@ -1144,11 +1140,11 @@ public:
   //
   // @param dim : Image dimension
   // @param flags : ImageFlag* flags
-  // @param imageDesc : The pointer to the image descriptor
-  // @param samplerDesc : The pointer to the sampler descriptor
+  // @param imageDescPointer : The pointer to the image descriptor
+  // @param samplerDesc : The pointer to the sampler descriptor or the full descriptor
   // @param coord : Coordinates: scalar or vector f32, exactly right width without array layer
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
+  llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDescPointer, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
 
   // Create a query of the sample position of given sample id in an image. Returns an v2f32 value.

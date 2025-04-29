@@ -25,7 +25,7 @@
 /**
  ***********************************************************************************************************************
  * @file  LgcLowering.cpp
- * @brief LLPC source file: contains implementation of class lgc::Patch.
+ * @brief LLPC source file: contains implementation of class lgc::LgcLowering.
  ***********************************************************************************************************************
  */
 #include "lgc/lowering/LgcLowering.h"
@@ -33,24 +33,27 @@
 #include "LowerPopsInterlock.h"
 #include "LowerRayQueryWrapper.h"
 #include "llvmraytracing/Continuations.h"
+#include "lgc/Debug.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
-#if LLPC_BUILD_GFX12
 #include "lgc/lowering/AddBufferOperationMetadata.h"
-#endif
 #include "lgc/lowering/AddLoopMetadata.h"
 #include "lgc/lowering/ApplyWorkarounds.h"
 #include "lgc/lowering/CheckShaderCache.h"
 #include "lgc/lowering/CollectImageOperations.h"
 #include "lgc/lowering/CollectResourceUsage.h"
+#include "lgc/lowering/CombineCooperativeMatrix.h"
 #include "lgc/lowering/Continufy.h"
+#include "lgc/lowering/EmitShaderHashToken.h"
 #include "lgc/lowering/FragmentColorExport.h"
 #include "lgc/lowering/GenerateCopyShader.h"
 #include "lgc/lowering/IncludeLlvmIr.h"
+#include "lgc/lowering/InitializeUndefInputs.h"
 #include "lgc/lowering/InitializeWorkgroupMemory.h"
 #include "lgc/lowering/LowerBufferOperations.h"
+#include "lgc/lowering/LowerCooperativeMatrix.h"
 #include "lgc/lowering/LowerDebugPrintf.h"
 #include "lgc/lowering/LowerDesc.h"
 #include "lgc/lowering/LowerGpuRt.h"
@@ -68,13 +71,7 @@
 #include "lgc/lowering/SetupTargetFeatures.h"
 #include "lgc/lowering/StructurizeBuffers.h"
 #include "lgc/lowering/VertexFetch.h"
-
-#if LLPC_BUILD_STRIX1 || LLPC_BUILD_STRIX_HALO
 #include "lgc/lowering/WorkaroundDsSubdwordWrite.h"
-#endif
-#include "lgc/Debug.h"
-#include "lgc/lowering/CombineCooperativeMatrix.h"
-#include "lgc/lowering/LowerCooperativeMatrix.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -125,20 +122,20 @@ static const char LdsHsName[] = "Lds.HS";
 namespace lgc {
 
 // =====================================================================================================================
-// Add whole-pipeline patch passes to pass manager
+// Add whole-pipeline LGC lowering passes to pass manager
 //
 // @param pipelineState : Pipeline state
 // @param [in/out] passMgr : Pass manager to add passes to
-// @param patchTimer : Timer to time patch passes with, nullptr if not timing
+// @param loweringTimer : Timer to time LGC lowering passes with, nullptr if not timing
 // @param optTimer : Timer to time LLVM optimization passes with, nullptr if not timing
 // @param checkShaderCacheFunc : Callback function to check shader cache
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
-void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, Timer *patchTimer, Timer *optTimer,
-                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel) {
-  // Start timer for patching passes.
-  if (patchTimer)
-    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+void LgcLowering::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, Timer *loweringTimer,
+                            Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel) {
+  // Start timer for LGC lowering passes.
+  if (loweringTimer)
+    LgcContext::createAndAddStartStopTimer(passMgr, loweringTimer, true);
 
   if (pipelineState->getOptions().useGpurt) {
     passMgr.addPass(LowerRayQueryWrapper());
@@ -177,6 +174,8 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(BuilderReplayer());
   passMgr.addPass(LowerSubgroupOps());
 
+  passMgr.addPass(createModuleToFunctionPassAdaptor(AddLoopMetadata()));
+
   if (raw_ostream *outs = getLgcOuts()) {
     passMgr.addPass(PrintModulePass(*outs,
                                     "===============================================================================\n"
@@ -193,6 +192,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     passMgr.addPass(PassthroughHullShader());
 
   passMgr.addPass(GenerateNullFragmentShader());
+  passMgr.addPass(InitializeUndefInputs());
   passMgr.addPass(CollectResourceUsage()); // also removes inactive/unused resources
 
   // CheckShaderCache depends on CollectResourceUsage
@@ -204,35 +204,30 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(LowerVertexFetch());
   passMgr.addPass(LowerFragmentColorExport());
   passMgr.addPass(LowerDebugPrintf());
-#if LLPC_BUILD_GFX12
   // Mark shader stage for load/store.
   if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 12)
     passMgr.addPass(createModuleToFunctionPassAdaptor(AddBufferOperationMetadata()));
-#endif
   passMgr.addPass(LowerDesc());
   passMgr.addPass(MutateEntryPoint());
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerPopsInterlock()));
   passMgr.addPass(InitializeWorkgroupMemory());
   passMgr.addPass(LowerInOut());
 
-  // Patch invariant load and loop metadata.
+  // Lower invariant load and loop metadata.
   passMgr.addPass(createModuleToFunctionPassAdaptor(LowerInvariantLoads()));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(createFunctionToLoopPassAdaptor(AddLoopMetadata())));
 
-#if LLPC_BUILD_STRIX1 || LLPC_BUILD_STRIX_HALO
   passMgr.addPass(WorkaroundDsSubdwordWrite());
-#endif
 
-  if (patchTimer) {
-    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+  if (loweringTimer) {
+    LgcContext::createAndAddStartStopTimer(passMgr, loweringTimer, false);
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
   }
 
   addOptimizationPasses(passMgr, optLevel);
 
-  if (patchTimer) {
+  if (loweringTimer) {
     LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
-    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+    LgcContext::createAndAddStartStopTimer(passMgr, loweringTimer, true);
   }
 
   // Collect image operations
@@ -241,22 +236,31 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   // Second part of lowering to "AMDGCN-style"
   passMgr.addPass(PreparePipelineAbi());
+  passMgr.addPass(EmitShaderHashToken());
 
   // Do inlining and global DCE to inline subfunctions that were introduced during preparing pipeline ABI.
   passMgr.addPass(AlwaysInlinerPass());
   passMgr.addPass(GlobalDCEPass());
 
-  const bool canUseNgg = pipelineState->isGraphics() &&
-                         ((pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
-                           (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) ||
-                          pipelineState->getTargetInfo().getGfxIpVersion().major >= 11); // Must enable NGG on GFX11+
-  if (canUseNgg) {
-    if (patchTimer) {
-      LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+  bool usesNgg = false;
+  if (pipelineState->isGraphics()) {
+    const auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
+    if (gfxIp.major >= 11) {
+      usesNgg = true; // Must enable NGG on GFX11+
+    } else {
+      assert(gfxIp.major == 10);
+      usesNgg = (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0; // Check NGG disable flag
+    }
+  }
+  const bool hasMeshShader = pipelineState->hasShaderStage(ShaderStage::Mesh);
+
+  if (usesNgg || hasMeshShader) {
+    if (loweringTimer) {
+      LgcContext::createAndAddStartStopTimer(passMgr, loweringTimer, false);
       LgcContext::createAndAddStartStopTimer(passMgr, optTimer, true);
     }
 
-    // Extra optimizations after NGG primitive shader creation
+    // Extra optimizations after NGG primitive shader creation or mesh shader lowering
     FunctionPassManager fpm;
     fpm.addPass(PromotePass());
     fpm.addPass(ADCEPass());
@@ -266,9 +270,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     fpm.addPass(SimplifyCFGPass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
-    if (patchTimer) {
+    if (loweringTimer) {
       LgcContext::createAndAddStartStopTimer(passMgr, optTimer, false);
-      LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+      LgcContext::createAndAddStartStopTimer(passMgr, loweringTimer, true);
     }
   } else {
     FunctionPassManager fpm;
@@ -290,9 +294,9 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   if (pipelineState->getOptions().includeIr)
     passMgr.addPass(IncludeLlvmIr());
 
-  // Stop timer for patching passes.
-  if (patchTimer)
-    LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, false);
+  // Stop timer for LGC lowering passes.
+  if (loweringTimer)
+    LgcContext::createAndAddStartStopTimer(passMgr, loweringTimer, false);
 
   // Dump the result
   if (raw_ostream *outs = getLgcOuts()) {
@@ -303,20 +307,20 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 }
 
 // =====================================================================================================================
-// Register all the patching passes into the given pass manager
+// Register all the LGC lowering passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
-void Patch::registerPasses(lgc::PassManager &passMgr) {
+void LgcLowering::registerPasses(lgc::PassManager &passMgr) {
 #define LLPC_PASS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #define LLPC_MODULE_ANALYSIS(NAME, CLASS) passMgr.registerPass(NAME, CLASS::name());
 #include "PassRegistry.inc"
 }
 
 // =====================================================================================================================
-// Register all the patching passes into the given pass manager
+// Register all the LGC lowering passes into the given pass manager
 //
 // @param [in/out] passMgr : Pass manager
-void Patch::registerPasses(PassBuilder &passBuilder) {
+void LgcLowering::registerPasses(PassBuilder &passBuilder) {
 #define HANDLE_PASS(NAME, CLASS)                                                                                       \
   if (innerPipeline.empty() && name == NAME) {                                                                         \
     passMgr.addPass(CLASS());                                                                                          \
@@ -398,7 +402,7 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
-void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) {
+void LgcLowering::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) {
   LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.addPass(ForceFunctionAttrsPass());
@@ -468,7 +472,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
 // NOTE: This function should be called at the beginning of "runOnModule()".
 //
 // @param module : LLVM module
-void Patch::init(Module *module) {
+void LgcLowering::init(Module *module) {
   m_module = module;
   m_context = &m_module->getContext();
   m_shaderStage = std::nullopt;
@@ -480,7 +484,7 @@ void Patch::init(Module *module) {
 //
 // @param pipelineState : Pipeline state
 // @param [in/out] module : Module to get or create LDS in
-Constant *Patch::getLdsVariable(PipelineState *pipelineState, Function *func, bool rtStack) {
+Constant *LgcLowering::getLdsVariable(PipelineState *pipelineState, Function *func, bool rtStack) {
   auto module = func->getParent();
   auto context = &module->getContext();
 

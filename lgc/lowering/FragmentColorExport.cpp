@@ -488,9 +488,8 @@ PreservedAnalyses LowerFragmentColorExport::run(Module &module, ModuleAnalysisMa
   }
 
   FragmentColorExport fragColorExport(m_pipelineState->getLgcContext());
-  bool dummyExport = m_resUsage->builtInUsage.fs.discard ||
-                     m_pipelineState->getOptions().forceNullFsDummyExport && m_resUsage->inOutUsage.fs.isNullFs ||
-                     m_pipelineState->getShaderModes()->getFragmentShaderMode().enablePops;
+  bool dummyExport =
+      m_resUsage->builtInUsage.fs.discard || m_pipelineState->getShaderModes()->getFragmentShaderMode().enablePops;
   FragmentColorExport::Key key = FragmentColorExport::computeKey(m_info, m_pipelineState);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
                                              builder, dynamicIsDualSource, key);
@@ -886,12 +885,16 @@ void FragmentColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key,
       continue;
     const unsigned channelWriteMask = key.channelWriteMask[exp.location];
     unsigned expFormat = key.expFmt[exp.location];
-    bool needUpdateMask = expFormat != 0 && (channelWriteMask > 0 || (exp.location == 0 && needMrt0a));
+    const bool isMrt0a = exp.location == 0 && needMrt0a;
+    bool needUpdateMask = expFormat != 0 && (channelWriteMask > 0 || isMrt0a);
     if (needUpdateMask) {
       // For dualSource, the cbShaderMask will only be valid for location=0, other locations setting will be
       // redundant. ToDo: this point can be optimized when use different ShaderMaskMetaKey or compile different
       // shaders.
-      *pCbShaderMask |= (0xF << (4 * exp.location));
+      if (expFormat == EXP_FORMAT_32_AR && isMrt0a)
+        *pCbShaderMask |= 0x9U;
+      else
+        *pCbShaderMask |= (0xF << (4 * exp.location));
     }
   }
 }
@@ -901,7 +904,7 @@ void FragmentColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key,
 //
 // @param info : The color export information for each color export in no particular order.
 // @param values : The values that are to be exported.  Indexed by the hw color target.
-// @param exportFormat : The export format for each color target. Indexed by the hw color target.
+// @param dummyExport : Whether to do dummy export
 // @param [out] palMetadata : The PAL metadata that will be extended with relevant information.
 // @param builder : The builder object that will be used to create new instructions.
 // @param dynamicIsDualSource: Identify whether it's in dynamicDualSourceBlend state
@@ -1046,35 +1049,14 @@ void FragmentColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> i
       }
     }
     if (!lastExport && dummyExport) {
-      // NOTE: We maybe should not set SPI_SHADER_COL_FORMAT to 0 because of observe corruptions in some games.
-      // For performance, we must set the CB_SHADER_MASK to non-zero for RB+ optimization. In this case, PAL re-sets
-      // SPI_SHADER_COL_FORMAT to 32R, maybe causing a mismatch with CB_SHADER_MASK, there seems to be no impact on
-      // performance.
-      // For correctness, we should enable all channels enabled via the export format and write 0.
-      auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
-      auto zeros = ConstantVector::get({zero, zero, zero, zero});
-      const auto expFmt = key.dummyExpFmt == EXP_FORMAT_ZERO ? EXP_FORMAT_32_R : key.dummyExpFmt;
-      lastExport = handleColorExportInstructions(zeros, 0, builder, expFmt, false, false);
+      // Use <0.0, poison, poison, poison> with mask 0x1 as the dummy export.
+      auto dummyOutput =
+          ConstantVector::get({ConstantFP::get(builder.getFloatTy(), 0.0), PoisonValue::get(builder.getFloatTy()),
+                               PoisonValue::get(builder.getFloatTy()), PoisonValue::get(builder.getFloatTy())});
+      lastExport = handleColorExportInstructions(dummyOutput, 0, builder, EXP_FORMAT_32_R, false, false);
       palMetadata->setPsDummyExport();
-      finalExportFormats.push_back(expFmt);
-      switch (expFmt) {
-      case EXP_FORMAT_32_R: {
-        cbShaderMask = 0x1U;
-        break;
-      }
-      case EXP_FORMAT_32_GR: {
-        cbShaderMask = 0x3U;
-        break;
-      }
-      case EXP_FORMAT_32_AR: {
-        cbShaderMask = 0x9U;
-        break;
-      }
-      default: {
-        cbShaderMask = 0xFU;
-        break;
-      }
-      }
+      finalExportFormats.push_back(EXP_FORMAT_32_R);
+      cbShaderMask = 0x1;
     }
     if (lastExport)
       FragmentColorExport::setDoneFlag(lastExport, builder);
@@ -1166,8 +1148,6 @@ FragmentColorExport::Key FragmentColorExport::computeKey(ArrayRef<ColorExportInf
   key.enableFragColor = pipelineState->getOptions().enableFragColor;
   key.colorExportState = pipelineState->getColorExportState();
   key.waveSize = pipelineState->getShaderWaveSize(ShaderStage::Fragment);
-  key.dummyExpFmt = static_cast<ExportFormat>(
-      pipelineState->computeExportFormat(Type::getFloatTy(pipelineState->getContext()), 0, false));
 
   if (!infos.empty() && infos[0].hwColorTarget == MaxColorTargets) {
     infos = infos.drop_front(1);

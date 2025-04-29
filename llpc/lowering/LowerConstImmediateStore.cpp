@@ -54,7 +54,7 @@ namespace Llpc {
 PreservedAnalyses LowerConstImmediateStore::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-Const-Immediate-Store\n");
 
-  SpirvLower::init(&module);
+  Lowering::init(&module);
 
   // Process "alloca" instructions to see if they can be optimized to a read-only global
   // variable.

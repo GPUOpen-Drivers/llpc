@@ -35,10 +35,15 @@
 #include "lgc/state/TargetInfo.h"
 
 namespace lgc {
-// Get the NumRecords from buffer resource descriptor
-llvm::Value *getBufferNumRecords(const lgc::GfxIpVersion &gfxIpVer, lgc::BuilderCommon &builder,
-                                 llvm::Value *const bufferDesc);
-// Get the stride from buffer resource descriptor
-llvm::Value *getBufferStride(const lgc::GfxIpVersion &gfxIpVer, lgc::BuilderCommon &builder,
-                             llvm::Value *const bufferDesc);
+
+// Get the NUM_RECORDS from buffer resource descriptor
+llvm::Value *getBufferNumRecords(const GfxIpVersion &gfxIp, BuilderCommon &builder, llvm::Value *const bufferDesc);
+
+// Get the STRIDE from buffer resource descriptor
+llvm::Value *getBufferStride(const GfxIpVersion &gfxIp, BuilderCommon &builder, llvm::Value *const bufferDesc);
+
+// Set the STRIDE to buffer resource descriptor
+void setBufferStride(const GfxIpVersion &gfxIp, BuilderCommon &builder, llvm::Value *&bufferDesc,
+                     llvm::Value *const stride);
+
 } // namespace lgc

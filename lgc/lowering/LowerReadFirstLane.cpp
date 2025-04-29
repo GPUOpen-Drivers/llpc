@@ -237,7 +237,6 @@ bool ReadFirstLaneOptimizer::liftReadFirstLane(Function &function) {
           continue;
         blockInitialReadFirstLanesMap[inst->getParent()].push_back(inst);
       }
-      break;
     }
   }
   bool changed = false;

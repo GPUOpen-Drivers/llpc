@@ -34,6 +34,7 @@
 #include "lgc/LgcDialect.h"
 #include "lgc/lowering/LgcLowering.h"
 #include "lgc/state/PalMetadata.h"
+#include "lgc/util/BufferResource.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -632,7 +633,6 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
       vgprArgs[8]->setName("instanceId");
     }
   } else {
-#if LLPC_BUILD_GFX12
     // GS VGPRs
     vgprArgs[0]->setName("primData");
     vgprArgs[1]->setName("primitiveId");
@@ -648,13 +648,10 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
       vgprArgs[3]->setName("vertexId");
       vgprArgs[4]->setName("instanceId");
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   // Setup LDS layout
-  m_lds = Patch::getLdsVariable(m_pipelineState, gsMain ? gsMain : esMain);
+  m_lds = LgcLowering::getLdsVariable(m_pipelineState, gsMain ? gsMain : esMain);
   calcVertexCullInfoSizeAndOffsets(m_pipelineState, esMain, m_vertCullInfoOffsets);
   layoutPrimShaderLds(m_pipelineState, &m_ldsLayout);
 
@@ -880,7 +877,6 @@ FunctionType *NggPrimShader::getPrimShaderType(uint64_t &inRegMask) {
       argTys.push_back(m_builder.getInt32Ty()); // Instance ID
     }
   } else {
-#if LLPC_BUILD_GFX12
     // GS VGPRs
     argTys.push_back(m_builder.getInt32Ty()); // Primitive connectivity data
     argTys.push_back(m_builder.getInt32Ty()); // Primitive ID (primitive based)
@@ -896,9 +892,6 @@ FunctionType *NggPrimShader::getPrimShaderType(uint64_t &inRegMask) {
       argTys.push_back(m_builder.getInt32Ty()); // Vertex ID
       argTys.push_back(m_builder.getInt32Ty()); // Instance ID
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   return FunctionType::get(m_builder.getVoidTy(), argTys, false);
@@ -965,7 +958,6 @@ void NggPrimShader::calcStreamOutControlCbOffsets() {
     }
   }
 
-#if LLPC_BUILD_GFX12
   // Following calculations are only available on GFX12+ (caused by GDS removal)
   if (m_gfxIp.major >= 12) {
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
@@ -991,7 +983,6 @@ void NggPrimShader::calcStreamOutControlCbOffsets() {
       }
     }
   }
-#endif
 }
 
 // =====================================================================================================================
@@ -1030,11 +1021,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   if (m_gfxIp.major <= 11)
     primitiveId = vgprArgs[2];
   else
-#if LLPC_BUILD_GFX12
     primitiveId = vgprArgs[1];
-#else
-    llvm_unreachable("Not implemented!");
-#endif
 
   //
   // For pass-through mode, the processing is something like this:
@@ -1093,7 +1080,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
     if (m_gfxIp.major >= 11) {
-      if (!m_pipelineState->exportAttributeByExportInstruction())
+      if (!m_pipelineState->attributeThroughExport())
         prepareAttribRingAccess(userData);
 
       if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
@@ -1105,14 +1092,11 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
 
     // Primitive connectivity data have such layout:
     //
-#if LLPC_BUILD_GFX12
     // Pre-GFX12:
-#endif
     //   +----------------+---------------+---------------+---------------+
     //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
     //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
     //   +----------------+---------------+---------------+---------------+
-#if LLPC_BUILD_GFX12
     //
     // GFX12 (from GE):
     //   +----------------+------------+---------------+------------+---------------+------------+---------------+
@@ -1125,7 +1109,6 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
     //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
     //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
     //   +----------------+------------+---------------+------------+---------------+------------+---------------+
-#endif
 
     // Record relative vertex indices
     if (m_gfxIp.major <= 11) {
@@ -1133,13 +1116,9 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       m_nggInputs.vertexIndex1 = createUBfe(primData, 10, 9);
       m_nggInputs.vertexIndex2 = createUBfe(primData, 20, 9);
     } else {
-#if LLPC_BUILD_GFX12
       m_nggInputs.vertexIndex0 = createUBfe(primData, 0, 8);
       m_nggInputs.vertexIndex1 = createUBfe(primData, 9, 8);
       m_nggInputs.vertexIndex2 = createUBfe(primData, 18, 8);
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
 
     // Distribute primitive ID if needed
@@ -1312,7 +1291,6 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       instanceId = vgprArgs[8];
     }
   } else {
-#if LLPC_BUILD_GFX12
     primitiveId = vgprArgs[1];
 
     if (m_hasTes) {
@@ -1324,9 +1302,6 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       vertexId = vgprArgs[3];
       instanceId = vgprArgs[4];
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   //
@@ -1485,7 +1460,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
     if (m_gfxIp.major >= 11) {
-      if (!m_pipelineState->exportAttributeByExportInstruction())
+      if (!m_pipelineState->attributeThroughExport())
         prepareAttribRingAccess(userData);
 
       if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
@@ -1495,14 +1470,12 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // Record primitive shader table address info
     m_nggInputs.primShaderTableAddr = std::make_pair(primShaderTableAddrLow, primShaderTableAddrHigh);
 
-#if LLPC_BUILD_GFX12
     if (m_gfxIp.major >= 12) {
       // NOTE: From GFX12+, GE will always send the primitive connectivity data to us (the highest 5 bits are GS
       // instance ID, which is not valid when API GS is absent). We can record this data and use it
       // when exporting primitive to PA without reconstructing it like what we have done on pre-GFX12.
       m_nggInputs.primData = createUBfe(vgprArgs[0], 0, 27);
     }
-#endif
 
     // Record vertex indices
     if (m_gfxIp.major <= 11) {
@@ -1510,13 +1483,9 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       m_nggInputs.vertexIndex1 = createUBfe(vgprArgs[0], 16, 16);
       m_nggInputs.vertexIndex2 = createUBfe(vgprArgs[1], 0, 16);
     } else {
-#if LLPC_BUILD_GFX12
       m_nggInputs.vertexIndex0 = createUBfe(vgprArgs[0], 0, 8);
       m_nggInputs.vertexIndex1 = createUBfe(vgprArgs[0], 9, 8);
       m_nggInputs.vertexIndex2 = createUBfe(vgprArgs[0], 18, 8);
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
 
     vertexItemOffset = m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(esGsRingItemSize));
@@ -1586,7 +1555,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       if (m_hasTes) {
         const auto &builtInUsage = resUsage->builtInUsage.tes;
 
-        const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+        const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                                builtInUsage.primitiveShadingRate;
         clipCullExportSlot = miscExport ? 2 : 1;
         clipDistanceCount = builtInUsage.clipDistance;
         cullDistanceCount = builtInUsage.cullDistance;
@@ -2362,7 +2332,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     initWaveThreadInfo(mergedGroupInfo, mergedWaveInfo);
 
     if (m_gfxIp.major >= 11) {
-      if (!m_pipelineState->exportAttributeByExportInstruction())
+      if (!m_pipelineState->attributeThroughExport())
         prepareAttribRingAccess(userData);
 
       if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
@@ -2943,8 +2913,8 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 //
 // @param userData : User data
 void NggPrimShader::prepareAttribRingAccess(Value *userData) {
-  assert(m_gfxIp.major >= 11);                                    // For GFX11+
-  assert(!m_pipelineState->exportAttributeByExportInstruction()); // ATM is allowed
+  assert(m_gfxIp.major >= 11);                        // For GFX11+
+  assert(!m_pipelineState->attributeThroughExport()); // ATM is allowed
 
   ShaderStageEnum shaderStage =
       m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
@@ -2958,9 +2928,8 @@ void NggPrimShader::prepareAttribRingAccess(Value *userData) {
       getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
   attribRingBase = m_builder.CreateAnd(attribRingBase, 0x7FFF);
 
-  static const unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
   m_attribRingBaseOffset =
-      m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity), "attribRingBaseOffset");
+      m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttributeGranularity), "attribRingBaseOffset");
 
   assert(userData->getType()->isVectorTy());
   auto globalTablePtrValue = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0));
@@ -2971,16 +2940,10 @@ void NggPrimShader::prepareAttribRingAccess(Value *userData) {
 
   // Modify the field STRIDE of attribute ring buffer descriptor
   if (attribCount >= 2) {
-    // STRIDE = WORD1[30:16], STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
-    // We override the value if there are more attributes.
-    auto descWord1 = m_builder.CreateExtractElement(m_attribRingBufDesc, 1);
+    // NOTE: STRIDE is initialized to 16 by the driver, which is the right value for one attribute.
+    // We have to override the value if there are more attributes.
     auto stride = m_builder.getInt32(attribCount * SizeOfVec4);
-    if ((attribCount & 1) == 0) {
-      // Clear the bit that was set in STRIDE by the driver.
-      descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);
-    }
-    descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
-    m_attribRingBufDesc = m_builder.CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
+    setBufferStride(m_gfxIp, m_builder, m_attribRingBufDesc, stride);
   }
   m_attribRingBufDesc->setName("attribRingBufDesc");
 }
@@ -2994,11 +2957,9 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
   if (m_pipelineState->enablePrimStats() && !m_pipelineState->enableSwXfb() && m_gfxIp.major <= 11) {
-#if LLPC_BUILD_GFX12
     // NOTE: For pre-GFX12, if we only want to do primitive statistics counting (no SW XFB), there is no need of load
     // stream-out buffer info. The primitive counters are in GDS. For GFX12+, GDS is removed and the counters are
     // defined in stream-out control buffer. We still have to load the info.
-#endif
     return;
   }
 
@@ -3325,14 +3286,11 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
 
   // Primitive connectivity data have such layout:
   //
-#if LLPC_BUILD_GFX12
   // pre-GFX12:
-#endif
   //   +----------------+---------------+---------------+---------------+
   //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
-#if LLPC_BUILD_GFX12
   //
   // GFX12 (from GE):
   //   +----------------+------------+---------------+------------+---------------+------------+---------------+
@@ -3345,7 +3303,6 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
   //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
   //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
   //   +----------------+------------+---------------+------------+---------------+------------+---------------+
-#endif
   Value *primData = nullptr;
   if (m_gfxIp.major <= 11) {
     primData = m_builder.CreateShl(vertexIndex2, 10);
@@ -3354,7 +3311,6 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
     primData = m_builder.CreateShl(primData, 10);
     primData = m_builder.CreateOr(primData, vertexIndex0);
   } else {
-#if LLPC_BUILD_GFX12
     if (m_compactVertex) {
       primData = m_builder.CreateShl(vertexIndex2, 9);
       primData = m_builder.CreateOr(primData, vertexIndex1);
@@ -3366,9 +3322,6 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
       // (sent by GE) without reconstructing it from relative vertex indices.
       primData = m_nggInputs.primData;
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   if (primitiveCulled)
@@ -3426,14 +3379,11 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
 
   // Primitive connectivity data have such layout:
   //
-#if LLPC_BUILD_GFX12
   // pre-GFX12:
-#endif
   //   +----------------+---------------+---------------+---------------+
   //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
-#if LLPC_BUILD_GFX12
   //
   // GFX12 (from GE):
   //   +----------------+------------+---------------+------------+---------------+------------+---------------+
@@ -3446,7 +3396,6 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   //   | Null Primitive | Edge Flag2 | Vertex Index2 | Edge Flag1 | Vertex Index1 | Edge Flag0 | Vertex Index0 |
   //   | [31]           | [26]       | [25:18]       | [17]       | [16:9]        | [8]        | [7:0]         |
   //   +----------------+------------+---------------+------------+---------------+------------+---------------+
-#endif
   Value *newPrimData = nullptr;
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
 
@@ -3460,11 +3409,7 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
     if (m_gfxIp.major <= 11)
       newPrimData = m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex0);
     else
-#if LLPC_BUILD_GFX12
       newPrimData = m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 9), vertexIndex0);
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     break;
   }
   case OutputPrimitives::TriangleStrip: {
@@ -3498,12 +3443,8 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
           m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 10), vertexIndex1), 10),
           vertexIndex0);
     } else {
-#if LLPC_BUILD_GFX12
       newPrimData = m_builder.CreateOr(
           m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 9), vertexIndex1), 9), vertexIndex0);
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
     break;
   }
@@ -3563,8 +3504,8 @@ void NggPrimShader::earlyExitWithDummyExport() {
     if (m_hasGs) {
       const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.gs;
 
-      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-      miscExport |= builtInUsage.primitiveShadingRate;
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                        builtInUsage.primitiveShadingRate;
       if (miscExport)
         ++posExpCount;
 
@@ -3572,7 +3513,8 @@ void NggPrimShader::earlyExitWithDummyExport() {
     } else if (m_hasTes) {
       const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.tes;
 
-      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                        builtInUsage.primitiveShadingRate;
       if (miscExport)
         ++posExpCount;
 
@@ -3580,8 +3522,8 @@ void NggPrimShader::earlyExitWithDummyExport() {
     } else {
       const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.vs;
 
-      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-      miscExport |= builtInUsage.primitiveShadingRate;
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                        builtInUsage.primitiveShadingRate;
       if (miscExport)
         ++posExpCount;
 
@@ -3655,7 +3597,6 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
       instanceId = vgprArgs[8];
     }
   } else {
-#if LLPC_BUILD_GFX12
     if (m_hasTes) {
       tessCoordX = vgprArgs[3];
       tessCoordY = vgprArgs[4];
@@ -3665,9 +3606,6 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
       vertexId = vgprArgs[3];
       instanceId = vgprArgs[4];
     }
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   SmallVector<Value *, 32> esArgs;
@@ -3750,7 +3688,8 @@ void NggPrimShader::splitEs() {
     if (m_hasTes) {
       const auto &builtInUsage = resUsage->builtInUsage.tes;
 
-      const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      const bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex ||
+                              builtInUsage.primitiveShadingRate;
       clipCullExportSlot = miscExport ? 2 : 1;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
@@ -3895,7 +3834,6 @@ void NggPrimShader::runGs(ArrayRef<Argument *> args) {
     // purposes according to GE-SPI interface.
     invocationId = m_builder.CreateAnd(vgprArgs[3], m_builder.getInt32(0xFF));
   } else {
-#if LLPC_BUILD_GFX12
     const auto esGsRingItemSize = m_builder.getInt32(
         m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.hwConfig.esGsRingItemSize);
 
@@ -3909,9 +3847,6 @@ void NggPrimShader::runGs(ArrayRef<Argument *> args) {
     primitiveId = vgprArgs[1];
     // NOTE: For GFX12, GS invocation ID is stored in highest 5 bits ([31:27])
     invocationId = createUBfe(vgprArgs[0], 27, 5);
-#else
-    llvm_unreachable("Not implemented!");
-#endif
   }
 
   SmallVector<Value *, 32> gsArgs;
@@ -6706,7 +6641,6 @@ void NggPrimShader::collectExports(ArrayRef<Argument *> args, Function *&fromFun
         instanceId = vgprArgs[8];
       }
     } else {
-#if LLPC_BUILD_GFX12
       if (m_hasTes) {
         tessCoordX = vgprArgs[3];
         tessCoordY = vgprArgs[4];
@@ -6716,9 +6650,6 @@ void NggPrimShader::collectExports(ArrayRef<Argument *> args, Function *&fromFun
         vertexId = vgprArgs[3];
         instanceId = vgprArgs[4];
       }
-#else
-      llvm_unreachable("Not implemented!");
-#endif
     }
 
     if (m_compactVertex) {
@@ -7004,7 +6935,7 @@ void NggPrimShader::exportPositions(const SmallVectorImpl<VertexExport> &positio
 // @param attributeExports : Input collection of attribute exports
 void NggPrimShader::exportAttributes(const SmallVectorImpl<VertexExport> &attributeExports) {
   for (auto &attributeExport : attributeExports) {
-    if (m_pipelineState->exportAttributeByExportInstruction()) {
+    if (m_pipelineState->attributeThroughExport()) {
       std::array<Value *, 4> exportValues;
       for (unsigned i = 0; i < 4; ++i)
         exportValues[i] = m_builder.CreateExtractElement(attributeExport.exportValue, i);
@@ -7024,7 +6955,6 @@ void NggPrimShader::exportAttributes(const SmallVectorImpl<VertexExport> &attrib
       CoherentFlag coherent = {};
       if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
         coherent.bits.glc = true;
-#if LLPC_BUILD_GFX12
       } else {
         coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
         coherent.gfx12.th = TH::TH_NT_WB;
@@ -7036,7 +6966,6 @@ void NggPrimShader::exportAttributes(const SmallVectorImpl<VertexExport> &attrib
         }
         coherent.gfx12.th =
             m_pipelineState->getTemporalHint(coherent.gfx12.th, TemporalHintOpType::TemporalHintAtmWrite);
-#endif
       }
 
       m_builder.CreateIntrinsic(m_builder.getVoidTy(), Intrinsic::amdgcn_struct_buffer_store,
@@ -7184,11 +7113,9 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args, const SmallVectorImp
       if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
         coherent.bits.glc = true;
         coherent.bits.slc = true;
-#if LLPC_BUILD_GFX12
       } else {
         coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
         coherent.gfx12.th = TH::TH_HT;
-#endif
       }
 
       // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
@@ -7614,11 +7541,9 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args, const SmallVec
           if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
             coherent.bits.glc = true;
             coherent.bits.slc = true;
-#if LLPC_BUILD_GFX12
           } else {
             coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
             coherent.gfx12.th = TH::TH_HT;
-#endif
           }
 
           // vertexOffset = (threadIdInSubgroup * outVertsPerPrim + vertexIndex) * xfbStride
@@ -7776,8 +7701,7 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
           m_builder.CreateFence(AtomicOrdering::Release, workgroupScope);
         }
 
-        // NUM_RECORDS = SQ_BUF_RSRC_WORD2
-        Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
+        Value *numRecords = getBufferNumRecords(m_gfxIp, m_builder, m_streamOutBufDescs[i]);
         // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
         Value *bufferSizeInDwords = m_builder.CreateLShr(numRecords, 2);
         // dwordsRemaining = max(0, bufferSizeInDwords - (bufferOffset + dwordsWritten))
@@ -7864,7 +7788,6 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
     return;
   }
 
-#if LLPC_BUILD_GFX12
   // GFX12+ SW emulated stream-out with global ordered atomic add support
   assert(m_gfxIp.major >= 12);
 
@@ -8006,8 +7929,8 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
       Value *primitiveSize =
           m_builder.CreateMul(m_verticesPerPrimitive, m_builder.getInt32(xfbStrides[i] / sizeof(unsigned)));
 
-      // NUM_RECORDS = SQ_BUF_RSRC_WORD2
-      Value *numRecords = m_builder.CreateExtractElement(m_streamOutBufDescs[i], 2);
+      Value *numRecords = getBufferNumRecords(m_gfxIp, m_builder, m_streamOutBufDescs[i]);
+      assert(numRecords->getType() == m_builder.getInt32Ty()); // Must be i32
       // bufferSizeInDwords = numRecords >> 2 (NOTE: NUM_RECORDS is set to the byte size of stream-out buffer)
       Value *bufferSize = m_builder.CreateLShr(numRecords, 2);
 
@@ -8184,9 +8107,6 @@ void NggPrimShader::prepareSwXfb(ArrayRef<Value *> primCountInSubgroup) {
     m_builder.SetInsertPoint(endUpdatePrimitiveCounterBlock);
     // Nothing to do
   }
-#else
-  llvm_unreachable("Not implemented!");
-#endif
 }
 
 // =====================================================================================================================
@@ -8234,16 +8154,12 @@ void NggPrimShader::collectPrimitiveStats() {
                                   {m_builder.getInt32(0),                                  // value to add
                                    m_builder.getInt32(GDS_STRMOUT_PRIMS_WRITTEN_0 << 2)}); // count index
       } else {
-#if LLPC_BUILD_GFX12
         globalAtomicOp(AtomicRMWInst::Add,
                        m_builder.CreateZExt(m_nggInputs.primCountInSubgroup, m_builder.getInt64Ty()),
                        m_streamOutControlBufPtr, m_builder.getInt32(m_streamOutControlCbOffsets.primsNeeded[0]));
 
         globalAtomicOp(AtomicRMWInst::Add, m_builder.getInt64(0), m_streamOutControlBufPtr,
                        m_builder.getInt32(m_streamOutControlCbOffsets.primsWritten[0]));
-#else
-        llvm_unreachable("Not implemented!");
-#endif
       }
 
       m_builder.CreateBr(endCollectPrimitiveStatsBlock);
@@ -8424,15 +8340,11 @@ void NggPrimShader::collectPrimitiveStats() {
                                   {m_builder.getInt32(0),                                            // value to add
                                    m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
       } else {
-#if LLPC_BUILD_GFX12
         globalAtomicOp(AtomicRMWInst::Add, m_builder.CreateZExt(primCountInSubgroup[i], m_builder.getInt64Ty()),
                        m_streamOutControlBufPtr, m_builder.getInt32(m_streamOutControlCbOffsets.primsNeeded[i]));
 
         globalAtomicOp(AtomicRMWInst::Add, m_builder.getInt64(0), m_streamOutControlBufPtr,
                        m_builder.getInt32(m_streamOutControlCbOffsets.primsWritten[i]));
-#else
-        llvm_unreachable("Not implemented!");
-#endif
       }
     }
 
@@ -8623,7 +8535,12 @@ Value *NggPrimShader::createUBfe(Value *value, unsigned offset, unsigned count) 
 Value *NggPrimShader::makePointer(Value *ptrValue, Type *ptrTy) {
   assert(ptrValue->getType()->isIntegerTy(32)); // Must be i32
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+  Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {});
+#else
   Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
+#endif
+  //
   pc = m_builder.CreateBitCast(pc, FixedVectorType::get(m_builder.getInt32Ty(), 2));
 
   Value *ptr = m_builder.CreateInsertElement(pc, ptrValue, static_cast<uint64_t>(0));
@@ -8665,16 +8582,18 @@ void NggPrimShader::createFenceAndBarrier() {
 // =====================================================================================================================
 // Create LDS barrier to guarantee the synchronization of LDS operations.
 void NggPrimShader::createBarrier() {
-#if LLPC_BUILD_GFX12
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12) {
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_signal, {}, m_builder.getInt32(WorkgroupNormalBarrierId));
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier_wait, {},
                               m_builder.getInt16(static_cast<uint16_t>(WorkgroupNormalBarrierId)));
     return;
   }
-#endif
 
+#if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 532478
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {});
+#else
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+#endif
 }
 
 // =====================================================================================================================
@@ -8763,7 +8682,6 @@ llvm::Value *NggPrimShader::readValueFromCb(Type *readyTy, Value *bufPtr, Value 
   return loadValue;
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Do global atomic operation with the value stored in the specified pointer
 //
@@ -8821,6 +8739,5 @@ std::pair<Value *, Value *> NggPrimShader::globalAtomicOrderedAdd(std::pair<Valu
   return std::make_pair(m_builder.CreateExtractElement(oldOrderedIdPair, static_cast<uint64_t>(0)),
                         m_builder.CreateExtractElement(oldOrderedIdPair, 1));
 }
-#endif
 
 } // namespace lgc

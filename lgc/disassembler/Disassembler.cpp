@@ -141,7 +141,7 @@ private:
                        StringRef contents, SymbolPool &symbols);
   InstOrDirective disasmInst(uint64_t offset, StringRef contents);
   void addBinaryEncodingComment(raw_ostream &stream, unsigned instAlignment, ArrayRef<uint8_t> instBytes);
-  void outputInst(InstOrDirective inst, unsigned instAlignment);
+  void outputInst(InstOrDirective inst, unsigned instAlignment, bool skipInstOffset);
   Error outputData(bool outputting, uint64_t offset, StringRef data, ArrayRef<object::RelocationRef> &relocs);
   Error outputRelocs(bool outputting, uint64_t offset, uint64_t size, ArrayRef<object::RelocationRef> &relocs);
   size_t decodeNote(StringRef data);
@@ -297,16 +297,28 @@ Error ObjDisassembler::run(StringRef symbolName) {
   m_instDisassembler.reset(m_target->createMCDisassembler(*m_subtargetInfo, *m_context));
   if (!m_instDisassembler)
     return createStringError("No disassembler for target");
-  m_instPrinter = m_target->createMCInstPrinter(triple, asmInfo->getAssemblerDialect(), *asmInfo, *instrInfo, *regInfo);
-  if (!m_instPrinter)
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 533664
+  MCInstPrinter *instPrinter(
+      m_target->createMCInstPrinter(triple, asmInfo->getAssemblerDialect(), *asmInfo, *instrInfo, *regInfo));
+  m_instPrinter = instPrinter;
+#else
+  std::unique_ptr<MCInstPrinter> instPrinter(
+      m_target->createMCInstPrinter(triple, asmInfo->getAssemblerDialect(), *asmInfo, *instrInfo, *regInfo));
+  // FIXME: solve this a better way?
+  m_instPrinter = instPrinter.get();
+#endif
+  if (!instPrinter)
     return createStringError("No instruction printer for target");
 
   auto fostream = std::make_unique<formatted_raw_ostream>(m_ostream);
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 505779
-  m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), true, false, m_instPrinter, nullptr,
-                                               nullptr, false));
+  m_streamer.reset(
+      m_target->createAsmStreamer(*m_context, std::move(fostream), true, false, instPrinter, nullptr, nullptr, false));
+#elif LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 533664
+  m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), instPrinter, nullptr, nullptr));
 #else
-  m_streamer.reset(m_target->createAsmStreamer(*m_context, std::move(fostream), m_instPrinter, nullptr, nullptr));
+  m_streamer.reset(
+      m_target->createAsmStreamer(*m_context, std::move(fostream), std::move(instPrinter), nullptr, nullptr));
 #endif
 
   if (!symbolName.empty()) {
@@ -332,6 +344,8 @@ Error ObjDisassembler::run(StringRef symbolName) {
         return err;
     }
   }
+
+  m_instPrinter = nullptr;
 
   return Error::success();
 }
@@ -628,7 +642,7 @@ Error ObjDisassembler::tryDisassembleSection(ELFSectionRef sectionRef, unsigned 
       return err;
 
     if (outputting)
-      outputInst(inst, instAlignment);
+      outputInst(inst, instAlignment, symbolRef.has_value());
 
     offset += inst.bytes.size();
     lastOffset = offset;
@@ -870,7 +884,8 @@ void ObjDisassembler::addBinaryEncodingComment(raw_ostream &stream, unsigned ins
 //
 // @param inst : The instruction or directive to output.
 // @param instAlignment : Alignment (instruction unit size in bytes)
-void ObjDisassembler::outputInst(InstOrDirective inst, unsigned instAlignment) {
+// @param skipInstOffset : True to skip outputting instruction offsets
+void ObjDisassembler::outputInst(InstOrDirective inst, unsigned instAlignment, bool skipInstOffset) {
   // Output the binary encoding as a comment.
   if (inst.status == MCDisassembler::SoftFail)
     m_streamer->AddComment("Illegal instruction encoding ");
@@ -878,7 +893,8 @@ void ObjDisassembler::outputInst(InstOrDirective inst, unsigned instAlignment) {
   raw_string_ostream commentStream(comment);
   if (!comment.empty())
     commentStream << " ";
-  commentStream << format("%06x:", inst.offset);
+  if (!skipInstOffset)
+    commentStream << format("%06x:", inst.offset);
   addBinaryEncodingComment(commentStream, instAlignment, inst.bytes);
   // Output the instruction to the streamer.
   if (!comment.empty())

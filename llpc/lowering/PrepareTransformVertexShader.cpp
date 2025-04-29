@@ -50,8 +50,9 @@ static const char TransformVsEntry[] = "TransformVertexEntry";
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses PrepareTransformVertexShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Prepare-transform-vertexShader\n");
-  SpirvLower::init(&module);
-  collectVsOutputSymbols(module);
+
+  Lowering::init(&module);
+  collectVtxBuiltInSymbols(module);
 
   Function *func = module.getFunction("main");
   if (func != nullptr)
@@ -60,17 +61,19 @@ PreservedAnalyses PrepareTransformVertexShader::run(Module &module, ModuleAnalys
   return PreservedAnalyses::none();
 }
 
-// =====================================================================================================================
-// Collect Vertex shader output builtins: gl_Position, gl_ClipDistance[], gl_FrontColor, gl_TexCoord
+// Collect Vertex shader builtIn inputs and outputs
 //
 // @param [in/out] module : LLVM module to be run on
-void PrepareTransformVertexShader::collectVsOutputSymbols(Module &module) {
+void PrepareTransformVertexShader::collectVtxBuiltInSymbols(Module &module) {
   for (auto &global : module.globals()) {
     auto type = global.getType();
+
+    MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
+    if (!metaNode)
+      continue;
+
+    auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
     if (type->getAddressSpace() == SPIRAS_Output) {
-      MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
-      assert(metaNode);
-      auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
       auto valueType = global.getValueType();
       SmallVector<ShaderInOutMetadata> mds;
       decodeInOutMetaRecursively(valueType, inOutMetaConst, mds);
@@ -78,20 +81,41 @@ void PrepareTransformVertexShader::collectVsOutputSymbols(Module &module) {
       for (auto md : mds) {
         if (md.IsBuiltIn) {
           if (md.Value == spv::BuiltInPosition) {
-            m_outputBuiltIns[TransformVertexVariable::Position] = &global;
+            m_outputBuiltIns[Position] = &global;
           } else if (md.Value == spv::BuiltInClipDistance) {
-            m_outputBuiltIns[TransformVertexVariable::ClipDistance0] = &global;
-            m_outputBuiltIns[TransformVertexVariable::ClipDistance1] = &global;
+            m_outputBuiltIns[ClipDistance0] = &global;
+            m_outputBuiltIns[ClipDistance1] = &global;
           }
         } else {
           if (md.IsLoc) {
             if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor) {
-              m_outputBuiltIns[TransformVertexVariable::FrontColor] = &global;
+              m_outputBuiltIns[FrontColor] = &global;
             } else if (md.Value == Vkgc::GlCompatibilityInOutLocation::TexCoord) {
-              m_outputBuiltIns[TransformVertexVariable::TexCoord] = &global;
+              m_outputBuiltIns[TexCoord] = &global;
             }
           }
         }
+      }
+    } else if (type->getAddressSpace() == SPIRAS_Input) {
+      ShaderInOutMetadata inputMeta = {};
+      Constant *metaValConst = cast<Constant>(inOutMetaConst);
+      inputMeta.U64All[0] = cast<ConstantInt>(metaValConst->getOperand(0))->getZExtValue();
+      inputMeta.U64All[1] = cast<ConstantInt>(metaValConst->getOperand(1))->getZExtValue();
+
+      if (inputMeta.IsBuiltIn) {
+        auto builtIn = static_cast<lgc::BuiltInKind>(inputMeta.Value);
+        if (builtIn == lgc::BuiltInVertexIndex)
+          m_inputBuiltIns[VertexIndex] = &global;
+        else if (builtIn == lgc::BuiltInInstanceId)
+          m_inputBuiltIns[InstanceIndex] = &global;
+        else if (builtIn == lgc::BuiltInDrawIndex)
+          m_inputBuiltIns[DrawID] = &global;
+        else if (builtIn == lgc::BuiltInBaseVertex)
+          m_inputBuiltIns[BaseVertex] = &global;
+        else if (builtIn == lgc::BuiltInBaseInstance)
+          m_inputBuiltIns[BaseInstance] = &global;
+        else
+          assert("unreachable!");
       }
     }
   }
@@ -109,7 +133,7 @@ Value *PrepareTransformVertexShader::loadClipDistanceComponent(unsigned index, u
   auto arraySize = ty->getArrayNumElements();
   auto floatType = m_builder->getFloatTy();
 
-  unsigned redirectIdx = (index == TransformVertexVariable::ClipDistance1) ? component + 4 : component;
+  unsigned redirectIdx = (index == ClipDistance1) ? component + 4 : component;
   if (redirectIdx < arraySize) {
     return m_builder->CreateLoad(floatType, m_builder->CreateConstGEP2_32(ty, clipDistance, 0, redirectIdx));
   } else {
@@ -138,11 +162,11 @@ void PrepareTransformVertexShader::genFunTransformVertex(Function &function) {
   auto floatOne = ConstantFP::get(floatType, 1.0);
   auto vecOne = ConstantVector::get({floatOne, floatOne, floatOne, floatOne});
 
-  for (unsigned idx = 0; idx < TransformVertexVariable::Count; idx++) {
+  for (unsigned idx = 0; idx < OutputCount; idx++) {
     Value *memberValue;
     if (m_outputBuiltIns[idx] != nullptr) {
       // gl_ClipDistance need to be handled specially
-      if (idx == TransformVertexVariable::ClipDistance0 || idx == TransformVertexVariable::ClipDistance1) {
+      if (idx == ClipDistance0 || idx == ClipDistance1) {
         memberValue = PoisonValue::get(vec4Type);
         for (unsigned i = 0; i < 4; i++) {
           Value *clipValue = loadClipDistanceComponent(idx, i);
@@ -165,7 +189,7 @@ void PrepareTransformVertexShader::genFunTransformVertex(Function &function) {
   //  { <4 x float>, <4 x float>, <4 x float>, <4 x float>, <4 x float> }
   //  @transform_vs_entry(i32 %vertexId, i32 %InstanceId, i32 %drawId, i32 %baseVertex, i32 %baseInstance)
   auto int32Ty = m_builder->getInt32Ty();
-  SmallVector<Type *, TransformVertexVariable::Count> allArgTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
+  SmallVector<Type *, InputCount> allArgTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
   Function *transformVertexFunc = mutateFunctionArguments(function, structTy, allArgTys, function.getAttributes());
   transformVertexFunc->setName(TransformVsEntry);
 
@@ -176,7 +200,27 @@ void PrepareTransformVertexShader::genFunTransformVertex(Function &function) {
     block->insertInto(transformVertexFunc);
   }
 
-  // 7. Remove the old main function and its metadata
+  // 7. If builtin inputs such as gl_VertexID, gl_InstanceID are used in the shader, replace them by function params
+  SmallVector<LoadInst *> loadInsts;
+  for (unsigned i = 0; i < InputCount; i++) {
+    if (m_inputBuiltIns[i] != nullptr) {
+      auto builtInInput = cast<GlobalVariable>(m_inputBuiltIns[i]);
+      Value *param = transformVertexFunc->getArg(i);
+      for (auto user : builtInInput->users()) {
+        if (auto *loadInst = dyn_cast<LoadInst>(user)) {
+          loadInst->replaceAllUsesWith(param);
+          loadInsts.push_back(loadInst);
+        }
+      }
+    }
+  }
+
+  // Remove the load instruction
+  for (auto &loadInst : loadInsts) {
+    loadInst->eraseFromParent();
+  }
+
+  // 8. Remove the old main function and its metadata
   function.dropAllReferences();
   function.getParent()->getFunctionList().remove(&function);
 }

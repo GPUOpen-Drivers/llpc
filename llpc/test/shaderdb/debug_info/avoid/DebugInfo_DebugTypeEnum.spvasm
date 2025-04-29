@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -22,7 +23,6 @@
  ;  IN THE SOFTWARE.
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -trim-debug-info=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
@@ -93,7 +93,6 @@ OpEntryPoint Vertex %main "main"
 %decl2 = OpExtInst %void %DbgExt DebugDeclare %foo_info2 %foo2 %null_expr
 %foo3 = OpVariable %f32_ptr_function Function
 %decl3 = OpExtInst %void %DbgExt DebugDeclare %foo_info3 %foo3 %null_expr
-
 
 OpReturn
 OpFunctionEnd

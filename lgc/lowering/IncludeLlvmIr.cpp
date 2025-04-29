@@ -41,7 +41,7 @@ using namespace lgc;
 namespace lgc {
 
 // =====================================================================================================================
-// Executes this patching pass on the specified LLVM module.
+// Executes this lowering pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
@@ -51,7 +51,7 @@ PreservedAnalyses IncludeLlvmIr::run(Module &module, ModuleAnalysisManager &anal
   if (!pipelineState->getOptions().includeIr)
     return PreservedAnalyses::all();
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   std::string moduleStr;
   raw_string_ostream llvmIr(moduleStr);

@@ -55,6 +55,7 @@ LLPC_MODULE_PASS("lgc-pipeline-state-recorder", PipelineStateRecorder)
 
 LLPC_MODULE_PASS("lgc-builder-replayer", BuilderReplayer)
 LLPC_MODULE_PASS("lgc-continufy", Continufy)
+LLPC_MODULE_PASS("lgc-initialize-undef-inputs", InitializeUndefInputs)
 LLPC_MODULE_PASS("lgc-collect-resource-usage", CollectResourceUsage)
 LLPC_MODULE_PASS("lgc-initialize-workgroup-memory", InitializeWorkgroupMemory)
 LLPC_MODULE_PASS("lgc-lower-image-derivatives", LowerImageDerivatives)
@@ -69,7 +70,7 @@ LLPC_FUNCTION_PASS("lgc-peephole-optimization", PeepholeOptimization)
 LLPC_MODULE_PASS("lgc-lower-subgroup-ops", LowerSubgroupOps)
 LLPC_MODULE_PASS("lgc-mutate-entry-point", MutateEntryPoint)
 LLPC_MODULE_PASS("lgc-check-shader-cache", CheckShaderCache)
-LLPC_LOOP_PASS("lgc-add-loop-metadata", AddLoopMetadata)
+LLPC_FUNCTION_PASS("lgc-add-loop-metadata", AddLoopMetadata)
 LLPC_FUNCTION_PASS("lgc-structurize-buffers", StructurizeBuffers)
 LLPC_FUNCTION_PASS("lgc-lower-buffer-operations", LowerBufferOperations)
 LLPC_MODULE_PASS("lgc-apply-workarounds", ApplyWorkarounds)
@@ -78,22 +79,19 @@ LLPC_FUNCTION_PASS("lgc-lower-mul-dx9-zero", LowerMulDx9Zero)
 LLPC_MODULE_PASS("lgc-generate-null-frag-shader", GenerateNullFragmentShader)
 LLPC_MODULE_PASS("lgc-passthrough-hull-shader", PassthroughHullShader)
 LLPC_MODULE_PASS("lgc-collect-image-operations", CollectImageOperations)
-#if LLPC_BUILD_GFX12
 LLPC_FUNCTION_PASS("lgc-add-buffer-operations-metadata", AddBufferOperationMetadata)
-#endif
 LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
 LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragmentColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 LLPC_MODULE_PASS("lgc-lower-desc", LowerDesc)
 
-#if LLPC_BUILD_STRIX1  || LLPC_BUILD_STRIX_HALO
 LLPC_MODULE_PASS("lgc-workaround-ds-subdword-write", WorkaroundDsSubdwordWrite)
-#endif
 
 LLPC_FUNCTION_PASS("lgc-combine-cooperative-matrix", CombineCooperativeMatrix)
 LLPC_MODULE_PASS("lgc-lower-cooperative-matrix", LowerCooperativeMatrix)
 LLPC_MODULE_PASS("lgc-lower-gpurt", LowerGpuRt)
 LLPC_MODULE_PASS("lgc-lower-rayquery", LowerRayQueryWrapper)
+LLPC_MODULE_PASS("lgc-emit-shader-hash-token", EmitShaderHashToken)
 
 #undef LLPC_PASS
 #undef LLPC_LOOP_PASS

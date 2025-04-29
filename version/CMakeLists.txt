@@ -74,15 +74,13 @@ endif()
 # Then, if the value is true, the function adds it to llpc_version's target_compile_definitions,
 # and appends the setting to LLPC_SET_PROPERTY_SUMMARY_llpc_version for us to report the summary.
 
-#if LLPC_BUILD_GFX11
-### GFX11 device support
-llpc_set_property(llpc_version INTERFACE LLPC_BUILD_GFX11 ON "HW_GFX11")
+#if LLPC_BUILD_HAWK_POINT1
+llpc_set_property(llpc_version INTERFACE LLPC_BUILD_HAWK_POINT1 ON "HW_HAWK_POINT1")
+#endif
+#if LLPC_BUILD_HAWK_POINT2
+llpc_set_property(llpc_version INTERFACE LLPC_BUILD_HAWK_POINT2 ON "HW_HAWK_POINT2")
 #endif
 
-#if LLPC_BUILD_GFX115
-### GFX11.5 device support
-llpc_set_property(llpc_version INTERFACE LLPC_BUILD_GFX115 ON "HW_GFX115")
-#endif
 #if LLPC_BUILD_STRIX1
 llpc_set_property(llpc_version INTERFACE LLPC_BUILD_STRIX1 ON "HW_STRIX1")
 #endif
@@ -90,12 +88,6 @@ llpc_set_property(llpc_version INTERFACE LLPC_BUILD_STRIX1 ON "HW_STRIX1")
 llpc_set_property(llpc_version INTERFACE LLPC_BUILD_STRIX_HALO ON "HW_STRIX_HALO")
 #endif
 
-#if LLPC_BUILD_GFX12
-### GFX12 device support
-llpc_set_property(llpc_version INTERFACE LLPC_BUILD_GFX12 ON "HW_GFX12")
-# Set in parent scope so that LLVM can see it.
-set(LLPC_BUILD_GFX12 "${LLPC_BUILD_GFX12}" PARENT_SCOPE)
-#endif
 #if LLPC_BUILD_NAVI48
 llpc_set_property(llpc_version INTERFACE LLPC_BUILD_NAVI48 ON "HW_NAVI48")
 #endif

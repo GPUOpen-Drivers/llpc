@@ -209,9 +209,13 @@ std::unique_ptr<TargetMachine> LgcContext::createTargetMachine(StringRef gpuName
   if (!isGpuNameValid(gpuName))
     return nullptr;
 
-  // Get the LLVM target and create the target machine. This should not fail, as we determined above
-  // that we support the requested target.
+    // Get the LLVM target and create the target machine. This should not fail, as we determined above
+    // that we support the requested target.
+#if LLVM_MAIN_REVISION >= 531330
+  const Triple triple("amdgcn--amdpal");
+#else
   const std::string triple = "amdgcn--amdpal";
+#endif
   std::string errMsg;
   const Target *target = TargetRegistry::lookupTarget(triple, errMsg);
   // Allow no signed zeros - this enables omod modifiers (div:2, mul:2)

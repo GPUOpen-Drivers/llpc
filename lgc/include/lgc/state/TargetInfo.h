@@ -127,7 +127,6 @@ struct WorkaroundFlags {
     unsigned u32All;
   } gfx11;
 
-#if LLPC_BUILD_GFX12
   union {
     struct {
       // Due to an issue in the DB, we cannot support ReZ in the compiler when this workaround is active.
@@ -136,7 +135,6 @@ struct WorkaroundFlags {
     };
     unsigned u32All;
   } gfx12;
-#endif
 };
 
 // =====================================================================================================================

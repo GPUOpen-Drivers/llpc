@@ -36,7 +36,6 @@
 #include "lgc/state/PipelineState.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Visitor.h"
-#include "llvm/ADT/SetVector.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Casting.h"
 
@@ -47,8 +46,10 @@ using namespace lgc;
 
 namespace {
 
+cl::opt<bool> ForceStructuredBuffers("force-structured-buffers", cl::init(false));
+
 struct StructurizeBuffersImpl {
-  StructurizeBuffersImpl(Function *function, bool robustBufferAccess);
+  StructurizeBuffersImpl(Function *function, PipelineState *pipelineState);
 
   bool run();
   void visitBufferIndex(BufferIndexOp &bufferIndex);
@@ -56,7 +57,7 @@ struct StructurizeBuffersImpl {
   Function *m_function;
   llvm_dialects::Builder m_builder;
   MapVector<Value *, SmallVector<BufferIndexOp *>> bufferIndexOps;
-  bool robustBufferAccess;
+  PipelineState *m_pipelineState;
 };
 
 } // anonymous namespace
@@ -71,17 +72,15 @@ PreservedAnalyses StructurizeBuffers::run(Function &function, FunctionAnalysisMa
   const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
   PipelineState *pipelineState =
       moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
-  bool robustBufferAccess =
-      pipelineState->getOptions().enableExtendedRobustBufferAccess || pipelineState->getOptions().robustBufferAccess;
-  StructurizeBuffersImpl impl(&function, robustBufferAccess);
+  StructurizeBuffersImpl impl(&function, pipelineState);
 
   if (impl.run())
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
 }
 
-StructurizeBuffersImpl::StructurizeBuffersImpl(Function *function, bool robustBufferAccess)
-    : m_function(function), m_builder(function->getContext()), robustBufferAccess(robustBufferAccess) {
+StructurizeBuffersImpl::StructurizeBuffersImpl(Function *function, PipelineState *pipelineState)
+    : m_function(function), m_builder(function->getContext()), m_pipelineState(pipelineState) {
 }
 
 void StructurizeBuffersImpl::visitBufferIndex(BufferIndexOp &bufferIndex) {
@@ -126,6 +125,13 @@ bool StructurizeBuffersImpl::run() {
 
   SmallVector<Value *> notConvertible;
   for (auto &base : bufferIndexOps) {
+    if (!ForceStructuredBuffers) {
+      notConvertible.push_back(base.first);
+      continue;
+    }
+
+    bool robustBufferAccess = m_pipelineState->getOptions().enableExtendedRobustBufferAccess ||
+                              m_pipelineState->getOptions().robustBufferAccess;
     if (robustBufferAccess) {
       notConvertible.push_back(base.first);
       continue;

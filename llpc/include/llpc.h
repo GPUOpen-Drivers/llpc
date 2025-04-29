@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2025 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
@@ -162,69 +162,6 @@ struct RayTracingPipelineBuildOut {
   bool isCps;                                          ///< Output whether is the pipeline is compiled in CPS mode
   bool hasKernelEntry; ///< Output whether the output pipeline binaries contain kernel entry
 };
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
-/// Defines callback function used to lookup shader cache info in an external cache
-typedef Result (*ShaderCacheGetValue)(const void *pClientData, uint64_t hash, void *pValue, size_t *pValueLen);
-
-/// Defines callback function used to store shader cache info in an external cache
-typedef Result (*ShaderCacheStoreValue)(const void *pClientData, uint64_t hash, const void *pValue, size_t valueLen);
-
-/// Specifies all information necessary to create a shader cache object.
-struct ShaderCacheCreateInfo {
-  const void *pInitialData; ///< Pointer to a data buffer whose contents should be used to seed the shader
-                            ///  cache. This may be null if no initial data is present.
-  size_t initialDataSize;   ///< Size of the initial data buffer, in bytes.
-
-  // NOTE: The following parameters are all optional, and are only used when the IShaderCache will be used in
-  // tandem with an external cache which serves as a backing store for the cached shader data.
-
-  // [optional] Private client-opaque data which will be passed to the pClientData parameters of the Get and
-  // Store callback functions.
-  const void *pClientData;
-  ShaderCacheGetValue pfnGetValueFunc;     ///< [Optional] Function to lookup shader cache data in an external cache
-  ShaderCacheStoreValue pfnStoreValueFunc; ///< [Optional] Function to store shader cache data in an external cache
-};
-
-// =====================================================================================================================
-/// Represents the interface of a cache for compiled shaders. The shader cache is designed to be optionally passed in at
-/// pipeline create time. The compiled binary for the shaders is stored in the cache object to avoid compiling the same
-/// shader multiple times. The shader cache also provides a method to serialize its data to be stored to disk.
-class IShaderCache {
-public:
-  /// Serializes the shader cache data or queries the size required for serialization.
-  ///
-  /// @param [in]      pBlob  System memory pointer where the serialized data should be placed. This parameter can
-  ///                         be null when querying the size of the serialized data. When non-null (and the size is
-  ///                         correct/sufficient) then the contents of the shader cache will be placed in this
-  ///                         location. The data is an opaque blob which is not intended to be parsed by clients.
-  /// @param [in,out]  pSize  Size of the memory pointed to by pBlob. If the value stored in pSize is zero then no
-  ///                         data will be copied and instead the size required for serialization will be returned
-  ///                         in pSize.
-  ///
-  /// @returns : Success if data was serialized successfully, Unknown if fail to do serialize.
-  virtual Result Serialize(void *pBlob, size_t *pSize) = 0;
-
-  /// Merges the provided source shader caches' content into this shader cache.
-  ///
-  /// @param [in]  srcCacheCount  Count of source shader caches to be merged.
-  /// @param [in]  ppSrcCaches    Pointer to an array of pointers to shader cache objects.
-  ///
-  /// @returns : Success if data of source shader caches was merged successfully, OutOfMemory if the internal allocator
-  ///          memory cannot be allocated.
-  virtual Result Merge(unsigned srcCacheCount, const IShaderCache **ppSrcCaches) = 0;
-
-  /// Frees all resources associated with this object.
-  virtual void Destroy() = 0;
-
-protected:
-  /// @internal Constructor. Prevent use of new operator on this interface.
-  IShaderCache() {}
-
-  /// @internal Destructor. Prevent use of delete operator on this interface.
-  virtual ~IShaderCache() = default;
-};
-#endif
 
 // Users of LLPC may implement this interface to allow the compiler to request additional threads.
 //

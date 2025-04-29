@@ -136,6 +136,7 @@ static bool isUtilFunction(StringRef Name) {
       "TraceRay",
       "Traversal",
       "ShaderStart",
+      "ShaderExit",
   };
 
   for (const char *UtilName : UtilNames) {

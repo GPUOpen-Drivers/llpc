@@ -151,8 +151,10 @@ target_sources(LLVMlgc PRIVATE
 
 # lgc/lowering
 target_sources(LLVMlgc PRIVATE
+    lowering/AddBufferOperationMetadata.cpp
     lowering/ConfigBuilderBase.cpp
     lowering/Continufy.cpp
+    lowering/EmitShaderHashToken.cpp
     lowering/FragmentColorExport.cpp
     lowering/LowerDebugPrintf.cpp
     lowering/LowerDesc.cpp
@@ -171,6 +173,7 @@ target_sources(LLVMlgc PRIVATE
     lowering/LowerInvariantLoads.cpp
     lowering/IncludeLlvmIr.cpp
     lowering/InitializeWorkgroupMemory.cpp
+    lowering/InitializeUndefInputs.cpp
     lowering/ScalarizeLoads.cpp
     lowering/LowerMulDx9Zero.cpp
     lowering/AddLoopMetadata.cpp
@@ -188,23 +191,16 @@ target_sources(LLVMlgc PRIVATE
     lowering/VertexFetch.cpp
     lowering/CollectImageOperations.cpp
     lowering/RegisterMetadataBuilder.cpp
-#if LLPC_BUILD_STRIX1  || LLPC_BUILD_STRIX_HALO
     lowering/WorkaroundDsSubdwordWrite.cpp
-#endif
     lowering/CombineCooperativeMatrix.cpp
     lowering/LowerCooperativeMatrix.cpp
     lowering/LowerGpuRt.cpp
     lowering/LowerRayQueryWrapper.cpp
 )
 
-#if LLPC_BUILD_GFX12
-if(LLPC_BUILD_GFX12)
-    target_sources(LLVMlgc PRIVATE lowering/AddBufferOperationMetadata.cpp)
-endif()
-#endif
-
 # include/lgc/lowering
 target_sources(LLVMlgc PRIVATE
+    include/lgc/lowering/AddBufferOperationMetadata.h
     include/lgc/lowering/AddLoopMetadata.h
     include/lgc/lowering/ApplyWorkarounds.h
     include/lgc/lowering/CheckShaderCache.h
@@ -212,10 +208,12 @@ target_sources(LLVMlgc PRIVATE
     include/lgc/lowering/CollectResourceUsage.h
     include/lgc/lowering/CombineCooperativeMatrix.h
     include/lgc/lowering/Continufy.h
+    include/lgc/lowering/EmitShaderHashToken.h
     include/lgc/lowering/FragmentColorExport.h
     include/lgc/lowering/GenerateCopyShader.h
     include/lgc/lowering/IncludeLlvmIr.h
     include/lgc/lowering/InitializeWorkgroupMemory.h
+    include/lgc/lowering/InitializeUndefInputs.h
     include/lgc/lowering/LgcLowering.h
     include/lgc/lowering/LowerBufferOperations.h
     include/lgc/lowering/LowerCooperativeMatrix.h
@@ -240,12 +238,6 @@ target_sources(LLVMlgc PRIVATE
     include/lgc/lowering/VertexFetch.h
     include/lgc/lowering/WorkaroundDsSubdwordWrite.h
 )
-
-#if LLPC_BUILD_GFX12
-if(LLPC_BUILD_GFX12)
-    target_sources(LLVMlgc PRIVATE include/lgc/lowering/AddBufferOperationMetadata.h)
-endif()
-#endif
 
 # lgc/state
 target_sources(LLVMlgc PRIVATE

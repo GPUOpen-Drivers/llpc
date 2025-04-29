@@ -36,7 +36,7 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to combine cooperative matrix operations.
-class CombineCooperativeMatrix : public Patch, public llvm::PassInfoMixin<CombineCooperativeMatrix> {
+class CombineCooperativeMatrix : public LgcLowering, public llvm::PassInfoMixin<CombineCooperativeMatrix> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 

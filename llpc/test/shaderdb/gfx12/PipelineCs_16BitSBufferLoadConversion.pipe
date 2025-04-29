@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 ; Check that padBufferSizeToNextDword is set correctly by llpc and it enables the conversion to s_buffer_load_u16
 ; This is only possible on GFX12 if the buffer size is padded, which we do in the Vulkan driver
 
@@ -33,6 +33,7 @@
 ; SHADERTEST: call i16 @llvm.amdgcn.s.buffer.load.i16(<4 x i32> [[desc:%[0-9]+]], i32 0, i32 0), !invariant.load !{{[0-9]+}}
 ; SHADERTEST: call i16 @llvm.amdgcn.s.buffer.load.i16(<4 x i32> [[desc]], i32 2, i32 0), !invariant.load !{{[0-9]+}}
 ; SHADERTEST: call i16 @llvm.amdgcn.s.buffer.load.i16(<4 x i32> [[desc]], i32 4, i32 0), !invariant.load !{{[0-9]+}}
+
 ; REQUIRES: do-not-run-me
 
 [CsGlsl]
@@ -62,7 +63,6 @@ void main (void)
 	float16_t in0 = float16_t(inputs[0].in0);
 	float16_t in1 = float16_t(inputs[0].in1);
 	float16_t in2 = float16_t(inputs[0].in2);
-
 
 	outputs[0].in0 = in0;
 	outputs[0].in1 = in1;

@@ -73,6 +73,9 @@ static constexpr char AmdGpuVsEntryName[] = "_amdgpu_vs_main";
 static constexpr char AmdGpuPsEntryName[] = "_amdgpu_ps_main";
 static constexpr char AmdGpuCsEntryName[] = "_amdgpu_cs_main";
 
+// Symbol name prefix for pipeline link symbol.
+static constexpr char AmdGpuPipelineLinkPrefix[] = "_amdgpu_pipelineLink";
+
 /// Maximum number of viewports.
 constexpr unsigned MaxViewports = 16;
 
@@ -133,21 +136,17 @@ struct PrimShaderCbLayout {
 };
 
 /// Constant buffer used by SW stream-out processing (GFX11+).
-#if LLPC_BUILD_GFX12
 struct OrderedIdPair {
   unsigned orderedWaveId;
   unsigned dwordsWritten;
 };
-#endif
 
 struct StreamOutControlCb {
   unsigned bufOffsets[MaxTransformFeedbackBuffers];
-#if LLPC_BUILD_GFX12
   // Following data are only available on GFX12+ (caused by GDS removal)
   uint64_t primsNeeded[MaxGsStreams];
   uint64_t primsWritten[MaxGsStreams];
   OrderedIdPair orderedIdPair[MaxTransformFeedbackBuffers];
-#endif
 };
 
 } // namespace Abi

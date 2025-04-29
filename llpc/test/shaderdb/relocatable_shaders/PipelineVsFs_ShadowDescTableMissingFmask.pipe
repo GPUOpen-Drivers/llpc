@@ -1,3 +1,4 @@
+
 ;;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;
@@ -23,7 +24,6 @@
  ;
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 // This test case checks that descriptor offset and descriptor buffer pointer relocation works
 // for buffer descriptors in a vs/fs pipeline.
 // Also check that the user data limit is set correctly.
@@ -45,10 +45,8 @@ void main() {
     outUV = inPosition;
 }
 
-
 [VsInfo]
 entryPoint = main
-
 
 [FsGlsl]
 #version 450 core

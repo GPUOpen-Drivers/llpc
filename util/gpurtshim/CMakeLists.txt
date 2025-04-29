@@ -35,10 +35,5 @@ if(LLPC_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
     # Link against vkgc_headers to pull in the necessary include directories and all the VKI_* defines
     target_link_libraries(vkgc_gpurtshim PUBLIC vkgc_headers)
     target_link_libraries(vkgc_gpurtshim PRIVATE gpurt)
-#if LLPC_BUILD_GFX12
-    if(LLPC_BUILD_GFX12)
-        target_compile_definitions(vkgc_gpurtshim PUBLIC LLPC_BUILD_GFX12)
-    endif()
-#endif
 endif()
 #endif

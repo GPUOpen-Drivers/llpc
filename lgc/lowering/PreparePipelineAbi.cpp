@@ -73,7 +73,7 @@ PreservedAnalyses PreparePipelineAbi::run(Module &module, ModuleAnalysisManager 
 
   LLVM_DEBUG(dbgs() << "Run the pass Prepare-Pipeline-Abi\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   m_pipelineState = pipelineState;
   m_pipelineShaders = &pipelineShaders;
@@ -111,7 +111,7 @@ PreservedAnalyses PreparePipelineAbi::run(Module &module, ModuleAnalysisManager 
 std::pair<Value *, Value *> PreparePipelineAbi::readTessFactors(PipelineState *pipelineState, Value *relPatchId,
                                                                 IRBuilder<> &builder) {
   auto func = builder.GetInsertBlock()->getParent();
-  auto lds = Patch::getLdsVariable(pipelineState, func);
+  auto lds = LgcLowering::getLdsVariable(pipelineState, func);
 
   const auto &hwConfig = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.hwConfig;
 
@@ -208,11 +208,9 @@ void PreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Value *t
   CoherentFlag coherent = {};
   if (pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
     coherent.bits.glc = true;
-#if LLPC_BUILD_GFX12
   } else {
     coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_SYS;
     coherent.gfx12.th = pipelineState->getTemporalHint(TH::TH_WB, TemporalHintTessFactorWrite);
-#endif
   }
 
   auto primitiveMode = pipelineState->getShaderModes()->getTessellationMode().primitiveMode;
@@ -275,7 +273,7 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
   IRBuilder<>::InsertPointGuard guard(builder);
 
   auto func = builder.GetInsertBlock()->getParent();
-  auto lds = Patch::getLdsVariable(pipelineState, func);
+  auto lds = LgcLowering::getLdsVariable(pipelineState, func);
 
   // Helper to read value from LDS
   auto readValueFromLds = [&](Type *readTy, Value *ldsOffset) {
@@ -300,9 +298,8 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
   //   1 = allow input denorms, flush output denorms
   //   2 = flush input denorms, allow output denorms
   //   3 = allow input and output denorms
-  static const unsigned HWRegMode = 1;
   static const unsigned AllowInOutDenorms = 3;
-  builder.CreateSetReg(HWRegMode, 4, 4, builder.getInt32(AllowInOutDenorms));
+  builder.CreateSetReg(WaveStateReg::MODE, 4, 4, builder.getInt32(AllowInOutDenorms));
 
   Value *minOuterTf = builder.CreateExtractElement(outerTf, static_cast<uint64_t>(0));
   for (unsigned i = 1; i < cast<FixedVectorType>(outerTf->getType())->getNumElements(); ++i)
@@ -329,11 +326,9 @@ void PreparePipelineAbi::writeHsOutputs(PipelineState *pipelineState, Value *off
   CoherentFlag coherent = {};
   if (gfxIp.major <= 11) {
     coherent.bits.glc = true;
-#if LLPC_BUILD_GFX12
   } else {
     coherent.gfx12.th = TH::TH_WB;
     coherent.gfx12.scope = MemoryScope::MEMORY_SCOPE_DEV;
-#endif
   }
 
   LLPC_OUTS("===============================================================================\n");

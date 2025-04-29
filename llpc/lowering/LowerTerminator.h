@@ -38,7 +38,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 // Represents the pass of FE lowering terminators.
-class LowerTerminator : public SpirvLower,
+class LowerTerminator : public Lowering,
                         public llvm::PassInfoMixin<LowerTerminator>,
                         public llvm::InstVisitor<LowerTerminator> {
 public:

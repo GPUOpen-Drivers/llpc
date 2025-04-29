@@ -387,14 +387,12 @@ static void setGfx1151Info(TargetInfo *targetInfo) {
 }
 #endif
 
-#if LLPC_BUILD_GFX12
 // gfx12
 //
 // @param [in/out] targetInfo : Target info
 static void setGfx12Info(TargetInfo *targetInfo) {
   setGfx11Info(targetInfo);
 }
-#endif
 
 #if LLPC_BUILD_NAVI48
 // gfx1201
@@ -407,6 +405,7 @@ static void setGfx1201Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numComputeUnitsPerShaderEngine = 8;
   targetInfo->getGpuWorkarounds().gfx12.waNoReZSupport = 1;
 }
+
 #endif
 
 // Represents device infos.

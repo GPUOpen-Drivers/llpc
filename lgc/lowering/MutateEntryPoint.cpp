@@ -96,14 +96,20 @@ bool MutateEntryPoint::useInitWholeWave() const {
   return UseInitWholeWave && m_initWholeWaveId != llvm::Intrinsic::not_intrinsic;
 }
 
+bool MutateEntryPoint::useDeadInsteadOfPoison() const {
+  return m_deadId != llvm::Intrinsic::not_intrinsic;
+}
+
 // =====================================================================================================================
 MutateEntryPoint::MutateEntryPoint() : m_hasTs(false), m_hasGs(false) {
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 513481
   m_setInactiveChainArgId = Function::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg");
   m_initWholeWaveId = Function::lookupIntrinsicID("llvm.amdgcn.init.whole.wave");
+  m_deadId = Function::lookupIntrinsicID("llvm.amdgcn.dead");
 #else
   m_setInactiveChainArgId = Intrinsic::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg");
   m_initWholeWaveId = Intrinsic::lookupIntrinsicID("llvm.amdgcn.init.whole.wave");
+  m_deadId = Intrinsic::lookupIntrinsicID("llvm.amdgcn.dead");
 #endif
 }
 
@@ -135,7 +141,7 @@ PreservedAnalyses MutateEntryPoint::run(Module &module, ModuleAnalysisManager &a
 
   LLVM_DEBUG(dbgs() << "Run the pass Mutate-Entry-Point\n");
 
-  Patch::init(&module);
+  LgcLowering::init(&module);
 
   m_pipelineState = pipelineState;
 
@@ -182,60 +188,6 @@ PreservedAnalyses MutateEntryPoint::run(Module &module, ModuleAnalysisManager &a
   processDriverTableLoad(module);
 
   return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Split the input into pieces of i32.
-//
-// @param layout : Data layout
-// @param builder : IR builder
-// @param input : A collection of inputs (structures, arrays, vectors, pointers, or basic primitive types)
-// @param [out] output : A collection of outputs by flattening the inputs to scalar values
-static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
-                         SmallVector<Value *> &output) {
-  for (auto *x : input) {
-    Type *xType = x->getType();
-    if (isa<StructType>(xType)) {
-      StructType *structTy = cast<StructType>(xType);
-      for (unsigned idx = 0; idx < structTy->getNumElements(); idx++)
-        splitIntoI32(layout, builder, builder.CreateExtractValue(x, idx), output);
-    } else if (auto *arrayTy = dyn_cast<ArrayType>(xType)) {
-      auto *elemTy = arrayTy->getElementType();
-      assert(layout.getTypeSizeInBits(elemTy) == 32 && "array of non-32bit type not supported");
-      for (unsigned idx = 0; idx < arrayTy->getNumElements(); idx++) {
-        auto *elem = builder.CreateExtractValue(x, idx);
-        if (!elemTy->isIntegerTy())
-          elem = builder.CreateBitCast(elem, builder.getInt32Ty());
-        output.push_back(elem);
-      }
-    } else if (auto *vecTy = dyn_cast<FixedVectorType>(xType)) {
-      Type *scalarTy = vecTy->getElementType();
-      assert((scalarTy->getPrimitiveSizeInBits() & 0x3) == 0);
-      unsigned scalarBytes = scalarTy->getPrimitiveSizeInBits() / 8;
-      if (scalarBytes < 4) {
-        // Use shufflevector for types like <i8 x 6>?
-        llvm_unreachable("vector of type smaller than dword not supported yet.");
-      } else {
-        for (unsigned idx = 0; idx < (unsigned)vecTy->getNumElements(); idx++)
-          splitIntoI32(layout, builder, builder.CreateExtractElement(x, idx), output);
-      }
-    } else {
-      // pointer or primitive types
-      assert(xType->isPointerTy() || xType->isIntegerTy() || xType->isFloatTy());
-      unsigned size = layout.getTypeSizeInBits(xType).getFixedValue();
-      if (xType->isPointerTy())
-        x = builder.CreatePtrToInt(x, builder.getIntNTy(size));
-
-      if (size > 32) {
-        assert(size % 32 == 0);
-        Value *vecDword = builder.CreateBitCast(x, FixedVectorType::get(builder.getInt32Ty(), size / 32));
-        splitIntoI32(layout, builder, vecDword, output);
-      } else {
-        x = builder.CreateZExtOrBitCast(x, builder.getInt32Ty());
-        output.push_back(x);
-      }
-    }
-  }
 }
 
 // =====================================================================================================================
@@ -486,13 +438,11 @@ void MutateEntryPoint::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCps
   Value *reloc = nullptr;
   Function &callee = *cast<Function>(asCpsReferenceOp.getFn());
 
-#if LLPC_BUILD_GFX12
   if (isDynamicVgprEnabled()) {
     auto funcName = callee.getName();
     std::string relocName = "_dvgpr$" + funcName.str();
     reloc = builder.CreateRelocationConstant(relocName);
   }
-#endif
 
   Value *loweredReference = lgc::cps::lowerAsContinuationReference(builder, asCpsReferenceOp, reloc);
 
@@ -553,7 +503,6 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   } else {
     numShaderArg = m_cpsShaderInputCache.getTypes().size();
     numUserdata = haveLocalInvocationId ? numShaderArg - 1 : numShaderArg;
-#if LLPC_BUILD_GFX12
     if (isDynamicVgprEnabled()) {
       numUserdata--;
       assert(m_cpsShaderInputCache.getNames().back() == "MaxOutgoingVgprCount");
@@ -561,9 +510,6 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     } else {
       assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
     }
-#else
-    assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
-#endif
   }
 
   // Get all the return instructions.
@@ -587,7 +533,9 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   //  tail.block:
   //    ...
   bool useIWW = useInitWholeWave();
-  if (isCpsFunc && useIWW) {
+  bool handleInactiveVgprs = isCpsFunc && useIWW;
+  Value *dead = PoisonValue::get(builder.getInt32Ty());
+  if (handleInactiveVgprs) {
     auto *entryBlock = &func->getEntryBlock();
     BasicBlock *shaderBlock = entryBlock->splitBasicBlock(entryBlock->getFirstNonPHIOrDbgOrAlloca());
     builder.SetInsertPoint(entryBlock, entryBlock->getFirstNonPHIOrDbgOrAlloca());
@@ -601,9 +549,12 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
       remainingArgs.push_back(&arg);
 
     SmallVector<Value *> vgprArgs;
-    splitIntoI32(func->getParent()->getDataLayout(), builder, remainingArgs, vgprArgs);
+    compilerutils::splitIntoI32(func->getParent()->getDataLayout(), builder, remainingArgs, vgprArgs);
 
-    exitInfos.push_back(CpsExitInfo(entryBlock, std::move(vgprArgs)));
+    exitInfos.push_back(CpsExitInfo(entryBlock, std::move(vgprArgs), /*containsInactiveVgprs=*/true));
+
+    if (useDeadInsteadOfPoison())
+      dead = builder.CreateIntrinsic(builder.getInt32Ty(), m_deadId, {});
 
     // Now we can finally insert the init.whole.wave intrinsic.
     auto *originalExec = builder.CreateIntrinsic(builder.getInt1Ty(), m_initWholeWaveId, {});
@@ -627,8 +578,15 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   }
 
   size_t vgprNum = 0;
-  for (const auto &exit : exitInfos)
+  size_t activeVgprNum = 0; // Only relevant when using init.whole.wave.
+  for (const auto &exit : exitInfos) {
     vgprNum = std::max(exit.vgpr.size(), vgprNum);
+
+    // When using init.whole.wave, the exitInfo for the entry block will include the inactive VGPR args.
+    // Skip that when determining the number of active VGPRs.
+    if (handleInactiveVgprs && !exit.containsInactiveVgprs)
+      activeVgprNum = std::max(exit.vgpr.size(), activeVgprNum);
+  }
 
   SmallVector<Value *> newVgpr;
   // Put LocalInvocationId before {vcr, csp, shaderIndex}.
@@ -649,7 +607,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
         if (vgprIdx < exitInfos[exitIdx].vgpr.size())
           phi->addIncoming(exitInfos[exitIdx].vgpr[vgprIdx], exitInfos[exitIdx].pred);
         else
-          phi->addIncoming(PoisonValue::get(builder.getInt32Ty()), exitInfos[exitIdx].pred);
+          phi->addIncoming(dead, exitInfos[exitIdx].pred);
       }
       newVgpr.push_back(phi);
     }
@@ -751,7 +709,6 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   AddressExtender addressExtender(func, tailBlock);
   Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
 
-#if LLPC_BUILD_GFX12
   Value *numVgpr = nullptr;
   if (isDynamicVgprEnabled()) {
     // dVGPRs only support wave 32 mode.
@@ -782,16 +739,14 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
     sgprArgs.push_back(execMask);
     sgprArgs.push_back(numVgpr);
   }
-#endif
 
   const DataLayout &layout = func->getParent()->getDataLayout();
   SmallVector<Value *> sgprI32;
-  splitIntoI32(layout, builder, sgprArgs, sgprI32);
+  compilerutils::splitIntoI32(layout, builder, sgprArgs, sgprI32);
   Value *sgprVec = mergeDwordsIntoVector(builder, sgprI32);
 
   SmallVector<Value *> chainArgs = {jumpTarget, execMask, sgprVec, vgprArg};
 
-#if LLPC_BUILD_GFX12
   if (isDynamicVgprEnabled()) {
     // Bit 0 of flags set to 1 means dVGPR mode enabled
     chainArgs.push_back(builder.getInt32(1));
@@ -800,9 +755,7 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
 
     auto fallbackFunc = createRetryVgprAllocFunc(cast<FixedVectorType>(sgprVec->getType()));
     chainArgs.push_back(fallbackFunc);
-  } else
-#endif
-  {
+  } else {
     // No flags
     chainArgs.push_back(builder.getInt32(0));
   }
@@ -824,18 +777,16 @@ bool MutateEntryPoint::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
                               .getMap(true)[Util::Abi::PipelineMetadataKey::ShaderFunctions]
                               .getMap(true);
   shaderFunctions[funcName].getMap(true)[Util::Abi::HardwareStageMetadataKey::FrontendStackSize] = stackSize;
-#if LLPC_BUILD_GFX12
   if (isDynamicVgprEnabled()) {
     // There are 8 VGPRs reserved for amdgpu_cs_chain call.
+    unsigned outgoingVgprNum = handleInactiveVgprs ? activeVgprNum : vgprNum;
     shaderFunctions[funcName].getMap(true)[Util::Abi::HardwareStageMetadataKey::OutgoingVgprCount] =
-        unsigned(vgprNum) + 8;
+        outgoingVgprNum + 8;
   }
-#endif
 
   return true;
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Create a function to do retry vgpr alloc
 //
@@ -890,7 +841,6 @@ Function *lgc::MutateEntryPoint::createRetryVgprAllocFunc(FixedVectorType *sgprs
 
   return func;
 }
-#endif
 
 // =====================================================================================================================
 // Mutate the argument list of the cps function
@@ -956,10 +906,9 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
 
   SmallVector<AttributeSet, 8> argAttrs;
   unsigned numUserdataArg = haveLocalInvocationId ? fixedShaderArgTys.size() - 1 : fixedShaderArgTys.size();
-#if LLPC_BUILD_GFX12
   if (isDynamicVgprEnabled())
     numUserdataArg--;
-#endif
+
   for (unsigned idx = 0; idx != numUserdataArg; ++idx)
     argAttrs.push_back(inRegAttrSet);
 
@@ -967,10 +916,8 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
   if (haveLocalInvocationId)
     argAttrs.push_back(emptyAttrSet);
 
-#if LLPC_BUILD_GFX12
   if (isDynamicVgprEnabled())
     argAttrs.push_back(inRegAttrSet);
-#endif
 
   // %vcr attribute
   argAttrs.push_back(emptyAttrSet);
@@ -1007,7 +954,7 @@ Function *MutateEntryPoint::lowerCpsFunction(Function *func, ArrayRef<Type *> fi
   }
 
   setShaderStage(newFunc, getShaderStage(func));
-  newFunc->setAlignment(Align(64));
+  newFunc->setAlignment(Align(128));
   newFunc->setCallingConv(CallingConv::AMDGPU_CS_Chain);
   return newFunc;
 }
@@ -1058,7 +1005,7 @@ void MutateEntryPoint::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, Basic
   vgprArgs.push_back(jumpOp->getCsp());
   vgprArgs.push_back(jumpOp->getShaderIndex());
   vgprArgs.push_back(jumpOp->getRcr());
-  splitIntoI32(layout, builder, remainingArgs, vgprArgs);
+  compilerutils::splitIntoI32(layout, builder, remainingArgs, vgprArgs);
 
   // Fill exit information.
   exitInfos.push_back(CpsExitInfo(jumpOp->getParent(), std::move(vgprArgs)));
@@ -1211,9 +1158,7 @@ void MutateEntryPoint::gatherUserDataUsage(Module *module) {
         auto stage = getShaderStage(call->getFunction());
         assert(stage != ShaderStage::CopyShader);
         auto &specialUserData = getUserDataUsage(stage.value())->specialUserData;
-        unsigned index = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue() -
-                         static_cast<unsigned>(UserDataMapping::GlobalTable);
-        specialUserData.resize(std::max(specialUserData.size(), size_t(index + 1)));
+        unsigned index = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
         specialUserData[index].users.push_back(call);
       }
     }
@@ -1339,8 +1284,8 @@ void MutateEntryPoint::fixupUserDataUses(Module &module) {
     }
 
     // Special user data from lgc.special.user.data calls
-    for (unsigned idx = 0; idx != userDataUsage->specialUserData.size(); ++idx) {
-      auto &specialUserData = userDataUsage->specialUserData[idx];
+    for (auto &it : userDataUsage->specialUserData) {
+      SpecialUserDataNodeUsage &specialUserData = it.second;
       if (!specialUserData.users.empty()) {
         assert(specialUserData.entryArgIdx != 0);
         Value *arg = getFunctionArgument(&func, specialUserData.entryArgIdx);
@@ -1479,7 +1424,7 @@ void MutateEntryPoint::processComputeFuncs(ShaderInputs *shaderInputs, Module &m
           shaderInputTys.pop_back();
           shaderInputNames.pop_back();
         }
-#if LLPC_BUILD_GFX12
+
         if (isDynamicVgprEnabled()) {
           // Add MaxOutgoingVgprCount as the last argument.
           // NOTE: Not doing this in generateEntryPointArgTys() as `MaxOutgoingVgprCount` is not essentially a userdata,
@@ -1487,7 +1432,7 @@ void MutateEntryPoint::processComputeFuncs(ShaderInputs *shaderInputs, Module &m
           shaderInputTys.push_back(Type::getInt32Ty(module.getContext()));
           shaderInputNames.push_back("MaxOutgoingVgprCount");
         }
-#endif
+
         m_cpsShaderInputCache.set(shaderInputTys, shaderInputNames);
       }
       newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
@@ -1714,6 +1659,13 @@ void MutateEntryPoint::setFuncAttrs(Function *entryPoint) {
   builder.addAttribute("amdgpu-memory-bound", shaderOptions->favorLatencyHiding ? "true" : "false");
   builder.addAttribute("amdgpu-wave-limiter", "false");
 
+  if (shaderOptions->promoteAllocaRegLimit != 0)
+    builder.addAttribute("amdgpu-promote-alloca-to-vector-max-regs",
+                         std::to_string(shaderOptions->promoteAllocaRegLimit));
+  if (shaderOptions->promoteAllocaRegRatio != 0)
+    builder.addAttribute("amdgpu-promote-alloca-to-vector-vgpr-ratio",
+                         std::to_string(shaderOptions->promoteAllocaRegRatio));
+
   entryPoint->addFnAttrs(builder);
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow
@@ -1799,10 +1751,8 @@ uint64_t MutateEntryPoint::generateEntryPointArgTys(ShaderInputs *shaderInputs, 
       assert((!isUnlinkedDescriptorSetValue(userDataArg.userDataValue) || dwordSize == 1) &&
              "Expecting descriptor set values to be one dword.  The linker cannot handle anything else.");
       if (isSystemUserData) {
-        unsigned index = userDataArg.userDataValue - static_cast<unsigned>(UserDataMapping::GlobalTable);
         auto &specialUserData = getUserDataUsage(m_shaderStage.value())->specialUserData;
-        if (index < specialUserData.size())
-          specialUserData[index].entryArgIdx = argTys.size() + argOffset;
+        specialUserData[userDataArg.userDataValue].entryArgIdx = argTys.size() + argOffset;
       }
     }
     argTys.push_back(userDataArg.argTy);
@@ -1882,6 +1832,12 @@ bool MutateEntryPoint::isUnlinkedDescriptorSetValue(unsigned userDataValue) cons
 }
 
 // =====================================================================================================================
+// Map from PipelineLinkKind to UserDataMapping
+static UserDataMapping toUserDataMapping(PipelineLinkKind kind) {
+  return UserDataMapping(unsigned(UserDataMapping::PipelineLinkStart) + unsigned(kind));
+}
+
+// =====================================================================================================================
 // Add a UserDataArg to the appropriate vector for each special argument (e.g. ViewId) needed in user data SGPRs.
 // In here, we need to check whether an argument is needed in two ways:
 // 1. Whether a flag is set saying it will be needed after MutateEntryPoint
@@ -1954,6 +1910,12 @@ void MutateEntryPoint::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &user
       // Draw index.
       if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::DrawIndex))
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex));
+
+      // Vertex fetch table (uber fetch).
+      if (userDataUsage->isSpecialUserDataUsed(toUserDataMapping(PipelineLinkKind::VertexFetchTable))) {
+        specialUserDataArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), "uberFetchTable", toUserDataMapping(PipelineLinkKind::VertexFetchTable)));
+      }
     }
 
     if ((m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) && !m_hasGs && !m_hasTs &&
@@ -2000,13 +1962,15 @@ void MutateEntryPoint::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &user
     specialUserDataArgs.push_back(UserDataArg(FixedVectorType::get(builder.getInt32Ty(), 3), "meshTaskDispatchDims",
                                               UserDataMapping::MeshTaskDispatchDims,
                                               &intfData->entryArgIdxs.mesh.dispatchDims));
-    specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshTaskRingIndex",
-                                              UserDataMapping::MeshTaskRingIndex,
-                                              &intfData->entryArgIdxs.mesh.baseRingEntryIndex));
     if (m_pipelineState->needSwMeshPipelineStats()) {
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshPipeStatsBuf",
                                                 UserDataMapping::MeshPipeStatsBuf,
                                                 &intfData->entryArgIdxs.mesh.pipeStatsBuf));
+    }
+    {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "meshTaskRingIndex",
+                                                UserDataMapping::MeshTaskRingIndex,
+                                                &intfData->entryArgIdxs.mesh.baseRingEntryIndex));
     }
   } else if (m_shaderStage == ShaderStage::Fragment) {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable &&
@@ -2024,7 +1988,8 @@ void MutateEntryPoint::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &user
     }
 
     bool useDynamicSampleInfo =
-        m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.runAtSampleRate &&
+        (m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.runAtSampleRate ||
+         m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.samplePosOffset) &&
         (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo);
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::CompositeData) || useDynamicSampleInfo) {
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "compositeData", UserDataMapping::CompositeData,
@@ -2068,18 +2033,12 @@ void MutateEntryPoint::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> &user
     }
   }
 
-#if LLPC_BUILD_GFX12
   if (m_pipelineState->enableSwXfb() ||
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 12 && m_pipelineState->enablePrimStats())) {
     // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the stream-out control
     // buffer address. And for GFX12+, we still need this special user data SGPR when we enable primitive statistics
     // counting. This is because primitive counters in GDS are removed and are replaced by those defined in stream-out
     // control buffer.
-#else
-  // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the stream-out control
-  // buffer address.
-  if (m_pipelineState->enableSwXfb()) {
-#endif
     unsigned *controlBufPtr = nullptr;
 
     switch (m_shaderStage.value()) {
@@ -2291,8 +2250,10 @@ bool MutateEntryPoint::isComputeWithCalls() const {
 
 // =====================================================================================================================
 bool MutateEntryPoint::UserDataUsage::isSpecialUserDataUsed(UserDataMapping kind) {
-  unsigned index = static_cast<unsigned>(kind) - static_cast<unsigned>(UserDataMapping::GlobalTable);
-  return specialUserData.size() > index && !specialUserData[index].users.empty();
+  auto it = specialUserData.find(unsigned(kind));
+  if (it == specialUserData.end())
+    return false;
+  return !it->second.users.empty();
 }
 
 // =====================================================================================================================

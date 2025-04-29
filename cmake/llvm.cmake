@@ -77,11 +77,8 @@ endif()
 if (NOT LLPC_LLVM_BUILD_PATH)
     set(LLPC_LLVM_BUILD_PATH ${PROJECT_BINARY_DIR}/llvm)
 endif()
-if (ICD_BUILD_LLPC)
-    add_subdirectory(${LLPC_LLVM_SRC_PATH} ${LLPC_LLVM_BUILD_PATH})
-else()
-    add_subdirectory(${LLPC_LLVM_SRC_PATH} ${LLPC_LLVM_BUILD_PATH} EXCLUDE_FROM_ALL)
-endif()
+
+add_subdirectory(${LLPC_LLVM_SRC_PATH} ${LLPC_LLVM_BUILD_PATH} EXCLUDE_FROM_ALL)
 
 # Get LLVMConfig onto cmake path.
 list(APPEND CMAKE_MODULE_PATH

@@ -182,6 +182,17 @@ TEST(PipelineDumperTest, TestRobustBufferAccessOptionCompute) {
 }
 
 // =====================================================================================================================
+// Test the enableRobustUnboundVertex option.
+
+TEST(PipelineDumperTest, TestEnableRobustUnboundVertexOptionGraphics) {
+  ModifyGraphicsBuildInfo modifyBuildInfo = [](GraphicsPipelineBuildInfo *buildInfo) {
+    buildInfo->options.enableRobustUnboundVertex = true;
+  };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
+  runGraphicsPipelineVariations(modifyBuildInfo, expectHashToBeEqual);
+}
+
+// =====================================================================================================================
 // Test the includeDisassembly option.
 
 TEST(PipelineDumperTest, TestIncludeDisassemblyOptionGraphics) {
@@ -397,7 +408,6 @@ TEST(PipelineDumperTest, TestForceNonUniformResourceIndexStageMaskCompute) {
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
 
-#if LLPC_BUILD_GFX12
 // =====================================================================================================================
 // Test the expertSchedulingMode option.
 
@@ -417,7 +427,6 @@ TEST(PipelineDumperTest, TestExpertSchedulingModeCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
-#endif
 
 } // namespace
 } // namespace Llpc
