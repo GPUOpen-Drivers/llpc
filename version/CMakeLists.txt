@@ -92,6 +92,10 @@ llpc_set_property(llpc_version INTERFACE LLPC_BUILD_STRIX_HALO ON "HW_STRIX_HALO
 llpc_set_property(llpc_version INTERFACE LLPC_BUILD_NAVI48 ON "HW_NAVI48")
 #endif
 
+#if LLPC_BUILD_NAVI44
+llpc_set_property(llpc_version INTERFACE LLPC_BUILD_NAVI44 ON "HW_NAVI44")
+#endif
+
 # Report the summary of what is enabled.
 message(STATUS "llpc_version:${LLPC_SET_PROPERTY_SUMMARY_llpc_version}")
 
